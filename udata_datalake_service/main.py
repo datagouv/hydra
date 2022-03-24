@@ -1,17 +1,17 @@
-import click
 import logging
+
+import click
 from dotenv import load_dotenv
 
-from consumer import consume_kafka, create_kafka_consumer
+from udata_datalake_service.consumer import consume_kafka
 
 
 @click.command()
 def consume():
-    consumer = create_kafka_consumer()
-    consume_kafka(consumer)
+    consume_kafka()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     load_dotenv()
     logging.basicConfig(level=logging.INFO)
     consume()

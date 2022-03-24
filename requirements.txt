@@ -1,6 +1,5 @@
 boto3==1.21.21
 click==8.0.4
-dependency-injector==4.38.0
 kafka-python==2.0.2
 redis==4.1.4
 requests==2.27.1
