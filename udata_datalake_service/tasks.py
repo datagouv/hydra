@@ -3,6 +3,7 @@ import os
 import tempfile
 
 import boto3
+from celery import Celery
 import requests
 from botocore.client import Config
 from botocore.exceptions import ClientError
@@ -12,15 +13,18 @@ from udata_datalake_service.producer import produce
 
 load_dotenv()
 
+BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
+app = Celery('tasks', broker=BROKER_URL)
+
 
 def download_resource(url):
-    tmp = tempfile.NamedTemporaryFile(delete=False)
+    tmp_file = tempfile.NamedTemporaryFile(delete=False)
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
-        total_length = r.headers.get("content-length")
         for chunk in r.iter_content(chunk_size=1024):
-            tmp.write(chunk)
-    return tmp
+            tmp_file.write(chunk)
+    tmp_file.close()
+    return tmp_file
 
 
 def save_resource_to_minio(resource_file, key, resource):
@@ -33,11 +37,8 @@ def save_resource_to_minio(resource_file, key, resource):
         config=Config(signature_version="s3v4"),
     )
     try:
-        s3.upload_fileobj(
-            resource_file,
-            os.getenv("MINIO_BUCKET"),
-            "stan/" + key + "/" + resource["id"],
-        )
+        with open(resource_file.name, "rb") as f:
+            s3.upload_fileobj(f, os.getenv("MINIO_BUCKET"), "stan/" + key + "/" + resource["id"])
     except ClientError as e:
         logging.error(e)
     logging.info(
@@ -52,11 +53,15 @@ def save_resource_to_minio(resource_file, key, resource):
     )
 
 
+@app.task
 def manage_resource(key, resource):
     logging.info(
         "Processing task for resource {} in dataset {}".format(resource["id"], key)
     )
-    tmp_resource_file = download_resource(resource["url"])
-    save_resource_to_minio(tmp_resource_file, key, resource)
-    produce(key, resource)
+    try:
+        tmp_file = download_resource(resource["url"])
+        save_resource_to_minio(tmp_file, key, resource)
+    finally:
+        os.unlink(tmp_file.name)
+    # produce(key, resource)
     return "Resource processed {} - END".format(resource["id"])

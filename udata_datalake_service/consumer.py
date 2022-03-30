@@ -2,20 +2,14 @@ import json
 import logging
 import os
 
-import tasks
+from tasks import manage_resource
 from kafka import KafkaConsumer
-from redis import Redis
-from rq import Queue
 
 KAFKA_HOST = os.environ.get("KAFKA_HOST", "localhost")
 KAFKA_PORT = os.environ.get("KAFKA_PORT", "9092")
 KAFKA_API_VERSION = os.environ.get("KAFKA_API_VERSION", "2.5.0")
-REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
-REDIS_PORT = os.environ.get("REDIS_PORT", "6380")
-
 TOPICS = ["dataset"]
 
-queue = Queue(connection=Redis(host=REDIS_HOST, port=int(REDIS_PORT)))
 
 
 def create_kafka_consumer():
@@ -46,8 +40,6 @@ def consume_kafka():
             if "resources" in data["data"]:
                 for r in data["data"]["resources"]:
                     logging.info("checking resource {}".format(r["id"]))
-                    queue.enqueue(
-                        tasks.manage_resource, key.decode("utf-8"), r, job_timeout=600
-                    )
+                    manage_resource.delay(key.decode("utf-8"), r)
         else:
             logging.info("Message empty, do not process anything - END")
