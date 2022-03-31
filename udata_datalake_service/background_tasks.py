@@ -61,7 +61,10 @@ def manage_resource(key, resource):
     try:
         tmp_file = download_resource(resource["url"])
         save_resource_to_minio(tmp_file, key, resource)
+        logging.info(
+            "Sending kafka message for resource {} in dataset {}".format(resource["id"], key)
+        )
+        produce(key, resource)
+        return "Resource processed {} - END".format(resource["id"])
     finally:
         os.unlink(tmp_file.name)
-    # produce(key, resource)
-    return "Resource processed {} - END".format(resource["id"])

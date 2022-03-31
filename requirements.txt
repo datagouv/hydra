@@ -3,4 +3,4 @@ click==8.0.4
 kafka-python==2.0.2
 redis==4.1.4
 requests==2.27.1
-rq==1.10.1
+celery==5.2.3

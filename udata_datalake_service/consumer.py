@@ -2,7 +2,7 @@ import json
 import logging
 import os
 
-from tasks import manage_resource
+from udata_datalake_service.background_tasks import manage_resource
 from kafka import KafkaConsumer
 
 KAFKA_HOST = os.environ.get("KAFKA_HOST", "localhost")
