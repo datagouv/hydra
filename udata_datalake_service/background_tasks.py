@@ -14,7 +14,7 @@ from udata_datalake_service.producer import produce
 load_dotenv()
 
 BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
-app = Celery('tasks', broker=BROKER_URL)
+celery = Celery('tasks', broker=BROKER_URL)
 
 
 def download_resource(url):
@@ -53,7 +53,7 @@ def save_resource_to_minio(resource_file, key, resource):
         logging.error(e)
 
 
-@app.task
+@celery.task
 def manage_resource(key, resource):
     logging.info(
         "Processing task for resource {} in dataset {}".format(resource["id"], key)
