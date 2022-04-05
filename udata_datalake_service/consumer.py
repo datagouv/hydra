@@ -11,7 +11,6 @@ KAFKA_API_VERSION = os.environ.get("KAFKA_API_VERSION", "2.5.0")
 TOPICS = ["dataset"]
 
 
-
 def create_kafka_consumer():
     logging.info("Creating Kafka Consumer")
     consumer = KafkaConsumer(
@@ -37,9 +36,8 @@ def consume_kafka():
         data = json.loads(val_utf8)
         logging.info("New message detected, checking dataset {}".format(key))
         if data:
-            if "resources" in data["data"]:
-                for r in data["data"]["resources"]:
-                    logging.info("checking resource {}".format(r["id"]))
-                    manage_resource.delay(key.decode("utf-8"), r)
+            for r in data["data"].get('resources', []):
+                logging.info("checking resource {}".format(r["id"]))
+                manage_resource.delay(key.decode("utf-8"), r)
         else:
             logging.info("Message empty, do not process anything - END")

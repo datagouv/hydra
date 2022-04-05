@@ -39,18 +39,18 @@ def save_resource_to_minio(resource_file, key, resource):
     try:
         with open(resource_file.name, "rb") as f:
             s3.upload_fileobj(f, os.getenv("MINIO_BUCKET"), "stan/" + key + "/" + resource["id"])
+        logging.info(
+            "Resource saved into minio at {}".format(
+                os.getenv("MINIO_URL")
+                + os.getenv("MINIO_BUCKET")
+                + "/stan/"
+                + key
+                + "/"
+                + resource["id"]
+            )
+        )
     except ClientError as e:
         logging.error(e)
-    logging.info(
-        "Resource saved into minio at {}".format(
-            os.getenv("MINIO_URL")
-            + os.getenv("MINIO_BUCKET")
-            + "/stan/"
-            + key
-            + "/"
-            + resource["id"]
-        )
-    )
 
 
 @app.task
