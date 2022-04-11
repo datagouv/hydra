@@ -14,6 +14,7 @@ from udata_datalake_service.producer import produce
 load_dotenv()
 
 BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
+MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
 celery = Celery('tasks', broker=BROKER_URL)
 
 
@@ -38,12 +39,12 @@ def save_resource_to_minio(resource_file, key, resource):
     )
     try:
         with open(resource_file.name, "rb") as f:
-            s3.upload_fileobj(f, os.getenv("MINIO_BUCKET"), "stan/" + key + "/" + resource["id"])
+            s3.upload_fileobj(f, os.getenv("MINIO_BUCKET"), MINIO_FOLDER + key + "/" + resource["id"])
         logging.info(
             "Resource saved into minio at {}".format(
                 os.getenv("MINIO_URL")
                 + os.getenv("MINIO_BUCKET")
-                + "/stan/"
+                + MINIO_FOLDER
                 + key
                 + "/"
                 + resource["id"]
