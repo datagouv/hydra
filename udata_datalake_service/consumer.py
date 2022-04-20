@@ -15,7 +15,7 @@ def create_kafka_consumer():
     logging.info("Creating Kafka Consumer")
     consumer = KafkaConsumer(
         bootstrap_servers=f"{KAFKA_HOST}:{KAFKA_PORT}",
-        group_id="datalake",
+        group_id=None,
         reconnect_backoff_max_ms=100000,  # TODO: what value to set here?
         # API Version is needed in order to prevent api version guessing leading to an error
         # on startup if Kafka Broker isn't ready yet
@@ -30,6 +30,7 @@ def consume_kafka():
     consumer = create_kafka_consumer()
     logging.info("Ready to consume message")
     for message in consumer:
+        print('Received message')
         value = message.value
         val_utf8 = value.decode("utf-8").replace("NaN", "null")
         key = message.key

@@ -1,9 +1,12 @@
 import logging
+from multiprocessing.sharedctypes import Value
 import os
 import tempfile
 
+import agate
 import boto3
 from celery import Celery
+import magic
 import requests
 from botocore.client import Config
 from botocore.exceptions import ClientError
@@ -60,12 +63,28 @@ def manage_resource(key, resource):
         "Processing task for resource {} in dataset {}".format(resource["id"], key)
     )
     try:
+        print(resource["url"])
         tmp_file = download_resource(resource["url"])
-        save_resource_to_minio(tmp_file, key, resource)
-        logging.info(
-            "Sending kafka message for resource {} in dataset {}".format(resource["id"], key)
-        )
-        produce(key, resource)
+        
+        # Check resource MIME type
+        mime_type = magic.from_file(tmp_file.name, mime=True)
+        # TODO: Decide if we also want to leverage the URL extension
+        if mime_type in ['text/plain', 'text/csv']:
+            # Save resource only if CSV
+            try:
+                # Raise ValueError if file is not a CSV
+                agate.Table.from_csv(tmp_file.name, sniff_limit=4096, row_limit=40)
+                save_resource_to_minio(tmp_file, key, resource)
+                logging.info(
+                    "Sending kafka message for resource {} in dataset {}".format(resource["id"], key)
+                )
+                # TODO: Add MIME type to Kafka message
+                produce(key, resource)
+            except ValueError:
+                # TODO: Check if we need to send a Kafka message for non CSV resources
+                logging.info(
+                    "Resource {} in dataset {} is not a CSV".format(resource["id"], key)
+                )
         return "Resource processed {} - END".format(resource["id"])
     finally:
         os.unlink(tmp_file.name)
