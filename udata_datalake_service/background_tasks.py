@@ -1,5 +1,4 @@
 import logging
-from multiprocessing.sharedctypes import Value
 import os
 import tempfile
 
@@ -18,7 +17,7 @@ load_dotenv()
 
 BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
 MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
-celery = Celery('tasks', broker=BROKER_URL)
+celery = Celery("tasks", broker=BROKER_URL)
 
 
 def download_resource(url):
@@ -29,6 +28,11 @@ def download_resource(url):
             tmp_file.write(chunk)
     tmp_file.close()
     return tmp_file
+
+
+def get_resource_minio_url(key, resource):
+    '''Returns location of given resource in minio once it is saved'''
+    return os.getenv("MINIO_URL") + os.getenv("MINIO_BUCKET") + "/" + MINIO_FOLDER + "/" + key + "/" + resource["id"]
 
 
 def save_resource_to_minio(resource_file, key, resource):
@@ -44,14 +48,7 @@ def save_resource_to_minio(resource_file, key, resource):
         with open(resource_file.name, "rb") as f:
             s3.upload_fileobj(f, os.getenv("MINIO_BUCKET"), MINIO_FOLDER + key + "/" + resource["id"])
         logging.info(
-            "Resource saved into minio at {}".format(
-                os.getenv("MINIO_URL")
-                + os.getenv("MINIO_BUCKET")
-                + MINIO_FOLDER
-                + key
-                + "/"
-                + resource["id"]
-            )
+            f"Resource saved into minio at {get_resource_minio_url(key, resource)}"
         )
     except ClientError as e:
         logging.error(e)
@@ -68,23 +65,25 @@ def manage_resource(key, resource):
         
         # Check resource MIME type
         mime_type = magic.from_file(tmp_file.name, mime=True)
-        # TODO: Decide if we also want to leverage the URL extension
-        if mime_type in ['text/plain', 'text/csv']:
+        storage_location = None
+        if mime_type in ["text/plain", "text/csv"]:
             # Save resource only if CSV
             try:
                 # Raise ValueError if file is not a CSV
                 agate.Table.from_csv(tmp_file.name, sniff_limit=4096, row_limit=40)
                 save_resource_to_minio(tmp_file, key, resource)
-                logging.info(
-                    "Sending kafka message for resource {} in dataset {}".format(resource["id"], key)
-                )
-                # TODO: Add MIME type to Kafka message
-                produce(key, resource)
+                storage_location = get_resource_minio_url(key, resource)
             except ValueError:
-                # TODO: Check if we need to send a Kafka message for non CSV resources
                 logging.info(
                     "Resource {} in dataset {} is not a CSV".format(resource["id"], key)
                 )
+
+        # Send a Kafka message for both CSV and non CSV resources
+        message = {"mime_type": mime_type, "original_filename": tmp_file.name, "minio_resource_url": storage_location, "resource": resource}
+        logging.info(
+            "Sending kafka message for resource {} in dataset {}".format(resource["id"], key)
+        )
+        produce(key, message)
         return "Resource processed {} - END".format(resource["id"])
     finally:
         os.unlink(tmp_file.name)
