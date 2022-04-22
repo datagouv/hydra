@@ -32,7 +32,7 @@ def download_resource(url):
 
 def get_resource_minio_url(key, resource):
     '''Returns location of given resource in minio once it is saved'''
-    return os.getenv("MINIO_URL") + os.getenv("MINIO_BUCKET") + "/" + MINIO_FOLDER + "/" + key + "/" + resource["id"]
+    return os.getenv("MINIO_URL") + "/" + os.getenv("MINIO_BUCKET") + "/" + MINIO_FOLDER + "/" + key + "/" + resource["id"]
 
 
 def save_resource_to_minio(resource_file, key, resource):
@@ -46,7 +46,7 @@ def save_resource_to_minio(resource_file, key, resource):
     )
     try:
         with open(resource_file.name, "rb") as f:
-            s3.upload_fileobj(f, os.getenv("MINIO_BUCKET"), MINIO_FOLDER + key + "/" + resource["id"])
+            s3.upload_fileobj(f, os.getenv("MINIO_BUCKET"), MINIO_FOLDER + "/" + key + "/" + resource["id"])
         logging.info(
             f"Resource saved into minio at {get_resource_minio_url(key, resource)}"
         )
@@ -55,12 +55,11 @@ def save_resource_to_minio(resource_file, key, resource):
 
 
 @celery.task
-def manage_resource(key, resource):
+def manage_resource(dataset_id: str, resource: dict):
     logging.info(
-        "Processing task for resource {} in dataset {}".format(resource["id"], key)
+        "Processing task for resource {} in dataset {}".format(resource["id"], dataset_id)
     )
     try:
-        print(resource["url"])
         tmp_file = download_resource(resource["url"])
         
         # Check resource MIME type
@@ -71,19 +70,23 @@ def manage_resource(key, resource):
             try:
                 # Raise ValueError if file is not a CSV
                 agate.Table.from_csv(tmp_file.name, sniff_limit=4096, row_limit=40)
-                save_resource_to_minio(tmp_file, key, resource)
-                storage_location = get_resource_minio_url(key, resource)
+                save_resource_to_minio(tmp_file, dataset_id, resource)
+                storage_location = get_resource_minio_url(dataset_id, resource)
+                logging.info(
+                    f"Sending kafka message for resource stored {resource['id']} in dataset {dataset_id}"
+                )
+                produce("resource.stored", resource["id"], {"location": storage_location}, meta={"dataset_id": dataset_id})
             except ValueError:
                 logging.info(
-                    "Resource {} in dataset {} is not a CSV".format(resource["id"], key)
+                    f"Resource {resource['id']} in dataset {dataset_id} is not a CSV"
                 )
 
         # Send a Kafka message for both CSV and non CSV resources
-        message = {"mime_type": mime_type, "original_filename": tmp_file.name, "minio_resource_url": storage_location, "resource": resource}
         logging.info(
-            "Sending kafka message for resource {} in dataset {}".format(resource["id"], key)
+            f"Sending kafka message for resource analysed {resource['id']} in dataset {dataset_id}"
         )
-        produce(key, message)
+        message = {"mime": mime_type, "resource_url": resource["url"]}
+        produce("resource.analysed", resource["id"], message, meta={"dataset_id": dataset_id})
         return "Resource processed {} - END".format(resource["id"])
     finally:
         os.unlink(tmp_file.name)

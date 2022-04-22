@@ -20,11 +20,11 @@ class KafkaProducerSingleton:
         return KafkaProducerSingleton.__instance
 
 
-def produce(key_id, document=None):
+def produce(topic: str, key_id: str, document: dict=None, meta=None) -> None:
     producer = KafkaProducerSingleton.get_instance()
     key = key_id.encode("utf-8")
 
-    value = {"service": "datalake", "data": document, "meta": {}}
+    value = {"service": "datalake", "value": document, "meta": meta}
 
-    producer.send("datalake", value=value, key=key)
+    producer.send(topic=topic, value=value, key=key)
     producer.flush()
