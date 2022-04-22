@@ -64,14 +64,13 @@ def manage_resource(dataset_id: str, resource: dict):
         
         # Check resource MIME type
         mime_type = magic.from_file(tmp_file.name, mime=True)
-        storage_location = None
         if mime_type in ["text/plain", "text/csv"]:
             # Save resource only if CSV
             try:
                 # Raise ValueError if file is not a CSV
                 agate.Table.from_csv(tmp_file.name, sniff_limit=4096, row_limit=40)
                 save_resource_to_minio(tmp_file, dataset_id, resource)
-                storage_location = get_resource_minio_url(dataset_id, resource)
+                storage_location = {"netloc": os.getenv("MINIO_URL"), "bucket": os.getenv("MINIO_BUCKET"), "key": MINIO_FOLDER + "/" + dataset_id + "/" + resource["id"]}
                 logging.info(
                     f"Sending kafka message for resource stored {resource['id']} in dataset {dataset_id}"
                 )
