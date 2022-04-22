@@ -8,7 +8,7 @@ from kafka import KafkaConsumer
 KAFKA_HOST = os.environ.get("KAFKA_HOST", "localhost")
 KAFKA_PORT = os.environ.get("KAFKA_PORT", "9092")
 KAFKA_API_VERSION = os.environ.get("KAFKA_API_VERSION", "2.5.0")
-TOPICS = os.environ.get("TOPICS", ["resource.created"])
+TOPICS = os.environ.get("TOPICS", ["resource.created", "resource.modified"])
 
 
 def create_kafka_consumer():
