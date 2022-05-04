@@ -4,7 +4,6 @@ services:
     image: redis
     ports:
       - "6380:6379"
-
   zookeeper:
     image: confluentinc/cp-zookeeper:7.0.0
     hostname: zookeeper

@@ -23,7 +23,8 @@ MINIO_URL = https://object.local.dev/
 MINIO_USER = sample_user
 MINIO_BUCKET = sample_bucket
 MINIO_PWD = sample_pwd
-MINIO_FOLDER = forlder
+MINIO_FOLDER = folder
+MAX_FILESIZE_ALLOWED = 1e9
 ```
 
 ## Usage
