@@ -84,6 +84,9 @@ def manage_resource(dataset_id: str, resource: dict):
     try:
         tmp_file = download_resource(resource["url"])
 
+        # Get file size
+        filesize = os.path.getsize(tmp_file.name)
+
         # Check resource MIME type
         mime_type = magic.from_file(tmp_file.name, mime=True)
         if mime_type in ["text/plain", "text/csv"]:
@@ -109,7 +112,11 @@ def manage_resource(dataset_id: str, resource: dict):
                 produce(
                     "resource.stored",
                     resource["id"],
-                    {"location": storage_location, "mime_type": mime_type},
+                    {
+                        "location": storage_location,
+                        "mime_type": mime_type,
+                        "filesize": filesize,
+                    },
                     meta={"dataset_id": dataset_id},
                 )
             except ValueError:
@@ -121,7 +128,11 @@ def manage_resource(dataset_id: str, resource: dict):
         logging.info(
             f"Sending kafka message for resource analysed {resource['id']} in dataset {dataset_id}"
         )
-        message = {"mime": mime_type, "resource_url": resource["url"]}
+        message = {
+            "filesize": filesize,
+            "mime": mime_type,
+            "resource_url": resource["url"],
+        }
         produce(
             "resource.analysed",
             resource["id"],
@@ -135,6 +146,7 @@ def manage_resource(dataset_id: str, resource: dict):
             {
                 "resource_url": resource["url"],
                 "error": "File too large to download",
+                "filesize": None,
             },
             meta={"dataset_id": dataset_id},
         )
