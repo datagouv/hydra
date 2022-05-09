@@ -1,6 +1,7 @@
 import logging
 import os
 import tempfile
+from typing import BinaryIO
 
 import agate
 import boto3
@@ -20,10 +21,19 @@ MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
 celery = Celery("tasks", broker=BROKER_URL)
 
 
-def download_resource(url):
+def download_resource(url: str) -> BinaryIO:
+    """
+    Attempts downloading a resource from a given url.
+    Returns the downloaded file object.
+    Raises IOError if the resource is too large.
+    """
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
+
+        if r.headers.get("content-length", -1) > os.getenv("MAX_FILE_SIZE"):
+            raise IOError("File too large to download")
+
         chunck_size = 1024
         for i, chunk in enumerate(r.iter_content(chunk_size=chunck_size)):
             if i * chunck_size < float(os.getenv("MAX_FILESIZE_ALLOWED")):
@@ -31,7 +41,7 @@ def download_resource(url):
             else:
                 tmp_file.close()
                 logging.error(f"File {url} is too big, skipping")
-                raise IOError("File too large")
+                raise IOError("File too large to download")
     tmp_file.close()
     return tmp_file
 
