@@ -12,7 +12,8 @@ from botocore.client import Config
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
-from udata_datalake_service.producer import produce
+# from udata_datalake_service.producer import produce
+from udata_event_service.producer import produce
 
 load_dotenv()
 
@@ -121,6 +122,7 @@ def manage_resource(dataset_id: str, resource: dict):
                 )
                 produce(
                     "resource.stored",
+                    "datalake",
                     resource["id"],
                     {
                         "location": storage_location,
@@ -145,6 +147,7 @@ def manage_resource(dataset_id: str, resource: dict):
         }
         produce(
             "resource.analysed",
+            "datalake",
             resource["id"],
             message,
             meta={"dataset_id": dataset_id},
@@ -152,6 +155,7 @@ def manage_resource(dataset_id: str, resource: dict):
     except IOError:
         produce(
             "resource.analysed",
+            "datalake",
             resource["id"],
             {
                 "resource_url": resource["url"],
