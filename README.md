@@ -21,9 +21,9 @@ KAFKA_PORT = 9092
 KAFKA_API_VERSION = 2.5.0
 MINIO_URL = https://object.local.dev/
 MINIO_USER = sample_user
-MINIO_BUCKET = sample_bucket
+MINIO_BUCKET = benchmark-de
 MINIO_PWD = sample_pwd
-MINIO_FOLDER = folder
+MINIO_FOLDER = data
 MAX_FILESIZE_ALLOWED = 1e9
 ```
 
