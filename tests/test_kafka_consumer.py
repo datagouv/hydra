@@ -27,11 +27,9 @@ def test_manage_resource():
         ]
     }
 
-    output = io.BytesIO()
-    output.write(b'First line.\n')
-    contents = output.getvalue()
+    output = b'First line.\nSecond line'
     with requests_mock.Mocker() as m:
         m.get('http://test.com', content=output)
         tmp_file = download_resource('http://test.com')
         with open(tmp_file.name,"r") as f1:
-            assert len(f1.readlines()) == len(contents)
+            assert len(f1.readlines()) == len(output.split(b'\n'))
