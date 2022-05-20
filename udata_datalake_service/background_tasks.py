@@ -18,7 +18,7 @@ load_dotenv()
 
 BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
 MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
-MAX_FILE_SIZE_ALLOWED = os.environ.get("MAX_FILE_SIZE_ALLOWED", 1000)
+MAX_FILESIZE_ALLOWED = os.environ.get("MAX_FILESIZE_ALLOWED", 1000)
 celery = Celery("tasks", broker=BROKER_URL)
 
 
@@ -32,12 +32,12 @@ def download_resource(url: str) -> BinaryIO:
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
 
-        if r.headers.get("content-length", -1) > MAX_FILE_SIZE_ALLOWED:
+        if r.headers.get("content-length", -1) > MAX_FILESIZE_ALLOWED:
             raise IOError("File too large to download")
 
         chunck_size = 1024
         for i, chunk in enumerate(r.iter_content(chunk_size=chunck_size)):
-            if i * chunck_size < float(MAX_FILE_SIZE_ALLOWED):
+            if i * chunck_size < float(MAX_FILESIZE_ALLOWED):
                 tmp_file.write(chunk)
             else:
                 tmp_file.close()
