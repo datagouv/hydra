@@ -5,10 +5,6 @@ jobs:
   build:
     docker:
       - image: udata/circleci:2-alpine
-        environment:
-          node.name: es01
-          cluster.name: es-docker-cluster
-          cluster.initial_master_nodes: es01
     environment:
        BASH_ENV: /root/.bashrc
     steps:
