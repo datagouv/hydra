@@ -11,4 +11,4 @@ python-magic==0.4.25
 agate==1.6.3
 requests-mock==1.9.3 
 flit==3.6.0
-udata_event_service==0.0.3
+udata_event_service==0.0.7

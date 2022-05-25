@@ -18,6 +18,7 @@ from udata_event_service.producer import produce
 load_dotenv()
 
 BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
+KAFKA_URI = f'{os.environ["KAFKA_HOST"]}:{os.environ["KAFKA_PORT"]}'
 MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
 MAX_FILESIZE_ALLOWED = os.environ.get("MAX_FILESIZE_ALLOWED", 1000)
 celery = Celery("tasks", broker=BROKER_URL)
@@ -122,6 +123,7 @@ def manage_resource(dataset_id: str, resource: dict):
                     f"Sending kafka message for resource stored {resource['id']} in dataset {dataset_id}"
                 )
                 produce(
+                    KAFKA_URI,
                     "resource.stored",
                     "datalake",
                     resource["id"],
@@ -147,6 +149,7 @@ def manage_resource(dataset_id: str, resource: dict):
             "resource_url": resource["url"],
         }
         produce(
+            KAFKA_URI,
             "resource.analysed",
             "datalake",
             resource["id"],
@@ -155,6 +158,7 @@ def manage_resource(dataset_id: str, resource: dict):
         )
     except IOError:
         produce(
+            KAFKA_URI,
             "resource.analysed",
             "datalake",
             resource["id"],
