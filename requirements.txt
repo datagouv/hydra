@@ -9,4 +9,4 @@ requests==2.27.1
 celery==5.2.3
 python-magic-bin==0.4.14
 agate==1.6.3
-udata_event_service==0.0.3
+udata_event_service==0.0.7

@@ -36,6 +36,7 @@ def consume() -> None:
     except ClientError:
         client.create_bucket(Bucket=os.getenv("MINIO_BUCKET"))
     consume_kafka(
+        kafka_uri=f'{os.environ["KAFKA_URI"]}:{os.environ["KAFKA_PORT"]}',
         group_id="datalake",
         topics=os.environ.get(
             "TOPICS", ["resource.created", "resource.modified"]
