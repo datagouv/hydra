@@ -32,7 +32,7 @@ def download_resource(url: str) -> BinaryIO:
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
 
-        if r.headers.get("content-length", -1) > MAX_FILESIZE_ALLOWED:
+        if float(r.headers.get("content-length", -1)) > float(MAX_FILESIZE_ALLOWED):
             raise IOError("File too large to download")
 
         chunck_size = 1024
