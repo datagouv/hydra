@@ -3,7 +3,7 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "udata-datalake-service"
+name = "hydra"
 authors = [{name = "Opendata Team", email = "opendatateam@data.gouv.fr"}]
 readme = "README.md"
 dynamic = ["version", "description"]
@@ -20,7 +20,7 @@ dependencies = [
 Home = "https://github.com/opendatateam/udata-datalake-service"
 
 [tool.flit.module]
-name = "udata_datalake_service"
+name = "hydra"
 
 [project.scripts]
- udata-datalake-service = "udata_datalake_service.cli:cli"
+ hydra = "hydra.cli:cli"

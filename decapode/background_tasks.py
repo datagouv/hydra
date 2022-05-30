@@ -12,7 +12,6 @@ from botocore.client import Config
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
-# from udata_datalake_service.producer import produce
 from udata_event_service.producer import produce
 
 load_dotenv()

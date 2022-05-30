@@ -1,6 +1,6 @@
 import requests_mock
 import io
-from udata_datalake_service.background_tasks import download_resource
+from hydra.background_tasks import download_resource
 
 
 def test_manage_resource():
@@ -24,12 +24,12 @@ def test_manage_resource():
                 "published": "2021-04-01T15:10:12",
                 "extras": {},
             }
-        ]
+        ],
     }
 
-    output = b'First line.\nSecond line'
+    output = b"First line.\nSecond line"
     with requests_mock.Mocker() as m:
-        m.get('http://test.com', content=output)
-        tmp_file = download_resource('http://test.com')
-        with open(tmp_file.name,"r") as f1:
-            assert len(f1.readlines()) == len(output.split(b'\n'))
+        m.get("http://test.com", content=output)
+        tmp_file = download_resource("http://test.com")
+        with open(tmp_file.name, "r") as f1:
+            assert len(f1.readlines()) == len(output.split(b"\n"))
