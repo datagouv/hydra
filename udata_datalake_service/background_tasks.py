@@ -18,7 +18,7 @@ from udata_event_service.producer import produce
 load_dotenv()
 
 BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
-KAFKA_URI = f'{os.environ["KAFKA_HOST"]}:{os.environ["KAFKA_PORT"]}'
+KAFKA_URI = f'{os.environ.get("KAFKA_HOST", "localhost")}:{os.environ.get("KAFKA_PORT", "9092")}'
 MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
 MAX_FILESIZE_ALLOWED = os.environ.get("MAX_FILESIZE_ALLOWED", 1000)
 celery = Celery("tasks", broker=BROKER_URL)
@@ -34,7 +34,9 @@ def download_resource(url: str) -> BinaryIO:
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
 
-        if float(r.headers.get("content-length", -1)) > float(MAX_FILESIZE_ALLOWED):
+        if float(r.headers.get("content-length", -1)) > float(
+            MAX_FILESIZE_ALLOWED
+        ):
             raise IOError("File too large to download")
 
         chunck_size = 1024
