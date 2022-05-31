@@ -4,7 +4,12 @@ version: 2
 jobs:
   build:
     docker:
-      - image: udata/circleci:2-alpine
+      - image: cimg/python:3.9.2
+      - image: cimg/postgres:11.15
+        environment:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
     environment:
        BASH_ENV: /root/.bashrc
     steps:
@@ -15,6 +20,7 @@ jobs:
       - restore_cache:
           keys:
             - py-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}
+            - py-cache-v1-{{ arch }}-{{ checksum "requirements_dev.txt" }}
             - py-cache-v1-{{ arch }}-{{ .Branch }}
             - py-cache-v1-{{ arch }}-{{ .Environment.BASE_BRANCH }}
       - run:
@@ -28,11 +34,17 @@ jobs:
           paths:
             - venv
       - save_cache:
+          key: py-cache-v1-{{ arch }}-{{ checksum "requirements_dev.txt" }}
+          paths:
+            - venv
+      - save_cache:
           key: py-cache-v1-{{ arch }}-{{ .Branch }}
           paths:
             - venv
       - run:
           name: Run tests
+          environment:
+            DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
           command: |
             source venv/bin/activate
             make test
@@ -51,7 +63,7 @@ jobs:
 
   publish:
     docker:
-      - image: udata/circleci:2-alpine
+      - image: cimg/python:3.9.2
     steps:
       - attach_workspace:
           at: .
