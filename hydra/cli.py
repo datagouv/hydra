@@ -17,7 +17,7 @@ from minicli import cli, run, wrap
 from progressist import ProgressBar
 
 from hydra.background_tasks import celery
-from hydra.consumer import consume_kafka
+from udata_event_service.consumer import consume_kafka
 
 from hydra.config import KAFKA_URI
 from hydra.kafka.consumer import process_message
