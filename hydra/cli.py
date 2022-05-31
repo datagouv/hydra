@@ -220,7 +220,7 @@ def run_kafka_integration() -> None:
     )
 
 
-@cli.command()
+@cli
 def work() -> None:
     """Starts a worker"""
     worker = celery.Worker()
