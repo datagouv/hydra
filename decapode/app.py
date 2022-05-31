@@ -279,7 +279,6 @@ async def app_factory():
 
     app = web.Application()
     app.add_routes(routes)
-    app.add_routes([web.static("/reports", "reports", show_index=True)])
     app.on_startup.append(app_startup)
     app.on_cleanup.append(app_cleanup)
     return app
