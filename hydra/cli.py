@@ -212,11 +212,15 @@ def run_kafka_integration() -> None:
         client.head_bucket(Bucket=os.getenv("MINIO_BUCKET"))
     except ClientError:
         client.create_bucket(Bucket=os.getenv("MINIO_BUCKET"))
+
+    def run_process_message(key: str, data: dict, topic: str) -> None:
+        asyncio.get_event_loop().run_until_complete(process_message(key, data, topic))
+
     consume_kafka(
         kafka_uri=KAFKA_URI,
         group_id="datalake",
         topics=["resource.created", "resource.modified", "resource.deleted"],
-        message_processing_func=lambda: asyncio.run(process_message),
+        message_processing_func=run_process_message,
     )
 
 

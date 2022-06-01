@@ -233,6 +233,7 @@ The `kafka_integration` module retrieves messages with the topics `resource.crea
 The Kafka instance URI, Hydra API URL and Data Gouv API URL to be used can be defined in `hydra/config` or overwritten with env variables.
 It can be launched using the CLI: `hydra run_kafka_integration`.
 This will mark the corresponding resources as highest priority for the next crawling batch.
+It also requires using the CLI command: `hydra work` to start Celery to process messages.
 
 ## TODO
 
@@ -244,6 +245,5 @@ This will mark the corresponding resources as highest priority for the next craw
 - [x] handle `GET` requests for some domains
 - [ ] denormalize interesting headers (length, mimetype, last-modified...)
 - [x] some sort of dashboard (dash?), or just plug postgrest and handle that elsewhere
-- [x] documentation for report command
 - [x] custom config file for pandas_profiling
 - [x] move API endpoints to /api endpoints
