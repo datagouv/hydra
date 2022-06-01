@@ -1,10 +1,6 @@
 version: '3'
 
 services:
-  redis:
-    image: redis
-    ports:
-      - "6380:6379"
   database:
     image: "postgres" # use latest official postgres version
     environment:

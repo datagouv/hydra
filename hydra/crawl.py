@@ -12,10 +12,10 @@ import aiohttp
 import asyncio
 
 from humanfriendly import parse_timespan
-import kafka
 from udata_event_service.producer import produce
 
 from hydra import config, context
+from hydra.datalake_service import process_resource
 
 log = logging.getLogger("hydra")
 
@@ -172,8 +172,9 @@ def convert_headers(headers):
     return _headers
 
 
-async def check_url(row, session, sleep=0, method="head"):
-    log.debug(f"check {row['url']}, sleep {sleep}")
+async def check_url(row, session, sleep=0, method="get"):
+    print(row["url"])
+    log.debug(f"check {row}, sleep {sleep}")
 
     if sleep:
         await asyncio.sleep(sleep)
@@ -190,9 +191,6 @@ async def check_url(row, session, sleep=0, method="head"):
             }
         )
         return STATUS_ERROR
-
-    if domain in config.GET_DOMAINS:
-        method = "get"
 
     should_backoff, nb_req = await is_backoff(domain)
     if should_backoff:
@@ -214,9 +212,11 @@ async def check_url(row, session, sleep=0, method="head"):
             row["url"], timeout=timeout, allow_redirects=True
         ) as resp:
             end = time.time()
-            if resp.status == 501 and method != "get":
-                return await check_url(row, session, method="get")
             resp.raise_for_status()
+
+            # Download resource, store on Minio if CSV and produce resource.analysed message
+            await process_resource(row["url"], row["dataset_id"], str(row["resource_id"]), resp)
+
             await update_check_and_catalog(
                 {
                     "url": row["url"],
@@ -289,7 +289,7 @@ async def crawl_batch():
         # first urls that are prioritised
         q = f"""
             SELECT * FROM (
-                SELECT DISTINCT(catalog.url)
+                SELECT DISTINCT(catalog.url), dataset_id, resource_id
                 FROM catalog
                 WHERE {excluded}
                 AND deleted = False
@@ -302,7 +302,7 @@ async def crawl_batch():
         if len(to_check) < config.BATCH_SIZE:
             q = f"""
                 SELECT * FROM (
-                    SELECT DISTINCT(catalog.url)
+                    SELECT DISTINCT(catalog.url), dataset_id, resource_id
                     FROM catalog
                     WHERE catalog.last_check IS NULL
                     AND {excluded}
@@ -319,7 +319,7 @@ async def crawl_batch():
             limit = config.BATCH_SIZE - len(to_check)
             q = f"""
             SELECT * FROM (
-                SELECT DISTINCT(catalog.url)
+                SELECT DISTINCT(catalog.url), dataset_id, resource_id
                 FROM catalog, checks
                 WHERE catalog.last_check IS NOT NULL
                 AND {excluded}

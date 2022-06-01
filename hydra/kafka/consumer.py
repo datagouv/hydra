@@ -1,7 +1,6 @@
 import logging
 
 from hydra import context
-from hydra.background_tasks import manage_resource
 
 log = logging.getLogger("hydra-kafka")
 
@@ -10,8 +9,8 @@ async def process_message(key: str, message: dict, topic: str) -> None:
     log.info("Received message")
     dataset_id = message["meta"]["dataset_id"]
     resource = message["value"]["resource"]
-    if topic in ["resource.created", "resource.modified"]:
-        manage_resource.delay(dataset_id, resource)
+    # if topic in ["resource.created", "resource.modified"]:
+    #     manage_resource.delay(dataset_id, resource)
 
     pool = await context.pool()
     async with pool.acquire() as connection:

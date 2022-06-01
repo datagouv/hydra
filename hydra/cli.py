@@ -16,7 +16,6 @@ from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
 
-from hydra.background_tasks import celery
 from udata_event_service.consumer import consume_kafka
 
 from hydra.config import KAFKA_URI
@@ -222,14 +221,6 @@ def run_kafka_integration() -> None:
         topics=["resource.created", "resource.modified", "resource.deleted"],
         message_processing_func=run_process_message,
     )
-
-
-@cli
-def work() -> None:
-    """Starts a worker"""
-    worker = celery.Worker()
-    worker.start()
-    return worker.exitcode
 
 
 @wrap

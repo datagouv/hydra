@@ -10,15 +10,9 @@ from minicli import run
 
 import hydra.cli  # noqa - this register the cli cmds
 from hydra.crawl import insert_check
-from hydra.background_tasks import celery
 
 DATABASE_URL = "postgresql://postgres:postgres@localhost:5433/postgres"
 pytestmark = pytest.mark.asyncio
-
-
-@pytest.fixture(autouse=True)
-def celery_config():
-    celery.conf.update(task_always_eager=True)
 
 
 # this really really really should run first (or "prod" db will get erased)

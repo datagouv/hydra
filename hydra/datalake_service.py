@@ -4,10 +4,9 @@ import tempfile
 from typing import BinaryIO
 
 import agate
+from aiohttp import ClientResponse
 import boto3
-from celery import Celery
 import magic
-import requests
 from botocore.client import Config
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
@@ -20,37 +19,36 @@ BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
 KAFKA_URI = f'{os.environ.get("KAFKA_HOST", "localhost")}:{os.environ.get("KAFKA_PORT", "9092")}'
 MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
 MAX_FILESIZE_ALLOWED = os.environ.get("MAX_FILESIZE_ALLOWED", 1000)
-celery = Celery("tasks", broker=BROKER_URL)
 
 
-def download_resource(url: str) -> BinaryIO:
+async def download_resource(url: str, response: ClientResponse) -> BinaryIO:
     """
     Attempts downloading a resource from a given url.
     Returns the downloaded file object.
     Raises IOError if the resource is too large.
     """
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
-    with requests.get(url, stream=True) as r:
-        r.raise_for_status()
 
-        if float(r.headers.get("content-length", -1)) > float(
-            MAX_FILESIZE_ALLOWED
-        ):
+    if float(response.headers.get("content-length", -1)) > float(
+        MAX_FILESIZE_ALLOWED
+    ):
+        raise IOError("File too large to download")
+
+    chunk_size = 1024
+    i = 0
+    async for chunk in response.content.iter_chunked(chunk_size):
+        if i * chunk_size < float(MAX_FILESIZE_ALLOWED):
+            tmp_file.write(chunk)
+        else:
+            tmp_file.close()
+            logging.error(f"File {url} is too big, skipping")
             raise IOError("File too large to download")
-
-        chunck_size = 1024
-        for i, chunk in enumerate(r.iter_content(chunk_size=chunck_size)):
-            if i * chunck_size < float(MAX_FILESIZE_ALLOWED):
-                tmp_file.write(chunk)
-            else:
-                tmp_file.close()
-                logging.error(f"File {url} is too big, skipping")
-                raise IOError("File too large to download")
+        i += 1
     tmp_file.close()
     return tmp_file
 
 
-def get_resource_minio_url(key, resource):
+def get_resource_minio_url(key, resource_id):
     """Returns location of given resource in minio once it is saved"""
     return (
         os.getenv("MINIO_URL")
@@ -61,11 +59,11 @@ def get_resource_minio_url(key, resource):
         + "/"
         + key
         + "/"
-        + resource["id"]
+        + resource_id
     )
 
 
-def save_resource_to_minio(resource_file, key, resource):
+def save_resource_to_minio(resource_file, key, resource_id):
     logging.info("Saving to minio")
     s3 = boto3.client(
         "s3",
@@ -79,24 +77,23 @@ def save_resource_to_minio(resource_file, key, resource):
             s3.upload_fileobj(
                 f,
                 os.getenv("MINIO_BUCKET"),
-                MINIO_FOLDER + "/" + key + "/" + resource["id"],
+                MINIO_FOLDER + "/" + key + "/" + resource_id,
             )
         logging.info(
-            f"Resource saved into minio at {get_resource_minio_url(key, resource)}"
+            f"Resource saved into minio at {get_resource_minio_url(key, resource_id)}"
         )
     except ClientError as e:
         logging.error(e)
 
 
-@celery.task
-def manage_resource(dataset_id: str, resource: dict):
+async def process_resource(url: str, dataset_id: str, resource_id: str, response: ClientResponse) -> None:
     logging.info(
         "Processing task for resource {} in dataset {}".format(
-            resource["id"], dataset_id
+            resource_id, dataset_id
         )
     )
     try:
-        tmp_file = download_resource(resource["url"])
+        tmp_file = await download_resource(url, response)
 
         # Get file size
         filesize = os.path.getsize(tmp_file.name)
@@ -110,7 +107,7 @@ def manage_resource(dataset_id: str, resource: dict):
                 agate.Table.from_csv(
                     tmp_file.name, sniff_limit=4096, row_limit=40
                 )
-                save_resource_to_minio(tmp_file, dataset_id, resource)
+                save_resource_to_minio(tmp_file, dataset_id, resource_id)
                 storage_location = {
                     "netloc": os.getenv("MINIO_URL"),
                     "bucket": os.getenv("MINIO_BUCKET"),
@@ -118,16 +115,16 @@ def manage_resource(dataset_id: str, resource: dict):
                     + "/"
                     + dataset_id
                     + "/"
-                    + resource["id"],
+                    + resource_id,
                 }
                 logging.info(
-                    f"Sending kafka message for resource stored {resource['id']} in dataset {dataset_id}"
+                    f"Sending kafka message for resource stored {resource_id} in dataset {dataset_id}"
                 )
                 produce(
                     KAFKA_URI,
                     "resource.stored",
                     "datalake",
-                    resource["id"],
+                    resource_id,
                     {
                         "location": storage_location,
                         "mime_type": mime_type,
@@ -137,23 +134,23 @@ def manage_resource(dataset_id: str, resource: dict):
                 )
             except ValueError:
                 logging.info(
-                    f"Resource {resource['id']} in dataset {dataset_id} is not a CSV"
+                    f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
                 )
 
         # Send a Kafka message for both CSV and non CSV resources
         logging.info(
-            f"Sending kafka message for resource analysed {resource['id']} in dataset {dataset_id}"
+            f"Sending kafka message for resource analysed {resource_id} in dataset {dataset_id}"
         )
         message = {
             "filesize": filesize,
             "mime": mime_type,
-            "resource_url": resource["url"],
+            "resource_url": url,
         }
         produce(
             KAFKA_URI,
             "resource.analysed",
             "datalake",
-            resource["id"],
+            resource_id,
             message,
             meta={"dataset_id": dataset_id},
         )
@@ -162,9 +159,9 @@ def manage_resource(dataset_id: str, resource: dict):
             KAFKA_URI,
             "resource.analysed",
             "datalake",
-            resource["id"],
+            resource_id,
             {
-                "resource_url": resource["url"],
+                "resource_url": url,
                 "error": "File too large to download",
                 "filesize": None,
             },
