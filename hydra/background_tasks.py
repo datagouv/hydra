@@ -103,7 +103,7 @@ def manage_resource(dataset_id: str, resource: dict):
 
         # Check resource MIME type
         mime_type = magic.from_file(tmp_file.name, mime=True)
-        if mime_type in ["text/plain", "text/csv"]:
+        if mime_type in ["text/plain", "text/csv", "application/csv"]:
             # Save resource only if CSV
             try:
                 # Raise ValueError if file is not a CSV
