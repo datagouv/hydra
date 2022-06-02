@@ -104,6 +104,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             # Save resource only if CSV
             try:
                 # Raise ValueError if file is not a CSV
+                # TODO: Ensure JSON files are not accepted
                 agate.Table.from_csv(
                     tmp_file.name, sniff_limit=4096, row_limit=40
                 )

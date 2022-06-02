@@ -2,8 +2,6 @@ agate==1.6.3
 aiohttp==3.8.1
 asyncpg==0.25.0
 boto3==1.21.21
-celery==5.2.3
-click==8.0.4
 flake8==4.0.1
 flit==3.6.0
 gunicorn==20.1.0
