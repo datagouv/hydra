@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 
 from udata_event_service.producer import produce
 
+from hydra.utils import is_json_file
+
 load_dotenv()
 
 BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
@@ -48,7 +50,7 @@ async def download_resource(url: str, response: ClientResponse) -> BinaryIO:
     return tmp_file
 
 
-def get_resource_minio_url(key, resource_id):
+def get_resource_minio_url(key: str, resource_id: str) -> str:
     """Returns location of given resource in minio once it is saved"""
     return (
         os.getenv("MINIO_URL")
@@ -63,7 +65,7 @@ def get_resource_minio_url(key, resource_id):
     )
 
 
-def save_resource_to_minio(resource_file, key, resource_id):
+def save_resource_to_minio(resource_file: BinaryIO, key: str, resource_id: str) -> None:
     logging.info("Saving to minio")
     s3 = boto3.client(
         "s3",
@@ -100,7 +102,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
 
         # Check resource MIME type
         mime_type = magic.from_file(tmp_file.name, mime=True)
-        if mime_type in ["text/plain", "text/csv", "application/csv"]:
+        if mime_type in ["text/plain", "text/csv", "application/csv"] and not is_json_file(tmp_file.name):
             # Save resource only if CSV
             try:
                 # Raise ValueError if file is not a CSV
