@@ -41,7 +41,7 @@ dev = [
     "flit==3.6.0",
     "gunicorn==20.1.0",
 ]
-tests = [
+test = [
     "aioresponses",
     "nest_asyncio",
     "pytest==7.1.1",
