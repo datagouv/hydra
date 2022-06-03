@@ -11,7 +11,7 @@ from minicli import run
 import hydra.cli  # noqa - this register the cli cmds
 from hydra.crawl import insert_check
 
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5433/postgres"
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 pytestmark = pytest.mark.asyncio
 
 
