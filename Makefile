@@ -2,8 +2,8 @@
 
 deps:  ## Install dependencies
 	python -m pip install --upgrade pip
-	python -m pip install -r requirements.txt
-	python -m pip install -r requirements_dev.txt
+	python -m pip install .[dev]
+	python -m pip install .[test]
 	python -m pip install .
 
 install:  ## Install the package
