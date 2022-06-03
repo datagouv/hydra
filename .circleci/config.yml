@@ -19,8 +19,7 @@ jobs:
           command: export BASE_BRANCH=$(base_branch)
       - restore_cache:
           keys:
-            - py-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}
-            - py-cache-v1-{{ arch }}-{{ checksum "requirements_dev.txt" }}
+            - py-cache-v1-{{ arch }}-{{ checksum "pyproject.toml" }}
             - py-cache-v1-{{ arch }}-{{ .Branch }}
             - py-cache-v1-{{ arch }}-{{ .Environment.BASE_BRANCH }}
       - run:
@@ -30,11 +29,7 @@ jobs:
             source venv/bin/activate
             make deps
       - save_cache:
-          key: py-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}
-          paths:
-            - venv
-      - save_cache:
-          key: py-cache-v1-{{ arch }}-{{ checksum "requirements_dev.txt" }}
+          key: py-cache-v1-{{ arch }}-{{ checksum "pyproject.toml" }}
           paths:
             - venv
       - save_cache:
