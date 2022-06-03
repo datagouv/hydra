@@ -45,6 +45,11 @@ def setup_catalog(catalog_content, rmock):
 
 
 @pytest.fixture
+def produce_mock(mocker):
+    mocker.patch("hydra.crawl.produce")
+    mocker.patch("hydra.datalake_service.produce")
+
+@pytest.fixture
 def rmock():
     # passthrough for local requests (aiohttp TestServer)
     with aioresponses(passthrough=["http://127.0.0.1"]) as m:

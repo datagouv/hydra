@@ -14,8 +14,6 @@ NO_BACKOFF_DOMAINS = [
     # dead domain, no need to backoff
     'inspire.data.gouv.fr',
 ]
-# domains which we use GET for by default
-GET_DOMAINS = []
 # max number of _completed_ requests per domain per period
 BACKOFF_NB_REQ = 180
 BACKOFF_PERIOD = 360  # in seconds

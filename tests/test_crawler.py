@@ -40,18 +40,18 @@ async def test_catalog(setup_catalog, db):
         (None, True, TimeoutError),
     ],
 )
-async def test_crawl(setup_catalog, rmock, event_loop, db, resource):
+async def test_crawl(setup_catalog, rmock, event_loop, db, resource, mocker, produce_mock):
     setup_logging()
     status, timeout, exception = resource
     rurl = "https://example.com/resource-1"
-    rmock.head(
+    rmock.get(
         rurl,
         status=status,
         headers={"Content-LENGTH": "10", "X-Do": "you"},
         exception=exception,
     )
     event_loop.run_until_complete(crawl(iterations=1))
-    assert ("HEAD", URL(rurl)) in rmock.requests
+    assert ("GET", URL(rurl)) in rmock.requests
     res = await db.fetchrow("SELECT * FROM checks WHERE url = $1", rurl)
     assert res["url"] == rurl
     assert res["status"] == status
@@ -71,7 +71,7 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource):
         assert not res["error"]
 
 
-async def test_backoff(setup_catalog, event_loop, rmock, mocker, fake_check):
+async def test_backoff(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock):
     setup_logging()
     await fake_check(resource=2)
     mocker.patch("hydra.config.BACKOFF_NB_REQ", 1)
@@ -79,14 +79,14 @@ async def test_backoff(setup_catalog, event_loop, rmock, mocker, fake_check):
     magic = MagicMock()
     mocker.patch("hydra.context.monitor").return_value = magic
     rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
+    rmock.get(rurl, status=200)
     event_loop.run_until_complete(crawl(iterations=1))
     # verify that we actually backed-off
     assert magic.add_backoff.called
 
 
 async def test_no_backoff_domains(
-    setup_catalog, event_loop, rmock, mocker, fake_check
+    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock
 ):
     setup_logging()
     await fake_check(resource=2)
@@ -95,60 +95,47 @@ async def test_no_backoff_domains(
     magic = MagicMock()
     mocker.patch("hydra.context.monitor").return_value = magic
     rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
+    rmock.get(rurl, status=200)
     event_loop.run_until_complete(crawl(iterations=1))
     # verify that we actually did not back-off
     assert not magic.add_backoff.called
 
 
-async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock):
+async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock, produce_mock):
     setup_logging()
     mocker.patch("hydra.config.SLEEP_BETWEEN_BATCHES", 0)
     mocker.patch("hydra.config.EXCLUDED_PATTERNS", ["http%example%"])
     rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
+    rmock.get(rurl, status=200)
     event_loop.run_until_complete(crawl(iterations=1))
     # url has not been called due to excluded clause
-    assert ("HEAD", URL(rurl)) not in rmock.requests
+    assert ("GET", URL(rurl)) not in rmock.requests
 
 
-async def test_outdated_check(setup_catalog, rmock, fake_check, event_loop):
+async def test_outdated_check(setup_catalog, rmock, fake_check, event_loop, produce_mock):
     await fake_check(created_at=datetime.now() - timedelta(weeks=52))
     rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
+    rmock.get(rurl, status=200)
     event_loop.run_until_complete(crawl(iterations=1))
     # url has been called because check is outdated
-    assert ("HEAD", URL(rurl)) in rmock.requests
+    assert ("GET", URL(rurl)) in rmock.requests
 
 
 async def test_not_outdated_check(
-    setup_catalog, rmock, fake_check, event_loop, mocker
+    setup_catalog, rmock, fake_check, event_loop, mocker, produce_mock
 ):
     mocker.patch("hydra.config.SLEEP_BETWEEN_BATCHES", 0)
     await fake_check()
     rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
+    rmock.get(rurl, status=200)
     event_loop.run_until_complete(crawl(iterations=1))
     # url has not been called because check is fresh
-    assert ("HEAD", URL(rurl)) not in rmock.requests
+    assert ("GET", URL(rurl)) not in rmock.requests
 
 
-async def test_501_get(setup_catalog, event_loop, rmock):
+async def test_501_get(setup_catalog, event_loop, rmock, produce_mock):
     setup_logging()
     rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=501)
     rmock.get(rurl, status=501)
     event_loop.run_until_complete(crawl(iterations=1))
-    assert ("HEAD", URL(rurl)) in rmock.requests
-    assert ("GET", URL(rurl)) in rmock.requests
-
-
-async def test_get_domains(setup_catalog, event_loop, rmock, mocker):
-    setup_logging()
-    mocker.patch("hydra.config.GET_DOMAINS", ["example.com"])
-    rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
-    rmock.get(rurl, status=501)
-    event_loop.run_until_complete(crawl(iterations=1))
-    assert ("HEAD", URL(rurl)) not in rmock.requests
     assert ("GET", URL(rurl)) in rmock.requests
