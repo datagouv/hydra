@@ -20,4 +20,4 @@ publish:  ## Publish to PyPi
 	python -m flit publish
 
 test:  ## Run tests
-	python -m pytest -ra
+	python -m pytest -ra --junitxml=reports/python/tests.xml

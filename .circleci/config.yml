@@ -48,6 +48,8 @@ jobs:
           command: |
             source venv/bin/activate
             make test
+      - store_test_results:
+          path: reports/python
       - run:
           name: Build a distributable package
           command: |
