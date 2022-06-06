@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from udata_event_service.producer import produce
 
 from hydra.utils.json import is_json_file
+from hydra.utils.kafka import get_topic
 from hydra.utils.minio import save_resource_to_minio
 
 load_dotenv()
@@ -86,7 +87,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                 )
                 produce(
                     KAFKA_URI,
-                    "resource.stored",
+                    get_topic("resource.stored"),
                     "datalake",
                     resource_id,
                     {
@@ -112,7 +113,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
         }
         produce(
             KAFKA_URI,
-            "resource.analysed",
+            get_topic("resource.analysed"),
             "datalake",
             resource_id,
             message,
@@ -121,7 +122,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
     except IOError:
         produce(
             KAFKA_URI,
-            "resource.analysed",
+            get_topic("resource.analysed"),
             "datalake",
             resource_id,
             {

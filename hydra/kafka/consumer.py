@@ -1,6 +1,7 @@
 import logging
 
 from hydra import context
+from hydra.utils.kafka import get_topic
 from hydra.utils.minio import delete_resource_from_minio
 
 log = logging.getLogger("hydra-kafka")
@@ -12,7 +13,7 @@ async def process_message(key: str, message: dict, topic: str) -> None:
 
     pool = await context.pool()
     async with pool.acquire() as connection:
-        if topic == "resource.created":
+        if topic == get_topic("resource.created"):
             resource = message["value"]["resource"]
             # Insert new resource in catalog table and mark as high priority for crawling
             q = f"""
@@ -20,12 +21,12 @@ async def process_message(key: str, message: dict, topic: str) -> None:
                     VALUES ('{dataset_id}', '{key}', '{resource["url"]}', FALSE, TRUE, FALSE)
                     ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
             await connection.execute(q)
-        elif topic == "resource.deleted":
+        elif topic == get_topic("resource.deleted"):
             delete_resource_from_minio(dataset_id, key)
             # Mark resource as deleted in catalog table
             q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{key}';"""
             await connection.execute(q)
-        elif topic == "resource.modified":
+        elif topic == get_topic("resource.modified"):
             # Make resource high priority for crawling
             q = f"""UPDATE catalog SET priority = TRUE WHERE resource_id = '{key}';"""
             await connection.execute(q)

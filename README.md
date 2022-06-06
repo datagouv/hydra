@@ -227,6 +227,7 @@ MINIO_BUCKET = benchmark-de
 MINIO_PWD = sample_pwd
 MINIO_FOLDER = data
 MAX_FILESIZE_ALLOWED = 1e9
+UDATA_INSTANCE_NAME = udata
 ```
 
 The `kafka_integration` module retrieves messages with the topics `resource.created`, `resource.modified` and `resource.deleted` sent by `udata`.

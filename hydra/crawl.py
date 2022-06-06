@@ -16,6 +16,7 @@ from udata_event_service.producer import produce
 
 from hydra import config, context
 from hydra.datalake_service import process_resource
+from hydra.utils.kafka import get_topic
 
 log = logging.getLogger("hydra")
 
@@ -113,7 +114,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
                     }
                     produce(
                         kafka_uri=config.KAFKA_URI,
-                        topic="resource.checked",
+                        topic=get_topic("resource.checked"),
                         service="hydra",
                         key_id=str(last_check["resource_id"]),
                         document=check_data,
