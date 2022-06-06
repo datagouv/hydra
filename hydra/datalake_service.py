@@ -5,15 +5,13 @@ from typing import BinaryIO
 
 import agate
 from aiohttp import ClientResponse
-import boto3
 import magic
-from botocore.client import Config
-from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
 from udata_event_service.producer import produce
 
-from hydra.utils import is_json_file
+from hydra.utils.json import is_json_file
+from hydra.utils.minio import save_resource_to_minio
 
 load_dotenv()
 
@@ -50,50 +48,13 @@ async def download_resource(url: str, response: ClientResponse) -> BinaryIO:
     return tmp_file
 
 
-def get_resource_minio_url(key: str, resource_id: str) -> str:
-    """Returns location of given resource in minio once it is saved"""
-    return (
-        os.getenv("MINIO_URL")
-        + "/"
-        + os.getenv("MINIO_BUCKET")
-        + "/"
-        + MINIO_FOLDER
-        + "/"
-        + key
-        + "/"
-        + resource_id
-    )
-
-
-def save_resource_to_minio(resource_file: BinaryIO, key: str, resource_id: str) -> None:
-    logging.info("Saving to minio")
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=os.getenv("MINIO_URL"),
-        aws_access_key_id=os.getenv("MINIO_USER"),
-        aws_secret_access_key=os.getenv("MINIO_PWD"),
-        config=Config(signature_version="s3v4"),
-    )
-    try:
-        with open(resource_file.name, "rb") as f:
-            s3.upload_fileobj(
-                f,
-                os.getenv("MINIO_BUCKET"),
-                MINIO_FOLDER + "/" + key + "/" + resource_id,
-            )
-        logging.info(
-            f"Resource saved into minio at {get_resource_minio_url(key, resource_id)}"
-        )
-    except ClientError as e:
-        logging.error(e)
-
-
 async def process_resource(url: str, dataset_id: str, resource_id: str, response: ClientResponse) -> None:
     logging.info(
         "Processing task for resource {} in dataset {}".format(
             resource_id, dataset_id
         )
     )
+    tmp_file = None
     try:
         tmp_file = await download_resource(url, response)
 
@@ -171,4 +132,5 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             meta={"dataset_id": dataset_id},
         )
     finally:
-        os.unlink(tmp_file.name)
+        if tmp_file:
+            os.remove(tmp_file.name)
