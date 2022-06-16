@@ -95,7 +95,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                         "mime_type": mime_type,
                         "filesize": filesize,
                     },
-                    meta={"dataset_id": dataset_id},
+                    meta={"dataset_id": dataset_id, "message_type": "resource.stored"},
                 )
             except ValueError:
                 logging.info(
