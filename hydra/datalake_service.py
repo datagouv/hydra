@@ -130,7 +130,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                 "error": "File too large to download",
                 "filesize": None,
             },
-            meta={"dataset_id": dataset_id},
+            meta={"dataset_id": dataset_id, "message_type": "resource.analysed"},
         )
     finally:
         if tmp_file:
