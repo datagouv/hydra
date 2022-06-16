@@ -117,7 +117,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             "datalake",
             resource_id,
             message,
-            meta={"dataset_id": dataset_id},
+            meta={"dataset_id": dataset_id, "message_type": "resource.analysed"},
         )
     except IOError:
         produce(
