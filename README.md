@@ -10,6 +10,9 @@ URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _Po
 
 ### Create database structure
 
+Install hydra dependencies and cli.
+`make deps`
+
 `hydra init-db`
 
 ### Load (UPSERT) latest catalog version from data.gouv.fr
