@@ -14,7 +14,7 @@ async def process_message(key: str, message: dict, topic: str) -> None:
     pool = await context.pool()
     async with pool.acquire() as connection:
         if topic == get_topic("resource.created"):
-            resource = message["value"]["resource"]
+            resource = message["value"]
             # Insert new resource in catalog table and mark as high priority for crawling
             q = f"""
                     INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)
