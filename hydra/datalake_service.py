@@ -107,6 +107,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             f"Sending kafka message for resource analysed {resource_id} in dataset {dataset_id}"
         )
         message = {
+            "error": None,
             "filesize": filesize,
             "mime": mime_type,
             "resource_url": url,

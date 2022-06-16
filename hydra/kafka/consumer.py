@@ -8,7 +8,7 @@ log = logging.getLogger("hydra-kafka")
 
 
 async def process_message(key: str, message: dict, topic: str) -> None:
-    log.info("Received message")
+    log.debug(f"Received message in topic {topic} with key {key}")
     dataset_id = message["meta"]["dataset_id"]
 
     pool = await context.pool()
