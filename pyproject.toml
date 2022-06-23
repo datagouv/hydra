@@ -5,11 +5,11 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "udata-hydra"
-version = "0.1.0"
 description = "Async crawler and datalake service for data.gouv.fr"
 authors = [{name = "Opendata Team", email = "opendatateam@data.gouv.fr"}]
 readme = "README.md"
 license = {text = "MIT"}
+dynamic = ["version"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
