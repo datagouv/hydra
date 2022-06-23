@@ -1,0 +1,26 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "udata-datalake-service"
+authors = [{name = "Opendata Team", email = "opendatateam@data.gouv.fr"}]
+readme = "README.md"
+dynamic = ["version", "description"]
+dependencies = [
+    "boto3==1.21.21",
+    "click==8.0.4",
+    "kafka-python==2.0.2",
+    "redis==4.1.4",
+    "requests==2.27.1",
+    "celery==5.2.3"
+]
+
+[project.urls]
+Home = "https://github.com/opendatateam/udata-datalake-service"
+
+[tool.flit.module]
+name = "udata_datalake_service"
+
+[project.scripts]
+ udata-datalake-service = "udata_datalake_service.cli:cli"
