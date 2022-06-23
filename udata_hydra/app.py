@@ -8,8 +8,8 @@ from dateutil.parser import parse as date_parser, ParserError
 from humanfriendly import parse_timespan
 from marshmallow import Schema, fields
 
-from hydra import context, config
-from hydra.crawl import get_excluded_clause
+from udata_hydra import context, config
+from udata_hydra.crawl import get_excluded_clause
 
 
 log = logging.getLogger("aiohttp.access")

@@ -9,7 +9,7 @@ from aiohttp.client_exceptions import ClientError
 from asyncio.exceptions import TimeoutError
 from yarl import URL
 
-from hydra.crawl import crawl, setup_logging
+from udata_hydra.crawl import crawl, setup_logging
 
 
 pytestmark = pytest.mark.asyncio
@@ -74,10 +74,10 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, mocker, pro
 async def test_backoff(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock):
     setup_logging()
     await fake_check(resource=2)
-    mocker.patch("hydra.config.BACKOFF_NB_REQ", 1)
-    mocker.patch("hydra.config.BACKOFF_PERIOD", 0.25)
+    mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
+    mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
     magic = MagicMock()
-    mocker.patch("hydra.context.monitor").return_value = magic
+    mocker.patch("udata_hydra.context.monitor").return_value = magic
     rurl = "https://example.com/resource-1"
     rmock.get(rurl, status=200)
     event_loop.run_until_complete(crawl(iterations=1))
@@ -90,10 +90,10 @@ async def test_no_backoff_domains(
 ):
     setup_logging()
     await fake_check(resource=2)
-    mocker.patch("hydra.config.BACKOFF_NB_REQ", 1)
-    mocker.patch("hydra.config.NO_BACKOFF_DOMAINS", ["example.com"])
+    mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
+    mocker.patch("udata_hydra.config.NO_BACKOFF_DOMAINS", ["example.com"])
     magic = MagicMock()
-    mocker.patch("hydra.context.monitor").return_value = magic
+    mocker.patch("udata_hydra.context.monitor").return_value = magic
     rurl = "https://example.com/resource-1"
     rmock.get(rurl, status=200)
     event_loop.run_until_complete(crawl(iterations=1))
@@ -103,8 +103,8 @@ async def test_no_backoff_domains(
 
 async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock, produce_mock):
     setup_logging()
-    mocker.patch("hydra.config.SLEEP_BETWEEN_BATCHES", 0)
-    mocker.patch("hydra.config.EXCLUDED_PATTERNS", ["http%example%"])
+    mocker.patch("udata_hydra.config.SLEEP_BETWEEN_BATCHES", 0)
+    mocker.patch("udata_hydra.config.EXCLUDED_PATTERNS", ["http%example%"])
     rurl = "https://example.com/resource-1"
     rmock.get(rurl, status=200)
     event_loop.run_until_complete(crawl(iterations=1))
@@ -124,7 +124,7 @@ async def test_outdated_check(setup_catalog, rmock, fake_check, event_loop, prod
 async def test_not_outdated_check(
     setup_catalog, rmock, fake_check, event_loop, mocker, produce_mock
 ):
-    mocker.patch("hydra.config.SLEEP_BETWEEN_BATCHES", 0)
+    mocker.patch("udata_hydra.config.SLEEP_BETWEEN_BATCHES", 0)
     await fake_check()
     rurl = "https://example.com/resource-1"
     rmock.get(rurl, status=200)

@@ -14,11 +14,11 @@ import asyncio
 from humanfriendly import parse_timespan
 from udata_event_service.producer import produce
 
-from hydra import config, context
-from hydra.datalake_service import process_resource
-from hydra.utils.kafka import get_topic
+from udata_hydra import config, context
+from udata_hydra.datalake_service import process_resource
+from udata_hydra.utils.kafka import get_topic
 
-log = logging.getLogger("hydra")
+log = logging.getLogger("udata-hydra")
 
 results = defaultdict(int)
 
@@ -115,7 +115,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
                     produce(
                         kafka_uri=config.KAFKA_URI,
                         topic=get_topic("resource.checked"),
-                        service="hydra",
+                        service="udata-hydra",
                         key_id=str(last_check["resource_id"]),
                         document=check_data,
                         meta=meta,

@@ -4,7 +4,7 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "hydra"
+name = "udata-hydra"
 version = "0.1.0"
 description = "Async crawler and datalake service for data.gouv.fr"
 authors = [{name = "Opendata Team", email = "opendatateam@data.gouv.fr"}]
@@ -55,8 +55,8 @@ test = [
 Home = "https://github.com/opendatateam/udata-datalake-service"
 
 [tool.flit.module]
-name = "hydra"
+name = "udata_hydra"
 
 [project.scripts]
-hydra = "hydra.cli:run"
-hydra-crawl = "hydra.crawl:run"
+udata-hydra = "udata_hydra.cli:run"
+udata-hydra-crawl = "udata_hydra.crawl:run"

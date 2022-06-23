@@ -8,8 +8,8 @@ import pytest
 
 from minicli import run
 
-import hydra.cli  # noqa - this register the cli cmds
-from hydra.crawl import insert_check
+import udata_hydra.cli  # noqa - this register the cli cmds
+from udata_hydra.crawl import insert_check
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 pytestmark = pytest.mark.asyncio
@@ -25,7 +25,7 @@ def setup():
 @pytest.fixture(autouse=True)
 async def mock_pool(mocker):
     """This avoids having different pools attached to different event loops"""
-    m = mocker.patch("hydra.context.pool")
+    m = mocker.patch("udata_hydra.context.pool")
     pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50)
     m.return_value = pool
 
@@ -46,8 +46,8 @@ def setup_catalog(catalog_content, rmock):
 
 @pytest.fixture
 def produce_mock(mocker):
-    mocker.patch("hydra.crawl.produce")
-    mocker.patch("hydra.datalake_service.produce")
+    mocker.patch("udata_hydra.crawl.produce")
+    mocker.patch("udata_hydra.datalake_service.produce")
 
 @pytest.fixture
 def rmock():

@@ -41,7 +41,7 @@ class Monitor:
         self.screen.clrtoeol()
 
     def init(self, **kwargs):
-        self.screen.addstr(0, 0, "🦀 hydra crawling...", curses.A_BOLD)
+        self.screen.addstr(0, 0, "🦀 udata-hydra crawling...", curses.A_BOLD)
         self.screen.addstr(
             1, 0, ", ".join([f"{k}: {v}" for k, v in kwargs.items()])
         )
