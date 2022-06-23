@@ -1,26 +1,62 @@
+
 [build-system]
 requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "udata-datalake-service"
+name = "hydra"
+version = "0.1.0"
+description = "Async crawler and datalake service for data.gouv.fr"
 authors = [{name = "Opendata Team", email = "opendatateam@data.gouv.fr"}]
 readme = "README.md"
-dynamic = ["version", "description"]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.9"
+]
 dependencies = [
+    "agate==1.6.3",
+    "aiohttp==3.8.1",
+    "asyncpg==0.25.0",
     "boto3==1.21.21",
-    "click==8.0.4",
-    "kafka-python==2.0.2",
+    "humanfriendly==10.0",
+    "marshmallow==3.14.1",
+    "minicli==0.5.0",
+    "progressist==0.1.0",
+    "python-dateutil==2.8.2",
+    "python-dotenv==0.19.2",
+    "python-magic==0.4.25 ",
     "redis==4.1.4",
     "requests==2.27.1",
-    "celery==5.2.3"
+    "udata_event_service==0.0.8"
+]
+
+[project.optional-dependencies]
+dev = [
+    "flake8==4.0.1",
+    "flit==3.6.0",
+    "gunicorn==20.1.0",
+    "aiohttp-devtools==1.0.post0",
+]
+test = [
+    "aioresponses",
+    "nest_asyncio",
+    "pytest==7.1.1",
+    "pytest-mock",
+    "pytest-asyncio",
+    "requests-mock==1.9.3"
 ]
 
 [project.urls]
 Home = "https://github.com/opendatateam/udata-datalake-service"
 
 [tool.flit.module]
-name = "udata_datalake_service"
+name = "hydra"
 
 [project.scripts]
- udata-datalake-service = "udata_datalake_service.cli:cli"
+hydra = "hydra.cli:run"
+hydra-crawl = "hydra.crawl:run"
