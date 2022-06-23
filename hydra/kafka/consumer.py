@@ -28,6 +28,7 @@ async def process_message(key: str, message: dict, topic: str) -> None:
             await connection.execute(q)
         elif topic == get_topic("resource.modified"):
             # Make resource high priority for crawling
+            # Check if resource is in catalog then insert or update into table
             q = f"""SELECT * FROM catalog WHERE resource_id = '{key}';"""
             res = await connection.fetch(q)
             if(len(res) != 0):
