@@ -28,7 +28,18 @@ async def process_message(key: str, message: dict, topic: str) -> None:
             await connection.execute(q)
         elif topic == get_topic("resource.modified"):
             # Make resource high priority for crawling
-            q = f"""UPDATE catalog SET priority = TRUE WHERE resource_id = '{key}';"""
+            # Check if resource is in catalog then insert or update into table
+            q = f"""SELECT * FROM catalog WHERE resource_id = '{key}';"""
+            res = await connection.fetch(q)
+            if(len(res) != 0):
+                q = f"""UPDATE catalog SET priority = TRUE WHERE resource_id = '{key}';"""
+            else:
+                resource = message["value"]
+                q = f"""
+                        INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)
+                        VALUES ('{dataset_id}', '{key}', '{resource["url"]}', FALSE, TRUE, FALSE)
+                        ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
             await connection.execute(q)
         else:
             log.error(f"Unknown topic {topic}")
+
