@@ -1,10 +1,10 @@
 import logging
 
-from hydra import context
-from hydra.utils.kafka import get_topic
-from hydra.utils.minio import delete_resource_from_minio
+from udata_hydra import context
+from udata_hydra.utils.kafka import get_topic
+from udata_hydra.utils.minio import delete_resource_from_minio
 
-log = logging.getLogger("hydra-kafka")
+log = logging.getLogger("udata-hydra-kafka")
 
 
 async def process_message(key: str, message: dict, topic: str) -> None:

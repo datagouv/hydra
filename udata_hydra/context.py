@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 
 import asyncpg
 
-from hydra.monitor import Monitor
+from udata_hydra.monitor import Monitor
 
-log = logging.getLogger("hydra")
+log = logging.getLogger("udata-hydra")
 context = {}
 
 
@@ -21,7 +21,7 @@ def monitor():
         monitor = MagicMock()
         monitor.set_status = lambda x: log.debug(x)
         monitor.init = lambda **kwargs: log.debug(
-            f"Starting hydra... {kwargs}"
+            f"Starting udata-hydra... {kwargs}"
         )
     context["monitor"] = monitor
     return context["monitor"]

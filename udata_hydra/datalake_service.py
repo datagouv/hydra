@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 
 from udata_event_service.producer import produce
 
-from hydra.utils.json import is_json_file
-from hydra.utils.kafka import get_topic
-from hydra.utils.minio import save_resource_to_minio
+from udata_hydra.utils.json import is_json_file
+from udata_hydra.utils.kafka import get_topic
+from udata_hydra.utils.minio import save_resource_to_minio
 
 load_dotenv()
 

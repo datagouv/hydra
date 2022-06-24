@@ -1,6 +1,6 @@
-# hydra 🦀
+# udata-hydra 🦀
 
-`hydra` is an async metadata crawler for [data.gouv.fr](https://www.data.gouv.fr).
+`udata-hydra` is an async metadata crawler for [data.gouv.fr](https://www.data.gouv.fr).
 
 URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _PostgreSQL_ database.
 
@@ -10,18 +10,18 @@ URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _Po
 
 ### Create database structure
 
-Install hydra dependencies and cli.
+Install udata-hydra dependencies and cli.
 `make deps`
 
-`hydra init-db`
+`udata-hydra init-db`
 
 ### Load (UPSERT) latest catalog version from data.gouv.fr
 
-`hydra load-catalog`
+`udata-hydra load-catalog`
 
 ## Crawler
 
-`hydra-crawl`
+`udata-hydra-crawl`
 
 It will crawl (forever) the catalog according to config set in `config.py`.
 
@@ -35,7 +35,7 @@ If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
 A curses interface is available via:
 
-`HYDRA_CURSES_ENABLED=True hydra-crawl`
+`HYDRA_CURSES_ENABLED=True udata-hydra-crawl`
 
 ## API
 
@@ -43,7 +43,7 @@ A curses interface is available via:
 
 ```
 pip install -r requirements.txt
-adev runserver hydra/app.py
+adev runserver udata-hydra/app.py
 ```
 
 ### Get latest check
@@ -234,8 +234,8 @@ UDATA_INSTANCE_NAME = udata
 ```
 
 The `kafka_integration` module retrieves messages with the topics `resource.created`, `resource.modified` and `resource.deleted` sent by `udata`.
-The Kafka instance URI, Hydra API URL and Data Gouv API URL to be used can be defined in `hydra/config` or overwritten with env variables.
-It can be launched using the CLI: `hydra run_kafka_integration`.
+The Kafka instance URI, Hydra API URL and Data Gouv API URL to be used can be defined in `udata-hydra/config` or overwritten with env variables.
+It can be launched using the CLI: `udata-hydra run_kafka_integration`.
 This will mark the corresponding resources as highest priority for the next crawling batch.
 
 ## TODO

@@ -7,7 +7,7 @@ import pytest
 
 from aiohttp.test_utils import TestClient, TestServer
 
-from hydra.app import app_factory
+from udata_hydra.app import app_factory
 
 pytestmark = pytest.mark.asyncio
 

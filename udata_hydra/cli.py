@@ -18,9 +18,9 @@ from progressist import ProgressBar
 
 from udata_event_service.consumer import consume_kafka
 
-from hydra.config import KAFKA_URI
-from hydra.kafka.consumer import process_message
-from hydra.utils.kafka import get_topic
+from udata_hydra.config import KAFKA_URI
+from udata_hydra.kafka.consumer import process_message
+from udata_hydra.utils.kafka import get_topic
 
 
 CATALOG_URL = 'https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d'
