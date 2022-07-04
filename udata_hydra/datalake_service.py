@@ -3,7 +3,7 @@ import os
 import tempfile
 from typing import BinaryIO
 
-import agate
+import pandas as pd
 from aiohttp import ClientResponse
 import magic
 from dotenv import load_dotenv
@@ -13,6 +13,7 @@ from udata_event_service.producer import produce
 from udata_hydra.utils.json import is_json_file
 from udata_hydra.utils.kafka import get_topic
 from udata_hydra.utils.minio import save_resource_to_minio
+from udata_hydra.utils.csv import detect_encoding, find_delimiter
 
 load_dotenv()
 
@@ -67,11 +68,14 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
         if mime_type in ["text/plain", "text/csv", "application/csv"] and not is_json_file(tmp_file.name):
             # Save resource only if CSV
             try:
-                # Raise ValueError if file is not a CSV
-                # TODO: Ensure JSON files are not accepted
-                agate.Table.from_csv(
-                    tmp_file.name, sniff_limit=4096, row_limit=40
-                )
+                # Try to detect encoding from suspected csv file
+                with open(tmp_file.name, mode='rb') as f:
+                    encoding = detect_encoding(f)
+                # Try to detect delimiter from suspected csv file
+                delimiter = find_delimiter(tmp_file.name)
+                # Try to read first 1000 rows with pandas
+                df = pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
+
                 save_resource_to_minio(tmp_file, dataset_id, resource_id)
                 storage_location = {
                     "netloc": os.getenv("MINIO_URL"),
