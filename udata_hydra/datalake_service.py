@@ -104,6 +104,8 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                         "location": storage_location,
                         "mime_type": mime_type,
                         "filesize": filesize,
+                        "delimiter": delimiter,
+                        "encoding": encoding,
                     },
                     meta={"dataset_id": dataset_id, "message_type": "resource.stored"},
                 )
