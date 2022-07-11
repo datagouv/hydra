@@ -52,7 +52,7 @@ test = [
 ]
 
 [project.urls]
-Home = "https://github.com/opendatateam/udata-datalake-service"
+Home = "https://github.com/etalab/udata-hydra"
 
 [tool.flit.module]
 name = "udata_hydra"
