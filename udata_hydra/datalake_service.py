@@ -3,7 +3,7 @@ import os
 import tempfile
 from typing import BinaryIO
 
-import agate
+import pandas as pd
 from aiohttp import ClientResponse
 import magic
 from dotenv import load_dotenv
@@ -13,6 +13,7 @@ from udata_event_service.producer import produce
 from udata_hydra.utils.json import is_json_file
 from udata_hydra.utils.kafka import get_topic
 from udata_hydra.utils.minio import save_resource_to_minio
+from udata_hydra.utils.csv import detect_encoding, find_delimiter
 
 load_dotenv()
 
@@ -69,11 +70,20 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
         if mime_type in ["text/plain", "text/csv", "application/csv"] and not is_json_file(tmp_file.name):
             # Save resource only if CSV
             try:
-                # Raise ValueError if file is not a CSV
-                # TODO: Ensure JSON files are not accepted
-                agate.Table.from_csv(
-                    tmp_file.name, sniff_limit=4096, row_limit=40
-                )
+                # Try to detect encoding from suspected csv file. If fail, set up to utf8 (most common)
+                with open(tmp_file.name, mode='rb') as f:
+                    try:
+                        encoding = detect_encoding(f)
+                    except:
+                        encoding = 'utf-8'
+                # Try to detect delimiter from suspected csv file. If fail, set up to None (pandas will use python engine and try to guess separator itself)
+                try:
+                    delimiter = find_delimiter(tmp_file.name)
+                except:
+                    delimiter = None
+                # Try to read first 1000 rows with pandas
+                df = pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
+
                 save_resource_to_minio(tmp_file, dataset_id, resource_id)
                 storage_location = {
                     "netloc": os.getenv("MINIO_URL"),
@@ -96,13 +106,15 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                         "location": storage_location,
                         "mime_type": mime_type,
                         "filesize": filesize,
+                        "delimiter": delimiter,
+                        "encoding": encoding,
                     },
                     meta={"dataset_id": dataset_id, "message_type": "resource.stored"},
                 )
             except ValueError:
                 log.debug(
                     f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
-                )
+
 
         # Send a Kafka message for both CSV and non CSV resources
         log.debug(
