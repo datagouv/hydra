@@ -114,6 +114,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             except ValueError:
                 log.debug(
                     f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
+                )
 
 
         # Send a Kafka message for both CSV and non CSV resources
