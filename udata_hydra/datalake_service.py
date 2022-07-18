@@ -17,6 +17,8 @@ from udata_hydra.utils.csv import detect_encoding, find_delimiter
 
 load_dotenv()
 
+log = logging.getLogger("udata-hydra")
+
 BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
 KAFKA_URI = f'{os.environ.get("KAFKA_HOST", "localhost")}:{os.environ.get("KAFKA_PORT", "9092")}'
 MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
@@ -43,7 +45,7 @@ async def download_resource(url: str, response: ClientResponse) -> BinaryIO:
             tmp_file.write(chunk)
         else:
             tmp_file.close()
-            logging.error(f"File {url} is too big, skipping")
+            log.error(f"File {url} is too big, skipping")
             raise IOError("File too large to download")
         i += 1
     tmp_file.close()
@@ -51,7 +53,7 @@ async def download_resource(url: str, response: ClientResponse) -> BinaryIO:
 
 
 async def process_resource(url: str, dataset_id: str, resource_id: str, response: ClientResponse) -> None:
-    logging.info(
+    log.debug(
         "Processing task for resource {} in dataset {}".format(
             resource_id, dataset_id
         )
@@ -92,7 +94,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                     + "/"
                     + resource_id,
                 }
-                logging.info(
+                log.debug(
                     f"Sending kafka message for resource stored {resource_id} in dataset {dataset_id}"
                 )
                 produce(
@@ -110,17 +112,12 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                     meta={"dataset_id": dataset_id, "message_type": "resource.stored"},
                 )
             except ValueError:
-                logging.info(
-                    f"ValueError - Resource {resource_id} in dataset {dataset_id} is not a CSV"
-                )
-            except:
-                logging.info(
-                    f"Error - Resource {resource_id} in dataset {dataset_id} is not a CSV"
-                )
+                log.debug(
+                    f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
 
 
         # Send a Kafka message for both CSV and non CSV resources
-        logging.info(
+        log.debug(
             f"Sending kafka message for resource analysed {resource_id} in dataset {dataset_id}"
         )
         message = {
