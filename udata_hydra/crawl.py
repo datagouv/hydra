@@ -174,7 +174,6 @@ def convert_headers(headers):
 
 
 async def check_url(row, session, sleep=0, method="get"):
-    print(row["url"])
     log.debug(f"check {row}, sleep {sleep}")
 
     if sleep:
