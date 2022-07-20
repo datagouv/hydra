@@ -22,6 +22,7 @@ from udata_hydra.config import KAFKA_URI
 from udata_hydra.kafka.consumer import process_message
 from udata_hydra.utils.kafka import get_topic
 
+log = logging.getLogger("udata-hydra")
 
 CATALOG_URL = 'https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d'
 
@@ -31,7 +32,7 @@ context = {}
 @cli
 async def init_db(drop=False, table=None, index=False, reindex=False):
     """Create the DB structure"""
-    print("Initializing database...")
+    log.info("Initializing database...")
     if drop:
         if table == "catalog" or not table:
             await context["conn"].execute("DROP TABLE IF EXISTS catalog")
@@ -97,10 +98,10 @@ async def download_file(url, fd):
 async def load_catalog(url=CATALOG_URL):
     """Load the catalog into DB from CSV file"""
     try:
-        print(f"Downloading catalog from {url}...")
+        log.info(f"Downloading catalog from {url}...")
         with NamedTemporaryFile(delete=False) as fd:
             await download_file(url, fd)
-        print("Upserting catalog in database...")
+        log.info("Upserting catalog in database...")
         # consider everything deleted, deleted will be updated when loading new catalog
         await context["conn"].execute("UPDATE catalog SET deleted = TRUE")
         with open(fd.name) as fd:
@@ -118,7 +119,7 @@ async def load_catalog(url=CATALOG_URL):
                     row["id"],
                     row["url"],
                 )
-        print("Done!")
+        log.info("Catalog successfully upserted into DB.")
     except Exception as e:
         raise e
     finally:
@@ -170,7 +171,7 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
     dl_path = data_path / "downloaded"
     dl_path.mkdir(exist_ok=True, parents=True)
     if download:
-        print("Cleaning up...")
+        log.debug("Cleaning up...")
         (data_path / "_index.csv").unlink(missing_ok=True)
         [p.unlink() for p in Path(dl_path).glob("*.csv")]
 
@@ -213,7 +214,10 @@ def run_kafka_integration() -> None:
         client.create_bucket(Bucket=os.getenv("MINIO_BUCKET"))
 
     def run_process_message(key: str, data: dict, topic: str) -> None:
-        asyncio.get_event_loop().run_until_complete(process_message(key, data, topic))
+        try:
+            asyncio.get_event_loop().run_until_complete(process_message(key, data, topic))
+        except Exception as e:
+            log.error(e)
 
     consume_kafka(
         kafka_uri=KAFKA_URI,
