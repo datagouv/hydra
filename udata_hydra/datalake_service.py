@@ -88,7 +88,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                 produce(
                     KAFKA_URI,
                     get_topic("resource.stored"),
-                    "datalake",
+                    "udata-hydra",
                     resource_id,
                     {
                         "data_location": storage_location,
@@ -115,7 +115,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
         produce(
             KAFKA_URI,
             get_topic("resource.analysed"),
-            "datalake",
+            "udata-hydra",
             resource_id,
             message,
             meta={"dataset_id": dataset_id, "message_type": "resource.analysed"},
@@ -124,7 +124,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
         produce(
             KAFKA_URI,
             get_topic("resource.analysed"),
-            "datalake",
+            "udata-hydra",
             resource_id,
             {
                 "resource_url": url,
