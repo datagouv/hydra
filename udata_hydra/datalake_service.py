@@ -91,7 +91,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                     "datalake",
                     resource_id,
                     {
-                        "location": storage_location,
+                        "data_location": storage_location,
                         "mime_type": mime_type,
                         "filesize": filesize,
                     },
