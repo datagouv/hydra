@@ -110,6 +110,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
                     meta = {
                         "dataset_id": last_check["dataset_id"],
                         "message_type": message_type,
+                        "check_date": str(datetime.now()),
                     }
                     produce(
                         kafka_uri=config.KAFKA_URI,
@@ -187,7 +188,6 @@ async def check_url(row, session, sleep=0, method="get"):
                 "url": row["url"],
                 "error": "Not netloc in url",
                 "timeout": False,
-                "check_date": str(datetime.now()),
             }
         )
         return STATUS_ERROR
@@ -225,7 +225,6 @@ async def check_url(row, session, sleep=0, method="get"):
                     "headers": convert_headers(resp.headers),
                     "timeout": False,
                     "response_time": end - start,
-                    "check_date": str(datetime.now()),
                 }
             )
             return STATUS_OK
@@ -248,7 +247,6 @@ async def check_url(row, session, sleep=0, method="get"):
                 "error": fix_surrogates(error),
                 "headers": convert_headers(getattr(e, "headers", {})),
                 "status": getattr(e, "status", None),
-                "check_date": str(datetime.now()),
             }
         )
         log.error(f"{row['url']}, {e}")
@@ -259,7 +257,6 @@ async def check_url(row, session, sleep=0, method="get"):
                 "url": row["url"],
                 "domain": domain,
                 "timeout": True,
-                "check_date": str(datetime.now()),
             }
         )
         return STATUS_TIMEOUT
