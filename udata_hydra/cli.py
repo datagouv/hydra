@@ -18,11 +18,13 @@ from progressist import ProgressBar
 
 from udata_event_service.consumer import consume_kafka
 
+log = logging.getLogger("udata-hydra")
+log.setLevel(os.getenv("LOGLEVEL", logging.INFO))
+logging.basicConfig()
+
 from udata_hydra.config import KAFKA_URI
 from udata_hydra.kafka.consumer import process_message
 from udata_hydra.utils.kafka import get_topic
-
-log = logging.getLogger("udata-hydra")
 
 CATALOG_URL = 'https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d'
 
@@ -199,7 +201,7 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
 @cli
 def run_kafka_integration() -> None:
     load_dotenv()
-    logging.basicConfig(level=logging.INFO)
+    log.debug('Running Kafka integration...')
     # Create bucket if it doesn't exist
     client = boto3.client(
         "s3",

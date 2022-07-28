@@ -4,7 +4,7 @@ from udata_hydra import context
 from udata_hydra.utils.kafka import get_topic
 from udata_hydra.utils.minio import delete_resource_from_minio
 
-log = logging.getLogger("udata-hydra-kafka")
+log = logging.getLogger("udata-hydra")
 
 
 async def process_message(key: str, message: dict, topic: str) -> None:
