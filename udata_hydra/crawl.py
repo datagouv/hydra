@@ -110,14 +110,13 @@ async def update_check_and_catalog(check_data: dict) -> None:
                     meta = {
                         "dataset_id": last_check["dataset_id"],
                         "message_type": message_type,
-                        "check_date": str(datetime.now()),
                     }
                     produce(
                         kafka_uri=config.KAFKA_URI,
                         topic=get_topic("resource.checked"),
                         service="udata-hydra",
                         key_id=str(last_check["resource_id"]),
-                        document=check_data,
+                        document={**check_data, "check_date": str(datetime.now())},
                         meta=meta,
                     )
 
