@@ -238,6 +238,11 @@ The Kafka instance URI, Hydra API URL and Data Gouv API URL to be used can be de
 It can be launched using the CLI: `udata-hydra run_kafka_integration`.
 This will mark the corresponding resources as highest priority for the next crawling batch.
 
+
+### Logging & Debugging
+The log level can be adjusted using the environment variable LOGLEVEL.
+For example, to set the log level to `DEBUG` when running the Kafka integration, use `LOGLEVEL="DEBUG" udata-hydra run_kafka_integration `.
+
 ## TODO
 
 - [x] non curse interface :sad:
