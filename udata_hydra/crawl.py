@@ -54,7 +54,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
         q = f"""
             SELECT * FROM catalog JOIN checks
             ON catalog.last_check = checks.id
-            WHERE catalog.url = '{check_data['url']}';
+            WHERE catalog.resource_id = '{check_data['resource_id']}';
         """
         last_checks = await connection.fetch(q)
 
@@ -62,7 +62,9 @@ async def update_check_and_catalog(check_data: dict) -> None:
             # In case we are doing our first check for given URL
             rows = await connection.fetch(
                 f"""
-                SELECT resource_id, dataset_id, priority, initialization FROM catalog WHERE url = '{check_data['url']}';
+                SELECT resource_id, dataset_id, priority, initialization
+                FROM catalog
+                WHERE resource_id = '{check_data['resource_id']}';
             """
             )
             last_checks = [
@@ -80,7 +82,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
         # There could be multiple resources pointing to the same URL
         for last_check in last_checks:
             if config.ENABLE_KAFKA:
-                is_first_check = last_check is None
+                is_first_check = last_check["status"] is None
                 status_has_changed = (
                     "status" in check_data
                     and check_data["status"] != last_check["status"]
@@ -123,7 +125,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
         log.debug("Updating priority...")
         await connection.execute(
             f"""
-            UPDATE catalog SET priority = FALSE, initialization = FALSE WHERE url = '{check_data['url']}';
+            UPDATE catalog SET priority = FALSE, initialization = FALSE WHERE resource_id = '{check_data['resource_id']}';
         """
         )
 
@@ -184,6 +186,7 @@ async def check_url(row, session, sleep=0, method="get"):
         log.warning(f"[warning] not netloc in url, skipping {row['url']}")
         await update_check_and_catalog(
             {
+                "resource_id": row["resource_id"],
                 "url": row["url"],
                 "error": "Not netloc in url",
                 "timeout": False,
@@ -218,6 +221,7 @@ async def check_url(row, session, sleep=0, method="get"):
 
             await update_check_and_catalog(
                 {
+                    "resource_id": row["resource_id"],
                     "url": row["url"],
                     "domain": domain,
                     "status": resp.status,
@@ -240,6 +244,7 @@ async def check_url(row, session, sleep=0, method="get"):
         error = getattr(e, "message", None) or str(e)
         await update_check_and_catalog(
             {
+                "resource_id": row["resource_id"],
                 "url": row["url"],
                 "domain": domain,
                 "timeout": False,
@@ -253,6 +258,7 @@ async def check_url(row, session, sleep=0, method="get"):
     except asyncio.exceptions.TimeoutError:
         await update_check_and_catalog(
             {
+                "resource_id": row["resource_id"],
                 "url": row["url"],
                 "domain": domain,
                 "timeout": True,
