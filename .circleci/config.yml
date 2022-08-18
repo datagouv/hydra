@@ -19,39 +19,36 @@ jobs:
           command: export BASE_BRANCH=$(base_branch)
       - restore_cache:
           keys:
-            - py-cache-v2-{{ arch }}-{{ checksum "pyproject.toml" }}
-            - py-cache-v2-{{ arch }}-{{ .Branch }}
-            - py-cache-v2-{{ arch }}-{{ .Environment.BASE_BRANCH }}
+            - py-cache-{{ arch }}-{{ checksum "poetry.lock" }}
+            - py-cache-{{ arch }}-{{ .Branch }}
+            - py-cache-{{ arch }}-{{ .Environment.BASE_BRANCH }}
       - run:
           name: Install python dependencies
           command: |
-            virtualenv venv
-            source venv/bin/activate
-            make deps
+            poetry install
       - save_cache:
-          key: py-cache-v2-{{ arch }}-{{ checksum "pyproject.toml" }}
+          key: py-cache-{{ arch }}-{{ checksum "poetry.lock" }}
           paths:
-            - venv
+            - /home/circleci/.cache/pypoetry/virtualenvs
       - save_cache:
-          key: py-cache-v2-{{ arch }}-{{ .Branch }}
+          key: py-cache-{{ arch }}-{{ .Branch }}
           paths:
-            - venv
+            - /home/circleci/.cache/pypoetry/virtualenvs
       - run:
           name: Run tests
           environment:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
           command: |
-            source venv/bin/activate
-            make test
+            poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes
       - store_test_results:
           path: reports/python
       - run:
           name: Build a distributable package
           command: |
-            source venv/bin/activate
-            # Build a wheel release
-            make build
+            # FIXME: try to build with a version number
+            poetry version prerelease
+            poetry build
       - store_artifacts:
           path: dist
       - persist_to_workspace:
@@ -68,8 +65,7 @@ jobs:
       - deploy:
           name: Publish on PyPI
           command: |
-            source venv/bin/activate
-            FLIT_USERNAME=${PYPI_USERNAME} FLIT_PASSWORD=${PYPI_PASSWORD} make publish
+            poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
 
 workflows:
   version: 2
@@ -85,7 +81,6 @@ workflows:
           filters:
             branches:
               only:
-                - main
                 - /[0-9]+(\.[0-9]+)+/
             tags:
               only: /v[0-9]+(\.[0-9]+)*/

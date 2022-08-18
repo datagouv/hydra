@@ -1,63 +1,43 @@
+[tool.poetry]
+name = "udata-hydra"
+version = "0.2.0.dev"
+description = "Async crawler and datalake service for data.gouv.fr"
+authors = ["Opendata Team <opendatateam@data.gouv.fr>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pandas = "^1.3.3"
+cchardet = "^2.1.7"
+aiohttp = "^3.8.1"
+asyncpg = "^0.25.0"
+boto3 = "^1.21.21"
+humanfriendly = "^10.0"
+marshmallow = "^3.14.1"
+minicli = "^0.5.0"
+progressist = "^0.1.0"
+python-dateutil = "^2.8.2"
+python-dotenv = "^0.19.2"
+python-magic = "^0.4.25 "
+redis = "^4.1.4"
+requests = "^2.27.1"
+udata_event_service = "^0.0.8"
+
+[tool.poetry.dev-dependencies]
+flake8 = "^4.0.1"
+flit = "^3.6.0"
+gunicorn = "^20.1.0"
+aiohttp-devtools = "^1.0.post0"
+aioresponses = "^0.7.3"
+nest_asyncio = "^1.5.5"
+pytest = "^7.1.1"
+pytest-mock = "^3.7.0"
+pytest-asyncio = "^0.18.3"
+requests-mock = "^1.9.3"
 
 [build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
-[project]
-name = "udata-hydra"
-description = "Async crawler and datalake service for data.gouv.fr"
-authors = [{name = "Opendata Team", email = "opendatateam@data.gouv.fr"}]
-readme = "README.md"
-license = {text = "MIT"}
-dynamic = ["version"]
-classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3.9"
-]
-dependencies = [
-    "pandas==1.3.3",
-    "cchardet==2.1.7",
-    "aiohttp==3.8.1",
-    "asyncpg==0.25.0",
-    "boto3==1.21.21",
-    "humanfriendly==10.0",
-    "marshmallow==3.14.1",
-    "minicli==0.5.0",
-    "progressist==0.1.0",
-    "python-dateutil==2.8.2",
-    "python-dotenv==0.19.2",
-    "python-magic==0.4.25 ",
-    "redis==4.1.4",
-    "requests==2.27.1",
-    "udata_event_service==0.0.8"
-]
-
-[project.optional-dependencies]
-dev = [
-    "flake8==4.0.1",
-    "flit==3.6.0",
-    "gunicorn==20.1.0",
-    "aiohttp-devtools==1.0.post0",
-]
-test = [
-    "aioresponses",
-    "nest_asyncio",
-    "pytest==7.1.1",
-    "pytest-mock",
-    "pytest-asyncio",
-    "requests-mock==1.9.3"
-]
-
-[project.urls]
-Home = "https://github.com/etalab/udata-hydra"
-
-[tool.flit.module]
-name = "udata_hydra"
-
-[project.scripts]
-udata-hydra = "udata_hydra.cli:run"
-udata-hydra-crawl = "udata_hydra.crawl:run"
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
