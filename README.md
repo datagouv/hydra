@@ -11,7 +11,7 @@ URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _Po
 ### Create database structure
 
 Install udata-hydra dependencies and cli.
-`make deps`
+`poetry install`
 
 `udata-hydra init-db`
 

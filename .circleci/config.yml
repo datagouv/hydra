@@ -10,8 +10,6 @@ jobs:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-    environment:
-       BASH_ENV: /root/.bashrc
     steps:
       - checkout
       - run:
