@@ -42,4 +42,3 @@ async def process_message(key: str, message: dict, topic: str) -> None:
             await connection.execute(q)
         else:
             log.error(f"Unknown topic {topic}")
-

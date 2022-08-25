@@ -3,11 +3,11 @@ import os
 import tempfile
 from typing import BinaryIO
 
-import pandas as pd
-from aiohttp import ClientResponse
 import magic
-from dotenv import load_dotenv
+import pandas as pd
 
+from aiohttp import ClientResponse
+from dotenv import load_dotenv
 from udata_event_service.producer import produce
 
 from udata_hydra.utils.json import is_json_file
@@ -74,15 +74,19 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                 with open(tmp_file.name, mode='rb') as f:
                     try:
                         encoding = detect_encoding(f)
-                    except:
+                    # FIXME: catch exception more precisely
+                    except Exception:
                         encoding = 'utf-8'
-                # Try to detect delimiter from suspected csv file. If fail, set up to None (pandas will use python engine and try to guess separator itself)
+                # Try to detect delimiter from suspected csv file. If fail, set up to None
+                # (pandas will use python engine and try to guess separator itself)
                 try:
                     delimiter = find_delimiter(tmp_file.name)
-                except:
+                # FIXME: catch exception more precisely
+                except Exception:
                     delimiter = None
+
                 # Try to read first 1000 rows with pandas
-                df = pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
+                pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
 
                 save_resource_to_minio(tmp_file, dataset_id, resource_id)
                 storage_location = {
@@ -115,7 +119,6 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                 log.debug(
                     f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
                 )
-
 
         # Send a Kafka message for both CSV and non CSV resources
         log.debug(
