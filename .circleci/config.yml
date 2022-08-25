@@ -119,10 +119,13 @@ workflows:
       - tests:
           requires:
             - install
+      - build:
+          requires:
+            - test
+            - lint
       - publish:
           requires:
-            - tests
-            - lint
+            - build
           filters:
             branches:
               only:
