@@ -35,6 +35,10 @@ jobs:
           key: py-cache-{{ arch }}-{{ .Branch }}
           paths:
             - /home/circleci/.cache/pypoetry/virtualenvs
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
 
   lint:
     docker:
@@ -44,11 +48,7 @@ jobs:
           at: .
       - run:
           name: Lint code
-          command: |
-            pip
-            poetry run flake8 << pipeline.parameters.python-module >>
-      - store_artifacts:
-          path: dist
+          command: poetry run flake8 << pipeline.parameters.python-module >>
 
   tests:
     docker:
@@ -70,10 +70,6 @@ jobs:
             poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes
       - store_test_results:
           path: reports/python
-      - persist_to_workspace:
-          root: .
-          paths:
-            - .
 
   build:
     docker:
