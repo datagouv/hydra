@@ -26,15 +26,16 @@ jobs:
       - run:
           name: Install python dependencies
           command: |
+            poetry config virtualenvs.in-project true
             poetry install
       - save_cache:
           key: py-cache-{{ arch }}-{{ checksum "poetry.lock" }}
           paths:
-            - /home/circleci/.cache/pypoetry/virtualenvs
+            - .venv
       - save_cache:
           key: py-cache-{{ arch }}-{{ .Branch }}
           paths:
-            - /home/circleci/.cache/pypoetry/virtualenvs
+            - .venv
       - persist_to_workspace:
           root: .
           paths:
