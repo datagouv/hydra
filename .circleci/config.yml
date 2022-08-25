@@ -129,8 +129,6 @@ workflows:
           filters:
             branches:
               only:
-                # FIXME: remove
-                - ci-workflow
                 - master
                 - /[0-9]+(\.[0-9]+)+/
             tags:
