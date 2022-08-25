@@ -92,6 +92,10 @@ jobs:
             fi
       - store_artifacts:
           path: dist
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
 
   publish:
     docker:
