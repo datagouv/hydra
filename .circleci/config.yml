@@ -121,7 +121,7 @@ workflows:
             - install
       - build:
           requires:
-            - test
+            - tests
             - lint
       - publish:
           requires:
