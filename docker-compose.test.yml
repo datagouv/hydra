@@ -21,3 +21,11 @@ services:
     ports:
     - 9092:9092
     - 29092:29092
+  test_database:
+    image: "postgres" # use latest official postgres version
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    ports:
+      - 5433:5432

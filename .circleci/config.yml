@@ -1,17 +1,18 @@
 ---
-version: 2
+version: 2.1
+
+parameters:
+  python-version:
+    type: string
+    default: "3.9"
+  python-module:
+    type: string
+    default: "udata_hydra"
 
 jobs:
-  build:
+  install:
     docker:
-      - image: cimg/python:3.9.2
-      - image: cimg/postgres:11.15
-        environment:
-          POSTGRES_DB: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-    environment:
-       BASH_ENV: /root/.bashrc
+      - image: cimg/python:<< pipeline.parameters.python-version >>
     steps:
       - checkout
       - run:
@@ -19,39 +20,76 @@ jobs:
           command: export BASE_BRANCH=$(base_branch)
       - restore_cache:
           keys:
-            - py-cache-v2-{{ arch }}-{{ checksum "pyproject.toml" }}
-            - py-cache-v2-{{ arch }}-{{ .Branch }}
-            - py-cache-v2-{{ arch }}-{{ .Environment.BASE_BRANCH }}
+            - py-cache-{{ arch }}-{{ checksum "poetry.lock" }}
+            - py-cache-{{ arch }}-{{ .Branch }}
+            - py-cache-{{ arch }}-{{ .Environment.BASE_BRANCH }}
       - run:
           name: Install python dependencies
           command: |
-            virtualenv venv
-            source venv/bin/activate
-            make deps
+            poetry config virtualenvs.in-project true
+            poetry install
       - save_cache:
-          key: py-cache-v2-{{ arch }}-{{ checksum "pyproject.toml" }}
+          key: py-cache-{{ arch }}-{{ checksum "poetry.lock" }}
           paths:
-            - venv
+            - .venv
       - save_cache:
-          key: py-cache-v2-{{ arch }}-{{ .Branch }}
+          key: py-cache-{{ arch }}-{{ .Branch }}
           paths:
-            - venv
+            - .venv
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+
+  lint:
+    docker:
+      - image: cimg/python:<< pipeline.parameters.python-version >>
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Lint code
+          command: poetry run flake8 << pipeline.parameters.python-module >>
+
+  tests:
+    docker:
+      - image: cimg/python:<< pipeline.parameters.python-version >>
+      - image: cimg/postgres:11.15
+        environment:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+    steps:
+      - attach_workspace:
+          at: .
       - run:
           name: Run tests
           environment:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
           command: |
-            source venv/bin/activate
-            make test
+            poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes
       - store_test_results:
           path: reports/python
+
+  build:
+    docker:
+      - image: cimg/python:<< pipeline.parameters.python-version >>
+    steps:
+      - attach_workspace:
+          at: .
       - run:
           name: Build a distributable package
           command: |
-            source venv/bin/activate
             # Build a wheel release
-            make build
+            if [[ $CIRCLE_TAG ]]; then
+                # This is a tagged release, version has been handled upstream
+                poetry build
+            else
+                # Relies on a dev version like "1.2.1.dev" by default
+                poetry version $(poetry version -s)$CIRCLE_BUILD_NUM
+                poetry build
+            fi
       - store_artifacts:
           path: dist
       - persist_to_workspace:
@@ -61,31 +99,37 @@ jobs:
 
   publish:
     docker:
-      - image: cimg/python:3.9.2
+      - image: cimg/python:<< pipeline.parameters.python-version >>
     steps:
       - attach_workspace:
           at: .
       - deploy:
           name: Publish on PyPI
           command: |
-            source venv/bin/activate
-            FLIT_USERNAME=${PYPI_USERNAME} FLIT_PASSWORD=${PYPI_PASSWORD} make publish
+            poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
 
 workflows:
   version: 2
   build:
     jobs:
+      - install
+      - lint:
+          requires:
+            - install
+      - tests:
+          requires:
+            - install
       - build:
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
+          requires:
+            - tests
+            - lint
       - publish:
           requires:
             - build
           filters:
             branches:
               only:
-                - main
+                - master
                 - /[0-9]+(\.[0-9]+)+/
             tags:
               only: /v[0-9]+(\.[0-9]+)*/

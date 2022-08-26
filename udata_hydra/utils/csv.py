@@ -9,6 +9,7 @@ def find_delimiter(filename):
         delimiter = sniffer.sniff(fp.read(5000), delimiters=';,|\t').delimiter
     return delimiter
 
+
 def detect_encoding(the_file):
     '''Detects file encoding using chardet based on N first lines
     '''

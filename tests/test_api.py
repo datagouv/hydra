@@ -4,6 +4,7 @@ it will interfere with the rest of our async code
 """
 from datetime import datetime, timedelta
 import pytest
+import pytest_asyncio
 
 from aiohttp.test_utils import TestClient, TestServer
 
@@ -12,7 +13,7 @@ from udata_hydra.app import app_factory
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client():
     app = await app_factory()
     async with TestClient(TestServer(app)) as client:

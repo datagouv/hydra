@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import csv
 import os
@@ -6,7 +7,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import aiohttp
-import asyncio
 import asyncpg
 import boto3
 from botocore.client import Config
@@ -18,13 +18,13 @@ from progressist import ProgressBar
 
 from udata_event_service.consumer import consume_kafka
 
-log = logging.getLogger("udata-hydra")
-log.setLevel(os.getenv("LOGLEVEL", logging.INFO))
-logging.basicConfig()
-
 from udata_hydra.config import KAFKA_URI
 from udata_hydra.kafka.consumer import process_message
 from udata_hydra.utils.kafka import get_topic
+
+log = logging.getLogger("udata-hydra")
+log.setLevel(os.getenv("LOGLEVEL", logging.INFO))
+logging.basicConfig()
 
 CATALOG_URL = 'https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d'
 
@@ -224,7 +224,9 @@ def run_kafka_integration() -> None:
     consume_kafka(
         kafka_uri=KAFKA_URI,
         group_id="datalake",
-        topics=[get_topic(topic_suffix) for topic_suffix in ["resource.created", "resource.modified", "resource.deleted"]],
+        topics=[get_topic(topic_suffix) for topic_suffix in [
+            "resource.created", "resource.modified", "resource.deleted"
+        ]],
         message_processing_func=run_process_message,
     )
 

@@ -5,6 +5,7 @@ from unittest import mock
 from aioresponses import aioresponses
 import asyncpg
 import pytest
+import pytest_asyncio
 
 from minicli import run
 
@@ -22,7 +23,7 @@ def setup():
         yield
 
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def mock_pool(mocker):
     """This avoids having different pools attached to different event loops"""
     m = mocker.patch("udata_hydra.context.pool")
@@ -49,6 +50,7 @@ def produce_mock(mocker):
     mocker.patch("udata_hydra.crawl.produce")
     mocker.patch("udata_hydra.datalake_service.produce")
 
+
 @pytest.fixture
 def rmock():
     # passthrough for local requests (aiohttp TestServer)
@@ -56,14 +58,14 @@ def rmock():
         yield m
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db():
     conn = await asyncpg.connect(dsn=DATABASE_URL)
     yield conn
     await conn.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def fake_check(db):
     async def _fake_check(
         status=200,
