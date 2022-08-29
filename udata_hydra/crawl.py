@@ -49,6 +49,8 @@ async def insert_check(data: dict):
 async def update_check_and_catalog(check_data: dict) -> None:
     """Update the catalog and checks tables"""
     context.monitor().set_status("Updating checks and catalog...")
+    check_data['resource_id'] = str(check_data['resource_id'])
+
     pool = await context.pool()
     async with pool.acquire() as connection:
         q = f"""
@@ -231,16 +233,22 @@ async def check_url(row, session, sleep=0, method="get"):
                 }
             )
             return STATUS_OK
+    except asyncio.exceptions.TimeoutError:
+        await update_check_and_catalog(
+            {
+                "resource_id": row["resource_id"],
+                "url": row["url"],
+                "domain": domain,
+                "timeout": True,
+            }
+        )
+        return STATUS_TIMEOUT
     # TODO: debug AssertionError, should be caught in DB now
     # File "[...]aiohttp/connector.py", line 991, in _create_direct_connection
     # assert port is not None
     # UnicodeError: encoding with 'idna' codec failed (UnicodeError: label too long)
     # eg http://%20Localisation%20des%20acc%C3%A8s%20des%20offices%20de%20tourisme
-    except (
-        aiohttp.client_exceptions.ClientError,
-        AssertionError,
-        UnicodeError,
-    ) as e:
+    except Exception as e:
         error = getattr(e, "message", None) or str(e)
         await update_check_and_catalog(
             {
@@ -255,16 +263,6 @@ async def check_url(row, session, sleep=0, method="get"):
         )
         log.error(f"{row['url']}, {e}")
         return STATUS_ERROR
-    except asyncio.exceptions.TimeoutError:
-        await update_check_and_catalog(
-            {
-                "resource_id": row["resource_id"],
-                "url": row["url"],
-                "domain": domain,
-                "timeout": True,
-            }
-        )
-        return STATUS_TIMEOUT
 
 
 async def crawl_urls(to_parse):
@@ -294,7 +292,7 @@ async def crawl_batch():
         # first urls that are prioritised
         q = f"""
             SELECT * FROM (
-                SELECT DISTINCT(catalog.url), dataset_id, resource_id
+                SELECT catalog.url, dataset_id, resource_id
                 FROM catalog
                 WHERE {excluded}
                 AND deleted = False
@@ -307,7 +305,7 @@ async def crawl_batch():
         if len(to_check) < config.BATCH_SIZE:
             q = f"""
                 SELECT * FROM (
-                    SELECT DISTINCT(catalog.url), dataset_id, resource_id
+                    SELECT catalog.url, dataset_id, resource_id
                     FROM catalog
                     WHERE catalog.last_check IS NULL
                     AND {excluded}
@@ -324,7 +322,7 @@ async def crawl_batch():
             limit = config.BATCH_SIZE - len(to_check)
             q = f"""
             SELECT * FROM (
-                SELECT DISTINCT(catalog.url), dataset_id, resource_id
+                SELECT catalog.url, dataset_id, catalog.resource_id
                 FROM catalog, checks
                 WHERE catalog.last_check IS NOT NULL
                 AND {excluded}
