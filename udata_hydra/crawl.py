@@ -127,7 +127,8 @@ async def update_check_and_catalog(check_data: dict) -> None:
         log.debug("Updating priority...")
         await connection.execute(
             f"""
-            UPDATE catalog SET priority = FALSE, initialization = FALSE WHERE resource_id = '{check_data['resource_id']}';
+            UPDATE catalog SET priority = FALSE, initialization = FALSE
+            WHERE resource_id = '{check_data['resource_id']}';
         """
         )
 
