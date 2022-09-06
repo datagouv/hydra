@@ -6,6 +6,7 @@ import time
 
 from collections import defaultdict
 from datetime import datetime, timedelta
+from requests.exceptions import SSLError
 from urllib.parse import urlparse
 
 import aiohttp
@@ -249,7 +250,12 @@ async def check_url(row, session, sleep=0, method="get"):
     # assert port is not None
     # UnicodeError: encoding with 'idna' codec failed (UnicodeError: label too long)
     # eg http://%20Localisation%20des%20acc%C3%A8s%20des%20offices%20de%20tourisme
-    except Exception as e:
+    except (
+        aiohttp.client_exceptions.ClientError,
+        AssertionError,
+        UnicodeError,
+        SSLError,
+    ) as e:
         error = getattr(e, "message", None) or str(e)
         await update_check_and_catalog(
             {
