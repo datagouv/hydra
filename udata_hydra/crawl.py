@@ -6,6 +6,7 @@ import time
 
 from collections import defaultdict
 from datetime import datetime, timedelta
+from requests.exceptions import SSLError
 from urllib.parse import urlparse
 
 import aiohttp
@@ -49,12 +50,14 @@ async def insert_check(data: dict):
 async def update_check_and_catalog(check_data: dict) -> None:
     """Update the catalog and checks tables"""
     context.monitor().set_status("Updating checks and catalog...")
+    check_data['resource_id'] = str(check_data['resource_id'])
+
     pool = await context.pool()
     async with pool.acquire() as connection:
         q = f"""
             SELECT * FROM catalog JOIN checks
             ON catalog.last_check = checks.id
-            WHERE catalog.url = '{check_data['url']}';
+            WHERE catalog.resource_id = '{check_data['resource_id']}';
         """
         last_checks = await connection.fetch(q)
 
@@ -62,7 +65,9 @@ async def update_check_and_catalog(check_data: dict) -> None:
             # In case we are doing our first check for given URL
             rows = await connection.fetch(
                 f"""
-                SELECT resource_id, dataset_id, priority, initialization FROM catalog WHERE url = '{check_data['url']}';
+                SELECT resource_id, dataset_id, priority, initialization
+                FROM catalog
+                WHERE resource_id = '{check_data['resource_id']}';
             """
             )
             last_checks = [
@@ -80,7 +85,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
         # There could be multiple resources pointing to the same URL
         for last_check in last_checks:
             if config.ENABLE_KAFKA:
-                is_first_check = last_check is None
+                is_first_check = last_check["status"] is None
                 status_has_changed = (
                     "status" in check_data
                     and check_data["status"] != last_check["status"]
@@ -123,7 +128,8 @@ async def update_check_and_catalog(check_data: dict) -> None:
         log.debug("Updating priority...")
         await connection.execute(
             f"""
-            UPDATE catalog SET priority = FALSE, initialization = FALSE WHERE url = '{check_data['url']}';
+            UPDATE catalog SET priority = FALSE, initialization = FALSE
+            WHERE resource_id = '{check_data['resource_id']}';
         """
         )
 
@@ -184,6 +190,7 @@ async def check_url(row, session, sleep=0, method="get"):
         log.warning(f"[warning] not netloc in url, skipping {row['url']}")
         await update_check_and_catalog(
             {
+                "resource_id": row["resource_id"],
                 "url": row["url"],
                 "error": "Not netloc in url",
                 "timeout": False,
@@ -218,6 +225,7 @@ async def check_url(row, session, sleep=0, method="get"):
 
             await update_check_and_catalog(
                 {
+                    "resource_id": row["resource_id"],
                     "url": row["url"],
                     "domain": domain,
                     "status": resp.status,
@@ -227,6 +235,16 @@ async def check_url(row, session, sleep=0, method="get"):
                 }
             )
             return STATUS_OK
+    except asyncio.exceptions.TimeoutError:
+        await update_check_and_catalog(
+            {
+                "resource_id": row["resource_id"],
+                "url": row["url"],
+                "domain": domain,
+                "timeout": True,
+            }
+        )
+        return STATUS_TIMEOUT
     # TODO: debug AssertionError, should be caught in DB now
     # File "[...]aiohttp/connector.py", line 991, in _create_direct_connection
     # assert port is not None
@@ -236,10 +254,12 @@ async def check_url(row, session, sleep=0, method="get"):
         aiohttp.client_exceptions.ClientError,
         AssertionError,
         UnicodeError,
+        SSLError,
     ) as e:
         error = getattr(e, "message", None) or str(e)
         await update_check_and_catalog(
             {
+                "resource_id": row["resource_id"],
                 "url": row["url"],
                 "domain": domain,
                 "timeout": False,
@@ -250,15 +270,6 @@ async def check_url(row, session, sleep=0, method="get"):
         )
         log.error(f"{row['url']}, {e}")
         return STATUS_ERROR
-    except asyncio.exceptions.TimeoutError:
-        await update_check_and_catalog(
-            {
-                "url": row["url"],
-                "domain": domain,
-                "timeout": True,
-            }
-        )
-        return STATUS_TIMEOUT
 
 
 async def crawl_urls(to_parse):
@@ -288,7 +299,7 @@ async def crawl_batch():
         # first urls that are prioritised
         q = f"""
             SELECT * FROM (
-                SELECT DISTINCT(catalog.url), dataset_id, resource_id
+                SELECT catalog.url, dataset_id, resource_id
                 FROM catalog
                 WHERE {excluded}
                 AND deleted = False
@@ -301,7 +312,7 @@ async def crawl_batch():
         if len(to_check) < config.BATCH_SIZE:
             q = f"""
                 SELECT * FROM (
-                    SELECT DISTINCT(catalog.url), dataset_id, resource_id
+                    SELECT catalog.url, dataset_id, resource_id
                     FROM catalog
                     WHERE catalog.last_check IS NULL
                     AND {excluded}
@@ -318,7 +329,7 @@ async def crawl_batch():
             limit = config.BATCH_SIZE - len(to_check)
             q = f"""
             SELECT * FROM (
-                SELECT DISTINCT(catalog.url), dataset_id, resource_id
+                SELECT catalog.url, dataset_id, catalog.resource_id
                 FROM catalog, checks
                 WHERE catalog.last_check IS NOT NULL
                 AND {excluded}

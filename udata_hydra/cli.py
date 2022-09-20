@@ -59,6 +59,7 @@ async def init_db(drop=False, table=None, index=False, reindex=False):
         """
         CREATE TABLE IF NOT EXISTS checks(
             id serial PRIMARY KEY,
+            resource_id UUID,
             url VARCHAR,
             domain VARCHAR,
             created_at TIMESTAMP DEFAULT NOW(),
