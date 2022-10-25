@@ -13,11 +13,10 @@ import aiohttp
 import asyncio
 
 from humanfriendly import parse_timespan
-from udata_event_service.producer import produce
 
 from udata_hydra import config, context
 from udata_hydra.datalake_service import process_resource
-from udata_hydra.utils.kafka import get_topic
+from udata_hydra.utils.http import send
 
 log = logging.getLogger("udata-hydra")
 
@@ -84,7 +83,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
 
         # There could be multiple resources pointing to the same URL
         for last_check in last_checks:
-            if config.ENABLE_KAFKA:
+            if config.ENABLE_WEBHOOK:
                 is_first_check = last_check["status"] is None
                 status_has_changed = (
                     "status" in check_data
@@ -104,26 +103,14 @@ async def update_check_and_catalog(check_data: dict) -> None:
                     or status_no_longer_available
                     or timeout_has_changed
                 ):
-                    log.debug("Sending message to Kafka...")
-                    message_type = (
-                        "event-update"
-                        if last_check["priority"]
-                        else "initialization"
-                        if last_check["initialization"]
-                        else "regular-update"
-                    )
-                    meta = {
-                        "dataset_id": last_check["dataset_id"],
-                        "message_type": message_type,
-                    }
-                    produce(
-                        kafka_uri=config.KAFKA_URI,
-                        topic=get_topic("resource.checked"),
-                        service="udata-hydra",
-                        key_id=str(last_check["resource_id"]),
-                        document={**check_data, "check_date": str(datetime.now())},
-                        meta=meta,
-                    )
+                    log.debug("Sending message to Udata...")
+                    document = dict()
+                    document['check:status'] = check_data['status'] if status_has_changed else last_check["status"]
+                    document['check:timeout'] = check_data['timeout']
+                    document['check:check_date'] = str(datetime.now())
+                    send(dataset_id=last_check["dataset_id"],
+                         resource_id=last_check["resource_id"],
+                         document=document)
 
         log.debug("Updating priority...")
         await connection.execute(

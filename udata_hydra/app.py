@@ -10,6 +10,7 @@ from marshmallow import Schema, fields
 
 from udata_hydra import context, config
 from udata_hydra.crawl import get_excluded_clause
+from udata_hydra.utils.minio import delete_resource_from_minio
 
 
 log = logging.getLogger("aiohttp.access")
@@ -40,6 +41,69 @@ def _get_args(request):
     if not url and not resource_id:
         raise web.HTTPBadRequest()
     return url, resource_id
+
+
+@routes.post("/api/resource/created/")
+async def resource_created(request):
+    payload = await request.json()
+
+    dataset_id = payload["meta"]["dataset_id"]
+    resource = payload["document"]
+    key = payload['key']
+
+    pool = await context.pool()
+    async with pool.acquire() as connection:
+        # Insert new resource in catalog table and mark as high priority for crawling
+        q = f"""
+                INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)
+                VALUES ('{dataset_id}', '{key}', '{resource["url"]}', FALSE, TRUE, FALSE)
+                ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
+        await connection.execute(q)
+
+    return web.json_response({'message': 'created'})
+
+
+@routes.post("/api/resource/updated/")
+async def resource_updated(request):
+    payload = await request.json()
+
+    dataset_id = payload["meta"]["dataset_id"]
+    resource = payload["document"]
+    key = payload['key']
+
+    pool = await context.pool()
+    async with pool.acquire() as connection:
+        # Make resource high priority for crawling
+        # Check if resource is in catalog then insert or update into table
+        q = f"""SELECT * FROM catalog WHERE resource_id = '{key}';"""
+        res = await connection.fetch(q)
+        if (len(res) != 0):
+            q = f"""UPDATE catalog SET priority = TRUE WHERE resource_id = '{key}';"""
+        else:
+            q = f"""
+                    INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)
+                    VALUES ('{dataset_id}', '{key}', '{resource["url"]}', FALSE, TRUE, FALSE)
+                    ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
+        await connection.execute(q)
+
+    return web.json_response({'message': 'updated'})
+
+
+@routes.post("/api/resource/deleted/")
+async def resource_deleted(request):
+    payload = await request.json()
+
+    dataset_id = payload["meta"]["dataset_id"]
+    key = payload['key']
+
+    pool = await context.pool()
+    async with pool.acquire() as connection:
+        delete_resource_from_minio(dataset_id, key)
+        # Mark resource as deleted in catalog table
+        q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{key}';"""
+        await connection.execute(q)
+
+    return web.json_response({'message': 'deleted'})
 
 
 @routes.get("/api/checks/latest/")

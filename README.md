@@ -212,18 +212,14 @@ $ curl -s "http://localhost:8000/api/stats/" | json_pp
 }
 ```
 
-### Using Kafka integration
+### Using Webhook integration
 
 ** Set the environment variables **
 Rename the `.env.sample` to `.env` and fill it with the right values.
 
 ```shell
-REDIS_URL = redis://localhost:6380/0
-REDIS_HOST = localhost
-REDIS_PORT = 6380
-KAFKA_HOST = localhost
-KAFKA_PORT = 9092
-KAFKA_API_VERSION = 2.5.0
+UDATA_URI = https://dev.local./
+UDATA_URI_API_KEY = example.api.key
 MINIO_URL = https://object.local.dev/
 MINIO_USER = sample_user
 MINIO_BUCKET = benchmark-de
@@ -233,15 +229,12 @@ MAX_FILESIZE_ALLOWED = 1e9
 UDATA_INSTANCE_NAME = udata
 ```
 
-The `kafka_integration` module retrieves messages with the topics `resource.created`, `resource.modified` and `resource.deleted` sent by `udata`.
-The Kafka instance URI, Hydra API URL and Data Gouv API URL to be used can be defined in `udata-hydra/config` or overwritten with env variables.
-It can be launched using the CLI: `udata-hydra run_kafka_integration`.
-This will mark the corresponding resources as highest priority for the next crawling batch.
+The webhook integration sends HTTP messages to `udata` when resources are stored, analyzed or checked to fill resources extras.
 
 
 ### Logging & Debugging
 The log level can be adjusted using the environment variable LOGLEVEL.
-For example, to set the log level to `DEBUG` when running the Kafka integration, use `LOGLEVEL="DEBUG" udata-hydra run_kafka_integration `.
+For example, to set the log level to `DEBUG` when initializing the database, use `LOGLEVEL="DEBUG" udata-hydra init_db `.
 
 ## TODO
 

@@ -24,8 +24,7 @@ SINCE = '1w'
 # seconds to wait for between batches
 SLEEP_BETWEEN_BATCHES = 60
 
-# -- Kafka integration config -- #
-ENABLE_KAFKA = True
-KAFKA_HOST = os.environ.get('KAFKA_HOST', 'localhost')
-KAFKA_PORT = os.environ.get('KAFKA_PORT', '9092')
-KAFKA_URI = f'{KAFKA_HOST}:{KAFKA_PORT}'
+# -- Webhook integration config -- #
+ENABLE_WEBHOOK = True
+UDATA_URI = ''
+UDATA_URI_API_KEY = ''
