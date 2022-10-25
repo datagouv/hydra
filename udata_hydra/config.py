@@ -1,4 +1,3 @@
-import os
 # -- crawler settings -- #
 
 # sql LIKE syntax
