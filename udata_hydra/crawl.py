@@ -357,11 +357,7 @@ async def crawl(iterations=-1):
 
 
 def setup_logging():
-    file_handler = os.getenv("HYDRA_CURSES_ENABLED", False) == "True"
-    if file_handler:
-        handler = logging.FileHandler("crawl.log")
-    else:
-        handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
     handler.setFormatter(formatter)
     log.addHandler(handler)

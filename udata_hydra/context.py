@@ -5,8 +5,6 @@ from unittest.mock import MagicMock
 
 import asyncpg
 
-from udata_hydra.monitor import Monitor
-
 log = logging.getLogger("udata-hydra")
 context = {}
 
@@ -14,15 +12,11 @@ context = {}
 def monitor():
     if "monitor" in context:
         return context["monitor"]
-    curses_enabled = os.getenv("HYDRA_CURSES_ENABLED", False) == "True"
-    if curses_enabled:
-        monitor = Monitor()
-    else:
-        monitor = MagicMock()
-        monitor.set_status = lambda x: log.debug(x)
-        monitor.init = lambda **kwargs: log.debug(
-            f"Starting udata-hydra... {kwargs}"
-        )
+    monitor = MagicMock()
+    monitor.set_status = lambda x: log.debug(x)
+    monitor.init = lambda **kwargs: log.debug(
+        f"Starting udata-hydra... {kwargs}"
+    )
     context["monitor"] = monitor
     return context["monitor"]
 

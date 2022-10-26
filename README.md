@@ -33,10 +33,6 @@ There's a by-domain backoff mecanism. The crawler will wait when, for a given do
 
 If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
-A curses interface is available via:
-
-`HYDRA_CURSES_ENABLED=True udata-hydra-crawl`
-
 ## API
 
 ### Run
