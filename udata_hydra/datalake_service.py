@@ -1,3 +1,5 @@
+from datetime import date
+import hashlib
 import logging
 import os
 import tempfile
@@ -9,6 +11,7 @@ import pandas as pd
 from aiohttp import ClientResponse
 from dotenv import load_dotenv
 
+from udata_hydra import context
 from udata_hydra.utils.http import send
 from udata_hydra.utils.json import is_json_file
 from udata_hydra.utils.minio import save_resource_to_minio
@@ -55,12 +58,22 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             resource_id, dataset_id
         )
     )
+
     tmp_file = None
+    mime_type = None
+    sha1 = None
+    filesize = None
+    error = None
+
     try:
         tmp_file = await download_resource(url, response)
 
         # Get file size
         filesize = os.path.getsize(tmp_file.name)
+
+        # Get checksum
+        with open(tmp_file.name, 'rb') as f:
+            sha1 = hashlib.sha1(f.read()).hexdigest()
 
         # Check resource MIME type
         mime_type = magic.from_file(tmp_file.name, mime=True)
@@ -85,7 +98,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                 # Try to read first 1000 rows with pandas
                 pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
 
-                save_resource_to_minio(tmp_file, dataset_id, resource_id)
+                # save_resource_to_minio(tmp_file, dataset_id, resource_id)
                 storage_location = {
                     "netloc": os.getenv("MINIO_URL"),
                     "bucket": os.getenv("MINIO_BUCKET"),
@@ -107,6 +120,10 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                     f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
                 )
 
+        # Check if checksum has been modified
+        checksum_modified = await has_checksum_been_modified(resource_id, sha1)
+        log.debug(checksum_modified)
+
         # Send Udata a message for both CSV and non CSV resources
         log.debug(
             f"Sending a message to Udata for resource analysed {resource_id} in dataset {dataset_id}"
@@ -114,14 +131,16 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
         document = {
             'analysis:error': None,
             'analysis:filesize': filesize,
-            'analysis:mime': mime_type
+            'analysis:mime': mime_type,
+            'analysis:checksum_last_modified': date.now()
         }
         await send(dataset_id=dataset_id,
                    resource_id=resource_id,
                    document=document)
     except IOError:
+        error = "File too large to download"
         document = {
-            'analysis:error': "File too large to download",
+            'analysis:error': error,
             'analysis:filesize': None,
             'analysis:mime': None,
         }
@@ -131,3 +150,31 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
     finally:
         if tmp_file:
             os.remove(tmp_file.name)
+        return {
+            "checksum": sha1,
+            "error": error,
+            "filesize": filesize,
+            "mime_type": mime_type
+        }
+
+async def has_checksum_been_modified(resource_id, new_checksum):
+    q = """
+    SELECT
+        checksum
+    FROM checks
+    WHERE resource_id = $1
+    ORDER BY created_at DESC
+    LIMIT 1
+    """
+    pool = await context.pool()
+    async with pool.acquire() as connection:
+        data = await connection.fetch(q, resource_id)
+        log.debug(data)
+        if data:
+            if data[0]['checksum'] != new_checksum:
+                return True
+            else:
+                return False
+        else:
+            # First check, thus this is a new checksum
+            return True
