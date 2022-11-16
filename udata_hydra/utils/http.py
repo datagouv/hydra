@@ -8,7 +8,7 @@ log = logging.getLogger("udata-hydra")
 
 async def send(dataset_id: str, resource_id: str, document: dict) -> None:
     if not config.UDATA_URI or not config.UDATA_URI_API_KEY:
-        log.error(f"Missing Udata URI and API key to send http query")
+        log.error(g"Missing Udata URI and API key to send http query")
         return
     uri = f"{config.UDATA_URI}{dataset_id}/resources/{resource_id}/extras/"
     headers = {"content-type": "application/json", "X-API-KEY": config.UDATA_URI_API_KEY}
