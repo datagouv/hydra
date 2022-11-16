@@ -107,9 +107,9 @@ async def update_check_and_catalog(check_data: dict) -> None:
                     document['check:status'] = check_data['status'] if status_has_changed else last_check["status"]
                     document['check:timeout'] = check_data['timeout']
                     document['check:check_date'] = str(datetime.now())
-                    send(dataset_id=last_check["dataset_id"],
-                         resource_id=last_check["resource_id"],
-                         document=document)
+                    await send(dataset_id=last_check["dataset_id"],
+                               resource_id=last_check["resource_id"],
+                               document=document)
 
         log.debug("Updating priority...")
         await connection.execute(

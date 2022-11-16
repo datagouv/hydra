@@ -99,9 +99,9 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                     f"Sending message to Udata for resource stored {resource_id} in dataset {dataset_id}"
                 )
                 document = {'store:data_location': storage_location}
-                send(dataset_id=dataset_id,
-                     resource_id=resource_id,
-                     document=document)
+                await send(dataset_id=dataset_id,
+                           resource_id=resource_id,
+                           document=document)
             except ValueError:
                 log.debug(
                     f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
@@ -116,18 +116,18 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             'analysis:filesize': filesize,
             'analysis:mime': mime_type
         }
-        send(dataset_id=dataset_id,
-             resource_id=resource_id,
-             document=document)
+        await send(dataset_id=dataset_id,
+                   resource_id=resource_id,
+                   document=document)
     except IOError:
         document = {
             'analysis:error': "File too large to download",
             'analysis:filesize': None,
             'analysis:mime': None,
         }
-        send(dataset_id=dataset_id,
-             resource_id=resource_id,
-             document=document)
+        await send(dataset_id=dataset_id,
+                   resource_id=resource_id,
+                   document=document)
     finally:
         if tmp_file:
             os.remove(tmp_file.name)
