@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 import hashlib
 import logging
 import os
@@ -99,15 +99,13 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                 pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
 
                 # save_resource_to_minio(tmp_file, dataset_id, resource_id)
-                storage_location = {
-                    "netloc": os.getenv("MINIO_URL"),
-                    "bucket": os.getenv("MINIO_BUCKET"),
-                    "key": MINIO_FOLDER
-                    + "/"
-                    + dataset_id
-                    + "/"
-                    + resource_id,
-                }
+                storage_location = '/'.join([
+                    os.getenv("MINIO_URL"),
+                    os.getenv("MINIO_BUCKET"),
+                    MINIO_FOLDER,
+                    dataset_id,
+                    resource_id
+                ])
                 log.debug(
                     f"Sending message to Udata for resource stored {resource_id} in dataset {dataset_id}"
                 )
@@ -132,7 +130,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             'analysis:error': None,
             'analysis:filesize': filesize,
             'analysis:mime': mime_type,
-            'analysis:checksum_last_modified': date.now()
+            'analysis:checksum_last_modified': datetime.now().isoformat()
         }
         await send(dataset_id=dataset_id,
                    resource_id=resource_id,
