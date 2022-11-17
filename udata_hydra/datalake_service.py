@@ -96,7 +96,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                     + resource_id,
                 }
                 log.debug(
-                    f"Sending message to Udata for resource stored {resource_id} in dataset {dataset_id}"
+                    f"Sending message to udata for resource stored {resource_id} in dataset {dataset_id}"
                 )
                 document = {'store:data_location': storage_location}
                 await send(dataset_id=dataset_id,
