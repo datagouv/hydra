@@ -107,7 +107,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                     f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
                 )
 
-        # Send Udata a message for both CSV and non CSV resources
+        # Send udata a message for both CSV and non CSV resources
         log.debug(
             f"Sending a message to udata for resource analysed {resource_id} in dataset {dataset_id}"
         )
