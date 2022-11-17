@@ -16,4 +16,4 @@ async def send(dataset_id: str, resource_id: str, document: dict) -> None:
         async with session.put(uri, json=document, headers=headers) as resp:
             body = await resp.json()
             if not resp.status == 200:
-                log.error(f"Udata reponded with a {resp.status} and content {body['message']}")
+                log.error(f"udata reponded with a {resp.status} and content {body['message']}")
