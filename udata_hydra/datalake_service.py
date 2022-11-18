@@ -118,10 +118,6 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                     f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
                 )
 
-        # Check if checksum has been modified
-        checksum_modified = await has_checksum_been_modified(resource_id, sha1)
-        log.debug(checksum_modified)
-
         # Send Udata a message for both CSV and non CSV resources
         log.debug(
             f"Sending a message to Udata for resource analysed {resource_id} in dataset {dataset_id}"
@@ -130,8 +126,12 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             'analysis:error': None,
             'analysis:filesize': filesize,
             'analysis:mime': mime_type,
-            'analysis:checksum_last_modified': datetime.now().isoformat()
         }
+        # Check if checksum has been modified
+        checksum_modified = await has_checksum_been_modified(resource_id, sha1)
+        if checksum_modified:
+            document['analysis:checksum_last_modified'] = datetime.now().isoformat()
+
         await send(dataset_id=dataset_id,
                    resource_id=resource_id,
                    document=document)
@@ -160,7 +160,7 @@ async def has_checksum_been_modified(resource_id, new_checksum):
     SELECT
         checksum
     FROM checks
-    WHERE resource_id = $1
+    WHERE resource_id = $1 and checksum IS NOT NULL
     ORDER BY created_at DESC
     LIMIT 1
     """
