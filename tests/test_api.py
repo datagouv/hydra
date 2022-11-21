@@ -202,3 +202,79 @@ async def test_changed_content_length_unchanged(
     check = await fake_check(headers={"content-length": 1}, created_at=c2)
     resp = await client.get(f"/api/changed/?url={check['url']}")
     assert resp.status == 204
+
+
+async def test_api_resource_created(client):
+    data = {
+        'resource_id': 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec',
+        'dataset_id': '61fd30cb29ea95c7bc0e1211',
+        'document': {
+            'id': 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec',
+            'url': 'http://dev.local/',
+            'title': 'random title',
+            'description': 'random description',
+            'filetype': 'file',
+            'type': 'documentation',
+            'mime': 'text/plain',
+            'filesize': 1024,
+            'checksum_type': 'sha1',
+            'checksum_value': 'b7b1cd8230881b18b6b487d550039949867ec7c5',
+            'created_at': datetime.now,
+            'modified': datetime.now,
+            'published': datetime.now
+        }
+    }
+    resp = await client.post("/api/resource/created/", json=data)
+    assert resp.status == 200
+    data = await resp.json()
+    assert data == {'message': 'created'}
+
+    data['document'] = None
+    resp = await client.post("/api/resource/created/", json=data)
+    assert resp.status == 400
+    text = await resp.text()
+    assert text == 'Missing document body'
+
+
+async def test_api_resource_updated(client):
+    data = {
+        'resource_id': 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec',
+        'dataset_id': '61fd30cb29ea95c7bc0e1211',
+        'document': {
+            'id': 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec',
+            'url': 'http://dev.local/',
+            'title': 'random title',
+            'description': 'random description',
+            'filetype': 'file',
+            'type': 'documentation',
+            'mime': 'text/plain',
+            'filesize': 1024,
+            'checksum_type': 'sha1',
+            'checksum_value': 'b7b1cd8230881b18b6b487d550039949867ec7c5',
+            'created_at': datetime.now,
+            'modified': datetime.now,
+            'published': datetime.now
+        }
+    }
+    resp = await client.post("/api/resource/updated/", json=data)
+    assert resp.status == 200
+    data = await resp.json()
+    assert data == {'message': 'updated'}
+
+    data['document'] = None
+    resp = await client.post("/api/resource/updated/", json=data)
+    assert resp.status == 400
+    text = await resp.text()
+    assert text == 'Missing document body'
+
+
+async def test_api_resource_deleted(client):
+    data = {
+        'resource_id': 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec',
+        'dataset_id': '61fd30cb29ea95c7bc0e1211',
+        'document': None
+    }
+    resp = await client.post("/api/resource/deleted/", json=data)
+    assert resp.status == 200
+    data = await resp.json()
+    assert data == {'message': 'deleted'}
