@@ -1,3 +1,12 @@
+import os
+
+# -- general settings -- #
+LOG_LEVEL = "DEBUG"
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgres://postgres:postgres@localhost:5432/postgres"
+)
+
 # -- crawler settings -- #
 
 # sql LIKE syntax
@@ -22,6 +31,8 @@ BATCH_SIZE = 100
 SINCE = '1w'
 # seconds to wait for between batches
 SLEEP_BETWEEN_BATCHES = 60
+# max download filesize in bytes (100 MB)
+MAX_FILESIZE_ALLOWED = 104857600
 
 # -- Webhook integration config -- #
 ENABLE_WEBHOOK = True

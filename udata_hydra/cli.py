@@ -11,8 +11,10 @@ from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
 
+from udata_hydra.config import config
+
 log = logging.getLogger("udata-hydra")
-log.setLevel(os.getenv("LOGLEVEL", logging.INFO))
+log.setLevel(config.LOG_LEVEL)
 logging.basicConfig()
 
 CATALOG_URL = 'https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d'
@@ -193,9 +195,7 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
 
 @wrap
 async def cli_wrapper():
-    dsn = os.getenv(
-        "DATABASE_URL", "postgres://postgres:postgres@localhost:5432/postgres"
-    )
+    dsn = config.DATABASE_URL
     context["conn"] = await asyncpg.connect(dsn=dsn)
     context["dsn"] = dsn
     yield

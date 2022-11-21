@@ -1,9 +1,10 @@
-import os
 import logging
 
 from unittest.mock import MagicMock
 
 import asyncpg
+
+from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
 context = {}
@@ -23,9 +24,6 @@ def monitor():
 
 async def pool():
     if "pool" not in context:
-        dsn = os.getenv(
-            "DATABASE_URL",
-            "postgres://postgres:postgres@localhost:5432/postgres",
-        )
+        dsn = config.DATABASE_URL
         context["pool"] = await asyncpg.create_pool(dsn=dsn, max_size=50)
     return context["pool"]

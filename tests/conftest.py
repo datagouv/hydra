@@ -1,5 +1,3 @@
-import os
-
 from unittest import mock
 
 from aioresponses import aioresponses
@@ -12,14 +10,14 @@ from minicli import run
 import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra.crawl import insert_check
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
+DATABASE_URL = "postgresql://postgres:postgres@localhost:5433/postgres"
 pytestmark = pytest.mark.asyncio
 
 
 # this really really really should run first (or "prod" db will get erased)
 @pytest.fixture(autouse=True, scope="session")
 def setup():
-    with mock.patch.dict(os.environ, {"DATABASE_URL": DATABASE_URL}):
+    with mock.patch("udata_hydra.config.DATABASE_URL", DATABASE_URL):
         yield
 
 
