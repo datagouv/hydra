@@ -8,10 +8,10 @@ import pandas as pd
 
 from aiohttp import ClientResponse
 from dotenv import load_dotenv
-from udata_event_service.producer import produce
 
+from udata_hydra import config
+from udata_hydra.utils.http import send
 from udata_hydra.utils.json import is_json_file
-from udata_hydra.utils.kafka import get_topic
 from udata_hydra.utils.minio import save_resource_to_minio
 from udata_hydra.utils.csv import detect_encoding, find_delimiter
 
@@ -19,8 +19,6 @@ load_dotenv()
 
 log = logging.getLogger("udata-hydra")
 
-BROKER_URL = os.environ.get("BROKER_URL", "redis://localhost:6380/0")
-KAFKA_URI = f'{os.environ.get("KAFKA_HOST", "localhost")}:{os.environ.get("KAFKA_PORT", "9092")}'
 MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
 MAX_FILESIZE_ALLOWED = os.environ.get("MAX_FILESIZE_ALLOWED", 1000)
 
@@ -87,70 +85,50 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
 
                 # Try to read first 1000 rows with pandas
                 pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
-
-                save_resource_to_minio(tmp_file, dataset_id, resource_id)
-                storage_location = {
-                    "netloc": os.getenv("MINIO_URL"),
-                    "bucket": os.getenv("MINIO_BUCKET"),
-                    "key": MINIO_FOLDER
-                    + "/"
-                    + dataset_id
-                    + "/"
-                    + resource_id,
-                }
-                log.debug(
-                    f"Sending kafka message for resource stored {resource_id} in dataset {dataset_id}"
-                )
-                produce(
-                    KAFKA_URI,
-                    get_topic("resource.stored"),
-                    "udata-hydra",
-                    resource_id,
-                    {
-                        "data_location": storage_location,
-                        "mime_type": mime_type,
-                        "filesize": filesize,
-                        "delimiter": delimiter,
-                        "encoding": encoding,
-                    },
-                    meta={"dataset_id": dataset_id, "message_type": "resource.stored"},
-                )
+                if config.SAVE_TO_MINIO:
+                    save_resource_to_minio(tmp_file, dataset_id, resource_id)
+                    storage_location = {
+                        "netloc": os.getenv("MINIO_URL"),
+                        "bucket": os.getenv("MINIO_BUCKET"),
+                        "key": MINIO_FOLDER
+                        + "/"
+                        + dataset_id
+                        + "/"
+                        + resource_id,
+                    }
+                    log.debug(
+                        f"Sending message to udata for resource stored {resource_id} in dataset {dataset_id}"
+                    )
+                    document = {'store:data_location': storage_location}
+                    await send(dataset_id=dataset_id,
+                               resource_id=resource_id,
+                               document=document)
             except ValueError:
                 log.debug(
                     f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
                 )
 
-        # Send a Kafka message for both CSV and non CSV resources
+        # Send udata a message for both CSV and non CSV resources
         log.debug(
-            f"Sending kafka message for resource analysed {resource_id} in dataset {dataset_id}"
+            f"Sending a message to udata for resource analysed {resource_id} in dataset {dataset_id}"
         )
-        message = {
-            "error": None,
-            "filesize": filesize,
-            "mime": mime_type,
-            "resource_url": url,
+        document = {
+            'analysis:error': None,
+            'analysis:filesize': filesize,
+            'analysis:mime': mime_type
         }
-        produce(
-            KAFKA_URI,
-            get_topic("resource.analysed"),
-            "udata-hydra",
-            resource_id,
-            message,
-            meta={"dataset_id": dataset_id, "message_type": "resource.analysed"},
-        )
+        await send(dataset_id=dataset_id,
+                   resource_id=resource_id,
+                   document=document)
     except IOError:
-        produce(
-            KAFKA_URI,
-            get_topic("resource.analysed"),
-            "udata-hydra",
-            resource_id,
-            {
-                "resource_url": url,
-                "error": "File too large to download",
-                "filesize": None,
-            },
-            meta={"dataset_id": dataset_id, "message_type": "resource.analysed"},
-        )
+        document = {
+            'analysis:error': "File too large to download",
+            'analysis:filesize': None,
+            'analysis:mime': None,
+        }
+        await send(dataset_id=dataset_id,
+                   resource_id=resource_id,
+                   document=document)
     finally:
         if tmp_file:
             os.remove(tmp_file.name)

@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import csv
 import os
@@ -8,19 +7,9 @@ from tempfile import NamedTemporaryFile
 
 import aiohttp
 import asyncpg
-import boto3
-from botocore.client import Config
-from botocore.exceptions import ClientError
-from dotenv import load_dotenv
 from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
-
-from udata_event_service.consumer import consume_kafka
-
-from udata_hydra.config import KAFKA_URI
-from udata_hydra.kafka.consumer import process_message
-from udata_hydra.utils.kafka import get_topic
 
 log = logging.getLogger("udata-hydra")
 log.setLevel(os.getenv("LOGLEVEL", logging.INFO))
@@ -197,39 +186,6 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
         writer = csv.DictWriter(ofile, fieldnames=lines[0].keys())
         writer.writeheader()
         writer.writerows(lines)
-
-
-@cli
-def run_kafka_integration() -> None:
-    load_dotenv()
-    log.debug('Running Kafka integration...')
-    # Create bucket if it doesn't exist
-    client = boto3.client(
-        "s3",
-        endpoint_url=os.getenv("MINIO_URL"),
-        aws_access_key_id=os.getenv("MINIO_USER"),
-        aws_secret_access_key=os.getenv("MINIO_PWD"),
-        config=Config(signature_version="s3v4"),
-    )
-    try:
-        client.head_bucket(Bucket=os.getenv("MINIO_BUCKET"))
-    except ClientError:
-        client.create_bucket(Bucket=os.getenv("MINIO_BUCKET"))
-
-    def run_process_message(key: str, data: dict, topic: str) -> None:
-        try:
-            asyncio.get_event_loop().run_until_complete(process_message(key, data, topic))
-        except Exception as e:
-            log.error(e)
-
-    consume_kafka(
-        kafka_uri=KAFKA_URI,
-        group_id="datalake",
-        topics=[get_topic(topic_suffix) for topic_suffix in [
-            "resource.created", "resource.modified", "resource.deleted"
-        ]],
-        message_processing_func=run_process_message,
-    )
 
 
 @wrap

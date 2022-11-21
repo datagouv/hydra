@@ -47,8 +47,8 @@ def setup_catalog(catalog_content, rmock):
 
 @pytest.fixture
 def produce_mock(mocker):
-    mocker.patch("udata_hydra.crawl.produce")
-    mocker.patch("udata_hydra.datalake_service.produce")
+    mocker.patch("udata_hydra.crawl.send")
+    mocker.patch("udata_hydra.datalake_service.send")
 
 
 @pytest.fixture
