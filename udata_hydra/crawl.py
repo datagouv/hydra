@@ -102,7 +102,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
                     or status_no_longer_available
                     or timeout_has_changed
                 ):
-                    log.debug("Sending message to Udata...")
+                    log.debug("Sending message to udata...")
                     document = dict()
                     document['check:status'] = check_data['status'] if status_has_changed else last_check["status"]
                     document['check:timeout'] = check_data['timeout']
