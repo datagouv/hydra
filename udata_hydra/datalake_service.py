@@ -98,7 +98,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                 # Try to read first 1000 rows with pandas
                 pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
 
-                # save_resource_to_minio(tmp_file, dataset_id, resource_id)
+                save_resource_to_minio(tmp_file, dataset_id, resource_id)
                 storage_location = '/'.join([
                     os.getenv("MINIO_URL"),
                     os.getenv("MINIO_BUCKET"),
@@ -154,6 +154,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             "filesize": filesize,
             "mime_type": mime_type
         }
+
 
 async def has_checksum_been_modified(resource_id, new_checksum):
     q = """
