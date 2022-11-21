@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from aiohttp import web
 from dateutil.parser import parse as date_parser, ParserError
 from humanfriendly import parse_timespan
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, ValidationError
 
 from udata_hydra import context, config
 from udata_hydra.crawl import get_excluded_clause
@@ -35,6 +35,32 @@ class CheckSchema(Schema):
     deleted = fields.Boolean()
 
 
+class ResourceDocument(Schema):
+    id = fields.Str(required=True)
+    url = fields.Str(required=True)
+    format = fields.Str(allow_none=True)
+    title = fields.Str(required=True)
+    schema = fields.Dict()
+    description = fields.Str(allow_none=True)
+    filetype = fields.Str(required=True)
+    type = fields.Str(required=True)
+    mime = fields.Str(allow_none=True)
+    filesize = fields.Int(allow_none=True)
+    checksum_type = fields.Str(allow_none=True)
+    checksum_value = fields.Str(allow_none=True)
+    created_at = fields.DateTime(required=True)
+    modified = fields.DateTime(required=True)
+    published = fields.DateTime(required=True)
+    extras = fields.Dict()
+    harvest = fields.Dict()
+
+
+class ResourceQuery(Schema):
+    dataset_id = fields.Str(required=True)
+    resource_id = fields.Str(required=True)
+    document = fields.Nested(ResourceDocument(), allow_none=True)
+
+
 def _get_args(request):
     url = request.query.get("url")
     resource_id = request.query.get("resource_id")
@@ -45,18 +71,25 @@ def _get_args(request):
 
 @routes.post("/api/resource/created/")
 async def resource_created(request):
-    payload = await request.json()
+    try:
+        payload = await request.json()
+        valid_payload = ResourceQuery().load(payload)
+    except ValidationError as err:
+        raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
-    dataset_id = payload["meta"]["dataset_id"]
-    resource = payload["document"]
-    key = payload['key']
+    resource = valid_payload["document"]
+    if not resource:
+        raise web.HTTPBadRequest(text='Missing document body')
+
+    dataset_id = valid_payload["dataset_id"]
+    resource_id = valid_payload['resource_id']
 
     pool = await context.pool()
     async with pool.acquire() as connection:
         # Insert new resource in catalog table and mark as high priority for crawling
         q = f"""
                 INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)
-                VALUES ('{dataset_id}', '{key}', '{resource["url"]}', FALSE, TRUE, FALSE)
+                VALUES ('{dataset_id}', '{resource_id}', '{resource["url"]}', FALSE, TRUE, FALSE)
                 ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
         await connection.execute(q)
 
@@ -65,24 +98,31 @@ async def resource_created(request):
 
 @routes.post("/api/resource/updated/")
 async def resource_updated(request):
-    payload = await request.json()
+    try:
+        payload = await request.json()
+        valid_payload = ResourceQuery().load(payload)
+    except ValidationError as err:
+        raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
-    dataset_id = payload["meta"]["dataset_id"]
-    resource = payload["document"]
-    key = payload['key']
+    resource = valid_payload["document"]
+    if not resource:
+        raise web.HTTPBadRequest(text='Missing document body')
+
+    dataset_id = valid_payload["dataset_id"]
+    resource_id = valid_payload['resource_id']
 
     pool = await context.pool()
     async with pool.acquire() as connection:
         # Make resource high priority for crawling
         # Check if resource is in catalog then insert or update into table
-        q = f"""SELECT * FROM catalog WHERE resource_id = '{key}';"""
+        q = f"""SELECT * FROM catalog WHERE resource_id = '{resource_id}';"""
         res = await connection.fetch(q)
         if (len(res) != 0):
-            q = f"""UPDATE catalog SET priority = TRUE, url = '{resource["url"]}' WHERE resource_id = '{key}';"""
+            q = f"""UPDATE catalog SET priority = TRUE, url = '{resource["url"]}' WHERE resource_id = '{resource_id}';"""
         else:
             q = f"""
                     INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)
-                    VALUES ('{dataset_id}', '{key}', '{resource["url"]}', FALSE, TRUE, FALSE)
+                    VALUES ('{dataset_id}', '{resource_id}', '{resource["url"]}', FALSE, TRUE, FALSE)
                     ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
         await connection.execute(q)
 
@@ -91,17 +131,21 @@ async def resource_updated(request):
 
 @routes.post("/api/resource/deleted/")
 async def resource_deleted(request):
-    payload = await request.json()
+    try:
+        payload = await request.json()
+        valid_payload = ResourceQuery().load(payload)
+    except ValidationError as err:
+        raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
-    dataset_id = payload["meta"]["dataset_id"]
-    key = payload['key']
+    dataset_id = valid_payload["dataset_id"]
+    resource_id = valid_payload['resource_id']
 
     pool = await context.pool()
     async with pool.acquire() as connection:
         if config.SAVE_TO_MINIO:
-            delete_resource_from_minio(dataset_id, key)
+            delete_resource_from_minio(dataset_id, resource_id)
         # Mark resource as deleted in catalog table
-        q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{key}';"""
+        q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
         await connection.execute(q)
 
     return web.json_response({'message': 'deleted'})

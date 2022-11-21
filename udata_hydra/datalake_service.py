@@ -11,7 +11,7 @@ import pandas as pd
 from aiohttp import ClientResponse
 from dotenv import load_dotenv
 
-from udata_hydra import config, context
+from udata_hydra import config
 from udata_hydra.utils.http import send
 from udata_hydra.utils.json import is_json_file
 from udata_hydra.utils.minio import save_resource_to_minio
