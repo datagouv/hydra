@@ -144,7 +144,8 @@ async def resource_deleted(request):
 
     pool = await context.pool()
     async with pool.acquire() as connection:
-        delete_resource_from_minio(dataset_id, resource_id)
+        if config.SAVE_TO_MINIO:
+            delete_resource_from_minio(dataset_id, resource_id)
         # Mark resource as deleted in catalog table
         q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
         await connection.execute(q)

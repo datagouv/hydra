@@ -9,6 +9,7 @@ import pandas as pd
 from aiohttp import ClientResponse
 from dotenv import load_dotenv
 
+from udata_hydra import config, context
 from udata_hydra.utils.http import send
 from udata_hydra.utils.json import is_json_file
 from udata_hydra.utils.minio import save_resource_to_minio
@@ -84,24 +85,24 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
 
                 # Try to read first 1000 rows with pandas
                 pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
-
-                save_resource_to_minio(tmp_file, dataset_id, resource_id)
-                storage_location = {
-                    "netloc": os.getenv("MINIO_URL"),
-                    "bucket": os.getenv("MINIO_BUCKET"),
-                    "key": MINIO_FOLDER
-                    + "/"
-                    + dataset_id
-                    + "/"
-                    + resource_id,
-                }
-                log.debug(
-                    f"Sending message to udata for resource stored {resource_id} in dataset {dataset_id}"
-                )
-                document = {'store:data_location': storage_location}
-                await send(dataset_id=dataset_id,
-                           resource_id=resource_id,
-                           document=document)
+                if config.SAVE_TO_MINIO:
+                    save_resource_to_minio(tmp_file, dataset_id, resource_id)
+                    storage_location = {
+                        "netloc": os.getenv("MINIO_URL"),
+                        "bucket": os.getenv("MINIO_BUCKET"),
+                        "key": MINIO_FOLDER
+                        + "/"
+                        + dataset_id
+                        + "/"
+                        + resource_id,
+                    }
+                    log.debug(
+                        f"Sending message to udata for resource stored {resource_id} in dataset {dataset_id}"
+                    )
+                    document = {'store:data_location': storage_location}
+                    await send(dataset_id=dataset_id,
+                               resource_id=resource_id,
+                               document=document)
             except ValueError:
                 log.debug(
                     f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
