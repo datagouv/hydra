@@ -118,7 +118,8 @@ async def resource_updated(request):
         q = f"""SELECT * FROM catalog WHERE resource_id = '{resource_id}';"""
         res = await connection.fetch(q)
         if (len(res) != 0):
-            q = f"""UPDATE catalog SET priority = TRUE, url = '{resource["url"]}' WHERE resource_id = '{resource_id}';"""
+            q = f"""UPDATE catalog SET priority = TRUE, url = '{resource["url"]}'
+            WHERE resource_id = '{resource_id}';"""
         else:
             q = f"""
                     INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)
