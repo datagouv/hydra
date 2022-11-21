@@ -75,11 +75,10 @@ async def resource_created(request):
         payload = await request.json()
         valid_payload = ResourceQuery().load(payload)
     except ValidationError as err:
-        raise web.HTTPBadRequest(text=err.messages)
+        raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
-    try:
-        resource = valid_payload["document"]
-    except KeyError:
+    resource = valid_payload["document"]
+    if not resource:
         raise web.HTTPBadRequest(text='Missing document body')
 
     dataset_id = valid_payload["dataset_id"]
@@ -103,11 +102,10 @@ async def resource_updated(request):
         payload = await request.json()
         valid_payload = ResourceQuery().load(payload)
     except ValidationError as err:
-        raise web.HTTPBadRequest(text=err.messages)
+        raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
-    try:
-        resource = valid_payload["document"]
-    except KeyError:
+    resource = valid_payload["document"]
+    if not resource:
         raise web.HTTPBadRequest(text='Missing document body')
 
     dataset_id = valid_payload["dataset_id"]
@@ -137,7 +135,7 @@ async def resource_deleted(request):
         payload = await request.json()
         valid_payload = ResourceQuery().load(payload)
     except ValidationError as err:
-        raise web.HTTPBadRequest(text=err.messages)
+        raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
     dataset_id = valid_payload["dataset_id"]
     resource_id = valid_payload['resource_id']
