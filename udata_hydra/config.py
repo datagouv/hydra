@@ -26,6 +26,7 @@ SLEEP_BETWEEN_BATCHES = 60
 # -- Webhook integration config -- #
 ENABLE_WEBHOOK = True
 UDATA_URI = 'http://dev.local:7000/api/2/'
+UDATA_URI_API_KEY = None
 
 # Save resource to minio or not
 SAVE_TO_MINIO = False

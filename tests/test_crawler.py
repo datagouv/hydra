@@ -1,7 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import json
+import hashlib
 from unittest.mock import MagicMock
 import pytest
+import sys
+import tempfile
 
 import nest_asyncio
 
@@ -9,12 +12,24 @@ from aiohttp.client_exceptions import ClientError
 from asyncio.exceptions import TimeoutError
 from yarl import URL
 
+from udata_hydra import config
 from udata_hydra.crawl import crawl, setup_logging
+from udata_hydra.datalake_service import process_resource
 
+SIMPLE_CSV_CONTENT ='''code_insee,number
+95211,102
+36522,48'''
 
 pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
 nest_asyncio.apply()
+
+
+async def mock_download_resource(url, response):
+    tmp_file = tempfile.NamedTemporaryFile(delete=False)
+    tmp_file.write(SIMPLE_CSV_CONTENT.encode("utf-8"))
+    tmp_file.close()
+    return tmp_file
 
 
 async def test_catalog(setup_catalog, db):
@@ -139,3 +154,36 @@ async def test_501_get(setup_catalog, event_loop, rmock, produce_mock):
     rmock.get(rurl, status=501)
     event_loop.run_until_complete(crawl(iterations=1))
     assert ("GET", URL(rurl)) in rmock.requests
+
+
+async def test_process_resource(setup_catalog, mocker):
+    rurl = "https://example.com/resource-1"
+
+    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+
+    result = await process_resource(rurl, 'dataset_id', 'resource_id', response=None)
+
+    assert result['error'] is None
+    assert result['checksum'] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode('utf-8')).hexdigest()
+    assert result['filesize'] == len(SIMPLE_CSV_CONTENT)
+    assert result['mime_type'] == 'text/plain'
+
+
+async def test_process_resource_send_udata(setup_catalog, mocker, rmock):
+    rurl = "https://example.com/resource-1"
+    resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'
+    udata_url = f'{config.UDATA_URI}/datasets/dataset_id/resources/{resource_id}/extras/'
+
+    mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
+    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    rmock.get(udata_url, status=200)
+
+    await process_resource(rurl, 'dataset_id', resource_id, response=None)
+
+    assert ("PUT", URL(udata_url)) in rmock.requests
+    req = rmock.requests[("PUT", URL(udata_url))]
+    assert len(req) == 1
+    document = req[0].kwargs['json']
+    assert document['analysis:filesize'] == len(SIMPLE_CSV_CONTENT)
+    assert document['analysis:mime'] == 'text/plain'
+    assert datetime.fromisoformat(document['analysis:checksum_last_modified']).date() == date.today()
