@@ -2,7 +2,10 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv("../.env")
+# This is a helper for development purpose which will load a
+# .env file content from where the command is run
+# In production, you should set the env vars w/o relying on .env
+load_dotenv(".env")
 
 # -- general settings -- #
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "DEBUG")
