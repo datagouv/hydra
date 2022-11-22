@@ -178,6 +178,7 @@ async def has_checksum_been_modified(resource_id, new_checksum):
             # First check, thus we don't consider the checksum has been modified
             return False
 
+
 async def compute_checksum_from_file(filename):
     # Compute sha1 in blocks
     sha1sum = hashlib.sha1()
