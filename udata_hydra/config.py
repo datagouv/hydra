@@ -36,8 +36,8 @@ MAX_FILESIZE_ALLOWED = 104857600
 
 # -- Webhook integration config -- #
 ENABLE_WEBHOOK = True
-UDATA_URI = 'http://dev.local:7000/api/2'
-UDATA_URI_API_KEY = ''
+UDATA_URI = os.environ.get("UDATA_URI")
+UDATA_URI_API_KEY = os.environ.get("UDATA_URI_API_KEY")
 
 # -- Minio / datalake settings -- #
 SAVE_TO_MINIO = False
