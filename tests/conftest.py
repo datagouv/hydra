@@ -19,7 +19,12 @@ pytestmark = pytest.mark.asyncio
 # this really really really should run first (or "prod" db will get erased)
 @pytest.fixture(autouse=True, scope="session")
 def setup():
-    with mock.patch("udata_hydra.config.DATABASE_URL", DATABASE_URL):
+    with mock.patch.multiple(
+        "udata_hydra.config",
+        DATABASE_URL=DATABASE_URL,
+        UDATA_URI="https://udata.example.com",
+        UDATA_URI_API_KEY="sup3rs3cr3t",
+    ):
         yield
 
 
