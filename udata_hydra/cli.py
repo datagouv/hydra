@@ -56,7 +56,10 @@ async def init_db(drop=False, table=None, index=False, reindex=False):
             headers JSONB,
             timeout BOOLEAN NOT NULL,
             response_time FLOAT,
-            error VARCHAR
+            error VARCHAR,
+            checksum VARCHAR,
+            filesize BIGINT,
+            mime_type VARCHAR
         )
     """
     )

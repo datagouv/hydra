@@ -117,8 +117,9 @@ async def resource_updated(request):
         # Check if resource is in catalog then insert or update into table
         q = f"""SELECT * FROM catalog WHERE resource_id = '{resource_id}';"""
         res = await connection.fetch(q)
-        if (len(res) != 0):
-            q = f"""UPDATE catalog SET priority = TRUE WHERE resource_id = '{resource_id}';"""
+        if len(res):
+            q = f"""UPDATE catalog SET priority = TRUE, url = '{resource["url"]}'
+            WHERE resource_id = '{resource_id}';"""
         else:
             q = f"""
                     INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)

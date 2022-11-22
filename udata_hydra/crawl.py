@@ -207,7 +207,7 @@ async def check_url(row, session, sleep=0, method="get"):
             resp.raise_for_status()
 
             # Download resource, store on Minio if CSV and produce resource.analysed message
-            await process_resource(row["url"], row["dataset_id"], str(row["resource_id"]), resp)
+            res = await process_resource(row["url"], row["dataset_id"], str(row["resource_id"]), resp)
 
             await update_check_and_catalog(
                 {
@@ -218,6 +218,10 @@ async def check_url(row, session, sleep=0, method="get"):
                     "headers": convert_headers(resp.headers),
                     "timeout": False,
                     "response_time": end - start,
+                    "error": res["error"],
+                    "checksum": res["checksum"],
+                    "filesize": res["filesize"],
+                    "mime_type": res["mime_type"]
                 }
             )
             return STATUS_OK

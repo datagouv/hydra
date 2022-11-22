@@ -1,3 +1,5 @@
+from datetime import datetime
+import hashlib
 import logging
 import os
 import tempfile
@@ -9,7 +11,7 @@ import pandas as pd
 from aiohttp import ClientResponse
 from dotenv import load_dotenv
 
-from udata_hydra import config
+from udata_hydra import config, context
 from udata_hydra.utils.http import send
 from udata_hydra.utils.json import is_json_file
 from udata_hydra.utils.minio import save_resource_to_minio
@@ -56,12 +58,21 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             resource_id, dataset_id
         )
     )
+
     tmp_file = None
+    mime_type = None
+    sha1 = None
+    filesize = None
+    error = None
+
     try:
         tmp_file = await download_resource(url, response)
 
         # Get file size
         filesize = os.path.getsize(tmp_file.name)
+
+        # Get checksum
+        sha1 = await compute_checksum_from_file(tmp_file.name)
 
         # Check resource MIME type
         mime_type = magic.from_file(tmp_file.name, mime=True)
@@ -69,12 +80,12 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             # Save resource only if CSV
             try:
                 # Try to detect encoding from suspected csv file. If fail, set up to utf8 (most common)
-                with open(tmp_file.name, mode='rb') as f:
+                with open(tmp_file.name, mode="rb") as f:
                     try:
                         encoding = detect_encoding(f)
                     # FIXME: catch exception more precisely
                     except Exception:
-                        encoding = 'utf-8'
+                        encoding = "utf-8"
                 # Try to detect delimiter from suspected csv file. If fail, set up to None
                 # (pandas will use python engine and try to guess separator itself)
                 try:
@@ -85,21 +96,20 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
 
                 # Try to read first 1000 rows with pandas
                 pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
+
                 if config.SAVE_TO_MINIO:
                     save_resource_to_minio(tmp_file, dataset_id, resource_id)
-                    storage_location = {
-                        "netloc": os.getenv("MINIO_URL"),
-                        "bucket": os.getenv("MINIO_BUCKET"),
-                        "key": MINIO_FOLDER
-                        + "/"
-                        + dataset_id
-                        + "/"
-                        + resource_id,
-                    }
+                    storage_location = "/".join([
+                        os.getenv("MINIO_URL"),
+                        os.getenv("MINIO_BUCKET"),
+                        MINIO_FOLDER,
+                        dataset_id,
+                        resource_id
+                    ])
                     log.debug(
                         f"Sending message to udata for resource stored {resource_id} in dataset {dataset_id}"
                     )
-                    document = {'store:data_location': storage_location}
+                    document = {"store:data_location": storage_location}
                     await send(dataset_id=dataset_id,
                                resource_id=resource_id,
                                document=document)
@@ -113,18 +123,25 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             f"Sending a message to udata for resource analysed {resource_id} in dataset {dataset_id}"
         )
         document = {
-            'analysis:error': None,
-            'analysis:filesize': filesize,
-            'analysis:mime': mime_type
+            "analysis:error": None,
+            "analysis:filesize": filesize,
+            "analysis:mime": mime_type,
         }
+        # Check if checksum has been modified
+        # TODO: improve file modification logic
+        checksum_modified = await has_checksum_been_modified(resource_id, sha1)
+        if checksum_modified:
+            document["analysis:checksum_last_modified"] = datetime.utcnow().isoformat()
+
         await send(dataset_id=dataset_id,
                    resource_id=resource_id,
                    document=document)
     except IOError:
+        error = "File too large to download"
         document = {
-            'analysis:error': "File too large to download",
-            'analysis:filesize': None,
-            'analysis:mime': None,
+            "analysis:error": error,
+            "analysis:filesize": None,
+            "analysis:mime": None,
         }
         await send(dataset_id=dataset_id,
                    resource_id=resource_id,
@@ -132,3 +149,42 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
     finally:
         if tmp_file:
             os.remove(tmp_file.name)
+        return {
+            "checksum": sha1,
+            "error": error,
+            "filesize": filesize,
+            "mime_type": mime_type
+        }
+
+
+async def has_checksum_been_modified(resource_id, new_checksum):
+    q = """
+    SELECT
+        checksum
+    FROM checks
+    WHERE resource_id = $1 and checksum IS NOT NULL
+    ORDER BY created_at DESC
+    LIMIT 1
+    """
+    pool = await context.pool()
+    async with pool.acquire() as connection:
+        data = await connection.fetch(q, resource_id)
+        if data:
+            if data[0]["checksum"] != new_checksum:
+                return True
+            else:
+                return False
+        else:
+            # First check, thus we don't consider the checksum has been modified
+            return False
+
+
+async def compute_checksum_from_file(filename):
+    # Compute sha1 in blocks
+    sha1sum = hashlib.sha1()
+    with open(filename, "rb") as f:
+        block = f.read(2**16)
+        while len(block) != 0:
+            sha1sum.update(block)
+            block = f.read(2**16)
+    return sha1sum.hexdigest()
