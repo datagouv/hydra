@@ -1,10 +1,11 @@
 from datetime import date, datetime, timedelta
-import json
 import hashlib
-from unittest.mock import MagicMock
+import json
+import os
 import pytest
 import sys
 import tempfile
+from unittest.mock import MagicMock
 
 import nest_asyncio
 
@@ -14,7 +15,7 @@ from yarl import URL
 
 from udata_hydra import config
 from udata_hydra.crawl import crawl, setup_logging
-from udata_hydra.datalake_service import process_resource
+from udata_hydra.datalake_service import process_resource, compute_checksum_from_file
 
 
 # TODO: make file content configurable
@@ -188,3 +189,12 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock):
     document = req[0].kwargs['json']
     assert document['analysis:filesize'] == len(SIMPLE_CSV_CONTENT)
     assert document['analysis:mime'] == 'text/plain'
+
+async def test_compute_checksum_from_file():
+    tmp_file = tempfile.NamedTemporaryFile(delete=False)
+    tmp_file.write(b"a very small file")
+    tmp_file.close()
+
+    checksum = await compute_checksum_from_file(tmp_file.name)
+    assert checksum == hashlib.sha1(b"a very small file").hexdigest()
+    os.remove(tmp_file.name)

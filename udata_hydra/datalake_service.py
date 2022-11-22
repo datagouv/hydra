@@ -72,8 +72,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
         filesize = os.path.getsize(tmp_file.name)
 
         # Get checksum
-        with open(tmp_file.name, "rb") as f:
-            sha1 = hashlib.sha1(f.read()).hexdigest()
+        sha1 = await compute_checksum_from_file(tmp_file.name)
 
         # Check resource MIME type
         mime_type = magic.from_file(tmp_file.name, mime=True)
@@ -178,3 +177,13 @@ async def has_checksum_been_modified(resource_id, new_checksum):
         else:
             # First check, thus we don't consider the checksum has been modified
             return False
+
+async def compute_checksum_from_file(filename):
+    # Compute sha1 in blocks
+    sha1sum = hashlib.sha1()
+    with open(filename, "rb") as f:
+        block = f.read(2**16)
+        while len(block) != 0:
+            sha1sum.update(block)
+            block = f.read(2**16)
+    return sha1sum.hexdigest()
