@@ -188,4 +188,3 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock):
     document = req[0].kwargs['json']
     assert document['analysis:filesize'] == len(SIMPLE_CSV_CONTENT)
     assert document['analysis:mime'] == 'text/plain'
-    assert datetime.fromisoformat(document['analysis:checksum_last_modified']).date() == date.today()

@@ -176,5 +176,5 @@ async def has_checksum_been_modified(resource_id, new_checksum):
             else:
                 return False
         else:
-            # First check, thus this is a new checksum
-            return True
+            # First check, thus we don't consider the checksum has been modified
+            return False
