@@ -11,7 +11,7 @@ from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
 
-from udata_hydra.config import config
+from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
 log.setLevel(config.LOG_LEVEL)

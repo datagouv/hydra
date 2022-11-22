@@ -39,5 +39,10 @@ ENABLE_WEBHOOK = True
 UDATA_URI = 'http://dev.local:7000/api/2'
 UDATA_URI_API_KEY = ''
 
-# Save resource to minio or not
+# -- Minio / datalake settings -- #
 SAVE_TO_MINIO = False
+MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
+MINIO_URL = os.environ.get("MINIO_URL")
+MINIO_BUCKET = os.environ.get("MINIO_BUCKET")
+MINIO_USER = os.environ.get("MINIO_USER")
+MINIO_PWD = os.environ.get("MINIO_PWD")
