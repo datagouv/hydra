@@ -17,7 +17,7 @@ log = logging.getLogger("udata-hydra")
 log.setLevel(config.LOG_LEVEL)
 logging.basicConfig()
 
-CATALOG_URL = 'https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d'
+CATALOG_URL = "https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d"
 
 context = {}
 

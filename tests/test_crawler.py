@@ -18,9 +18,9 @@ from udata_hydra.datalake_service import process_resource, compute_checksum_from
 
 
 # TODO: make file content configurable
-SIMPLE_CSV_CONTENT = '''code_insee,number
+SIMPLE_CSV_CONTENT = """code_insee,number
 95211,102
-36522,48'''
+36522,48"""
 
 pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
@@ -163,31 +163,31 @@ async def test_process_resource(setup_catalog, mocker):
 
     mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
 
-    result = await process_resource(rurl, 'dataset_id', 'resource_id', response=None)
+    result = await process_resource(rurl, "dataset_id", "resource_id", response=None)
 
-    assert result['error'] is None
-    assert result['checksum'] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode('utf-8')).hexdigest()
-    assert result['filesize'] == len(SIMPLE_CSV_CONTENT)
-    assert result['mime_type'] == 'text/plain'
+    assert result["error"] is None
+    assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
+    assert result["filesize"] == len(SIMPLE_CSV_CONTENT)
+    assert result["mime_type"] == "text/plain"
 
 
 async def test_process_resource_send_udata(setup_catalog, mocker, rmock):
     rurl = "https://example.com/resource-1"
-    resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'
-    udata_url = f'{config.UDATA_URI}/datasets/dataset_id/resources/{resource_id}/extras/'
+    resource_id = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
+    udata_url = f"{config.UDATA_URI}/datasets/dataset_id/resources/{resource_id}/extras/"
 
     mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
     mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
     rmock.get(udata_url, status=200)
 
-    await process_resource(rurl, 'dataset_id', resource_id, response=None)
+    await process_resource(rurl, "dataset_id", resource_id, response=None)
 
     assert ("PUT", URL(udata_url)) in rmock.requests
     req = rmock.requests[("PUT", URL(udata_url))]
     assert len(req) == 1
-    document = req[0].kwargs['json']
-    assert document['analysis:filesize'] == len(SIMPLE_CSV_CONTENT)
-    assert document['analysis:mime'] == 'text/plain'
+    document = req[0].kwargs["json"]
+    assert document["analysis:filesize"] == len(SIMPLE_CSV_CONTENT)
+    assert document["analysis:mime"] == "text/plain"
 
 
 async def test_compute_checksum_from_file():
