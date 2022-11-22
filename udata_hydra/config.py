@@ -1,7 +1,11 @@
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv("../.env")
+
 # -- general settings -- #
-LOG_LEVEL = "DEBUG"
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "DEBUG")
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     "postgres://postgres:postgres@localhost:5432/postgres"
@@ -30,7 +34,7 @@ BATCH_SIZE = 100
 # crawl url if last check is older than
 SINCE = '1w'
 # seconds to wait for between batches
-SLEEP_BETWEEN_BATCHES = 60
+SLEEP_BETWEEN_BATCHES = int(os.environ.get("SLEEP_BETWEEN_BATCHES", "60"))
 # max download filesize in bytes (100 MB)
 MAX_FILESIZE_ALLOWED = 104857600
 

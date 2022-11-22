@@ -10,8 +10,6 @@ from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
 
-MINIO_FOLDER = config.MINIO_FOLDER
-
 
 def get_resource_minio_url(key: str, resource_id: str) -> str:
     """Returns location of given resource in minio once it is saved"""
