@@ -206,75 +206,75 @@ async def test_changed_content_length_unchanged(
 
 async def test_api_resource_created(client):
     payload = {
-        'resource_id': 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec',
-        'dataset_id': '61fd30cb29ea95c7bc0e1211',
-        'document': {
-            'id': 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec',
-            'url': 'http://dev.local/',
-            'title': 'random title',
-            'description': 'random description',
-            'filetype': 'file',
-            'type': 'documentation',
-            'mime': 'text/plain',
-            'filesize': 1024,
-            'checksum_type': 'sha1',
-            'checksum_value': 'b7b1cd8230881b18b6b487d550039949867ec7c5',
-            'created_at': datetime.now().isoformat(),
-            'modified': datetime.now().isoformat(),
-            'published': datetime.now().isoformat()
+        "resource_id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
+        "dataset_id": "61fd30cb29ea95c7bc0e1211",
+        "document": {
+            "id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
+            "url": "http://dev.local/",
+            "title": "random title",
+            "description": "random description",
+            "filetype": "file",
+            "type": "documentation",
+            "mime": "text/plain",
+            "filesize": 1024,
+            "checksum_type": "sha1",
+            "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
+            "created_at": datetime.now().isoformat(),
+            "modified": datetime.now().isoformat(),
+            "published": datetime.now().isoformat(),
         }
     }
     resp = await client.post("/api/resource/created/", json=payload)
     assert resp.status == 200
     data = await resp.json()
-    assert data == {'message': 'created'}
+    assert data == {"message": "created"}
 
-    payload['document'] = None
+    payload["document"] = None
     resp = await client.post("/api/resource/created/", json=payload)
     assert resp.status == 400
     text = await resp.text()
-    assert text == 'Missing document body'
+    assert text == "Missing document body"
 
 
 async def test_api_resource_updated(client):
     payload = {
-        'resource_id': 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec',
-        'dataset_id': '61fd30cb29ea95c7bc0e1211',
-        'document': {
-            'id': 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec',
-            'url': 'http://dev.local/',
-            'title': 'random title',
-            'description': 'random description',
-            'filetype': 'file',
-            'type': 'documentation',
-            'mime': 'text/plain',
-            'filesize': 1024,
-            'checksum_type': 'sha1',
-            'checksum_value': 'b7b1cd8230881b18b6b487d550039949867ec7c5',
-            'created_at': datetime.now().isoformat(),
-            'modified': datetime.now().isoformat(),
-            'published': datetime.now().isoformat()
+        "resource_id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
+        "dataset_id": "61fd30cb29ea95c7bc0e1211",
+        "document": {
+            "id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
+            "url": "http://dev.local/",
+            "title": "random title",
+            "description": "random description",
+            "filetype": "file",
+            "type": "documentation",
+            "mime": "text/plain",
+            "filesize": 1024,
+            "checksum_type": "sha1",
+            "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
+            "created_at": datetime.now().isoformat(),
+            "modified": datetime.now().isoformat(),
+            "published": datetime.now().isoformat(),
         }
     }
     resp = await client.post("/api/resource/updated/", json=payload)
     assert resp.status == 200
     data = await resp.json()
-    assert data == {'message': 'updated'}
+    assert data == {"message": "updated"}
 
-    payload['document'] = None
+    payload["document"] = None
     resp = await client.post("/api/resource/updated/", json=payload)
     assert resp.status == 400
     text = await resp.text()
-    assert text == 'Missing document body'
+    assert text == "Missing document body"
 
 
 async def test_api_resource_deleted(client):
     payload = {
-        'resource_id': 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec',
-        'dataset_id': '61fd30cb29ea95c7bc0e1211',
-        'document': None
+        "resource_id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
+        "dataset_id": "61fd30cb29ea95c7bc0e1211",
+        "document": None
     }
     resp = await client.post("/api/resource/deleted/", json=payload)
     assert resp.status == 200
     data = await resp.json()
-    assert data == {'message': 'deleted'}
+    assert data == {"message": "deleted"}

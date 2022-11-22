@@ -48,14 +48,14 @@ async def insert_check(data: dict):
 async def update_check_and_catalog(check_data: dict) -> None:
     """Update the catalog and checks tables"""
     context.monitor().set_status("Updating checks and catalog...")
-    check_data['resource_id'] = str(check_data['resource_id'])
+    check_data["resource_id"] = str(check_data["resource_id"])
 
     pool = await context.pool()
     async with pool.acquire() as connection:
         q = f"""
             SELECT * FROM catalog JOIN checks
             ON catalog.last_check = checks.id
-            WHERE catalog.resource_id = '{check_data['resource_id']}';
+            WHERE catalog.resource_id = '{check_data["resource_id"]}';
         """
         last_checks = await connection.fetch(q)
 
@@ -65,7 +65,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
                 f"""
                 SELECT resource_id, dataset_id, priority, initialization
                 FROM catalog
-                WHERE resource_id = '{check_data['resource_id']}';
+                WHERE resource_id = '{check_data["resource_id"]}';
             """
             )
             last_checks = [
@@ -104,9 +104,9 @@ async def update_check_and_catalog(check_data: dict) -> None:
                 ):
                     log.debug("Sending message to udata...")
                     document = dict()
-                    document['check:status'] = check_data['status'] if status_has_changed else last_check["status"]
-                    document['check:timeout'] = check_data['timeout']
-                    document['check:check_date'] = str(datetime.now())
+                    document["check:status"] = check_data["status"] if status_has_changed else last_check["status"]
+                    document["check:timeout"] = check_data["timeout"]
+                    document["check:check_date"] = str(datetime.now())
                     await send(dataset_id=last_check["dataset_id"],
                                resource_id=last_check["resource_id"],
                                document=document)

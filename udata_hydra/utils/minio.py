@@ -18,7 +18,7 @@ def get_resource_minio_url(key: str, resource_id: str) -> str:
 
 def save_resource_to_minio(resource_file: BinaryIO, key: str, resource_id: str) -> None:
     log.info("Saving to minio")
-    log.debug(f'Bucket is {config.MINIO_BUCKET}')
+    log.debug(f"Bucket is {config.MINIO_BUCKET}")
     s3 = boto3.client(
         "s3",
         endpoint_url=config.MINIO_URL,
