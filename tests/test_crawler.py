@@ -16,6 +16,8 @@ from udata_hydra import config
 from udata_hydra.crawl import crawl, setup_logging
 from udata_hydra.datalake_service import process_resource
 
+
+# TODO: make file content configurable
 SIMPLE_CSV_CONTENT ='''code_insee,number
 95211,102
 36522,48'''

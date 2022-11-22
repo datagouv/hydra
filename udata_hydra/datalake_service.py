@@ -129,6 +129,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             'analysis:mime': mime_type,
         }
         # Check if checksum has been modified
+        # TODO: improve file modification logic
         checksum_modified = await has_checksum_been_modified(resource_id, sha1)
         if checksum_modified:
             document['analysis:checksum_last_modified'] = datetime.now().isoformat()
@@ -169,7 +170,6 @@ async def has_checksum_been_modified(resource_id, new_checksum):
     pool = await context.pool()
     async with pool.acquire() as connection:
         data = await connection.fetch(q, resource_id)
-        log.debug(data)
         if data:
             if data[0]['checksum'] != new_checksum:
                 return True
