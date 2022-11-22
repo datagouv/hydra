@@ -9,7 +9,6 @@ import magic
 import pandas as pd
 
 from aiohttp import ClientResponse
-from dotenv import load_dotenv
 
 from udata_hydra import config, context
 from udata_hydra.utils.http import send
@@ -17,12 +16,8 @@ from udata_hydra.utils.json import is_json_file
 from udata_hydra.utils.minio import save_resource_to_minio
 from udata_hydra.utils.csv import detect_encoding, find_delimiter
 
-load_dotenv()
 
 log = logging.getLogger("udata-hydra")
-
-MINIO_FOLDER = os.environ.get("MINIO_FOLDER", "folder")
-MAX_FILESIZE_ALLOWED = os.environ.get("MAX_FILESIZE_ALLOWED", 1000)
 
 
 async def download_resource(url: str, response: ClientResponse) -> BinaryIO:
@@ -34,14 +29,14 @@ async def download_resource(url: str, response: ClientResponse) -> BinaryIO:
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
 
     if float(response.headers.get("content-length", -1)) > float(
-        MAX_FILESIZE_ALLOWED
+        config.MAX_FILESIZE_ALLOWED
     ):
         raise IOError("File too large to download")
 
     chunk_size = 1024
     i = 0
     async for chunk in response.content.iter_chunked(chunk_size):
-        if i * chunk_size < float(MAX_FILESIZE_ALLOWED):
+        if i * chunk_size < float(config.MAX_FILESIZE_ALLOWED):
             tmp_file.write(chunk)
         else:
             tmp_file.close()
@@ -100,11 +95,11 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                 if config.SAVE_TO_MINIO:
                     save_resource_to_minio(tmp_file, dataset_id, resource_id)
                     storage_location = "/".join([
-                        os.getenv("MINIO_URL"),
-                        os.getenv("MINIO_BUCKET"),
-                        MINIO_FOLDER,
+                        config.MINIO_URL,
+                        config.MINIO_BUCKET,
+                        config.MINIO_FOLDER,
                         dataset_id,
-                        resource_id
+                        resource_id,
                     ])
                     log.debug(
                         f"Sending message to udata for resource stored {resource_id} in dataset {dataset_id}"

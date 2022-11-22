@@ -52,6 +52,9 @@ jobs:
       - run:
           name: Lint code
           command: poetry run flake8 << pipeline.parameters.python-module >>
+      - run:
+          name: Lint tests
+          command: poetry run flake8 tests/
 
   tests:
     docker:

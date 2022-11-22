@@ -221,7 +221,6 @@ MINIO_USER = sample_user
 MINIO_BUCKET = benchmark-de
 MINIO_PWD = sample_pwd
 MINIO_FOLDER = data
-MAX_FILESIZE_ALLOWED = 1e9
 UDATA_INSTANCE_NAME = udata
 ```
 

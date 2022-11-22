@@ -1,9 +1,8 @@
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 import hashlib
 import json
 import os
 import pytest
-import sys
 import tempfile
 from unittest.mock import MagicMock
 
@@ -19,7 +18,7 @@ from udata_hydra.datalake_service import process_resource, compute_checksum_from
 
 
 # TODO: make file content configurable
-SIMPLE_CSV_CONTENT ='''code_insee,number
+SIMPLE_CSV_CONTENT = '''code_insee,number
 95211,102
 36522,48'''
 
@@ -189,6 +188,7 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock):
     document = req[0].kwargs['json']
     assert document['analysis:filesize'] == len(SIMPLE_CSV_CONTENT)
     assert document['analysis:mime'] == 'text/plain'
+
 
 async def test_compute_checksum_from_file():
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
