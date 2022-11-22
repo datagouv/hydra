@@ -79,10 +79,10 @@ async def resource_created(request):
 
     resource = valid_payload["document"]
     if not resource:
-        raise web.HTTPBadRequest(text='Missing document body')
+        raise web.HTTPBadRequest(text="Missing document body")
 
     dataset_id = valid_payload["dataset_id"]
-    resource_id = valid_payload['resource_id']
+    resource_id = valid_payload["resource_id"]
 
     pool = await context.pool()
     async with pool.acquire() as connection:
@@ -93,7 +93,7 @@ async def resource_created(request):
                 ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
         await connection.execute(q)
 
-    return web.json_response({'message': 'created'})
+    return web.json_response({"message": "created"})
 
 
 @routes.post("/api/resource/updated/")
@@ -106,10 +106,10 @@ async def resource_updated(request):
 
     resource = valid_payload["document"]
     if not resource:
-        raise web.HTTPBadRequest(text='Missing document body')
+        raise web.HTTPBadRequest(text="Missing document body")
 
     dataset_id = valid_payload["dataset_id"]
-    resource_id = valid_payload['resource_id']
+    resource_id = valid_payload["resource_id"]
 
     pool = await context.pool()
     async with pool.acquire() as connection:
@@ -127,7 +127,7 @@ async def resource_updated(request):
                     ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
         await connection.execute(q)
 
-    return web.json_response({'message': 'updated'})
+    return web.json_response({"message": "updated"})
 
 
 @routes.post("/api/resource/deleted/")
@@ -139,7 +139,7 @@ async def resource_deleted(request):
         raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
     dataset_id = valid_payload["dataset_id"]
-    resource_id = valid_payload['resource_id']
+    resource_id = valid_payload["resource_id"]
 
     pool = await context.pool()
     async with pool.acquire() as connection:
@@ -149,7 +149,7 @@ async def resource_deleted(request):
         q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
         await connection.execute(q)
 
-    return web.json_response({'message': 'deleted'})
+    return web.json_response({"message": "deleted"})
 
 
 @routes.get("/api/checks/latest/")
