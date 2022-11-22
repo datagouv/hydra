@@ -132,7 +132,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
         # TODO: improve file modification logic
         checksum_modified = await has_checksum_been_modified(resource_id, sha1)
         if checksum_modified:
-            document["analysis:checksum_last_modified"] = datetime.now().isoformat()
+            document["analysis:checksum_last_modified"] = datetime.utcnow().isoformat()
 
         await send(dataset_id=dataset_id,
                    resource_id=resource_id,
