@@ -72,7 +72,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
         filesize = os.path.getsize(tmp_file.name)
 
         # Get checksum
-        with open(tmp_file.name, 'rb') as f:
+        with open(tmp_file.name, "rb") as f:
             sha1 = hashlib.sha1(f.read()).hexdigest()
 
         # Check resource MIME type
@@ -81,12 +81,12 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             # Save resource only if CSV
             try:
                 # Try to detect encoding from suspected csv file. If fail, set up to utf8 (most common)
-                with open(tmp_file.name, mode='rb') as f:
+                with open(tmp_file.name, mode="rb") as f:
                     try:
                         encoding = detect_encoding(f)
                     # FIXME: catch exception more precisely
                     except Exception:
-                        encoding = 'utf-8'
+                        encoding = "utf-8"
                 # Try to detect delimiter from suspected csv file. If fail, set up to None
                 # (pandas will use python engine and try to guess separator itself)
                 try:
@@ -100,7 +100,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
 
                 if config.SAVE_TO_MINIO:
                     save_resource_to_minio(tmp_file, dataset_id, resource_id)
-                    storage_location = '/'.join([
+                    storage_location = "/".join([
                         os.getenv("MINIO_URL"),
                         os.getenv("MINIO_BUCKET"),
                         MINIO_FOLDER,
@@ -110,7 +110,7 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
                     log.debug(
                         f"Sending message to udata for resource stored {resource_id} in dataset {dataset_id}"
                     )
-                    document = {'store:data_location': storage_location}
+                    document = {"store:data_location": storage_location}
                     await send(dataset_id=dataset_id,
                                resource_id=resource_id,
                                document=document)
@@ -124,15 +124,15 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
             f"Sending a message to udata for resource analysed {resource_id} in dataset {dataset_id}"
         )
         document = {
-            'analysis:error': None,
-            'analysis:filesize': filesize,
-            'analysis:mime': mime_type,
+            "analysis:error": None,
+            "analysis:filesize": filesize,
+            "analysis:mime": mime_type,
         }
         # Check if checksum has been modified
         # TODO: improve file modification logic
         checksum_modified = await has_checksum_been_modified(resource_id, sha1)
         if checksum_modified:
-            document['analysis:checksum_last_modified'] = datetime.now().isoformat()
+            document["analysis:checksum_last_modified"] = datetime.now().isoformat()
 
         await send(dataset_id=dataset_id,
                    resource_id=resource_id,
@@ -140,9 +140,9 @@ async def process_resource(url: str, dataset_id: str, resource_id: str, response
     except IOError:
         error = "File too large to download"
         document = {
-            'analysis:error': error,
-            'analysis:filesize': None,
-            'analysis:mime': None,
+            "analysis:error": error,
+            "analysis:filesize": None,
+            "analysis:mime": None,
         }
         await send(dataset_id=dataset_id,
                    resource_id=resource_id,
@@ -171,7 +171,7 @@ async def has_checksum_been_modified(resource_id, new_checksum):
     async with pool.acquire() as connection:
         data = await connection.fetch(q, resource_id)
         if data:
-            if data[0]['checksum'] != new_checksum:
+            if data[0]["checksum"] != new_checksum:
                 return True
             else:
                 return False

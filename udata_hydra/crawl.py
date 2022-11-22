@@ -218,10 +218,10 @@ async def check_url(row, session, sleep=0, method="get"):
                     "headers": convert_headers(resp.headers),
                     "timeout": False,
                     "response_time": end - start,
-                    "error": res['error'],
-                    "checksum": res['checksum'],
-                    "filesize": res['filesize'],
-                    "mime_type": res['mime_type']
+                    "error": res["error"],
+                    "checksum": res["checksum"],
+                    "filesize": res["filesize"],
+                    "mime_type": res["mime_type"]
                 }
             )
             return STATUS_OK
