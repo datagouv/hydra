@@ -1,6 +1,4 @@
 import json
-import logging
-import sys
 import time
 
 from collections import defaultdict
@@ -15,15 +13,16 @@ from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
 from udata_hydra.datalake_service import process_resource
+from udata_hydra.logger import setup_logging
 from udata_hydra.utils.http import send
-
-log = logging.getLogger("udata-hydra")
 
 results = defaultdict(int)
 
 STATUS_OK = "ok"
 STATUS_TIMEOUT = "timeout"
 STATUS_ERROR = "error"
+
+log = setup_logging()
 
 
 async def insert_check(data: dict):
@@ -359,20 +358,11 @@ async def crawl(iterations=-1):
         await pool.close()
 
 
-def setup_logging():
-    handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-    handler.setFormatter(formatter)
-    log.addHandler(handler)
-    log.setLevel(logging.DEBUG)
-
-
 def run():
     """Main function
 
     :iterations: for testing purposes (break infinite loop)
     """
-    setup_logging()
     try:
         asyncio.get_event_loop().run_until_complete(crawl())
     except KeyboardInterrupt:
