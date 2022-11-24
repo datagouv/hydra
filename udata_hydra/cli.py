@@ -1,4 +1,3 @@
-import logging
 import csv
 import os
 
@@ -12,14 +11,13 @@ from minicli import cli, run, wrap
 from progressist import ProgressBar
 
 from udata_hydra import config
+from udata_hydra.logger import setup_logging
 
-log = logging.getLogger("udata-hydra")
-log.setLevel(config.LOG_LEVEL)
-logging.basicConfig()
 
 CATALOG_URL = "https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d"
 
 context = {}
+log = setup_logging()
 
 
 @cli
@@ -122,6 +120,23 @@ async def load_catalog(url=CATALOG_URL):
     finally:
         fd.close()
         os.unlink(fd.name)
+
+
+@cli
+async def check_url(url, method="get"):
+    """Quickly check an URL"""
+    log.info(f"Checking url {url}")
+    async with aiohttp.ClientSession(timeout=None) as session:
+        timeout = aiohttp.ClientTimeout(total=5)
+        _method = getattr(session, method)
+        try:
+            async with _method(
+                url, timeout=timeout, allow_redirects=True
+            ) as resp:
+                print("Status :", resp.status)
+                print("Headers:", resp.headers)
+        except Exception as e:
+            log.error(e)
 
 
 @cli

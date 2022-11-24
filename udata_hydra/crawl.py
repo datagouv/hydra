@@ -144,6 +144,8 @@ def fix_surrogates(value):
     """FIX Unicode low surrogate must follow a high surrogate.
     eg in 'TREMI_2017-R\xe9sultats enqu\xeate bruts.csv'
     """
+    if not type(value) == str:
+        value = str(value)
     return value.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
 
 
@@ -257,7 +259,7 @@ async def check_url(row, session, sleep=0, method="get"):
                 "status": getattr(e, "status", None),
             }
         )
-        log.error(f"{row['url']}, {e}")
+        log.error(f"Crawling error for url {row['url']}", exc_info=e)
         return STATUS_ERROR
 
 

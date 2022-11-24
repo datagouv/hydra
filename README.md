@@ -38,8 +38,8 @@ If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 ### Run
 
 ```
-pip install -r requirements.txt
-adev runserver udata-hydra/app.py
+poetry install
+poetry run adev runserver udata_hydra/app.py
 ```
 
 ### Get latest check
@@ -214,14 +214,14 @@ $ curl -s "http://localhost:8000/api/stats/" | json_pp
 Rename the `.env.sample` to `.env` and fill it with the right values.
 
 ```shell
-UDATA_URI = https://dev.local./
-UDATA_URI_API_KEY = example.api.key
-MINIO_URL = https://object.local.dev/
-MINIO_USER = sample_user
-MINIO_BUCKET = benchmark-de
-MINIO_PWD = sample_pwd
-MINIO_FOLDER = data
-UDATA_INSTANCE_NAME = udata
+UDATA_URI=https://dev.local./
+UDATA_URI_API_KEY=example.api.key
+MINIO_URL=https://object.local.dev/
+MINIO_USER=sample_user
+MINIO_BUCKET=benchmark-de
+MINIO_PWD=sample_pwd
+MINIO_FOLDER=data
+SENTRY_DSN=https://{my-sentry-dsn}
 ```
 
 The webhook integration sends HTTP messages to `udata` when resources are stored, analyzed or checked to fill resources extras.
