@@ -13,7 +13,7 @@ from asyncio.exceptions import TimeoutError
 from yarl import URL
 
 from udata_hydra import config
-from udata_hydra.crawl import crawl, setup_logging
+from udata_hydra.crawl import crawl
 from udata_hydra.datalake_service import process_resource, compute_checksum_from_file
 
 
