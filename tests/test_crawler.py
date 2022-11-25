@@ -13,7 +13,7 @@ from asyncio.exceptions import TimeoutError
 from yarl import URL
 
 from udata_hydra import config
-from udata_hydra.crawl import crawl, setup_logging
+from udata_hydra.crawl import crawl
 from udata_hydra.datalake_service import process_resource, compute_checksum_from_file
 
 
@@ -58,7 +58,6 @@ async def test_catalog(setup_catalog, db):
     ],
 )
 async def test_crawl(setup_catalog, rmock, event_loop, db, resource, mocker, produce_mock):
-    setup_logging()
     status, timeout, exception = resource
     rurl = "https://example.com/resource-1"
     rmock.get(
@@ -89,7 +88,6 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, mocker, pro
 
 
 async def test_backoff(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock):
-    setup_logging()
     await fake_check(resource=2)
     mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
     mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
@@ -105,7 +103,6 @@ async def test_backoff(setup_catalog, event_loop, rmock, mocker, fake_check, pro
 async def test_no_backoff_domains(
     setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock
 ):
-    setup_logging()
     await fake_check(resource=2)
     mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
     mocker.patch("udata_hydra.config.NO_BACKOFF_DOMAINS", ["example.com"])
@@ -119,7 +116,6 @@ async def test_no_backoff_domains(
 
 
 async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock, produce_mock):
-    setup_logging()
     mocker.patch("udata_hydra.config.SLEEP_BETWEEN_BATCHES", 0)
     mocker.patch("udata_hydra.config.EXCLUDED_PATTERNS", ["http%example%"])
     rurl = "https://example.com/resource-1"
@@ -151,7 +147,6 @@ async def test_not_outdated_check(
 
 
 async def test_501_get(setup_catalog, event_loop, rmock, produce_mock):
-    setup_logging()
     rurl = "https://example.com/resource-1"
     rmock.get(rurl, status=501)
     event_loop.run_until_complete(crawl(iterations=1))

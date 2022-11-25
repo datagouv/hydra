@@ -1,5 +1,4 @@
 import json
-import logging
 
 from datetime import datetime, timedelta
 
@@ -10,10 +9,11 @@ from marshmallow import Schema, fields, ValidationError
 
 from udata_hydra import context, config
 from udata_hydra.crawl import get_excluded_clause
+from udata_hydra.logger import setup_logging
 from udata_hydra.utils.minio import delete_resource_from_minio
 
 
-log = logging.getLogger("aiohttp.access")
+log = setup_logging()
 routes = web.RouteTableDef()
 
 
