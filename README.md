@@ -222,6 +222,7 @@ MINIO_BUCKET=benchmark-de
 MINIO_PWD=sample_pwd
 MINIO_FOLDER=data
 SENTRY_DSN=https://{my-sentry-dsn}
+WEBHOOK_ENABLED=True
 ```
 
 The webhook integration sends HTTP messages to `udata` when resources are stored, analyzed or checked to fill resources extras.

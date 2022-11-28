@@ -54,9 +54,14 @@ async def update_check_and_catalog(check_data: dict) -> None:
         q = f"""
             SELECT * FROM catalog JOIN checks
             ON catalog.last_check = checks.id
-            WHERE catalog.resource_id = '{check_data["resource_id"]}';
+            WHERE catalog.resource_id = '{check_data["resource_id"]}'
+            AND catalog.deleted = FALSE;
         """
         last_checks = await connection.fetch(q)
+
+        # does not make sense to have multiple last_checks for one resource_id
+        # TODO: this should be unit tested but keeping it here for now
+        assert len(last_checks) <= 1, f"Got {len(last_checks)} checks instead of 1"
 
         if len(last_checks) == 0:
             # In case we are doing our first check for given URL
@@ -64,51 +69,53 @@ async def update_check_and_catalog(check_data: dict) -> None:
                 f"""
                 SELECT resource_id, dataset_id, priority, initialization
                 FROM catalog
-                WHERE resource_id = '{check_data["resource_id"]}';
+                WHERE resource_id = '{check_data["resource_id"]}'
+                AND deleted = FALSE;
             """
             )
-            last_checks = [
-                {
-                    "resource_id": row[0],
-                    "dataset_id": row[1],
-                    "priority": row[2],
-                    "initialization": row[3],
-                    "status": None,
-                    "timeout": None,
-                }
-                for row in rows
-            ]
+            last_check = {
+                "resource_id": rows[0]["resource_id"],
+                "dataset_id": rows[0]["dataset_id"],
+                "priority": rows[0]["priority"],
+                "initialization": rows[0]["initialization"],
+                "status": None,
+                "timeout": None,
+            }
+        else:
+            last_check = last_checks[0]
 
-        # There could be multiple resources pointing to the same URL
-        for last_check in last_checks:
-            if config.ENABLE_WEBHOOK:
-                is_first_check = last_check["status"] is None
-                status_has_changed = (
-                    "status" in check_data
-                    and check_data["status"] != last_check["status"]
-                )
-                status_no_longer_available = (
-                    "status" not in check_data
-                    and last_check["status"] is not None
-                )
-                timeout_has_changed = (
-                    check_data["timeout"] != last_check["timeout"]
-                )
+        is_first_check = last_check["status"] is None
+        status_has_changed = (
+            "status" in check_data
+            and check_data["status"] != last_check["status"]
+        )
+        status_no_longer_available = (
+            "status" not in check_data
+            and last_check["status"] is not None
+        )
+        timeout_has_changed = (
+            check_data["timeout"] != last_check["timeout"]
+        )
 
-                if (
-                    is_first_check
-                    or status_has_changed
-                    or status_no_longer_available
-                    or timeout_has_changed
-                ):
-                    log.debug("Sending message to udata...")
-                    document = dict()
-                    document["check:status"] = check_data["status"] if status_has_changed else last_check["status"]
-                    document["check:timeout"] = check_data["timeout"]
-                    document["check:check_date"] = str(datetime.now())
-                    await send(dataset_id=last_check["dataset_id"],
-                               resource_id=last_check["resource_id"],
-                               document=document)
+        criterions = {
+            "is_first_check": is_first_check,
+            "status_has_changed": status_has_changed,
+            "status_no_longer_available": status_no_longer_available,
+            "timeout_has_changed": timeout_has_changed,
+        }
+        log.debug("crawl.py -k update_checks_and_catalog:criterions %s", json.dumps(criterions, indent=4))
+        if any(criterions.values()):
+            document = dict()
+            document["check:status"] = check_data["status"] if status_has_changed else last_check["status"]
+            document["check:timeout"] = check_data["timeout"]
+            document["check:check_date"] = str(datetime.now())
+            await send(
+                dataset_id=last_check["dataset_id"],
+                resource_id=last_check["resource_id"],
+                document=document
+            )
+        else:
+            log.debug("Not sending check infos to udata, criterions not met")
 
         log.debug("Updating priority...")
         await connection.execute(
@@ -206,26 +213,30 @@ async def check_url(row, session, sleep=0, method="get"):
         ) as resp:
             end = time.time()
             resp.raise_for_status()
+            data = {
+                "resource_id": row["resource_id"],
+                "url": row["url"],
+                "domain": domain,
+                "status": resp.status,
+                "headers": convert_headers(resp.headers),
+                "timeout": False,
+                "response_time": end - start,
+            }
 
-            # Download resource, store on Minio if CSV and produce resource.analysed message
-            res = await process_resource(row["url"], row["dataset_id"], str(row["resource_id"]), resp)
+        # Download resource, store on Minio if CSV and produce resource.analysed message
+        res = await process_resource(
+            row["url"], row["dataset_id"], str(row["resource_id"]), session, data["headers"]
+        )
+        data.update({
+            "error": res["error"],
+            "checksum": res["checksum"],
+            "filesize": res["filesize"],
+            "mime_type": res["mime_type"],
+        })
 
-            await update_check_and_catalog(
-                {
-                    "resource_id": row["resource_id"],
-                    "url": row["url"],
-                    "domain": domain,
-                    "status": resp.status,
-                    "headers": convert_headers(resp.headers),
-                    "timeout": False,
-                    "response_time": end - start,
-                    "error": res["error"],
-                    "checksum": res["checksum"],
-                    "filesize": res["filesize"],
-                    "mime_type": res["mime_type"]
-                }
-            )
-            return STATUS_OK
+        await update_check_and_catalog(data)
+
+        return STATUS_OK
     except asyncio.exceptions.TimeoutError:
         await update_check_and_catalog(
             {

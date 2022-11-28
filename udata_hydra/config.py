@@ -1,5 +1,7 @@
 import os
 
+from distutils.util import strtobool
+
 from dotenv import load_dotenv
 
 # This is a helper for development purpose which will load a
@@ -43,7 +45,7 @@ SLEEP_BETWEEN_BATCHES = int(os.environ.get("SLEEP_BETWEEN_BATCHES", "60"))
 MAX_FILESIZE_ALLOWED = 104857600
 
 # -- Webhook integration config -- #
-ENABLE_WEBHOOK = True
+WEBHOOK_ENABLED = bool(strtobool(os.getenv("WEBHOOK_ENABLED", "True")))
 UDATA_URI = os.environ.get("UDATA_URI")
 UDATA_URI_API_KEY = os.environ.get("UDATA_URI_API_KEY")
 
