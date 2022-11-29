@@ -3,7 +3,7 @@ import hashlib
 import logging
 import os
 import tempfile
-from typing import BinaryIO
+from typing import BinaryIO, Union
 
 import aiohttp
 import magic
@@ -56,7 +56,7 @@ async def process_resource(
     resource_id: str,
     session: aiohttp.ClientSession,
     headers: dict
-) -> None:
+) -> Union[dict, None]:
     log.debug(f"Processing task for resource {resource_id} in dataset {dataset_id}")
 
     tmp_file = None

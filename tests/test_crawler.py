@@ -58,6 +58,14 @@ async def test_catalog(setup_catalog, db):
     ],
 )
 async def test_crawl(setup_catalog, rmock, event_loop, db, resource, mocker, produce_mock):
+    # disable process_resource, tested elsewhere (and would call rmock twice)
+    mocker.patch("udata_hydra.crawl.process_resource").return_value = {
+        "error": None,
+        "checksum": None,
+        "filesize": None,
+        "mime_type": None
+    }
+
     status, timeout, exception = resource
     rurl = "https://example.com/resource-1"
     rmock.get(
