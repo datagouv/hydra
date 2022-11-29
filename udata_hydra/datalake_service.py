@@ -80,19 +80,10 @@ async def process_resource(
             # Save resource only if CSV
             try:
                 # Try to detect encoding from suspected csv file. If fail, set up to utf8 (most common)
-                with open(tmp_file.name, mode="rb") as f:
-                    try:
-                        encoding = detect_encoding(f)
-                    # FIXME: catch exception more precisely
-                    except Exception:
-                        encoding = "utf-8"
+                encoding = detect_encoding(tmp_file.name) or "utf-8"
                 # Try to detect delimiter from suspected csv file. If fail, set up to None
                 # (pandas will use python engine and try to guess separator itself)
-                try:
-                    delimiter = find_delimiter(tmp_file.name)
-                # FIXME: catch exception more precisely
-                except Exception:
-                    delimiter = None
+                delimiter = find_delimiter(tmp_file.name)
 
                 # Try to read first 1000 rows with pandas
                 pd.read_csv(tmp_file.name, sep=delimiter, encoding=encoding, nrows=1000)
