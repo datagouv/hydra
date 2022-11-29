@@ -27,7 +27,7 @@ pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
 
-async def mock_download_resource(url, response):
+async def mock_download_resource(url, session, headers):
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
     tmp_file.write(SIMPLE_CSV_CONTENT.encode("utf-8"))
     tmp_file.close()
@@ -157,8 +157,11 @@ async def test_process_resource(setup_catalog, mocker):
     rurl = "https://example.com/resource-1"
 
     mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    # disable webhook, tested in following test
+    mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
-    result = await process_resource(rurl, "dataset_id", "resource_id", response=None)
+    resource_id = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
+    result = await process_resource(rurl, "dataset_id", resource_id, None, {})
 
     assert result["error"] is None
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
@@ -173,9 +176,9 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock):
 
     mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
     mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
-    rmock.get(udata_url, status=200)
+    rmock.put(udata_url, status=200)
 
-    await process_resource(rurl, "dataset_id", resource_id, response=None)
+    await process_resource(rurl, "dataset_id", resource_id, None, {})
 
     assert ("PUT", URL(udata_url)) in rmock.requests
     req = rmock.requests[("PUT", URL(udata_url))]
