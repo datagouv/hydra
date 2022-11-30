@@ -4,6 +4,8 @@ from unittest.mock import MagicMock
 
 import asyncpg
 
+from rq import Queue
+
 from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
@@ -27,3 +29,15 @@ async def pool():
         dsn = config.DATABASE_URL
         context["pool"] = await asyncpg.create_pool(dsn=dsn, max_size=50)
     return context["pool"]
+
+
+def queue():
+    if "queue" not in context:
+        if config.TESTING:
+            from fakeredis import FakeStrictRedis
+            connection = FakeStrictRedis()
+        else:
+            import redis
+            connection = redis.from_url(config.REDIS_URL)
+        context["queue"] = Queue(connection=connection, is_async=(not config.TESTING))
+    return context["queue"]

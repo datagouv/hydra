@@ -4,6 +4,7 @@ import coloredlogs
 import sentry_sdk
 
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
+from sentry_sdk.integrations.rq import RqIntegration
 
 from udata_hydra import config
 
@@ -16,6 +17,7 @@ def setup_logging():
             dsn=config.SENTRY_DSN,
             integrations=[
                 AioHttpIntegration(),
+                RqIntegration(),
             ],
         )
     coloredlogs.install(level=config.LOG_LEVEL)

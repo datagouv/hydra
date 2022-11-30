@@ -3,7 +3,6 @@ import time
 
 from collections import defaultdict
 from datetime import datetime, timedelta
-from requests.exceptions import SSLError
 from urllib.parse import urlparse
 
 import aiohttp
@@ -116,7 +115,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
             }
 
         if config.WEBHOOK_ENABLED:
-            await send_check_data(check_data, last_check)
+            context.queue().enqueue(send_check_data, check_data, dict(last_check))
 
         log.debug("Updating priority...")
         await connection.execute(
@@ -259,7 +258,6 @@ async def check_url(row, session, sleep=0, method="get"):
         aiohttp.client_exceptions.ClientError,
         AssertionError,
         UnicodeError,
-        SSLError,
     ) as e:
         error = getattr(e, "message", None) or str(e)
         await update_check_and_catalog(
