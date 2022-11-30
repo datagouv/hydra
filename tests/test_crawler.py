@@ -10,6 +10,7 @@ import nest_asyncio
 
 from aiohttp.client_exceptions import ClientError
 from asyncio.exceptions import TimeoutError
+from minicli import run
 from yarl import URL
 
 from udata_hydra import config
@@ -21,6 +22,9 @@ from udata_hydra.datalake_service import process_resource, compute_checksum_from
 SIMPLE_CSV_CONTENT = """code_insee,number
 95211,102
 36522,48"""
+resource_id = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
+dataset_id = "601ddcfc85a59c3a45c2435a"
+
 
 pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
@@ -45,6 +49,98 @@ async def test_catalog(setup_catalog, db):
     assert resource["dataset_id"] == "601ddcfc85a59c3a45c2435a"
 
 
+async def test_catalog_deleted(setup_catalog, db, rmock):
+    res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE")
+    assert len(res) == 1
+    with open("tests/catalog.csv", "rb") as cfile:
+        catalog_content = cfile.readlines()
+    catalog = "https://example.com/catalog"
+    # feed empty catalog, should delete the previously loaded resource
+    rmock.get(catalog, status=200, body=catalog_content[0])
+    run("load_catalog", url=catalog)
+    res = await db.fetch("SELECT id FROM catalog WHERE deleted = TRUE")
+    assert len(res) == 1
+    res = await db.fetch("SELECT id FROM catalog")
+    assert len(res) == 1
+
+
+async def test_catalog_deleted_with_checked_resource(setup_catalog, db, rmock, event_loop, mocker, analysis_mock):
+    mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
+
+    rurl = "https://example.com/resource-1"
+    rmock.get(rurl)
+    event_loop.run_until_complete(crawl(iterations=1))
+
+    res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE and last_check IS NOT NULL")
+    assert len(res) == 1
+
+    with open("tests/catalog.csv", "rb") as cfile:
+        catalog_content = cfile.readlines()
+    catalog = "https://example.com/catalog"
+    # feed empty catalog, should delete the previously loaded resource
+    rmock.get(catalog, status=200, body=catalog_content[0])
+    run("load_catalog", url=catalog)
+    res = await db.fetch("SELECT id FROM catalog WHERE deleted = TRUE")
+    assert len(res) == 1
+    res = await db.fetch("SELECT id FROM catalog")
+    assert len(res) == 1
+
+
+async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop, mocker, analysis_mock):
+    # load a new catalog with a new URL for this resource
+    with open("tests/catalog.csv", "r") as cfile:
+        catalog_content = cfile.readlines()
+    catalog_content[-1] = catalog_content[-1].replace("resource-1", "resource-2")
+    catalog_content = "\n".join(catalog_content)
+    catalog = "https://example.com/catalog"
+    rmock.get(catalog, status=200, body=catalog_content.encode("utf-8"))
+    run("load_catalog", url=catalog)
+
+    # check catalog coherence
+    res = await db.fetch("SELECT id FROM catalog WHERE deleted = TRUE")
+    assert len(res) == 1
+    res = await db.fetch("SELECT id FROM catalog WHERE resource_id = $1", resource_id)
+    assert len(res) == 2
+
+    # check that the crawler does not crawl the deleted resource
+    # check that udata is called only once
+    # (rmock will raise an error if a mock is called more than once)
+    # udata is not called for analysis results since it's mocked, only for checks
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
+    mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
+    rurl_1 = "https://example.com/resource-1"
+    rurl_2 = "https://example.com/resource-2"
+    rmock.get(rurl_1)
+    rmock.get(rurl_2)
+    rmock.put(udata_url, status=200)
+    event_loop.run_until_complete(crawl(iterations=1))
+    assert ("GET", URL(rurl_1)) not in rmock.requests
+    assert ("GET", URL(rurl_2)) in rmock.requests
+    assert ("PUT", URL(udata_url)) in rmock.requests
+
+
+async def test_udata_connection_error_500(setup_catalog, mocker, analysis_mock, rmock, event_loop):
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
+    mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
+    rurl = "https://example.com/resource-1"
+    rmock.get(rurl)
+    rmock.put(udata_url, status=500)
+    event_loop.run_until_complete(crawl(iterations=1))
+    assert ("GET", URL(rurl)) in rmock.requests
+    assert ("PUT", URL(udata_url)) in rmock.requests
+
+
+async def test_udata_connection_error_exception(setup_catalog, mocker, analysis_mock, rmock, event_loop):
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
+    mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
+    rurl = "https://example.com/resource-1"
+    rmock.get(rurl)
+    rmock.put(udata_url, exception=ClientError("client error"))
+    event_loop.run_until_complete(crawl(iterations=1))
+    assert ("GET", URL(rurl)) in rmock.requests
+    assert ("PUT", URL(udata_url)) in rmock.requests
+
+
 @pytest.mark.parametrize(
     "resource",
     [
@@ -57,15 +153,7 @@ async def test_catalog(setup_catalog, db):
         (None, True, TimeoutError),
     ],
 )
-async def test_crawl(setup_catalog, rmock, event_loop, db, resource, mocker, produce_mock):
-    # disable process_resource, tested elsewhere (and would call rmock twice)
-    mocker.patch("udata_hydra.crawl.process_resource").return_value = {
-        "error": None,
-        "checksum": None,
-        "filesize": None,
-        "mime_type": None
-    }
-
+async def test_crawl(setup_catalog, rmock, event_loop, db, resource, produce_mock, analysis_mock):
     status, timeout, exception = resource
     rurl = "https://example.com/resource-1"
     rmock.get(
@@ -168,7 +256,6 @@ async def test_process_resource(setup_catalog, mocker):
     # disable webhook, tested in following test
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
-    resource_id = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
     result = await process_resource(rurl, "dataset_id", resource_id, None, {})
 
     assert result["error"] is None
@@ -179,7 +266,6 @@ async def test_process_resource(setup_catalog, mocker):
 
 async def test_process_resource_send_udata(setup_catalog, mocker, rmock):
     rurl = "https://example.com/resource-1"
-    resource_id = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
     udata_url = f"{config.UDATA_URI}/datasets/dataset_id/resources/{resource_id}/extras/"
 
     mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
