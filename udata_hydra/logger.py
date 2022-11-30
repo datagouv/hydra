@@ -9,9 +9,12 @@ from sentry_sdk.integrations.rq import RqIntegration
 from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
+context = {"inited": False}
 
 
 def setup_logging():
+    if context.get("inited"):
+        return log
     if config.SENTRY_DSN:
         sentry_sdk.init(
             dsn=config.SENTRY_DSN,
@@ -23,4 +26,5 @@ def setup_logging():
     coloredlogs.install(level=config.LOG_LEVEL)
     # silence urllib3 a bit
     logging.getLogger("urllib3").setLevel("INFO")
+    context["inited"] = True
     return log
