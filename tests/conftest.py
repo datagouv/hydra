@@ -53,7 +53,9 @@ def setup_catalog(catalog_content, rmock):
 
 @pytest.fixture
 def produce_mock(mocker):
-    mocker.patch("udata_hydra.crawl.send")
+    # return a lambda because this function can be enqueued
+    # and a MagicMock is not serializable
+    mocker.patch("udata_hydra.crawl.send", lambda x: x)
     mocker.patch("udata_hydra.datalake_service.send")
 
 

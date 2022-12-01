@@ -43,7 +43,7 @@ async def insert_check(data: dict):
     return last_check["id"]
 
 
-async def send_check_data(check_data, last_check):
+async def compute_check_has_changed(check_data, last_check) -> bool:
     is_first_check = last_check["status"] is None
     status_has_changed = (
         "status" in check_data
@@ -64,19 +64,24 @@ async def send_check_data(check_data, last_check):
         "timeout_has_changed": timeout_has_changed,
     }
     log.debug("crawl.py::update_checks_and_catalog:::criterions %s", json.dumps(criterions, indent=4))
-    if any(criterions.values()):
+
+    has_changed = any(criterions.values())
+    if has_changed:
         document = {
             "check:status": check_data["status"] if status_has_changed else last_check["status"],
             "check:timeout": check_data["timeout"],
             "check:check_date": str(datetime.now()),
         }
-        await send(
+        context.queue().enqueue(
+            send,
             dataset_id=last_check["dataset_id"],
             resource_id=last_check["resource_id"],
             document=document
         )
     else:
         log.debug("Not sending check infos to udata, criterions not met")
+
+    return has_changed
 
 
 # TODO: we should handle the case when multiple resources point to the same URL and update them all
@@ -115,7 +120,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
             }
 
         if config.WEBHOOK_ENABLED:
-            context.queue().enqueue(send_check_data, check_data, dict(last_check))
+            await compute_check_has_changed(check_data, dict(last_check))
 
         log.debug("Updating priority...")
         await connection.execute(
