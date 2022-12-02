@@ -3,6 +3,7 @@ import logging
 from unittest.mock import MagicMock
 
 import asyncpg
+import redis
 
 from rq import Queue
 
@@ -33,11 +34,9 @@ async def pool():
 
 def queue():
     if "queue" not in context:
+        # we dont need a queue will testing, make sure we're not using a real Redis connection
         if config.TESTING:
-            from fakeredis import FakeStrictRedis
-            connection = FakeStrictRedis()
-        else:
-            import redis
-            connection = redis.from_url(config.REDIS_URL)
-        context["queue"] = Queue(connection=connection, is_async=(not config.TESTING))
+            return None
+        connection = redis.from_url(config.REDIS_URL)
+        context["queue"] = Queue(connection=connection)
     return context["queue"]

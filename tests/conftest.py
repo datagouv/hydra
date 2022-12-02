@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 from unittest import mock
@@ -10,10 +11,21 @@ import pytest_asyncio
 from minicli import run
 
 import udata_hydra.cli  # noqa - this register the cli cmds
-from udata_hydra.crawl import insert_check
+from udata_hydra.utils.db import insert_check, update_check
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 pytestmark = pytest.mark.asyncio
+
+
+def dummy(return_value=None):
+    """
+    Creates a generic function which returns what is asked
+    A kind of MagicMock but pickle-able for workers
+    You should use this when mocking an enqueued function
+    """
+    def fn(*args, **kwargs):
+        return return_value
+    return fn
 
 
 # this really really really should run first (or "prod" db will get erased)
@@ -37,6 +49,23 @@ async def mock_pool(mocker):
     m.return_value = pool
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def patch_enqueue(mocker, event_loop):
+    """
+    Patch our enqueue helper
+    This bypasses rq totally by execute the function in the same event loop
+    This also has the advantage of bubbling up errors in queued functions
+    """
+    def _execute(fn, *args, **kwargs):
+        result = fn(*args, **kwargs)
+        if asyncio.iscoroutine(result):
+            loop = event_loop
+            coro_result = loop.run_until_complete(result)
+            return coro_result
+        return result
+    mocker.patch("udata_hydra.utils.queue.enqueue", _execute)
+
+
 @pytest.fixture
 def catalog_content():
     with open("tests/catalog.csv", "rb") as cfile:
@@ -53,21 +82,19 @@ def setup_catalog(catalog_content, rmock):
 
 @pytest.fixture
 def produce_mock(mocker):
-    # return a lambda because this function can be enqueued
-    # and a MagicMock is not serializable
-    mocker.patch("udata_hydra.crawl.send", lambda x: x)
-    mocker.patch("udata_hydra.datalake_service.send")
+    mocker.patch("udata_hydra.crawl.send", dummy())
+    mocker.patch("udata_hydra.datalake_service.send", dummy())
 
 
 @pytest.fixture
 def analysis_mock(mocker):
     """Disable process_resource while crawling"""
-    mocker.patch("udata_hydra.crawl.process_resource").return_value = {
+    mocker.patch("udata_hydra.crawl.process_resource", dummy({
         "error": None,
         "checksum": None,
         "filesize": None,
         "mime_type": None
-    }
+    }))
 
 
 @pytest.fixture
@@ -101,20 +128,14 @@ async def fake_check(db):
             "headers": headers,
             "timeout": timeout,
             "response_time": 0.1,
+            "resource_id": "c4e3a9fb-4415-488e-ba57-d05269b27adf",
             "error": error,
         }
         id = await insert_check(data)
+        data["id"] = id
         if created_at:
+            await update_check(id, {"created_at": created_at})
             data["created_at"] = created_at
-            await db.execute(
-                """
-                UPDATE checks
-                SET created_at = $1
-                WHERE id = $2
-            """,
-                created_at,
-                id,
-            )
         return data
 
     return _fake_check

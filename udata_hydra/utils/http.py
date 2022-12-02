@@ -25,12 +25,6 @@ async def send(dataset_id: str, resource_id: str, document: dict) -> None:
     headers = {"content-type": "application/json", "X-API-KEY": config.UDATA_URI_API_KEY}
 
     async with aiohttp.ClientSession() as session:
-        # /!\ we don't want a connection error to udata to bubble up to the crawler
-        # TODO: this would be a lot more sane if we used a queue
-        try:
-            async with session.put(uri, json=document, headers=headers) as resp:
-                body = await resp.text()
-                if not resp.status == 200:
-                    log.error(f"udata responded with a {resp.status} and content: {body}")
-        except aiohttp.ClientError as e:
-            log.error("Error while contacting udata", exc_info=e)
+        async with session.put(uri, json=document, headers=headers) as resp:
+            # we're raising since we should be in a worker thread
+            resp.raise_for_status()
