@@ -168,7 +168,7 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
 @cli
 async def drop_db(tables=["checks", "catalog", "migrations"]):
     for table in tables:
-        await context["conn"].execute(f"DROP TABLE {table}")
+        await context["conn"].execute(f"DROP TABLE IF EXISTS {table}")
 
 
 @cli
