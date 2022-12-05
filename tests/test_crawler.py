@@ -104,7 +104,6 @@ async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop
 
     # check that the crawler does not crawl the deleted resource
     # check that udata is called only once
-    # (rmock will raise an error if a mock is called more than once)
     # udata is not called for analysis results since it's mocked, only for checks
     udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
     mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
@@ -116,7 +115,7 @@ async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop
     event_loop.run_until_complete(crawl(iterations=1))
     assert ("GET", URL(rurl_1)) not in rmock.requests
     assert ("GET", URL(rurl_2)) in rmock.requests
-    assert ("PUT", URL(udata_url)) in rmock.requests
+    assert len(rmock.requests[("PUT", URL(udata_url))]) == 1
 
 
 async def test_udata_connection_error_500(setup_catalog, mocker, analysis_mock, rmock, event_loop):
