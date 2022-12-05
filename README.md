@@ -4,8 +4,6 @@
 
 URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _PostgreSQL_ database.
 
-![](docs/screenshot.png)
-
 ## CLI
 
 ### Create database structure
@@ -13,7 +11,7 @@ URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _Po
 Install udata-hydra dependencies and cli.
 `poetry install`
 
-`udata-hydra init-db`
+`poetry run udata-hydra migrate`
 
 ### Load (UPSERT) latest catalog version from data.gouv.fr
 
@@ -214,7 +212,7 @@ $ curl -s "http://localhost:8000/api/stats/" | json_pp
 }
 ```
 
-### Using Webhook integration
+## Using Webhook integration
 
 ** Set the environment variables **
 Rename the `.env.sample` to `.env` and fill it with the right values.
@@ -233,20 +231,14 @@ WEBHOOK_ENABLED=True
 
 The webhook integration sends HTTP messages to `udata` when resources are stored, analyzed or checked to fill resources extras.
 
+## Development
 
 ### Logging & Debugging
-The log level can be adjusted using the environment variable LOGLEVEL.
-For example, to set the log level to `DEBUG` when initializing the database, use `LOGLEVEL="DEBUG" udata-hydra init_db `.
+The log level can be adjusted using the environment variable LOG_LEVEL.
+For example, to set the log level to `DEBUG` when initializing the database, use `LOG_LEVEL="DEBUG" udata-hydra init_db `.
 
-## TODO
+### Writing a migration
 
-- [x] non curse interface :sad:
-- [x] tests
-- [x] expose summary/status as API
-- [x] change detection API on url / resource
-- [x] handle `GET` request when `501` on `HEAD`
-- [x] handle `GET` requests for some domains
-- [ ] denormalize interesting headers (length, mimetype, last-modified...)
-- [x] some sort of dashboard (dash?), or just plug postgrest and handle that elsewhere
-- [x] custom config file for pandas_profiling
-- [x] move API endpoints to /api endpoints
+1. Add a file named `migrations/{YYYYMMDD}_rev{from}_up_rev{to}.sql` and write the SQL you need to perform migration. `from` should be the revision from before (eg `rev1`), `to` the revision you're aiming at (eg `rev2`)
+2. Modify the latest revision (eg `rev2`) in `migrations/_LATEST_REVISION`
+3. `udata-hydra migrate` will use the info from `_LATEST_REVISION` to upgrade to `rev2`. You can also specify `udata-hydra migrate --revision rev2`
