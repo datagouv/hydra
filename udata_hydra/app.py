@@ -84,7 +84,7 @@ async def resource_created(request):
     dataset_id = valid_payload["dataset_id"]
     resource_id = valid_payload["resource_id"]
 
-    pool = await context.pool()
+    pool = request.app["pool"]
     async with pool.acquire() as connection:
         # Insert new resource in catalog table and mark as high priority for crawling
         q = f"""
@@ -111,7 +111,7 @@ async def resource_updated(request):
     dataset_id = valid_payload["dataset_id"]
     resource_id = valid_payload["resource_id"]
 
-    pool = await context.pool()
+    pool = request.app["pool"]
     async with pool.acquire() as connection:
         # Make resource high priority for crawling
         # Check if resource is in catalog then insert or update into table
@@ -141,7 +141,7 @@ async def resource_deleted(request):
     dataset_id = valid_payload["dataset_id"]
     resource_id = valid_payload["resource_id"]
 
-    pool = await context.pool()
+    pool = request.app["pool"]
     async with pool.acquire() as connection:
         if config.SAVE_TO_MINIO:
             delete_resource_from_minio(dataset_id, resource_id)
