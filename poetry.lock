@@ -237,14 +237,6 @@ executing = ">=1.1.1"
 pygments = ["pygments (>=2.2.0)"]
 
 [[package]]
-name = "docutils"
-version = "0.19"
-description = "Docutils -- Python Documentation Utilities"
-category = "dev"
-optional = false
-python-versions = ">=3.7"
-
-[[package]]
 name = "exceptiongroup"
 version = "1.0.4"
 description = "Backport of PEP 654 (exception groups)"
@@ -305,32 +297,6 @@ python-versions = "*"
 
 [package.dependencies]
 flake8 = "*"
-
-[[package]]
-name = "flit"
-version = "3.8.0"
-description = "A simple packaging tool for simple packages."
-category = "dev"
-optional = false
-python-versions = ">=3.6"
-
-[package.dependencies]
-docutils = "*"
-flit_core = ">=3.8.0"
-requests = "*"
-tomli-w = "*"
-
-[package.extras]
-doc = ["pygments-github-lexers", "sphinx", "sphinxcontrib_github_alt"]
-test = ["pytest (>=2.7.3)", "pytest-cov", "responses", "testpath", "tomli"]
-
-[[package]]
-name = "flit-core"
-version = "3.8.0"
-description = "Distribution-building parts of Flit. See flit package for more information"
-category = "dev"
-optional = false
-python-versions = ">=3.6"
 
 [[package]]
 name = "frozenlist"
@@ -656,24 +622,6 @@ hiredis = ["hiredis (>=1.0.0)"]
 ocsp = ["cryptography (>=36.0.1)", "pyopenssl (==20.0.1)", "requests (>=2.26.0)"]
 
 [[package]]
-name = "requests"
-version = "2.28.1"
-description = "Python HTTP for Humans."
-category = "dev"
-optional = false
-python-versions = ">=3.7, <4"
-
-[package.dependencies]
-certifi = ">=2017.4.17"
-charset-normalizer = ">=2,<3"
-idna = ">=2.5,<4"
-urllib3 = ">=1.21.1,<1.27"
-
-[package.extras]
-socks = ["PySocks (>=1.5.6,!=1.5.7)"]
-use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
-
-[[package]]
 name = "rq"
 version = "1.11.1"
 description = "RQ is a simple, lightweight, library for creating background jobs, and processing them."
@@ -786,14 +734,6 @@ optional = false
 python-versions = ">=3.7"
 
 [[package]]
-name = "tomli-w"
-version = "1.0.0"
-description = "A lil' TOML writer"
-category = "dev"
-optional = false
-python-versions = ">=3.7"
-
-[[package]]
 name = "urllib3"
 version = "1.26.13"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -832,7 +772,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "df60f23a673232a1e70956c9135a472bc8d03a8f734ecb238162661d59731ddd"
+content-hash = "c5f2aa4c5aff8b709a530cfd58c0d535e4c28e94e3148f1d073c36adc6dc864c"
 
 [metadata.files]
 aiocontextvars = [
@@ -1047,10 +987,6 @@ devtools = [
     {file = "devtools-0.10.0-py3-none-any.whl", hash = "sha256:b0bc02043bb032cdfb93e227226e2fea1aaea8f5a31fca25fabc4eadca22f228"},
     {file = "devtools-0.10.0.tar.gz", hash = "sha256:6eb7c4fa7c4b90e5cfe623537a9961d1dc3199d8be0981802c6931cd8f02418f"},
 ]
-docutils = [
-    {file = "docutils-0.19-py3-none-any.whl", hash = "sha256:5e1de4d849fee02c63b040a4a3fd567f4ab104defd8a5511fbbc24a8a017efbc"},
-    {file = "docutils-0.19.tar.gz", hash = "sha256:33995a6753c30b7f577febfc2c50411fec6aac7f7ffeb7c4cfe5991072dcf9e6"},
-]
 exceptiongroup = [
     {file = "exceptiongroup-1.0.4-py3-none-any.whl", hash = "sha256:542adf9dea4055530d6e1279602fa5cb11dab2395fa650b8674eaec35fc4a828"},
     {file = "exceptiongroup-1.0.4.tar.gz", hash = "sha256:bd14967b79cd9bdb54d97323216f8fdf533e278df937aa2a90089e7d6e06e5ec"},
@@ -1069,14 +1005,6 @@ flake8 = [
 ]
 flake8-quotes = [
     {file = "flake8-quotes-3.3.1.tar.gz", hash = "sha256:633adca6fb8a08131536af0d750b44d6985b9aba46f498871e21588c3e6f525a"},
-]
-flit = [
-    {file = "flit-3.8.0-py3-none-any.whl", hash = "sha256:5ee0f88fd1cfa4160d1a8fa01237e96d06d677ae0403a0bbabbb277cb37c5e9c"},
-    {file = "flit-3.8.0.tar.gz", hash = "sha256:d0f2a8f4bd45dc794befbf5839ecc0fd3830d65a57bd52b5997542fac5d5e937"},
-]
-flit-core = [
-    {file = "flit_core-3.8.0-py3-none-any.whl", hash = "sha256:64a29ec845164a6abe1136bf4bc5ae012bdfe758ed42fc7571a9059a7c80bd83"},
-    {file = "flit_core-3.8.0.tar.gz", hash = "sha256:b305b30c99526df5e63d6022dd2310a0a941a187bd3884f4c8ef0418df6c39f3"},
 ]
 frozenlist = [
     {file = "frozenlist-1.3.3-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:ff8bf625fe85e119553b5383ba0fb6aa3d0ec2ae980295aaefa552374926b3f4"},
@@ -1375,10 +1303,6 @@ redis = [
     {file = "redis-4.3.5-py3-none-any.whl", hash = "sha256:46652271dc7525cd5a9667e5b0ca983c848c75b2b8f7425403395bb8379dcf25"},
     {file = "redis-4.3.5.tar.gz", hash = "sha256:30c07511627a4c5c4d970e060000772f323174f75e745a26938319817ead7a12"},
 ]
-requests = [
-    {file = "requests-2.28.1-py3-none-any.whl", hash = "sha256:8fefa2a1a1365bf5520aac41836fbee479da67864514bdb821f31ce07ce65349"},
-    {file = "requests-2.28.1.tar.gz", hash = "sha256:7c5599b102feddaa661c826c56ab4fee28bfd17f5abca1ebbe3e7f19d7c97983"},
-]
 rq = [
     {file = "rq-1.11.1-py2.py3-none-any.whl", hash = "sha256:433882bde50ac462eb489dc1ffa476209c42b284d0031270631da26363923702"},
     {file = "rq-1.11.1.tar.gz", hash = "sha256:31c07e55255bdc05c804902d4e15779185603b04b9161b43c3e7bcac84b3343b"},
@@ -1413,10 +1337,6 @@ str2bool = [
 tomli = [
     {file = "tomli-2.0.1-py3-none-any.whl", hash = "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc"},
     {file = "tomli-2.0.1.tar.gz", hash = "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f"},
-]
-tomli-w = [
-    {file = "tomli_w-1.0.0-py3-none-any.whl", hash = "sha256:9f2a07e8be30a0729e533ec968016807069991ae2fd921a78d42f429ae5f4463"},
-    {file = "tomli_w-1.0.0.tar.gz", hash = "sha256:f463434305e0336248cac9c2dc8076b707d8a12d019dd349f5c1e382dd1ae1b9"},
 ]
 urllib3 = [
     {file = "urllib3-1.26.13-py2.py3-none-any.whl", hash = "sha256:47cc05d99aaa09c9e72ed5809b60e7ba354e64b59c9c173ac3018642d8bb41fc"},
