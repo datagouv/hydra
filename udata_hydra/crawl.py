@@ -44,6 +44,43 @@ async def insert_check(data: dict):
     return last_check["id"]
 
 
+async def send_check_data(check_data, last_check):
+    is_first_check = last_check["status"] is None
+    status_has_changed = (
+        "status" in check_data
+        and check_data["status"] != last_check["status"]
+    )
+    status_no_longer_available = (
+        "status" not in check_data
+        and last_check["status"] is not None
+    )
+    timeout_has_changed = (
+        check_data["timeout"] != last_check["timeout"]
+    )
+
+    criterions = {
+        "is_first_check": is_first_check,
+        "status_has_changed": status_has_changed,
+        "status_no_longer_available": status_no_longer_available,
+        "timeout_has_changed": timeout_has_changed,
+    }
+    log.debug("crawl.py::update_checks_and_catalog:::criterions %s", json.dumps(criterions, indent=4))
+    if any(criterions.values()):
+        document = {
+            "check:status": check_data["status"] if status_has_changed else last_check["status"],
+            "check:timeout": check_data["timeout"],
+            "check:check_date": str(datetime.utcnow()),
+        }
+        await send(
+            dataset_id=last_check["dataset_id"],
+            resource_id=last_check["resource_id"],
+            document=document
+        )
+    else:
+        log.debug("Not sending check infos to udata, criterions not met")
+
+
+# TODO: we should handle the case when multiple resources point to the same URL and update them all
 async def update_check_and_catalog(check_data: dict) -> None:
     """Update the catalog and checks tables"""
     context.monitor().set_status("Updating checks and catalog...")
@@ -54,61 +91,32 @@ async def update_check_and_catalog(check_data: dict) -> None:
         q = f"""
             SELECT * FROM catalog JOIN checks
             ON catalog.last_check = checks.id
-            WHERE catalog.resource_id = '{check_data["resource_id"]}';
+            WHERE catalog.resource_id = '{check_data["resource_id"]}'
+            AND catalog.deleted = FALSE;
         """
-        last_checks = await connection.fetch(q)
+        last_check = await connection.fetchrow(q)
 
-        if len(last_checks) == 0:
-            # In case we are doing our first check for given URL
-            rows = await connection.fetch(
+        # In case we are doing our first check for given resource
+        if not last_check:
+            row = await connection.fetchrow(
                 f"""
                 SELECT resource_id, dataset_id, priority, initialization
                 FROM catalog
-                WHERE resource_id = '{check_data["resource_id"]}';
+                WHERE resource_id = '{check_data["resource_id"]}'
+                AND deleted = FALSE;
             """
             )
-            last_checks = [
-                {
-                    "resource_id": row[0],
-                    "dataset_id": row[1],
-                    "priority": row[2],
-                    "initialization": row[3],
-                    "status": None,
-                    "timeout": None,
-                }
-                for row in rows
-            ]
+            last_check = {
+                "resource_id": row["resource_id"],
+                "dataset_id": row["dataset_id"],
+                "priority": row["priority"],
+                "initialization": row["initialization"],
+                "status": None,
+                "timeout": None,
+            }
 
-        # There could be multiple resources pointing to the same URL
-        for last_check in last_checks:
-            if config.ENABLE_WEBHOOK:
-                is_first_check = last_check["status"] is None
-                status_has_changed = (
-                    "status" in check_data
-                    and check_data["status"] != last_check["status"]
-                )
-                status_no_longer_available = (
-                    "status" not in check_data
-                    and last_check["status"] is not None
-                )
-                timeout_has_changed = (
-                    check_data["timeout"] != last_check["timeout"]
-                )
-
-                if (
-                    is_first_check
-                    or status_has_changed
-                    or status_no_longer_available
-                    or timeout_has_changed
-                ):
-                    log.debug("Sending message to udata...")
-                    document = dict()
-                    document["check:status"] = check_data["status"] if status_has_changed else last_check["status"]
-                    document["check:timeout"] = check_data["timeout"]
-                    document["check:check_date"] = str(datetime.now())
-                    await send(dataset_id=last_check["dataset_id"],
-                               resource_id=last_check["resource_id"],
-                               document=document)
+        if config.WEBHOOK_ENABLED:
+            await send_check_data(check_data, last_check)
 
         log.debug("Updating priority...")
         await connection.execute(
@@ -208,7 +216,13 @@ async def check_url(row, session, sleep=0, method="get"):
             resp.raise_for_status()
 
             # Download resource, store on Minio if CSV and produce resource.analysed message
-            res = await process_resource(row["url"], row["dataset_id"], str(row["resource_id"]), resp)
+            res = await process_resource(
+                row["url"],
+                row["dataset_id"],
+                str(row["resource_id"]),
+                session,
+                resp.headers
+            )
 
             await update_check_and_catalog(
                 {

@@ -11,6 +11,7 @@ from minicli import cli, run, wrap
 from progressist import ProgressBar
 
 from udata_hydra import config
+from udata_hydra.crawl import check_url as crawl_check_url
 from udata_hydra.logger import setup_logging
 
 
@@ -137,6 +138,18 @@ async def check_url(url, method="get"):
                 print("Headers:", resp.headers)
         except Exception as e:
             log.error(e)
+
+
+@cli
+async def check_resource(resource_id, method="get"):
+    """Trigger a complete check for a given resource_id"""
+    q = "SELECT * FROM catalog WHERE resource_id = $1"
+    res = await context["conn"].fetch(q, resource_id)
+    if not res:
+        log.error("Resource not found in catalog")
+        return
+    async with aiohttp.ClientSession(timeout=None) as session:
+        await crawl_check_url(res[0], session, method=method)
 
 
 @cli

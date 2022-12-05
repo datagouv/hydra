@@ -57,6 +57,17 @@ def produce_mock(mocker):
 
 
 @pytest.fixture
+def analysis_mock(mocker):
+    """Disable process_resource while crawling"""
+    mocker.patch("udata_hydra.crawl.process_resource").return_value = {
+        "error": None,
+        "checksum": None,
+        "filesize": None,
+        "mime_type": None
+    }
+
+
+@pytest.fixture
 def rmock():
     # passthrough for local requests (aiohttp TestServer)
     with aioresponses(passthrough=["http://127.0.0.1"]) as m:
