@@ -69,7 +69,7 @@ async def send_check_data(check_data, last_check):
         document = {
             "check:status": check_data["status"] if status_has_changed else last_check["status"],
             "check:timeout": check_data["timeout"],
-            "check:check_date": str(datetime.now()),
+            "check:check_date": str(datetime.utcnow()),
         }
         await send(
             dataset_id=last_check["dataset_id"],
