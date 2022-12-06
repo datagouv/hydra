@@ -53,7 +53,7 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
         document = {
             "check:status": check_data["status"] if status_has_changed else last_check["status"],
             "check:timeout": check_data["timeout"],
-            "check:check_date": str(datetime.utcnow()),
+            "check:check_date": str(datetime.now()),
         }
         queue.enqueue(
             send,
