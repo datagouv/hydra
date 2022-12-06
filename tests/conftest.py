@@ -24,6 +24,7 @@ def setup():
         DATABASE_URL=DATABASE_URL,
         UDATA_URI="https://udata.example.com",
         UDATA_URI_API_KEY="sup3rs3cr3t",
+        TESTING=True,
     ):
         yield
 
@@ -52,7 +53,9 @@ def setup_catalog(catalog_content, rmock):
 
 @pytest.fixture
 def produce_mock(mocker):
-    mocker.patch("udata_hydra.crawl.send")
+    # return a lambda because this function can be enqueued
+    # and a MagicMock is not serializable
+    mocker.patch("udata_hydra.crawl.send", lambda x: x)
     mocker.patch("udata_hydra.datalake_service.send")
 
 

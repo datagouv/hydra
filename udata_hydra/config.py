@@ -15,7 +15,9 @@ DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     "postgres://postgres:postgres@localhost:5432/postgres"
 )
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 SENTRY_DSN = os.environ.get("SENTRY_DSN")
+TESTING = False
 
 # -- crawler settings -- #
 

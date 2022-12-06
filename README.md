@@ -33,6 +33,12 @@ There's a by-domain backoff mecanism. The crawler will wait when, for a given do
 
 If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
+## Worker
+
+A job queuing system is used to process long-running tasks. Launch the worker with the following command:
+
+`poetry run rq worker -c udata_hydra.worker`
+
 ## API
 
 ### Run
