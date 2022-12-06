@@ -1,25 +1,27 @@
 from datetime import datetime
 import hashlib
+import json
 import logging
 import os
 import tempfile
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 import aiohttp
 import magic
 import pandas as pd
 
 from udata_hydra import config, context
+from udata_hydra.utils.csv import detect_encoding, find_delimiter
+from udata_hydra.utils.db import update_check, get_check
 from udata_hydra.utils.http import send
 from udata_hydra.utils.json import is_json_file
 from udata_hydra.utils.minio import save_resource_to_minio
-from udata_hydra.utils.csv import detect_encoding, find_delimiter
 
 
 log = logging.getLogger("udata-hydra")
 
 
-async def download_resource(url: str, session: aiohttp.ClientSession, headers: dict) -> BinaryIO:
+async def download_resource(url: str, headers: dict) -> BinaryIO:
     """
     Attempts downloading a resource from a given url.
     Returns the downloaded file object.
@@ -32,17 +34,16 @@ async def download_resource(url: str, session: aiohttp.ClientSession, headers: d
 
     chunk_size = 1024
     i = 0
-    # TODO: move to queue, can be long, also add setting for this
-    timeout = aiohttp.ClientTimeout(total=5*60)
-    async with session.get(url, timeout=timeout, allow_redirects=True) as response:
-        async for chunk in response.content.iter_chunked(chunk_size):
-            if i * chunk_size < float(config.MAX_FILESIZE_ALLOWED):
-                tmp_file.write(chunk)
-            else:
-                tmp_file.close()
-                log.error(f"File {url} is too big, skipping")
-                raise IOError("File too large to download")
-            i += 1
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, allow_redirects=True) as response:
+            async for chunk in response.content.iter_chunked(chunk_size):
+                if i * chunk_size < float(config.MAX_FILESIZE_ALLOWED):
+                    tmp_file.write(chunk)
+                else:
+                    tmp_file.close()
+                    log.error(f"File {url} is too big, skipping")
+                    raise IOError("File too large to download")
+                i += 1
     tmp_file.close()
     return tmp_file
 
@@ -50,15 +51,18 @@ async def download_resource(url: str, session: aiohttp.ClientSession, headers: d
 # TODO: we're sending analysis info to udata every time a resource is crawled
 # although we only send "meta" check info only when they change
 # maybe introduce conditionnal webhook trigger here too
-async def process_resource(
-    url: str,
-    dataset_id: str,
-    resource_id: str,
-    session: aiohttp.ClientSession,
-    headers: dict
-) -> Union[dict, None]:
-    log.debug(f"Processing task for resource {resource_id} in dataset {dataset_id}")
+async def process_resource(check_id) -> None:
+    check = await get_check(check_id)
+    if not check:
+        log.error(f"Check not found by id {check_id}")
+        return
 
+    resource_id = check["resource_id"]
+    dataset_id = check["dataset_id"]
+    url = check["url"]
+    headers = json.loads(check["headers"] or "{}")
+
+    log.debug(f"Analysis for resource {resource_id} in dataset {dataset_id}")
     tmp_file = None
     mime_type = None
     sha1 = None
@@ -66,7 +70,7 @@ async def process_resource(
     error = None
 
     try:
-        tmp_file = await download_resource(url, session, headers)
+        tmp_file = await download_resource(url, headers)
         # Get file size
         filesize = os.path.getsize(tmp_file.name)
 
@@ -106,7 +110,7 @@ async def process_resource(
                                document=document)
             except ValueError:
                 log.warning(
-                    f"Resource {resource_id} in dataset {dataset_id} is not a CSV"
+                    f"Resource {resource_id} in dataset {dataset_id} is not a parsable CSV"
                 )
 
         # Send udata a message for both CSV and non CSV resources
@@ -124,15 +128,17 @@ async def process_resource(
         if checksum_modified:
             document["analysis:checksum_last_modified"] = datetime.utcnow().isoformat()
 
-        await send(dataset_id=dataset_id,
-                   resource_id=resource_id,
-                   document=document)
-        return {
+        await send(
+            dataset_id=dataset_id,
+            resource_id=resource_id,
+            document=document
+        )
+        await update_check(check_id, {
             "checksum": sha1,
             "error": error,
             "filesize": filesize,
             "mime_type": mime_type
-        }
+        })
     except IOError:
         error = "File too large to download"
         document = {
@@ -140,15 +146,17 @@ async def process_resource(
             "analysis:filesize": None,
             "analysis:mime": None,
         }
-        await send(dataset_id=dataset_id,
-                   resource_id=resource_id,
-                   document=document)
-        return {
+        await send(
+            dataset_id=dataset_id,
+            resource_id=resource_id,
+            document=document
+        )
+        await update_check(check_id, {
             "checksum": sha1,
             "error": error,
             "filesize": filesize,
             "mime_type": mime_type
-        }
+        })
     finally:
         if tmp_file:
             os.remove(tmp_file.name)

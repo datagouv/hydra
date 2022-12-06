@@ -16,6 +16,7 @@ from yarl import URL
 from udata_hydra import config
 from udata_hydra.crawl import crawl
 from udata_hydra.datalake_service import process_resource, compute_checksum_from_file
+from udata_hydra.utils.db import get_check
 
 
 # TODO: make file content configurable
@@ -31,7 +32,7 @@ pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
 
-async def mock_download_resource(url, session, headers):
+async def mock_download_resource(url, headers):
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
     tmp_file.write(SIMPLE_CSV_CONTENT.encode("utf-8"))
     tmp_file.close()
@@ -106,7 +107,6 @@ async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop
     # check that udata is called only once
     # udata is not called for analysis results since it's mocked, only for checks
     udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
-    mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
     rurl_1 = "https://example.com/resource-1"
     rurl_2 = "https://example.com/resource-2"
     rmock.get(rurl_1)
@@ -116,28 +116,6 @@ async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop
     assert ("GET", URL(rurl_1)) not in rmock.requests
     assert ("GET", URL(rurl_2)) in rmock.requests
     assert len(rmock.requests[("PUT", URL(udata_url))]) == 1
-
-
-async def test_udata_connection_error_500(setup_catalog, mocker, analysis_mock, rmock, event_loop):
-    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
-    mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
-    rurl = "https://example.com/resource-1"
-    rmock.get(rurl)
-    rmock.put(udata_url, status=500)
-    event_loop.run_until_complete(crawl(iterations=1))
-    assert ("GET", URL(rurl)) in rmock.requests
-    assert ("PUT", URL(udata_url)) in rmock.requests
-
-
-async def test_udata_connection_error_exception(setup_catalog, mocker, analysis_mock, rmock, event_loop):
-    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
-    mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
-    rurl = "https://example.com/resource-1"
-    rmock.get(rurl)
-    rmock.put(udata_url, exception=ClientError("client error"))
-    event_loop.run_until_complete(crawl(iterations=1))
-    assert ("GET", URL(rurl)) in rmock.requests
-    assert ("PUT", URL(udata_url)) in rmock.requests
 
 
 @pytest.mark.parametrize(
@@ -248,14 +226,14 @@ async def test_501_get(setup_catalog, event_loop, rmock, produce_mock):
     assert ("GET", URL(rurl)) in rmock.requests
 
 
-async def test_process_resource(setup_catalog, mocker):
-    rurl = "https://example.com/resource-1"
-
+async def test_process_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
     # disable webhook, tested in following test
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
-    result = await process_resource(rurl, "dataset_id", resource_id, None, {})
+    check = await fake_check()
+    await process_resource(check["id"])
+    result = await get_check(check["id"])
 
     assert result["error"] is None
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
@@ -263,22 +241,49 @@ async def test_process_resource(setup_catalog, mocker):
     assert result["mime_type"] == "text/plain"
 
 
-async def test_process_resource_send_udata(setup_catalog, mocker, rmock):
-    rurl = "https://example.com/resource-1"
-    udata_url = f"{config.UDATA_URI}/datasets/dataset_id/resources/{resource_id}/extras/"
+async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_check, db):
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
 
-    mocker.patch("udata_hydra.config.UDATA_URI_API_KEY", "my-api-key")
     mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
-    rmock.put(udata_url, status=200)
+    rmock.put(udata_url, status=200, repeat=True)
 
-    await process_resource(rurl, "dataset_id", resource_id, None, {})
+    check = await fake_check()
+    await process_resource(check["id"])
 
-    assert ("PUT", URL(udata_url)) in rmock.requests
     req = rmock.requests[("PUT", URL(udata_url))]
     assert len(req) == 1
     document = req[0].kwargs["json"]
     assert document["analysis:filesize"] == len(SIMPLE_CSV_CONTENT)
     assert document["analysis:mime"] == "text/plain"
+
+
+async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db):
+    """"
+    Looks a lot like an E2E test:
+    - process catalog
+    - check resource
+    - download and analysis resource
+    - trigger udata callbacks
+    """
+
+    rurl = "https://example.com/resource-1"
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
+
+    # mock for check
+    rmock.get(rurl, status=200, headers={"Content-Length": "200"})
+    # mock for download
+    rmock.get(rurl, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+    # mock for check and analysis results
+    rmock.put(udata_url, status=200, repeat=True)
+
+    event_loop.run_until_complete(crawl(iterations=1))
+
+    assert len(rmock.requests[("PUT", URL(udata_url))]) == 2
+    res = await db.fetch("SELECT * FROM checks")
+    assert len(res) == 1
+    assert res[0]["url"] == rurl
+    assert res[0]["checksum"] is not None
+    assert res[0]["status"] is not None
 
 
 async def test_compute_checksum_from_file():

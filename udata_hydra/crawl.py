@@ -13,6 +13,8 @@ from humanfriendly import parse_timespan
 from udata_hydra import config, context
 from udata_hydra.datalake_service import process_resource
 from udata_hydra.logger import setup_logging
+from udata_hydra.utils import queue
+from udata_hydra.utils.db import insert_check
 from udata_hydra.utils.http import send
 
 results = defaultdict(int)
@@ -22,25 +24,6 @@ STATUS_TIMEOUT = "timeout"
 STATUS_ERROR = "error"
 
 log = setup_logging()
-
-
-async def insert_check(data: dict):
-    if "headers" in data:
-        data["headers"] = json.dumps(data["headers"])
-    columns = ",".join(data.keys())
-    # $1, $2...
-    placeholders = ",".join([f"${x + 1}" for x in range(len(data.values()))])
-    q = f"""
-        INSERT INTO checks ({columns})
-        VALUES ({placeholders})
-        RETURNING id
-    """
-    pool = await context.pool()
-    async with pool.acquire() as connection:
-        last_check = await connection.fetchrow(q, *data.values())
-        q = """UPDATE catalog SET last_check = $1 WHERE url = $2"""
-        await connection.execute(q, last_check["id"], data["url"])
-    return last_check["id"]
 
 
 async def compute_check_has_changed(check_data, last_check) -> bool:
@@ -72,7 +55,7 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
             "check:timeout": check_data["timeout"],
             "check:check_date": str(datetime.now()),
         }
-        context.queue().enqueue(
+        queue.enqueue(
             send,
             dataset_id=last_check["dataset_id"],
             resource_id=last_check["resource_id"],
@@ -85,7 +68,7 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
 
 
 # TODO: we should handle the case when multiple resources point to the same URL and update them all
-async def update_check_and_catalog(check_data: dict) -> None:
+async def update_check_and_catalog(check_data: dict) -> int:
     """Update the catalog and checks tables"""
     context.monitor().set_status("Updating checks and catalog...")
     check_data["resource_id"] = str(check_data["resource_id"])
@@ -130,7 +113,7 @@ async def update_check_and_catalog(check_data: dict) -> None:
         """
         )
 
-    await insert_check(check_data)
+    return await insert_check(check_data)
 
 
 async def is_backoff(domain):
@@ -219,16 +202,7 @@ async def check_url(row, session, sleep=0, method="get"):
             end = time.time()
             resp.raise_for_status()
 
-            # Download resource, store on Minio if CSV and produce resource.analysed message
-            res = await process_resource(
-                row["url"],
-                row["dataset_id"],
-                str(row["resource_id"]),
-                session,
-                resp.headers
-            )
-
-            await update_check_and_catalog(
+            check_id = await update_check_and_catalog(
                 {
                     "resource_id": row["resource_id"],
                     "url": row["url"],
@@ -237,12 +211,12 @@ async def check_url(row, session, sleep=0, method="get"):
                     "headers": convert_headers(resp.headers),
                     "timeout": False,
                     "response_time": end - start,
-                    "error": res["error"],
-                    "checksum": res["checksum"],
-                    "filesize": res["filesize"],
-                    "mime_type": res["mime_type"]
                 }
             )
+
+            # launch analysis tasks
+            queue.enqueue(process_resource, check_id)
+
             return STATUS_OK
     except asyncio.exceptions.TimeoutError:
         await update_check_and_catalog(
