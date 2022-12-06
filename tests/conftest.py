@@ -53,7 +53,7 @@ async def mock_pool(mocker):
 async def patch_enqueue(mocker, event_loop):
     """
     Patch our enqueue helper
-    This bypasses rq totally by execute the function in the same event loop
+    This bypasses rq totally by executing the function in the same event loop
     This also has the advantage of bubbling up errors in queued functions
     """
     def _execute(fn, *args, **kwargs):
