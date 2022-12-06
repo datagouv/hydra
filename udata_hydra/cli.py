@@ -1,6 +1,7 @@
 import csv
 import os
 
+from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -18,8 +19,6 @@ from udata_hydra.crawl import check_url as crawl_check_url
 from udata_hydra.logger import setup_logging
 
 
-CATALOG_URL = "https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d"
-
 context = {}
 log = setup_logging()
 
@@ -35,8 +34,11 @@ async def download_file(url, fd):
 
 
 @cli
-async def load_catalog(url=CATALOG_URL):
+async def load_catalog(url=None):
     """Load the catalog into DB from CSV file"""
+    if not url:
+        url = config.CATALOG_URL
+
     try:
         log.info(f"Downloading catalog from {url}...")
         with NamedTemporaryFile(delete=False) as fd:
@@ -51,13 +53,17 @@ async def load_catalog(url=CATALOG_URL):
             for row in bar.iter(rows):
                 await context["conn"].execute(
                     """
-                    INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)
-                    VALUES ($1, $2, $3, FALSE, FALSE, TRUE)
+                    INSERT INTO catalog (
+                        dataset_id, resource_id, url, harvest_modified_at,
+                        deleted, priority, initialization
+                    )
+                    VALUES ($1, $2, $3, $4, FALSE, FALSE, TRUE)
                     ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET deleted = FALSE
                 """,
                     row["dataset.id"],
                     row["id"],
                     row["url"],
+                    datetime.fromisoformat(row["harvest.modified_at"]) if row["harvest.modified_at"] else None,
                 )
         log.info("Catalog successfully upserted into DB.")
     except Exception as e:
