@@ -34,7 +34,7 @@ async def pool():
 
 def queue():
     if "queue" not in context:
-        # we dont need a queue will testing, make sure we're not using a real Redis connection
+        # we dont need a queue while testing, make sure we're not using a real Redis connection
         if config.TESTING:
             return None
         connection = redis.from_url(config.REDIS_URL)
