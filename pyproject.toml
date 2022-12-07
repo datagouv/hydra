@@ -25,7 +25,7 @@ aiocontextvars = "^0.2.2"
 coloredlogs = "^15.0.1"
 str2bool = "^1.1"
 rq = "^1.11.1"
-asyncpg-trek = {git = "https://github.com/adriangb/asyncpg-trek.git", rev = "a2f2054b05e779c722c929d4a42093c52bd0427c"}
+asyncpg-trek = "^0.2.1"
 
 [tool.poetry.group.dev.dependencies]
 flake8-quotes = "^3.3.1"
