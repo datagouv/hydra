@@ -265,6 +265,6 @@ async def detect_resource_change_from_harvest(resource_id):
         data = await connection.fetchrow(q, resource_id)
         if data["harvest_modified_at"]:
             return {
-                "analysis:last-modified-at": data["harvest_modified_at"],
+                "analysis:last-modified-at": data["harvest_modified_at"].isoformat(),
                 "analysis:last-modified-detection": "harvest-resource-metadata",
             }

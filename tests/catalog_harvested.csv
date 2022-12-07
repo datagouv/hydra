@@ -1,0 +1,2 @@
+"dataset.id";"dataset.title";"dataset.slug";"dataset.url";"dataset.organization";"dataset.organization_id";"dataset.license";"dataset.private";"id";"url";"title";"description";"filetype";"format";"mime";"filesize";"checksum.type";"checksum.value";"created_at";"modified";"downloads";"harvest.modified_at"
+"63478da8b4c219a0cf8c0d3a";"";"";"";"";"";"";"";"fda33536-a0e0-4cad-b1bf-b88d2a7586e6";"https://example.com/harvested";"";"";"";"";"";"";"";"";"";"";"";"2022-12-06T05:00:32.647000"

@@ -28,6 +28,17 @@ def dummy(return_value=None):
     return fn
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "catalog_harvested: use catalog_harvested.csv as source"
+    )
+
+
+@pytest.fixture
+def is_harvested(request):
+    return "catalog_harvested" in [m.name for m in request.node.iter_markers()]
+
+
 # this really really really should run first (or "prod" db will get erased)
 @pytest.fixture(autouse=True, scope="session")
 def setup():
@@ -37,6 +48,7 @@ def setup():
         UDATA_URI="https://udata.example.com",
         UDATA_URI_API_KEY="sup3rs3cr3t",
         TESTING=True,
+        SLEEP_BETWEEN_BATCHES=0,
     ):
         yield
 
@@ -67,8 +79,9 @@ async def patch_enqueue(mocker, event_loop):
 
 
 @pytest.fixture
-def catalog_content():
-    with open("tests/catalog.csv", "rb") as cfile:
+def catalog_content(is_harvested):
+    filename = "catalog" if not is_harvested else "catalog_harvested"
+    with open(f"tests/{filename}.csv", "rb") as cfile:
         return cfile.read()
 
 
@@ -121,6 +134,7 @@ async def fake_check(db):
         resource=1,
         created_at=None,
         headers={"x-do": "you"},
+        checksum=None,
     ):
         data = {
             "url": f"https://example.com/resource-{resource}",
@@ -131,6 +145,7 @@ async def fake_check(db):
             "response_time": 0.1,
             "resource_id": "c4e3a9fb-4415-488e-ba57-d05269b27adf",
             "error": error,
+            "checksum": checksum,
         }
         id = await insert_check(data)
         data["id"] = id
