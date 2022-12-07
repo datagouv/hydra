@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 import hashlib
 import json
-import os
 import pytest
 import tempfile
 from unittest.mock import MagicMock
@@ -15,7 +14,7 @@ from yarl import URL
 
 from udata_hydra import config
 from udata_hydra.crawl import crawl
-from udata_hydra.datalake_service import process_resource, compute_checksum_from_file
+from udata_hydra.datalake_service import process_resource
 from udata_hydra.utils.db import get_check
 
 
@@ -283,16 +282,6 @@ async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db)
     assert res[0]["url"] == rurl
     assert res[0]["checksum"] is not None
     assert res[0]["status"] is not None
-
-
-async def test_compute_checksum_from_file():
-    tmp_file = tempfile.NamedTemporaryFile(delete=False)
-    tmp_file.write(b"a very small file")
-    tmp_file.close()
-
-    checksum = await compute_checksum_from_file(tmp_file.name)
-    assert checksum == hashlib.sha1(b"a very small file").hexdigest()
-    os.remove(tmp_file.name)
 
 
 async def test_change_analysis_last_modified_header(setup_catalog, rmock, event_loop):

@@ -1,4 +1,3 @@
-import hashlib
 import json
 import logging
 import os
@@ -14,6 +13,7 @@ from dateutil.parser import parse as date_parser, ParserError
 
 from udata_hydra import config, context
 from udata_hydra.utils.db import update_check, get_check
+from udata_hydra.utils.file import compute_checksum_from_file
 from udata_hydra.utils.http import send
 
 
@@ -88,7 +88,9 @@ async def process_resource(check_id: int) -> None:
         filesize = os.path.getsize(tmp_file.name)
 
         # Get checksum
-        sha1 = await compute_checksum_from_file(tmp_file.name)
+        sha1 = compute_checksum_from_file(tmp_file.name)
+        # Check if checksum has been modified if we don't have other hints
+        change_analysis = change_analysis or await detect_resource_change_from_checksum(resource_id, sha1) or {}
 
         # FIXME: this never seems to output text/csv, maybe override it later
         mime_type = magic.from_file(tmp_file.name, mime=True)
@@ -97,18 +99,8 @@ async def process_resource(check_id: int) -> None:
             "analysis:error": error,
             "analysis:filesize": filesize,
             "analysis:mime": mime_type,
+            **change_analysis,
         }
-
-        # Check if checksum has been modified if we don't have other hints
-        if not change_analysis:
-            checksum_modified = await has_checksum_been_modified(resource_id, sha1)
-            if checksum_modified:
-                change_analysis = {
-                    "analysis:last-modified-at": datetime.utcnow().isoformat(),
-                    "analysis:last-modified-detection": "computed-checksum",
-                }
-
-        document.update(change_analysis)
 
         await send(
             dataset_id=dataset_id,
@@ -144,7 +136,14 @@ async def process_resource(check_id: int) -> None:
             os.remove(tmp_file.name)
 
 
-async def has_checksum_been_modified(resource_id, new_checksum):
+async def detect_resource_change_from_checksum(resource_id, new_checksum):
+    """
+    Checks if resource has a harvest.modified_at
+    Returns {
+        "analysis:last-modified-at": last_modified_date,
+        "analysis:last-modified-detection": "computed-checksum",
+    } or None if no match
+    """
     q = """
     SELECT checksum
     FROM checks
@@ -155,25 +154,11 @@ async def has_checksum_been_modified(resource_id, new_checksum):
     pool = await context.pool()
     async with pool.acquire() as connection:
         data = await connection.fetchrow(q, resource_id)
-        if data:
-            if data["checksum"] != new_checksum:
-                return True
-            else:
-                return False
-        else:
-            # First check, thus we don't consider the checksum has been modified
-            return False
-
-
-async def compute_checksum_from_file(filename):
-    # Compute sha1 in blocks
-    sha1sum = hashlib.sha1()
-    with open(filename, "rb") as f:
-        block = f.read(2**16)
-        while len(block) != 0:
-            sha1sum.update(block)
-            block = f.read(2**16)
-    return sha1sum.hexdigest()
+        if data and data["checksum"] != new_checksum:
+            return {
+                "analysis:last-modified-at": datetime.utcnow().isoformat(),
+                "analysis:last-modified-detection": "computed-checksum",
+            }
 
 
 async def detect_resource_change_from_headers(value: str, column: str = "url"):

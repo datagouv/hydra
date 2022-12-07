@@ -1,6 +1,11 @@
+import hashlib
+import os
+import tempfile
+
 import pytest
 
 from udata_hydra.utils.csv import find_delimiter, detect_encoding
+from udata_hydra.utils.file import compute_checksum_from_file
 
 
 def test_detect_encoding():
@@ -21,3 +26,13 @@ def test_find_delimiter():
     assert delimiter is None
     delimiter = find_delimiter("tests/catalog.csv", encoding="nimp")
     assert delimiter is None
+
+
+def test_compute_checksum_from_file():
+    tmp_file = tempfile.NamedTemporaryFile(delete=False)
+    tmp_file.write(b"a very small file")
+    tmp_file.close()
+
+    checksum = compute_checksum_from_file(tmp_file.name)
+    assert checksum == hashlib.sha1(b"a very small file").hexdigest()
+    os.remove(tmp_file.name)
