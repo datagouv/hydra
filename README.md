@@ -123,30 +123,6 @@ $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv
 ]
 ```
 
-### Get modification date on resources
-
-This tries to find a modification date for a given resource, by order of priority:
-1. `last-modified` header if any
-2. `content-length` comparison over multiple checks if any (precision depends on crawling frequency)
-
-Works with `?url={url}` and `?resource_id={resource_id}`.
-
-```
-$ curl -s "http://localhost:8000/api/changed/?resource_id=f2d3e1ad-4d7d-46fc-91f8-c26f02c1e487" | json_pp
-{
-   "changed_at" : "2014-09-15T14:51:52",
-   "detection" : "last-modified"
-}
-```
-
-```
-$ curl -s "http://localhost:8000/api/changed/?resource_id=f2d3e1ad-4d7d-46fc-91f8-c26f02c1e487" | json_pp
-{
-   "changed_at" : "2020-09-15T14:51:52",
-   "detection" : "content-length"
-}
-```
-
 ### Get crawling status
 
 ```
