@@ -252,7 +252,7 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
     assert len(req) == 1
     document = req[0].kwargs["json"]
     assert document["analysis:filesize"] == len(SIMPLE_CSV_CONTENT)
-    assert document["analysis:mime"] == "text/plain"
+    assert document["analysis:mime-type"] == "text/plain"
 
 
 async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db):

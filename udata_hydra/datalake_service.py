@@ -98,16 +98,18 @@ async def process_resource(check_id: int) -> None:
         # FIXME: this never seems to output text/csv, maybe override it later
         mime_type = magic.from_file(tmp_file.name, mime=True)
     finally:
-        document = {
-            "analysis:error": error,
-            "analysis:filesize": filesize,
-            "analysis:mime": mime_type,
-            **change_analysis,
-        }
+        if tmp_file:
+            os.remove(tmp_file.name)
         await send(
             dataset_id=dataset_id,
             resource_id=resource_id,
-            document=document
+            document={
+                "analysis:error": error,
+                "analysis:filesize": filesize,
+                "analysis:mime-type": mime_type,
+                "analysis:checksum": sha1,
+                **change_analysis,
+            }
         )
         await update_check(check_id, {
             "checksum": sha1,
@@ -115,8 +117,6 @@ async def process_resource(check_id: int) -> None:
             "filesize": filesize,
             "mime_type": mime_type
         })
-        if tmp_file:
-            os.remove(tmp_file.name)
 
 
 async def detect_resource_change_from_checksum(resource_id, new_checksum):
