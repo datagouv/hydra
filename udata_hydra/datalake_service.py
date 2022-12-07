@@ -89,12 +89,10 @@ async def process_resource(check_id: int) -> None:
     else:
         # Get file size
         filesize = os.path.getsize(tmp_file.name)
-
         # Get checksum
         sha1 = compute_checksum_from_file(tmp_file.name)
         # Check if checksum has been modified if we don't have other hints
         change_analysis = change_analysis or await detect_resource_change_from_checksum(resource_id, sha1) or {}
-
         # FIXME: this never seems to output text/csv, maybe override it later
         mime_type = magic.from_file(tmp_file.name, mime=True)
     finally:
