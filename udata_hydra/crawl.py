@@ -27,6 +27,7 @@ log = setup_logging()
 
 
 async def compute_check_has_changed(check_data, last_check) -> bool:
+    # FIXME: this is flawed (eg ssl.SSLCertVerificationError won't have a status)
     is_first_check = last_check["status"] is None
     status_has_changed = (
         "status" in check_data
@@ -53,7 +54,8 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
         document = {
             "check:status": check_data["status"] if status_has_changed else last_check["status"],
             "check:timeout": check_data["timeout"],
-            "check:check_date": str(datetime.now()),
+            "check:check_date": datetime.utcnow().isoformat(),
+            "check:error": check_data.get("error"),
         }
         queue.enqueue(
             send,
@@ -214,7 +216,6 @@ async def check_url(row, session, sleep=0, method="get"):
                 }
             )
 
-            # launch analysis tasks
             queue.enqueue(process_resource, check_id)
 
             return STATUS_OK

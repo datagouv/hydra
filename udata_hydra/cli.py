@@ -34,10 +34,14 @@ async def download_file(url, fd):
 
 
 @cli
-async def load_catalog(url=None):
+async def load_catalog(url=None, drop=False):
     """Load the catalog into DB from CSV file"""
     if not url:
         url = config.CATALOG_URL
+
+    if drop:
+        await drop_db(["catalog", "checks", "migrations"])
+        await migrate()
 
     try:
         log.info(f"Downloading catalog from {url}...")

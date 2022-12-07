@@ -124,6 +124,7 @@ async def test_api_stats(setup_catalog, client, fake_check):
     }
 
 
+@pytest.mark.skip(reason="Unimplemented endpoint")
 async def test_changed_last_modified(setup_catalog, client, fake_check):
     check = await fake_check(
         headers={
@@ -153,12 +154,14 @@ async def test_changed_last_modified(setup_catalog, client, fake_check):
     }
 
 
+@pytest.mark.skip(reason="Unimplemented endpoint")
 async def test_changed_no_header(setup_catalog, client, fake_check):
     check = await fake_check(headers={})
     resp = await client.get(f"/api/changed/?url={check['url']}")
     assert resp.status == 204
 
 
+@pytest.mark.skip(reason="Unimplemented endpoint")
 async def test_changed_content_length(setup_catalog, client, fake_check):
     c1 = datetime.now() - timedelta(days=2)
     check = await fake_check(headers={"content-length": 1}, created_at=c1)
@@ -193,6 +196,7 @@ async def test_changed_content_length(setup_catalog, client, fake_check):
     }
 
 
+@pytest.mark.skip(reason="Unimplemented endpoint")
 async def test_changed_content_length_unchanged(
     setup_catalog, client, fake_check
 ):
