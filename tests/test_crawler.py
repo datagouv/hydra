@@ -346,7 +346,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
 
 @pytest.mark.catalog_harvested
 async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loop):
-    udata_url = f"{config.UDATA_URI}/datasets/63478da8b4c219a0cf8c0d3a/resources/fda33536-a0e0-4cad-b1bf-b88d2a7586e6/extras/"
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
     mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
     rmock.get("https://example.com/harvested", headers={"content-length": "2"}, repeat=True)
     rmock.put(udata_url, repeat=True)
