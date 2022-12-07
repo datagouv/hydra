@@ -84,6 +84,9 @@ async def process_resource(check_id: int) -> None:
 
     try:
         tmp_file = await download_resource(url, headers)
+    except IOError:
+        error = "File too large to download"
+    else:
         # Get file size
         filesize = os.path.getsize(tmp_file.name)
 
@@ -94,14 +97,13 @@ async def process_resource(check_id: int) -> None:
 
         # FIXME: this never seems to output text/csv, maybe override it later
         mime_type = magic.from_file(tmp_file.name, mime=True)
-
+    finally:
         document = {
             "analysis:error": error,
             "analysis:filesize": filesize,
             "analysis:mime": mime_type,
             **change_analysis,
         }
-
         await send(
             dataset_id=dataset_id,
             resource_id=resource_id,
@@ -113,25 +115,6 @@ async def process_resource(check_id: int) -> None:
             "filesize": filesize,
             "mime_type": mime_type
         })
-    except IOError:
-        error = "File too large to download"
-        document = {
-            "analysis:error": error,
-            "analysis:filesize": None,
-            "analysis:mime": mime_type,
-            **change_analysis,
-        }
-        await send(
-            dataset_id=dataset_id,
-            resource_id=resource_id,
-            document=document
-        )
-        await update_check(check_id, {
-            "analysis_error": error,
-            "mime_type": mime_type
-        })
-    # TODO: maybe catch all for analysis_error
-    finally:
         if tmp_file:
             os.remove(tmp_file.name)
 

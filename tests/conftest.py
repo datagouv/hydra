@@ -23,7 +23,7 @@ def dummy(return_value=None):
     A kind of MagicMock but pickle-able for workers
     You should use this when mocking an enqueued function
     """
-    def fn(*args, **kwargs):
+    async def fn(*args, **kwargs):
         return return_value
     return fn
 
