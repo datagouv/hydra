@@ -135,6 +135,7 @@ async def fake_check(db):
         created_at=None,
         headers={"x-do": "you"},
         checksum=None,
+        resource_id="c4e3a9fb-4415-488e-ba57-d05269b27adf",
     ):
         data = {
             "url": f"https://example.com/resource-{resource}",
@@ -143,7 +144,7 @@ async def fake_check(db):
             "headers": headers,
             "timeout": timeout,
             "response_time": 0.1,
-            "resource_id": "c4e3a9fb-4415-488e-ba57-d05269b27adf",
+            "resource_id": resource_id,
             "error": error,
             "checksum": checksum,
         }

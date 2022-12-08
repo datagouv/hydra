@@ -159,7 +159,7 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, produce_moc
 
 
 async def test_backoff(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock):
-    await fake_check(resource=2)
+    await fake_check(resource=2, resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe")
     mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
     mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
     magic = MagicMock()
