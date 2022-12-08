@@ -148,8 +148,7 @@ def convert_headers(headers):
     return _headers
 
 
-# TODO: should we try head first?
-async def check_url(row, session, sleep=0, method="get"):
+async def check_url(row, session, sleep=0, method="head"):
     log.debug(f"check {row}, sleep {sleep}")
 
     if sleep:
@@ -189,6 +188,8 @@ async def check_url(row, session, sleep=0, method="get"):
             row["url"], timeout=timeout, allow_redirects=True
         ) as resp:
             end = time.time()
+            if method != "get" and not is_valid_status(resp.status):
+                return await check_url(row, session, method="get")
             resp.raise_for_status()
 
             check_id = await update_check_and_catalog(
