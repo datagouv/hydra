@@ -60,10 +60,14 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
             "check:check-date": datetime.utcnow().isoformat(),
             "check:error": check_data.get("error"),
         }
+        pool = await context.pool()
+        async with pool.acquire() as conn:
+            q = "SELECT dataset_id FROM CATALOG where resource_id = $1"
+            dataset = await conn.fetchrow(q, check_data["resource_id"])
         queue.enqueue(
             send,
-            dataset_id=last_check["dataset_id"],
-            resource_id=last_check["resource_id"],
+            dataset_id=dataset["dataset_id"],
+            resource_id=check_data["resource_id"],
             document=document
         )
     else:
@@ -90,7 +94,7 @@ async def update_check_and_catalog(check_data: dict) -> int:
 
         # TODO: conditionnal later in compute_check_has_changed
         if config.WEBHOOK_ENABLED:
-            await compute_check_has_changed(check_data, dict(last_check))
+            await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
         log.debug("Updating priority...")
         await connection.execute(
