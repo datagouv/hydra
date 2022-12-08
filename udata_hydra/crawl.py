@@ -96,12 +96,9 @@ async def update_check_and_catalog(check_data: dict) -> int:
         if config.WEBHOOK_ENABLED:
             await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
-        log.debug("Updating priority...")
         await connection.execute(
-            f"""
-            UPDATE catalog SET priority = FALSE, initialization = FALSE
-            WHERE resource_id = '{check_data['resource_id']}';
-        """
+            "UPDATE catalog SET priority = FALSE WHERE resource_id = $1",
+            check_data["resource_id"]
         )
 
     return await insert_check(check_data)

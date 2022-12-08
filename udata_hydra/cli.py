@@ -55,14 +55,13 @@ async def load_catalog(url=None, drop=False):
             rows = list(reader)
             bar = ProgressBar(total=len(rows))
             for row in bar.iter(rows):
-                # FIXME: do we need initialization??
                 await context["conn"].execute(
                     """
                     INSERT INTO catalog (
                         dataset_id, resource_id, url, harvest_modified_at,
-                        deleted, priority, initialization
+                        deleted, priority
                     )
-                    VALUES ($1, $2, $3, $4, FALSE, FALSE, TRUE)
+                    VALUES ($1, $2, $3, $4, FALSE, FALSE)
                     ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET deleted = FALSE
                 """,
                     row["dataset.id"],
