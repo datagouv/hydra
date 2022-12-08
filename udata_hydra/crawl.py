@@ -149,6 +149,7 @@ def convert_headers(headers):
 
 
 def has_nice_head(resp):
+    """Check if a HEAD response looks useful to us"""
     if not is_valid_status(resp.status):
         return False
     if not any([k in resp.headers for k in ("content-length", "last-modified")]):
