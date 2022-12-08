@@ -148,6 +148,14 @@ def convert_headers(headers):
     return _headers
 
 
+def has_nice_head(resp):
+    if not is_valid_status(resp.status):
+        return False
+    if not any([k in resp.headers for k in ("content-length", "last-modified")]):
+        return False
+    return True
+
+
 async def check_url(row, session, sleep=0, method="head"):
     log.debug(f"check {row}, sleep {sleep}")
 
@@ -188,7 +196,7 @@ async def check_url(row, session, sleep=0, method="head"):
             row["url"], timeout=timeout, allow_redirects=True
         ) as resp:
             end = time.time()
-            if method != "get" and not is_valid_status(resp.status):
+            if method != "get" and not has_nice_head(resp):
                 return await check_url(row, session, method="get")
             resp.raise_for_status()
 

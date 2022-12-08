@@ -228,6 +228,23 @@ async def test_switch_head_to_get(setup_catalog, event_loop, rmock, produce_mock
     assert ("GET", URL(rurl)) in rmock.requests
 
 
+async def test_switch_head_to_get_headers(setup_catalog, event_loop, rmock, produce_mock):
+    rurl = "https://example.com/resource-1"
+    rmock.head(rurl, status=200, headers={})
+    rmock.get(rurl, status=200)
+    event_loop.run_until_complete(crawl(iterations=1))
+    assert ("HEAD", URL(rurl)) in rmock.requests
+    assert ("GET", URL(rurl)) in rmock.requests
+
+
+async def test_no_switch_head_to_get(setup_catalog, event_loop, rmock, produce_mock, analysis_mock):
+    rurl = "https://example.com/resource-1"
+    rmock.head(rurl, status=200, headers={"content-length": "1"})
+    event_loop.run_until_complete(crawl(iterations=1))
+    assert ("HEAD", URL(rurl)) in rmock.requests
+    assert ("GET", URL(rurl)) not in rmock.requests
+
+
 async def test_process_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
     # disable webhook, tested in following test
@@ -326,7 +343,8 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
     udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
     mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
-    rmock.head("https://example.com/resource-1", repeat=True)
+    rmock.head("https://example.com/resource-1")
+    rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(crawl(iterations=1))
     requests = rmock.requests[("PUT", URL(udata_url))]
