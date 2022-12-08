@@ -26,20 +26,22 @@ STATUS_ERROR = "error"
 log = setup_logging()
 
 
+def is_valid_status(status):
+    if not status:
+        return False
+    status = int(status)
+    return status >= 200 and status < 400
+
+
 async def compute_check_has_changed(check_data, last_check) -> bool:
-    # FIXME: this is flawed (eg ssl.SSLCertVerificationError won't have a status)
-    is_first_check = last_check["status"] is None
-    status_has_changed = (
-        "status" in check_data
-        and check_data["status"] != last_check["status"]
-    )
+    is_first_check = not last_check
+    status_has_changed = last_check and check_data.get("status") != last_check.get("status")
     status_no_longer_available = (
-        "status" not in check_data
-        and last_check["status"] is not None
+        last_check
+        and is_valid_status(last_check.get("status"))
+        and not is_valid_status(check_data.get("status"))
     )
-    timeout_has_changed = (
-        check_data["timeout"] != last_check["timeout"]
-    )
+    timeout_has_changed = last_check and check_data.get("timeout") != last_check.get("timeout")
 
     criterions = {
         "is_first_check": is_first_check,
@@ -52,9 +54,10 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
     has_changed = any(criterions.values())
     if has_changed:
         document = {
-            "check:status": check_data["status"] if status_has_changed else last_check["status"],
+            "check:valid-status": is_valid_status(check_data.get("status")),
+            "check:status": check_data.get("status"),
             "check:timeout": check_data["timeout"],
-            "check:check_date": datetime.utcnow().isoformat(),
+            "check:check-date": datetime.utcnow().isoformat(),
             "check:error": check_data.get("error"),
         }
         queue.enqueue(
@@ -69,7 +72,7 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
     return has_changed
 
 
-# TODO: we should handle the case when multiple resources point to the same URL and update them all
+# TODO: rename this function
 async def update_check_and_catalog(check_data: dict) -> int:
     """Update the catalog and checks tables"""
     context.monitor().set_status("Updating checks and catalog...")
@@ -85,25 +88,7 @@ async def update_check_and_catalog(check_data: dict) -> int:
         """
         last_check = await connection.fetchrow(q)
 
-        # In case we are doing our first check for given resource
-        if not last_check:
-            row = await connection.fetchrow(
-                f"""
-                SELECT resource_id, dataset_id, priority, initialization
-                FROM catalog
-                WHERE resource_id = '{check_data["resource_id"]}'
-                AND deleted = FALSE;
-            """
-            )
-            last_check = {
-                "resource_id": row["resource_id"],
-                "dataset_id": row["dataset_id"],
-                "priority": row["priority"],
-                "initialization": row["initialization"],
-                "status": None,
-                "timeout": None,
-            }
-
+        # TODO: conditionnal later in compute_check_has_changed
         if config.WEBHOOK_ENABLED:
             await compute_check_has_changed(check_data, dict(last_check))
 
@@ -162,6 +147,7 @@ def convert_headers(headers):
     return _headers
 
 
+# TODO: should we try head first?
 async def check_url(row, session, sleep=0, method="get"):
     log.debug(f"check {row}, sleep {sleep}")
 

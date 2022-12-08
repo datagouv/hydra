@@ -55,6 +55,7 @@ async def load_catalog(url=None, drop=False):
             rows = list(reader)
             bar = ProgressBar(total=len(rows))
             for row in bar.iter(rows):
+                # FIXME: do we need initialization??
                 await context["conn"].execute(
                     """
                     INSERT INTO catalog (

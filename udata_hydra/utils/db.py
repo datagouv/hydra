@@ -17,6 +17,7 @@ async def insert_check(data: dict):
     pool = await context.pool()
     async with pool.acquire() as connection:
         last_check = await connection.fetchrow(q, *data.values())
+        # FIXME: update on resource_id
         q = """UPDATE catalog SET last_check = $1 WHERE url = $2"""
         await connection.execute(q, last_check["id"], data["url"])
     return last_check["id"]
