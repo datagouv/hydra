@@ -70,15 +70,12 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
             resource_id=check_data["resource_id"],
             document=document
         )
-    else:
-        log.debug("Not sending check infos to udata, criterions not met")
 
     return has_changed
 
 
-# TODO: rename this function
-async def update_check_and_catalog(check_data: dict) -> int:
-    """Update the catalog and checks tables"""
+async def process_check_data(check_data: dict) -> int:
+    """Preprocess a check before saving it"""
     context.monitor().set_status("Updating checks and catalog...")
     check_data["resource_id"] = str(check_data["resource_id"])
 
@@ -92,9 +89,7 @@ async def update_check_and_catalog(check_data: dict) -> int:
         """
         last_check = await connection.fetchrow(q)
 
-        # TODO: conditionnal later in compute_check_has_changed
-        if config.WEBHOOK_ENABLED:
-            await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
+        await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
         await connection.execute(
             "UPDATE catalog SET priority = FALSE WHERE resource_id = $1",
@@ -167,7 +162,7 @@ async def check_url(row, session, sleep=0, method="head"):
     domain = url_parsed.netloc
     if not domain:
         log.warning(f"[warning] not netloc in url, skipping {row['url']}")
-        await update_check_and_catalog(
+        await process_check_data(
             {
                 "resource_id": row["resource_id"],
                 "url": row["url"],
@@ -201,7 +196,7 @@ async def check_url(row, session, sleep=0, method="head"):
                 return await check_url(row, session, method="get")
             resp.raise_for_status()
 
-            check_id = await update_check_and_catalog(
+            check_id = await process_check_data(
                 {
                     "resource_id": row["resource_id"],
                     "url": row["url"],
@@ -217,7 +212,7 @@ async def check_url(row, session, sleep=0, method="head"):
 
             return STATUS_OK
     except asyncio.exceptions.TimeoutError:
-        await update_check_and_catalog(
+        await process_check_data(
             {
                 "resource_id": row["resource_id"],
                 "url": row["url"],
@@ -237,7 +232,7 @@ async def check_url(row, session, sleep=0, method="head"):
         UnicodeError,
     ) as e:
         error = getattr(e, "message", None) or str(e)
-        await update_check_and_catalog(
+        await process_check_data(
             {
                 "resource_id": row["resource_id"],
                 "url": row["url"],
