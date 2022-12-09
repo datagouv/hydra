@@ -57,6 +57,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     Will call udata if first check or changes found, and update check with optionnal infos
     """
+    pool = await context.pool()
     check = await get_check(check_id)
     if not check:
         log.error(f"Check not found by id {check_id}")
@@ -70,10 +71,8 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     log.debug(f"Analysis for resource {resource_id} in dataset {dataset_id}")
 
     # let's see if we can infer a modification date from harvest infos
-    # FIXME: this does not detect a change over time
     change_analysis = await detect_resource_change_from_harvest(resource_id) or {}
     # if not, let's see if we can infer a modifification date from headers
-    # FIXME: this does not detect a change over time in case of last-modified
     change_analysis = change_analysis or await detect_resource_change_from_headers(url) or {}
 
     # if not, let's download the file to get some hints and other infos
@@ -106,8 +105,30 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
                 "mime_type": dl_analysis.get("analysis:mime-type"),
             })
 
-    if change_analysis or (is_first_check and dl_analysis):
-        change_analysis.update(dl_analysis)
+    # determine if our detected last modified date has changed since last check
+    # because some methods (eg last-modified header) do not permit this
+    has_changed_over_time = False
+    last_modified = change_analysis.get("analysis:last-modified-at")
+    if last_modified:
+        q = """
+        SELECT detected_last_modified_at
+        FROM checks
+        WHERE resource_id = $1 AND detected_last_modified_at IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+        async with pool.acquire() as conn:
+            res = await conn.fetchrow(q, resource_id)
+            if res and res["detected_last_modified_at"] != last_modified:
+                has_changed_over_time = True
+            # keep date in store for next run
+            await conn.execute(
+                "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
+                datetime.fromisoformat(last_modified), check_id
+            )
+
+    change_analysis.update(dl_analysis)
+    if has_changed_over_time or (is_first_check and change_analysis):
         await send(
             dataset_id=dataset_id,
             resource_id=resource_id,

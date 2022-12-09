@@ -9,6 +9,7 @@ import nest_asyncio
 
 from aiohttp.client_exceptions import ClientError
 from asyncio.exceptions import TimeoutError
+from dateutil.parser import parse as date_parser
 from minicli import run
 from yarl import URL
 
@@ -347,7 +348,8 @@ async def test_change_analysis_last_modified_header(setup_catalog, rmock, event_
 
 
 async def test_change_analysis_content_length_header(setup_catalog, rmock, event_loop, fake_check, db, udata_url):
-    await fake_check(headers={"content-length": "1"})
+    # different content-length than mock response, with a detection date to trigger udata webhook
+    await fake_check(headers={"content-length": "1"}, detected_last_modified_at=datetime.now())
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
     rmock.head("https://example.com/resource-1", headers={"content-length": "2"})
@@ -365,7 +367,8 @@ async def test_change_analysis_content_length_header(setup_catalog, rmock, event
 
 
 async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, rmock, event_loop, udata_url):
-    await fake_check(checksum="136bd31d53340d234957650e042172705bf32984")
+    # different checksum than mock file, with a detection date to trigger udata webhook
+    await fake_check(checksum="136bd31d53340d234957650e042172705bf32984", detected_last_modified_at=datetime.now())
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
     mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
@@ -394,3 +397,15 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loo
     data = requests[-1].kwargs["json"]
     assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000"
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
+
+
+async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, event_loop, fake_check):
+    _date = "Thu, 09 Jan 2020 09:33:37 GMT"
+    await fake_check(detected_last_modified_at=date_parser(_date, ignoretz=True))
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
+    rmock.head("https://example.com/resource-1", headers={"last-modified": _date})
+    rmock.get("https://example.com/resource-1")
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    # udata has not been called: not first check, and last-modified stayed the same
+    assert ("PUT", URL(udata_url)) not in rmock.requests
