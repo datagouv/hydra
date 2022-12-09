@@ -14,7 +14,7 @@ from yarl import URL
 
 from udata_hydra import config
 from udata_hydra.crawl import crawl
-from udata_hydra.datalake_service import process_resource
+from udata_hydra.analysis import process_resource
 from udata_hydra.utils.db import get_check
 
 from .conftest import RESOURCE_ID as resource_id
@@ -263,7 +263,7 @@ async def test_no_switch_head_to_get(setup_catalog, event_loop, rmock, produce_m
 
 
 async def test_process_resource(setup_catalog, mocker, fake_check):
-    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
     # disable webhook, tested in following test
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
@@ -353,7 +353,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
     await fake_check(checksum="136bd31d53340d234957650e042172705bf32984")
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
-    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
     rmock.head("https://example.com/resource-1")
     rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
@@ -370,7 +370,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
 
 @pytest.mark.catalog_harvested
 async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loop, udata_url):
-    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
     rmock.head("https://example.com/harvested", headers={"content-length": "2"}, repeat=True)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(crawl(iterations=1))

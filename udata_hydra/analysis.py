@@ -119,7 +119,7 @@ async def process_resource(check_id: int) -> None:
 
 async def detect_resource_change_from_checksum(resource_id, new_checksum):
     """
-    Checks if resource checksum has changed over time
+    Checks if resource has a harvest.modified_at
     Returns {
         "analysis:last-modified-at": last_modified_date,
         "analysis:last-modified-detection": "computed-checksum",
@@ -144,16 +144,11 @@ async def detect_resource_change_from_checksum(resource_id, new_checksum):
 
 async def detect_resource_change_from_headers(value: str, column: str = "url"):
     """
-    Try to guess if a resource has been modified from headers in check data:
-    - last-modified header value if it can be found and parsed
-    - content-length if it is found and changed over time (vs last checks)
-
+    Try to guess if a resource has been modified from check data
     Returns {
         "analysis:last-modified-at": last_modified_date,
         "analysis:last-modified-detection": "detection-method",
     } or None if no guess
-
-    TODO: this could be split two dedicated functions
     """
     # do we have a last-modified on the latest check?
     q = f"""

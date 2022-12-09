@@ -11,7 +11,7 @@ import asyncio
 from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
-from udata_hydra.datalake_service import process_resource
+from udata_hydra.analysis import process_resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils import queue
 from udata_hydra.utils.db import insert_check
