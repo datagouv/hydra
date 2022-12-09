@@ -70,8 +70,10 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     log.debug(f"Analysis for resource {resource_id} in dataset {dataset_id}")
 
     # let's see if we can infer a modification date from harvest infos
+    # FIXME: this does not detect a change over time
     change_analysis = await detect_resource_change_from_harvest(resource_id) or {}
     # if not, let's see if we can infer a modifification date from headers
+    # FIXME: this does not detect a change over time in case of last-modified
     change_analysis = change_analysis or await detect_resource_change_from_headers(url) or {}
 
     # if not, let's download the file to get some hints and other infos
