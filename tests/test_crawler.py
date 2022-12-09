@@ -268,7 +268,7 @@ async def test_process_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
     check = await fake_check()
-    await process_resource(check["id"])
+    await process_resource(check["id"], False)
     result = await get_check(check["id"])
 
     assert result["error"] is None
@@ -282,13 +282,28 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
     rmock.put(udata_url, status=200, repeat=True)
 
     check = await fake_check()
-    await process_resource(check["id"])
+    await process_resource(check["id"], True)
 
     req = rmock.requests[("PUT", URL(udata_url))]
     assert len(req) == 1
     document = req[0].kwargs["json"]
     assert document["analysis:filesize"] == len(SIMPLE_CSV_CONTENT)
     assert document["analysis:mime-type"] == "text/plain"
+
+
+async def test_process_resource_send_udata_no_change(setup_catalog, mocker, rmock, fake_check, db):
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
+
+    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
+    rmock.put(udata_url, status=200, repeat=True)
+
+    # previous check with same checksum
+    await fake_check(checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest())
+    check = await fake_check()
+    await process_resource(check["id"], False)
+
+    # udata has not been called
+    assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
 async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db, udata_url):
