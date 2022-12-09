@@ -205,7 +205,24 @@ SENTRY_DSN=https://{my-sentry-dsn}
 WEBHOOK_ENABLED=True
 ```
 
-The webhook integration sends HTTP messages to `udata` when resources are stored, analyzed or checked to fill resources extras.
+The webhook integration sends HTTP messages to `udata` when resources are analyzed or checked to fill resources extras.
+
+Regarding analysis, there is a phase called "change detection". It will try to guess if a resource has been modified based on different criterions:
+- harvest modified date in catalog
+- content-length and last-modified headers
+- checksum comparison over time
+
+The payload should look something like:
+
+```json
+{
+   "analysis:filesize": 91661,
+   "analysis:mime-type": "application/zip",
+   "analysis:checksum": "bef1de04601dedaf2d127418759b16915ba083be",
+   "analysis:last-modified-at": "2022-11-27T23:00:54.762000",
+   "analysis:last-modified-detection": "harvest-resource-metadata",
+}
+```
 
 ## Development
 

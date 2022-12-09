@@ -186,15 +186,6 @@ async def get_checks(request):
     return web.json_response([CheckSchema().dump(dict(r)) for r in data])
 
 
-@routes.get("/api/changed/")
-async def get_changed(request):
-    """Detect if a resource has changed
-
-    Returns 204 if no hint available
-    """
-    raise NotImplementedError()
-
-
 @routes.get("/api/status/")
 async def status(request):
     q = f"""
