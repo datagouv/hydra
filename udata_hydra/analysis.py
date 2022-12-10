@@ -57,7 +57,6 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     Will call udata if first check or changes found, and update check with optionnal infos
     """
-    pool = await context.pool()
     check = await get_check(check_id)
     if not check:
         log.error(f"Check not found by id {check_id}")
@@ -105,8 +104,22 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
                 "mime_type": dl_analysis.get("analysis:mime-type"),
             })
 
-    # determine if our detected last modified date has changed since last check
-    # because some methods (eg last-modified header) do not permit this
+    has_changed_over_time = await detect_has_changed_over_time(change_analysis, resource_id, check_id)
+
+    change_analysis.update(dl_analysis)
+    if has_changed_over_time or (is_first_check and change_analysis):
+        await send(
+            dataset_id=dataset_id,
+            resource_id=resource_id,
+            document=change_analysis
+        )
+
+
+async def detect_has_changed_over_time(change_analysis, resource_id, check_id):
+    """
+    Determine if our detected last modified date has changed since last check
+    because some methods (eg last-modified header) do not embed this
+    """
     has_changed_over_time = False
     last_modified = change_analysis.get("analysis:last-modified-at")
     if last_modified:
@@ -117,6 +130,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         ORDER BY created_at DESC
         LIMIT 1
         """
+        pool = await context.pool()
         async with pool.acquire() as conn:
             res = await conn.fetchrow(q, resource_id)
             if res and res["detected_last_modified_at"] != last_modified:
@@ -126,14 +140,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
                 "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
                 datetime.fromisoformat(last_modified), check_id
             )
-
-    change_analysis.update(dl_analysis)
-    if has_changed_over_time or (is_first_check and change_analysis):
-        await send(
-            dataset_id=dataset_id,
-            resource_id=resource_id,
-            document=change_analysis
-        )
+    return has_changed_over_time
 
 
 async def detect_resource_change_from_checksum(resource_id, new_checksum):
