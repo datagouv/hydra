@@ -129,7 +129,7 @@ async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop
         (None, True, TimeoutError),
     ],
 )
-async def test_crawl(setup_catalog, rmock, event_loop, db, resource, produce_mock, analysis_mock):
+async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mock, udata_url):
     status, timeout, exception = resource
     rurl = "https://example.com/resource-1"
     params = {
@@ -140,8 +140,11 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, produce_moc
     rmock.head(rurl, **params)
     # mock for head fallback
     rmock.get(rurl, **params)
+    rmock.put(udata_url)
     event_loop.run_until_complete(crawl(iterations=1))
     assert ("HEAD", URL(rurl)) in rmock.requests
+
+    # test check results in DB
     res = await db.fetchrow("SELECT * FROM checks WHERE url = $1", rurl)
     assert res["url"] == rurl
     assert res["status"] == status
@@ -159,6 +162,19 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, produce_moc
         assert res["error"] == "Internal Server Error"
     else:
         assert not res["error"]
+
+    # test webhook results from mock
+    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    assert webhook.get("check:date")
+    datetime.fromisoformat(webhook["check:date"])
+    if exception or status == 500:
+        assert webhook.get("check:available") is False
+    else:
+        assert webhook.get("check:available")
+    if timeout:
+        assert webhook.get("check:timeout")
+    else:
+        assert webhook.get("check:timeout") is False
 
 
 async def test_backoff(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock):

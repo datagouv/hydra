@@ -54,10 +54,10 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
     has_changed = any(criterions.values())
     if has_changed:
         document = {
-            "check:valid-status": is_valid_status(check_data.get("status")),
+            "check:available": is_valid_status(check_data.get("status")),
             "check:status": check_data.get("status"),
             "check:timeout": check_data["timeout"],
-            "check:check-date": datetime.utcnow().isoformat(),
+            "check:date": datetime.utcnow().isoformat(),
             "check:error": check_data.get("error"),
         }
         pool = await context.pool()
