@@ -292,9 +292,7 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
     assert document["analysis:mime-type"] == "text/plain"
 
 
-async def test_process_resource_send_udata_no_change(setup_catalog, mocker, rmock, fake_check, db):
-    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
-
+async def test_process_resource_send_udata_no_change(setup_catalog, mocker, rmock, fake_check, udata_url):
     mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
 
@@ -399,10 +397,9 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loo
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
 
 
-async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, event_loop, fake_check):
+async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, event_loop, fake_check, udata_url):
     _date = "Thu, 09 Jan 2020 09:33:37 GMT"
     await fake_check(detected_last_modified_at=date_parser(_date, ignoretz=True))
-    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
     rmock.head("https://example.com/resource-1", headers={"last-modified": _date})
     rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
