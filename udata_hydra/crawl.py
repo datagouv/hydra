@@ -153,7 +153,7 @@ def has_nice_head(resp):
 
 
 async def check_url(row, session, sleep=0, method="head"):
-    log.debug(f"check {row}, sleep {sleep}")
+    log.debug(f"check {row}, sleep {sleep}, method {method}")
 
     if sleep:
         await asyncio.sleep(sleep)
