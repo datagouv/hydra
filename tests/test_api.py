@@ -2,7 +2,7 @@
 NB: we can't use pytest-aiohttp helpers beause
 it will interfere with the rest of our async code
 """
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytest
 import pytest_asyncio
 
@@ -122,86 +122,6 @@ async def test_api_stats(setup_catalog, client, fake_check):
         ],
         "status_codes": [{"code": 500, "count": 1, "percentage": 100.0}],
     }
-
-
-async def test_changed_last_modified(setup_catalog, client, fake_check):
-    check = await fake_check(
-        headers={
-            "last-modified": "Wed, 21 Oct 2015 07:28:00 GMT",
-            "content-length": 1,
-        }
-    )
-    resp = await client.get(f"/api/changed/?url={check['url']}")
-    assert resp.status == 200
-    assert await resp.json() == {
-        "changed_at": "2015-10-21T07:28:00",
-        "detection": "last-modified",
-    }
-
-    # last-modified takes precendence over content-length comparison
-    check = await fake_check(
-        headers={
-            "last-modified": "Wed, 21 Oct 2015 07:28:00 GMT",
-            "content-length": 2,
-        }
-    )
-    resp = await client.get(f"/api/changed/?url={check['url']}")
-    assert resp.status == 200
-    assert await resp.json() == {
-        "changed_at": "2015-10-21T07:28:00",
-        "detection": "last-modified",
-    }
-
-
-async def test_changed_no_header(setup_catalog, client, fake_check):
-    check = await fake_check(headers={})
-    resp = await client.get(f"/api/changed/?url={check['url']}")
-    assert resp.status == 204
-
-
-async def test_changed_content_length(setup_catalog, client, fake_check):
-    c1 = datetime.now() - timedelta(days=2)
-    check = await fake_check(headers={"content-length": 1}, created_at=c1)
-    resp = await client.get(f"/api/changed/?url={check['url']}")
-    assert resp.status == 204
-
-    c2 = datetime.now() - timedelta(days=1)
-    check = await fake_check(headers={"content-length": 2}, created_at=c2)
-    resp = await client.get(f"/api/changed/?url={check['url']}")
-    assert resp.status == 200
-    assert await resp.json() == {
-        "changed_at": c2.isoformat(),
-        "detection": "content-length",
-    }
-
-    c3 = datetime.now()
-    check = await fake_check(headers={"content-length": 3}, created_at=c3)
-    resp = await client.get(f"/api/changed/?url={check['url']}")
-    assert resp.status == 200
-    assert await resp.json() == {
-        "changed_at": c3.isoformat(),
-        "detection": "content-length",
-    }
-
-    c4 = datetime.now()
-    check = await fake_check(headers={"content-length": 3}, created_at=c4)
-    resp = await client.get(f"/api/changed/?url={check['url']}")
-    assert resp.status == 200
-    assert await resp.json() == {
-        "changed_at": c3.isoformat(),
-        "detection": "content-length",
-    }
-
-
-async def test_changed_content_length_unchanged(
-    setup_catalog, client, fake_check
-):
-    c1 = datetime.now() - timedelta(days=2)
-    check = await fake_check(headers={"content-length": 1}, created_at=c1)
-    c2 = datetime.now() - timedelta(days=1)
-    check = await fake_check(headers={"content-length": 1}, created_at=c2)
-    resp = await client.get(f"/api/changed/?url={check['url']}")
-    assert resp.status == 204
 
 
 async def test_api_resource_created(client):

@@ -3,7 +3,6 @@ import json
 from datetime import datetime, timedelta
 
 from aiohttp import web
-from dateutil.parser import parse as date_parser, ParserError
 from humanfriendly import parse_timespan
 from marshmallow import Schema, fields, ValidationError
 
@@ -185,81 +184,6 @@ async def get_checks(request):
     if not data:
         raise web.HTTPNotFound()
     return web.json_response([CheckSchema().dump(dict(r)) for r in data])
-
-
-@routes.get("/api/changed/")
-async def get_changed(request):
-    """Detect if a resource has changed
-
-    Returns 204 if no hint available
-    """
-    url, resource_id = _get_args(request)
-    column = "url" if url else "resource_id"
-
-    # do we have a last-modified on the latest check?
-    q = f"""
-    SELECT
-        checks.headers->>'last-modified' as last_modified,
-        checks.headers->>'content-length' as content_length,
-        catalog.url
-    FROM checks, catalog
-    WHERE checks.id = catalog.last_check
-    AND catalog.{column} = $1
-    """
-    data = await request.app["pool"].fetchrow(q, url or resource_id)
-    if not data:
-        raise web.HTTPNotFound()
-    if data["last_modified"]:
-        try:
-            return web.json_response(
-                {
-                    # this is GMT so we should be able to safely ignore tz info
-                    "changed_at": date_parser(
-                        data["last_modified"], ignoretz=True
-                    ).isoformat(),
-                    "detection": "last-modified",
-                }
-            )
-        except ParserError:
-            pass
-
-    # switch to content-length comparison
-    if not data["content_length"]:
-        raise web.HTTPNoContent(text="")
-    q = """
-    SELECT
-        created_at,
-        checks.headers->>'content-length' as content_length
-    FROM checks
-    WHERE url = $1
-    ORDER BY created_at DESC
-    """
-    data = await request.app["pool"].fetch(q, data["url"])
-    # not enough checks to make a comparison
-    if len(data) <= 1:
-        raise web.HTTPNoContent(text="")
-    changed_at = None
-    last_length = None
-    previous_date = None
-    for check in data:
-        if not check["content_length"]:
-            continue
-        if not last_length:
-            last_length = check["content_length"]
-        else:
-            if check["content_length"] != last_length:
-                changed_at = previous_date
-                break
-        previous_date = check["created_at"]
-    if changed_at:
-        return web.json_response(
-            {
-                "changed_at": changed_at.isoformat(),
-                "detection": "content-length",
-            }
-        )
-    else:
-        raise web.HTTPNoContent(text="")
 
 
 @routes.get("/api/status/")

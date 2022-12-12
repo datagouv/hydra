@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 import hashlib
 import json
-import os
 import pytest
 import tempfile
 from unittest.mock import MagicMock
@@ -15,7 +14,7 @@ from yarl import URL
 
 from udata_hydra import config
 from udata_hydra.crawl import crawl
-from udata_hydra.datalake_service import process_resource, compute_checksum_from_file
+from udata_hydra.datalake_service import process_resource
 from udata_hydra.utils.db import get_check
 
 
@@ -25,7 +24,6 @@ SIMPLE_CSV_CONTENT = """code_insee,number
 36522,48"""
 resource_id = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
 dataset_id = "601ddcfc85a59c3a45c2435a"
-
 
 pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
@@ -106,11 +104,11 @@ async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop
     # check that the crawler does not crawl the deleted resource
     # check that udata is called only once
     # udata is not called for analysis results since it's mocked, only for checks
-    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
     rurl_1 = "https://example.com/resource-1"
     rurl_2 = "https://example.com/resource-2"
     rmock.get(rurl_1)
     rmock.get(rurl_2)
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
     rmock.put(udata_url, status=200)
     event_loop.run_until_complete(crawl(iterations=1))
     assert ("GET", URL(rurl_1)) not in rmock.requests
@@ -254,7 +252,7 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
     assert len(req) == 1
     document = req[0].kwargs["json"]
     assert document["analysis:filesize"] == len(SIMPLE_CSV_CONTENT)
-    assert document["analysis:mime"] == "text/plain"
+    assert document["analysis:mime-type"] == "text/plain"
 
 
 async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db):
@@ -267,13 +265,13 @@ async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db)
     """
 
     rurl = "https://example.com/resource-1"
-    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
 
     # mock for check
     rmock.get(rurl, status=200, headers={"Content-Length": "200"})
     # mock for download
     rmock.get(rurl, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
     # mock for check and analysis results
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
     rmock.put(udata_url, status=200, repeat=True)
 
     event_loop.run_until_complete(crawl(iterations=1))
@@ -286,11 +284,64 @@ async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db)
     assert res[0]["status"] is not None
 
 
-async def test_compute_checksum_from_file():
-    tmp_file = tempfile.NamedTemporaryFile(delete=False)
-    tmp_file.write(b"a very small file")
-    tmp_file.close()
+async def test_change_analysis_last_modified_header(setup_catalog, rmock, event_loop):
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
+    rmock.get("https://example.com/resource-1", headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"}, repeat=True)
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    requests = rmock.requests[("PUT", URL(udata_url))]
+    # last request is the one for analysis
+    data = requests[-1].kwargs["json"]
+    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37"
+    assert data["analysis:last-modified-detection"] == "last-modified-header"
 
-    checksum = await compute_checksum_from_file(tmp_file.name)
-    assert checksum == hashlib.sha1(b"a very small file").hexdigest()
-    os.remove(tmp_file.name)
+
+async def test_change_analysis_content_length_header(setup_catalog, rmock, event_loop, fake_check, db):
+    await fake_check(headers={"content-length": "1"})
+    # force check execution at next run
+    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
+    rmock.get("https://example.com/resource-1", headers={"content-length": "2"}, repeat=True)
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    requests = rmock.requests[("PUT", URL(udata_url))]
+    # last request is the one for analysis
+    data = requests[-1].kwargs["json"]
+    modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
+    now = datetime.utcnow()
+    # modified date should be pretty close from now, let's say 30 seconds
+    assert (modified_date - now).total_seconds() < 30
+    assert data["analysis:last-modified-detection"] == "content-length-header"
+
+
+async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, rmock, event_loop):
+    await fake_check(checksum="136bd31d53340d234957650e042172705bf32984")
+    # force check execution at next run
+    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
+    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    rmock.get("https://example.com/resource-1", repeat=True)
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    requests = rmock.requests[("PUT", URL(udata_url))]
+    # last request is the one for analysis
+    data = requests[-1].kwargs["json"]
+    modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
+    now = datetime.utcnow()
+    # modified date should be pretty close from now, let's say 30 seconds
+    assert (modified_date - now).total_seconds() < 30
+    assert data["analysis:last-modified-detection"] == "computed-checksum"
+
+
+@pytest.mark.catalog_harvested
+async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loop):
+    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
+    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    rmock.get("https://example.com/harvested", headers={"content-length": "2"}, repeat=True)
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    requests = rmock.requests[("PUT", URL(udata_url))]
+    # last request is the one for analysis
+    data = requests[-1].kwargs["json"]
+    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000"
+    assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
