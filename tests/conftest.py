@@ -42,10 +42,10 @@ def setup():
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def mock_pool(mocker):
+async def mock_pool(mocker, event_loop):
     """This avoids having different pools attached to different event loops"""
     m = mocker.patch("udata_hydra.context.pool")
-    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50)
+    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50, loop=event_loop)
     m.return_value = pool
 
 
@@ -76,7 +76,8 @@ def catalog_content():
 def setup_catalog(catalog_content, rmock):
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    run("init_db", drop=True, table=None, index=True, reindex=False)
+    run("drop_db")
+    run("migrate")
     run("load_catalog", url=catalog)
 
 

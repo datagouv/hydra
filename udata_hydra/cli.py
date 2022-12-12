@@ -6,6 +6,9 @@ from tempfile import NamedTemporaryFile
 
 import aiohttp
 import asyncpg
+
+from asyncpg_trek import plan, execute, Direction
+from asyncpg_trek.asyncpg import AsyncpgBackend
 from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
@@ -19,65 +22,6 @@ CATALOG_URL = "https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca
 
 context = {}
 log = setup_logging()
-
-
-@cli
-async def init_db(drop=False, table=None, index=False, reindex=False):
-    """Create the DB structure"""
-    log.info("Initializing database...")
-    if drop:
-        if table == "catalog" or not table:
-            await context["conn"].execute("DROP TABLE IF EXISTS catalog")
-        if table == "checks" or not table:
-            await context["conn"].execute("DROP TABLE IF EXISTS checks")
-    await context["conn"].execute(
-        """
-        CREATE TABLE IF NOT EXISTS catalog(
-            id serial PRIMARY KEY,
-            dataset_id VARCHAR(24),
-            resource_id UUID,
-            url VARCHAR,
-            deleted BOOLEAN NOT NULL,
-            last_check INT,
-            priority BOOLEAN NOT NULL,
-            initialization BOOLEAN NOT NULL DEFAULT FALSE,
-            UNIQUE(dataset_id, resource_id, url)
-        )
-    """
-    )
-    await context["conn"].execute(
-        """
-        CREATE TABLE IF NOT EXISTS checks(
-            id serial PRIMARY KEY,
-            resource_id UUID,
-            url VARCHAR,
-            domain VARCHAR,
-            created_at TIMESTAMP DEFAULT NOW(),
-            status INT,
-            headers JSONB,
-            timeout BOOLEAN NOT NULL,
-            response_time FLOAT,
-            error VARCHAR,
-            checksum VARCHAR,
-            filesize BIGINT,
-            mime_type VARCHAR
-        )
-    """
-    )
-    if reindex:
-        await context["conn"].execute(
-            """
-            DROP INDEX IF EXISTS url_idx;
-            DROP INDEX IF EXISTS domain_idx;
-        """
-        )
-    if index or reindex:
-        await context["conn"].execute(
-            """
-            CREATE INDEX IF NOT EXISTS url_idx ON checks (url);
-            CREATE INDEX IF NOT EXISTS domain_idx ON checks (domain);
-        """
-        )
 
 
 async def download_file(url, fd):
@@ -219,6 +163,28 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
         writer = csv.DictWriter(ofile, fieldnames=lines[0].keys())
         writer.writeheader()
         writer.writerows(lines)
+
+
+@cli
+async def drop_db(tables=["checks", "catalog", "migrations"]):
+    for table in tables:
+        await context["conn"].execute(f"DROP TABLE IF EXISTS {table}")
+
+
+@cli
+async def migrate(revision=None):
+    """Migrate the database to _LATEST_REVISION or specified one"""
+    migrations_dir = Path(__file__).parent / "../migrations"
+
+    if not revision:
+        with open(migrations_dir / "_LATEST_REVISION", "r") as f:
+            revision = f.read().strip()
+        log.info(f"No revision asked, using from _LATEST_REVISION: {revision}")
+
+    backend = AsyncpgBackend(context["conn"])
+    async with backend.connect() as conn:
+        planned = await plan(conn, backend, migrations_dir.resolve(), revision, Direction.up)
+        await execute(conn, backend, planned)
 
 
 @wrap
