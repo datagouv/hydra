@@ -1,4 +1,3 @@
-import json
 import time
 
 from collections import defaultdict
@@ -50,7 +49,6 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
         "status_no_longer_available": status_no_longer_available,
         "timeout_has_changed": timeout_has_changed,
     }
-    log.debug("crawl.py::update_checks_and_catalog:::criterions %s", json.dumps(criterions, indent=4))
 
     has_changed = any(criterions.values())
     if has_changed:
@@ -77,7 +75,6 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
 
 async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     """Preprocess a check before saving it"""
-    context.monitor().set_status("Updating checks and catalog...")
     check_data["resource_id"] = str(check_data["resource_id"])
 
     pool = await context.pool()

@@ -1,8 +1,6 @@
 import asyncio
 import os
 
-from unittest import mock
-
 from aioresponses import aioresponses
 import asyncpg
 import pytest
@@ -45,15 +43,13 @@ def is_harvested(request):
 # this really really really should run first (or "prod" db will get erased)
 @pytest.fixture(autouse=True, scope="session")
 def setup():
-    with mock.patch.multiple(
-        "udata_hydra.config",
+    config.override(
         DATABASE_URL=DATABASE_URL,
         UDATA_URI="https://udata.example.com",
         UDATA_URI_API_KEY="sup3rs3cr3t",
         TESTING=True,
         SLEEP_BETWEEN_BATCHES=0,
-    ):
-        yield
+    )
 
 
 @pytest_asyncio.fixture(autouse=True)

@@ -190,19 +190,14 @@ $ curl -s "http://localhost:8000/api/stats/" | json_pp
 
 ## Using Webhook integration
 
-** Set the environment variables **
-Rename the `.env.sample` to `.env` and fill it with the right values.
+** Set the config values**
 
-```shell
-UDATA_URI=https://dev.local./
-UDATA_URI_API_KEY=example.api.key
-MINIO_URL=https://object.local.dev/
-MINIO_USER=sample_user
-MINIO_BUCKET=benchmark-de
-MINIO_PWD=sample_pwd
-MINIO_FOLDER=data
-SENTRY_DSN=https://{my-sentry-dsn}
-WEBHOOK_ENABLED=True
+Create a `config.toml` where your service and commands are launched, or specify a path to a TOML file via the `HYDRA_SETTINGS` environment variable. `config.toml` or equivalent will override values from `udata_hydra/config_default.toml`, lookup there for values that can/need to be defined.
+
+```toml
+UDATA_URI = "https://dev.local:7000/api/2"
+UDATA_URI_API_KEY = "example.api.key"
+SENTRY_DSN = "https://{my-sentry-dsn}"
 ```
 
 The webhook integration sends HTTP messages to `udata` when resources are analyzed or checked to fill resources extras.
@@ -226,7 +221,17 @@ The payload should look something like:
 
 ## Development
 
+### docker-compose
+
+Multiple docker-compose files are provided:
+- a minimal `docker-compose.yml` with PostgreSQL
+- `docker-compose.broker.yml` adds a Redis broker
+- `docker-compose.test.yml` launches a test DB, needed to run tests
+
+NB: you can launch compose from multiple files like this: `docker-compose -f docker-compose.yml -f docker-compose.test.yml up`
+
 ### Logging & Debugging
+
 The log level can be adjusted using the environment variable LOG_LEVEL.
 For example, to set the log level to `DEBUG` when initializing the database, use `LOG_LEVEL="DEBUG" udata-hydra init_db `.
 
