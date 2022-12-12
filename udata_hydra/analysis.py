@@ -4,7 +4,7 @@ import os
 import tempfile
 
 from datetime import datetime
-from typing import BinaryIO
+from typing import BinaryIO, Union
 
 import aiohttp
 import magic
@@ -115,7 +115,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         )
 
 
-async def detect_has_changed_over_time(change_analysis, resource_id, check_id):
+async def detect_has_changed_over_time(change_analysis, resource_id, check_id) -> bool:
     """
     Determine if our detected last modified date has changed since last check
     because some methods (eg last-modified header) do not embed this
@@ -143,7 +143,7 @@ async def detect_has_changed_over_time(change_analysis, resource_id, check_id):
     return has_changed_over_time
 
 
-async def detect_resource_change_from_checksum(resource_id, new_checksum):
+async def detect_resource_change_from_checksum(resource_id, new_checksum) -> Union[dict, None]:
     """
     Checks if resource checksum has changed over time
     Returns {
@@ -168,7 +168,7 @@ async def detect_resource_change_from_checksum(resource_id, new_checksum):
             }
 
 
-async def detect_resource_change_from_headers(value: str, column: str = "url"):
+async def detect_resource_change_from_headers(value: str, column: str = "url") -> Union[dict, None]:
     """
     Try to guess if a resource has been modified from headers in check data:
     - last-modified header value if it can be found and parsed
@@ -245,7 +245,7 @@ async def detect_resource_change_from_headers(value: str, column: str = "url"):
         }
 
 
-async def detect_resource_change_from_harvest(resource_id):
+async def detect_resource_change_from_harvest(resource_id) -> Union[dict, None]:
     """
     Checks if resource has a harvest.modified_at
     Returns {
