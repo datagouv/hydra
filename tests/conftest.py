@@ -10,10 +10,13 @@ import pytest_asyncio
 
 from minicli import run
 
+from udata_hydra import config
 import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra.utils.db import insert_check, update_check
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
+RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
+DATASET_ID = "601ddcfc85a59c3a45c2435a"
 pytestmark = pytest.mark.asyncio
 
 
@@ -156,3 +159,8 @@ async def fake_check(db):
         return data
 
     return _fake_check
+
+
+@pytest.fixture
+def udata_url():
+    return f"{config.UDATA_URI}/datasets/{DATASET_ID}/resources/{RESOURCE_ID}/extras/"
