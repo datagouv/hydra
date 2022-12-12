@@ -279,7 +279,7 @@ async def test_process_resource(setup_catalog, mocker, fake_check):
 
 
 async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_check, db, udata_url):
-    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
 
     check = await fake_check()
