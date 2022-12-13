@@ -24,6 +24,7 @@ NO_BACKOFF_DOMAINS = [
 BACKOFF_NB_REQ = 180
 BACKOFF_PERIOD = 360  # in seconds
 # crawl batch size, beware of open file limits
+# FIXME: increase to 100 again?
 BATCH_SIZE = 10
 # crawl url if last check is older than
 SINCE = "1w"

@@ -68,6 +68,7 @@ async def patch_enqueue(mocker, event_loop):
     This also has the advantage of bubbling up errors in queued functions
     """
     def _execute(fn, *args, **kwargs):
+        kwargs.pop("_priority")
         result = fn(*args, **kwargs)
         if asyncio.iscoroutine(result):
             loop = event_loop

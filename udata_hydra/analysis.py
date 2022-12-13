@@ -12,6 +12,7 @@ import magic
 from dateutil.parser import parse as date_parser, ParserError
 
 from udata_hydra import config, context
+from udata_hydra.utils import queue
 from udata_hydra.utils.db import update_check, get_check
 from udata_hydra.utils.file import compute_checksum_from_file
 from udata_hydra.utils.http import send
@@ -97,12 +98,12 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         finally:
             if tmp_file:
                 os.remove(tmp_file.name)
-            await update_check(check_id, {
+            queue.enqueue(update_check, check_id, {
                 "checksum": dl_analysis.get("analysis:checksum"),
                 "analysis_error": dl_analysis.get("analysis:error"),
                 "filesize": dl_analysis.get("analysis:filesize"),
                 "mime_type": dl_analysis.get("analysis:mime-type"),
-            })
+            }, _priority="high")
 
     has_changed_over_time = await detect_has_changed_over_time(change_analysis, resource_id, check_id)
 

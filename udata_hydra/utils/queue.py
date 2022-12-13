@@ -10,6 +10,8 @@ def enqueue(fn, *args, **kwargs):
     Simple helper useful to facilitate mock in testing
     Should be used like this (import matters):
         from udata_hydra.utils import queue
-        queue.enqueue(fn, a, b=b)
+        queue.enqueue(fn, a, b=b, _priority="low")
     """
-    return context.queue().enqueue(fn, *args, **kwargs)
+    priority = kwargs.pop("_priority")
+    # FIXME: singleton by queue name
+    return context.queue(priority or "default").enqueue(fn, *args, **kwargs)

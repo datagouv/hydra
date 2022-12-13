@@ -67,7 +67,8 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
             send,
             dataset_id=dataset["dataset_id"],
             resource_id=check_data["resource_id"],
-            document=document
+            document=document,
+            _priority="high",
         )
 
     return has_changed
@@ -207,7 +208,7 @@ async def check_url(row, session, sleep=0, method="head"):
                 }
             )
 
-            queue.enqueue(process_resource, check_id, is_first_check)
+            queue.enqueue(process_resource, check_id, is_first_check, _priority="low")
 
             return STATUS_OK
     except asyncio.exceptions.TimeoutError:
