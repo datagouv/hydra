@@ -10,6 +10,8 @@ log = logging.getLogger("udata-hydra")
 
 async def send(dataset_id: str, resource_id: str, document: dict) -> None:
     # Extras in udata can't be None
+    # FIXME: we will need to send None values
+    # cf https://github.com/etalab/data.gouv.fr/issues/1001
     document = {k: document[k] for k in document if document[k] is not None}
     log.debug(f"Sending payload to udata {dataset_id}/{resource_id}: {json.dumps(document, indent=4)}")
 

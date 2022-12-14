@@ -87,8 +87,8 @@ async def resource_created(request):
     async with pool.acquire() as connection:
         # Insert new resource in catalog table and mark as high priority for crawling
         q = f"""
-                INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)
-                VALUES ('{dataset_id}', '{resource_id}', '{resource["url"]}', FALSE, TRUE, FALSE)
+                INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority)
+                VALUES ('{dataset_id}', '{resource_id}', '{resource["url"]}', FALSE, TRUE)
                 ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
         await connection.execute(q)
 
@@ -121,8 +121,8 @@ async def resource_updated(request):
             WHERE resource_id = '{resource_id}';"""
         else:
             q = f"""
-                    INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority, initialization)
-                    VALUES ('{dataset_id}', '{resource_id}', '{resource["url"]}', FALSE, TRUE, FALSE)
+                    INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority)
+                    VALUES ('{dataset_id}', '{resource_id}', '{resource["url"]}', FALSE, TRUE)
                     ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
         await connection.execute(q)
 

@@ -59,9 +59,9 @@ async def load_catalog(url=None, drop=False):
                     """
                     INSERT INTO catalog (
                         dataset_id, resource_id, url, harvest_modified_at,
-                        deleted, priority, initialization
+                        deleted, priority
                     )
-                    VALUES ($1, $2, $3, $4, FALSE, FALSE, TRUE)
+                    VALUES ($1, $2, $3, $4, FALSE, FALSE)
                     ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET deleted = FALSE
                 """,
                     row["dataset.id"],
