@@ -278,7 +278,7 @@ async def test_process_resource(setup_catalog, mocker, fake_check):
     assert result["mime_type"] == "text/plain"
 
 
-async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_check, db, udata_url):
+async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_check, udata_url):
     mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
 
