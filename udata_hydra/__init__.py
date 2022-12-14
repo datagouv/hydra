@@ -23,9 +23,15 @@ class Configurator:
             configuration.update(toml.load(local_settings))
 
         self.configuration = configuration
+        self.check()
 
     def override(self, **kwargs):
         self.configuration.update(kwargs)
+        self.check()
+
+    def check(self):
+        """Sanity check on config"""
+        assert self.MAX_POOL_SIZE >= self.BATCH_SIZE, "BATCH_SIZE cannot exceed MAX_POOL_SIZE"
 
     def __getattr__(self, __name):
         return self.configuration.get(__name)

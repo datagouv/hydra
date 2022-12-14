@@ -29,8 +29,7 @@ def monitor():
 
 async def pool():
     if "pool" not in context:
-        dsn = config.DATABASE_URL
-        context["pool"] = await asyncpg.create_pool(dsn=dsn, max_size=50)
+        context["pool"] = await asyncpg.create_pool(dsn=config.DATABASE_URL, max_size=config.MAX_POOL_SIZE)
     return context["pool"]
 
 
