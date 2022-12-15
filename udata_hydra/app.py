@@ -1,4 +1,5 @@
 import json
+import os
 
 from datetime import datetime, timedelta
 
@@ -319,4 +320,4 @@ async def app_factory():
 
 
 if __name__ == "__main__":
-    web.run_app(app_factory())
+    web.run_app(app_factory(), path=os.environ.get("HYDRA_APP_SOCKET_PATH"))
