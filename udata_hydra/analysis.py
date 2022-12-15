@@ -106,12 +106,12 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     has_changed_over_time = await detect_has_changed_over_time(change_analysis, resource_id, check_id)
 
-    change_analysis.update(dl_analysis)
-    if has_changed_over_time or (is_first_check and change_analysis):
+    analysis_results = {**dl_analysis, **change_analysis}
+    if has_changed_over_time or (is_first_check and analysis_results):
         await send(
             dataset_id=dataset_id,
             resource_id=resource_id,
-            document=change_analysis
+            document=analysis_results,
         )
 
 
