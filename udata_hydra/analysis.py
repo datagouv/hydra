@@ -123,6 +123,7 @@ async def detect_has_changed_over_time(change_analysis, resource_id, check_id) -
     has_changed_over_time = False
     last_modified = change_analysis.get("analysis:last-modified-at")
     if last_modified:
+        last_modified = datetime.fromisoformat(last_modified)
         q = """
         SELECT detected_last_modified_at
         FROM checks
@@ -138,7 +139,7 @@ async def detect_has_changed_over_time(change_analysis, resource_id, check_id) -
             # keep date in store for next run
             await conn.execute(
                 "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
-                datetime.fromisoformat(last_modified), check_id
+                last_modified, check_id
             )
     return has_changed_over_time
 
