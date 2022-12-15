@@ -319,5 +319,9 @@ async def app_factory():
     return app
 
 
-if __name__ == "__main__":
+def run():
     web.run_app(app_factory(), path=os.environ.get("HYDRA_APP_SOCKET_PATH"))
+
+
+if __name__ == "__main__":
+    run()

@@ -48,3 +48,4 @@ asyncio_mode = "strict"
 [tool.poetry.scripts]
 udata-hydra = "udata_hydra.cli:run"
 udata-hydra-crawl = "udata_hydra.crawl:run"
+udata-hydra-app = "udata_hydra.app:run"
