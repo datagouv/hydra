@@ -346,8 +346,8 @@ async def test_change_analysis_last_modified_header(setup_catalog, rmock, event_
 
 
 async def test_change_analysis_content_length_header(setup_catalog, rmock, event_loop, fake_check, db, udata_url):
-    # different content-length than mock response, with a detection date to trigger udata webhook
-    await fake_check(headers={"content-length": "1"}, detected_last_modified_at=datetime.now())
+    # different content-length than mock response
+    await fake_check(headers={"content-length": "1"})
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
     rmock.head("https://example.com/resource-1", headers={"content-length": "2"})
@@ -365,8 +365,8 @@ async def test_change_analysis_content_length_header(setup_catalog, rmock, event
 
 
 async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, rmock, event_loop, udata_url):
-    # different checksum than mock file, with a detection date to trigger udata webhook
-    await fake_check(checksum="136bd31d53340d234957650e042172705bf32984", detected_last_modified_at=datetime.now())
+    # different checksum than mock file
+    await fake_check(checksum="136bd31d53340d234957650e042172705bf32984")
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
     mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)

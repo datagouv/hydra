@@ -121,26 +121,42 @@ async def detect_has_changed_over_time(change_analysis, resource_id, check_id) -
     because some methods (eg last-modified header) do not embed this
     """
     has_changed_over_time = False
+
     last_modified = change_analysis.get("analysis:last-modified-at")
-    if last_modified:
-        last_modified = datetime.fromisoformat(last_modified)
-        q = """
-        SELECT detected_last_modified_at
-        FROM checks
-        WHERE resource_id = $1 AND detected_last_modified_at IS NOT NULL
-        ORDER BY created_at DESC
-        LIMIT 1
-        """
-        pool = await context.pool()
+    if not last_modified:
+        return False
+    last_modified = datetime.fromisoformat(last_modified)
+
+    pool = await context.pool()
+
+    # those detection methods already embed comparison over time, we trust them
+    TRUSTED_METHODS = ["computed-checksum", "content-length-header"]
+    last_modified_method = change_analysis.get("analysis:last-modified-detection")
+    if last_modified_method in TRUSTED_METHODS:
         async with pool.acquire() as conn:
-            res = await conn.fetchrow(q, resource_id)
-            if res and res["detected_last_modified_at"] != last_modified:
-                has_changed_over_time = True
-            # keep date in store for next run
             await conn.execute(
                 "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
                 last_modified, check_id
             )
+        return True
+
+    q = """
+    SELECT detected_last_modified_at
+    FROM checks
+    WHERE resource_id = $1 AND detected_last_modified_at IS NOT NULL
+    ORDER BY created_at DESC
+    LIMIT 1
+    """
+    async with pool.acquire() as conn:
+        res = await conn.fetchrow(q, resource_id)
+        if res and res["detected_last_modified_at"] != last_modified:
+            has_changed_over_time = True
+        # keep date in store for next run
+        await conn.execute(
+            "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
+            last_modified, check_id
+        )
+
     return has_changed_over_time
 
 
