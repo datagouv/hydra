@@ -69,8 +69,8 @@ async def test_api_all(setup_catalog, query, client, fake_check):
     assert second["error"] == "no-can-do"
 
 
-async def test_api_status(setup_catalog, client, fake_check):
-    resp = await client.get("/api/status/")
+async def test_api_status_crawler(setup_catalog, client, fake_check):
+    resp = await client.get("/api/status/crawler/")
     assert resp.status == 200
     data = await resp.json()
     assert data == {
@@ -82,7 +82,7 @@ async def test_api_status(setup_catalog, client, fake_check):
     }
 
     await fake_check()
-    resp = await client.get("/api/status/")
+    resp = await client.get("/api/status/crawler/")
     assert resp.status == 200
     data = await resp.json()
     assert data == {

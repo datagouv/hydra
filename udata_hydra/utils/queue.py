@@ -13,5 +13,4 @@ def enqueue(fn, *args, **kwargs):
         queue.enqueue(fn, a, b=b, _priority="low")
     """
     priority = kwargs.pop("_priority")
-    # FIXME: singleton by queue name
     return context.queue(priority or "default").enqueue(fn, *args, **kwargs)
