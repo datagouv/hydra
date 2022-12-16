@@ -126,13 +126,26 @@ $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv
 ### Get crawling status
 
 ```
-$ curl -s "http://localhost:8000/api/status/" | json_pp
+$ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 {
    "fresh_checks_percentage" : 0.4,
    "pending_checks" : 142153,
    "total" : 142687,
    "fresh_checks" : 534,
    "checks_percentage" : 0.4
+}
+```
+
+### Get worker status
+
+```
+$ curl -s "http://localhost:8000/api/status/worker/" | json_pp
+{
+   "queued" : {
+      "default" : 0,
+      "high" : 825,
+      "low" : 655
+   }
 }
 ```
 
