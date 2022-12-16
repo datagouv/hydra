@@ -253,3 +253,14 @@ For example, to set the log level to `DEBUG` when initializing the database, use
 1. Add a file named `migrations/{YYYYMMDD}_{from}_up_{to}.sql` and write the SQL you need to perform migration. `from` should be the revision from before (eg `rev1`), `to` the revision you're aiming at (eg `rev2`)
 2. Modify the latest revision (eg `rev2`) in `migrations/_LATEST_REVISION`
 3. `udata-hydra migrate` will use the info from `_LATEST_REVISION` to upgrade to `rev2`. You can also specify `udata-hydra migrate --revision rev2`
+
+## Deployment
+
+3 services need to be deployed for the full stack to run:
+- worker
+- api / app
+- crawler
+
+Refer to each section to learn how to launch them. The only differences from dev to prod are:
+- use `HYDRA_SETTINGS` env var to point to your custom `config.toml`
+- use `HYDRA_APP_SOCKET_PATH` to configure where aiohttp should listen to a [reverse proxy connection (eg nginx)](https://docs.aiohttp.org/en/stable/deployment.html#nginx-configuration) and use `udata-hydra-app` to launch the app server
