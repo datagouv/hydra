@@ -100,7 +100,7 @@ def setup_catalog(catalog_content, rmock):
 @pytest.fixture
 def produce_mock(mocker):
     mocker.patch("udata_hydra.crawl.send", dummy())
-    mocker.patch("udata_hydra.datalake_service.send", dummy())
+    mocker.patch("udata_hydra.analysis.send", dummy())
 
 
 @pytest.fixture
@@ -139,6 +139,7 @@ async def fake_check(db):
         headers={"x-do": "you"},
         checksum=None,
         resource_id="c4e3a9fb-4415-488e-ba57-d05269b27adf",
+        detected_last_modified_at=None,
     ):
         data = {
             "url": f"https://example.com/resource-{resource}",
@@ -150,6 +151,7 @@ async def fake_check(db):
             "resource_id": resource_id,
             "error": error,
             "checksum": checksum,
+            "detected_last_modified_at": detected_last_modified_at,
         }
         id = await insert_check(data)
         data["id"] = id

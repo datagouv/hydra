@@ -4,7 +4,7 @@ import os
 import tempfile
 
 from datetime import datetime
-from typing import BinaryIO
+from typing import BinaryIO, Union
 
 import aiohttp
 import magic
@@ -47,16 +47,15 @@ async def download_resource(url: str, headers: dict) -> BinaryIO:
     return tmp_file
 
 
-# TODO: we're sending analysis info to udata every time a resource is crawled
-# although we only send "meta" check info only when they change
-# maybe introduce conditionnal webhook trigger here too
-async def process_resource(check_id: int) -> None:
+async def process_resource(check_id: int, is_first_check: bool) -> None:
     """
     Perform analysis on the resource designated by check_id
     - change analysis
-    - size
-    - mime_type
-    # FIXME: saving to minio and parsing CSV not called for now
+    - size (optionnal)
+    - mime_type (optionnal)
+    - checksum (optionnal)
+
+    Will call udata if first check or changes found, and update check with optionnal infos
     """
     check = await get_check(check_id)
     if not check:
@@ -75,49 +74,93 @@ async def process_resource(check_id: int) -> None:
     # if not, let's see if we can infer a modifification date from headers
     change_analysis = change_analysis or await detect_resource_change_from_headers(url) or {}
 
-    tmp_file = None
-    sha1 = None
-    error = None
-    # TODO: those can be infered from header, we could skip download totally
-    mime_type = None
-    filesize = None
+    # if not, let's download the file to get some hints and other infos
+    dl_analysis = {}
+    if not change_analysis:
+        tmp_file = None
+        try:
+            tmp_file = await download_resource(url, headers)
+        except IOError:
+            dl_analysis["analysis:error"] = "File too large to download"
+        else:
+            # Get file size
+            dl_analysis["analysis:filesize"] = os.path.getsize(tmp_file.name)
+            # Get checksum
+            dl_analysis["analysis:checksum"] = compute_checksum_from_file(tmp_file.name)
+            # Check if checksum has been modified if we don't have other hints
+            change_analysis = (
+                await detect_resource_change_from_checksum(resource_id, dl_analysis["analysis:checksum"])
+                or {}
+            )
+            # TODO: this never seems to output text/csv, maybe override it later
+            dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
+        finally:
+            if tmp_file:
+                os.remove(tmp_file.name)
+            await update_check(check_id, {
+                "checksum": dl_analysis.get("analysis:checksum"),
+                "analysis_error": dl_analysis.get("analysis:error"),
+                "filesize": dl_analysis.get("analysis:filesize"),
+                "mime_type": dl_analysis.get("analysis:mime-type"),
+            })
 
-    try:
-        tmp_file = await download_resource(url, headers)
-    except IOError:
-        error = "File too large to download"
-    else:
-        # Get file size
-        filesize = os.path.getsize(tmp_file.name)
-        # Get checksum
-        sha1 = compute_checksum_from_file(tmp_file.name)
-        # Check if checksum has been modified if we don't have other hints
-        change_analysis = change_analysis or await detect_resource_change_from_checksum(resource_id, sha1) or {}
-        # FIXME: this never seems to output text/csv, maybe override it later
-        mime_type = magic.from_file(tmp_file.name, mime=True)
-    finally:
-        if tmp_file:
-            os.remove(tmp_file.name)
+    has_changed_over_time = await detect_has_changed_over_time(change_analysis, resource_id, check_id)
+
+    analysis_results = {**dl_analysis, **change_analysis}
+    if has_changed_over_time or (is_first_check and analysis_results):
         await send(
             dataset_id=dataset_id,
             resource_id=resource_id,
-            document={
-                "analysis:error": error,
-                "analysis:filesize": filesize,
-                "analysis:mime-type": mime_type,
-                "analysis:checksum": sha1,
-                **change_analysis,
-            }
+            document=analysis_results,
         )
-        await update_check(check_id, {
-            "checksum": sha1,
-            "analysis_error": error,
-            "filesize": filesize,
-            "mime_type": mime_type
-        })
 
 
-async def detect_resource_change_from_checksum(resource_id, new_checksum):
+async def detect_has_changed_over_time(change_analysis, resource_id, check_id) -> bool:
+    """
+    Determine if our detected last modified date has changed since last check
+    because some methods (eg last-modified header) do not embed this
+    """
+    has_changed_over_time = False
+
+    last_modified = change_analysis.get("analysis:last-modified-at")
+    if not last_modified:
+        return False
+    last_modified = datetime.fromisoformat(last_modified)
+
+    pool = await context.pool()
+
+    # those detection methods already embed comparison over time, we trust them
+    TRUSTED_METHODS = ["computed-checksum", "content-length-header"]
+    last_modified_method = change_analysis.get("analysis:last-modified-detection")
+    if last_modified_method in TRUSTED_METHODS:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
+                last_modified, check_id
+            )
+        return True
+
+    q = """
+    SELECT detected_last_modified_at
+    FROM checks
+    WHERE resource_id = $1 AND detected_last_modified_at IS NOT NULL
+    ORDER BY created_at DESC
+    LIMIT 1
+    """
+    async with pool.acquire() as conn:
+        res = await conn.fetchrow(q, resource_id)
+        if res and res["detected_last_modified_at"] != last_modified:
+            has_changed_over_time = True
+        # keep date in store for next run
+        await conn.execute(
+            "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
+            last_modified, check_id
+        )
+
+    return has_changed_over_time
+
+
+async def detect_resource_change_from_checksum(resource_id, new_checksum) -> Union[dict, None]:
     """
     Checks if resource checksum has changed over time
     Returns {
@@ -142,7 +185,7 @@ async def detect_resource_change_from_checksum(resource_id, new_checksum):
             }
 
 
-async def detect_resource_change_from_headers(value: str, column: str = "url"):
+async def detect_resource_change_from_headers(value: str, column: str = "url") -> Union[dict, None]:
     """
     Try to guess if a resource has been modified from headers in check data:
     - last-modified header value if it can be found and parsed
@@ -219,7 +262,7 @@ async def detect_resource_change_from_headers(value: str, column: str = "url"):
         }
 
 
-async def detect_resource_change_from_harvest(resource_id):
+async def detect_resource_change_from_harvest(resource_id) -> Union[dict, None]:
     """
     Checks if resource has a harvest.modified_at
     Returns {

@@ -3,6 +3,7 @@ import time
 
 from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import Tuple
 from urllib.parse import urlparse
 
 import aiohttp
@@ -11,7 +12,7 @@ import asyncio
 from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
-from udata_hydra.datalake_service import process_resource
+from udata_hydra.analysis import process_resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils import queue
 from udata_hydra.utils.db import insert_check
@@ -74,7 +75,7 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
     return has_changed
 
 
-async def process_check_data(check_data: dict) -> int:
+async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     """Preprocess a check before saving it"""
     context.monitor().set_status("Updating checks and catalog...")
     check_data["resource_id"] = str(check_data["resource_id"])
@@ -96,7 +97,8 @@ async def process_check_data(check_data: dict) -> int:
             check_data["resource_id"]
         )
 
-    return await insert_check(check_data)
+    is_first_check = last_check is None
+    return await insert_check(check_data), is_first_check
 
 
 async def is_backoff(domain):
@@ -145,6 +147,7 @@ def convert_headers(headers):
 
 def has_nice_head(resp):
     """Check if a HEAD response looks useful to us"""
+    # TODO: 40x should not trigget GET
     if not is_valid_status(resp.status):
         return False
     if not any([k in resp.headers for k in ("content-length", "last-modified")]):
@@ -196,7 +199,7 @@ async def check_url(row, session, sleep=0, method="head"):
                 return await check_url(row, session, method="get")
             resp.raise_for_status()
 
-            check_id = await process_check_data(
+            check_id, is_first_check = await process_check_data(
                 {
                     "resource_id": row["resource_id"],
                     "url": row["url"],
@@ -208,7 +211,7 @@ async def check_url(row, session, sleep=0, method="head"):
                 }
             )
 
-            queue.enqueue(process_resource, check_id)
+            queue.enqueue(process_resource, check_id, is_first_check)
 
             return STATUS_OK
     except asyncio.exceptions.TimeoutError:

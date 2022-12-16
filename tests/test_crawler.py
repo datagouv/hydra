@@ -9,12 +9,13 @@ import nest_asyncio
 
 from aiohttp.client_exceptions import ClientError
 from asyncio.exceptions import TimeoutError
+from dateutil.parser import parse as date_parser
 from minicli import run
 from yarl import URL
 
 from udata_hydra import config
 from udata_hydra.crawl import crawl
-from udata_hydra.datalake_service import process_resource
+from udata_hydra.analysis import process_resource
 from udata_hydra.utils.db import get_check
 
 from .conftest import RESOURCE_ID as resource_id
@@ -263,12 +264,12 @@ async def test_no_switch_head_to_get(setup_catalog, event_loop, rmock, produce_m
 
 
 async def test_process_resource(setup_catalog, mocker, fake_check):
-    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
     # disable webhook, tested in following test
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
     check = await fake_check()
-    await process_resource(check["id"])
+    await process_resource(check["id"], False)
     result = await get_check(check["id"])
 
     assert result["error"] is None
@@ -277,18 +278,31 @@ async def test_process_resource(setup_catalog, mocker, fake_check):
     assert result["mime_type"] == "text/plain"
 
 
-async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_check, db, udata_url):
-    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_check, udata_url):
+    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
 
     check = await fake_check()
-    await process_resource(check["id"])
+    await process_resource(check["id"], True)
 
     req = rmock.requests[("PUT", URL(udata_url))]
     assert len(req) == 1
     document = req[0].kwargs["json"]
     assert document["analysis:filesize"] == len(SIMPLE_CSV_CONTENT)
     assert document["analysis:mime-type"] == "text/plain"
+
+
+async def test_process_resource_send_udata_no_change(setup_catalog, mocker, rmock, fake_check, udata_url):
+    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
+    rmock.put(udata_url, status=200, repeat=True)
+
+    # previous check with same checksum
+    await fake_check(checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest())
+    check = await fake_check()
+    await process_resource(check["id"], False)
+
+    # udata has not been called
+    assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
 async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db, udata_url):
@@ -332,6 +346,7 @@ async def test_change_analysis_last_modified_header(setup_catalog, rmock, event_
 
 
 async def test_change_analysis_content_length_header(setup_catalog, rmock, event_loop, fake_check, db, udata_url):
+    # different content-length than mock response
     await fake_check(headers={"content-length": "1"})
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
@@ -350,10 +365,11 @@ async def test_change_analysis_content_length_header(setup_catalog, rmock, event
 
 
 async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, rmock, event_loop, udata_url):
+    # different checksum than mock file
     await fake_check(checksum="136bd31d53340d234957650e042172705bf32984")
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
-    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
     rmock.head("https://example.com/resource-1")
     rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
@@ -370,7 +386,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
 
 @pytest.mark.catalog_harvested
 async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loop, udata_url):
-    mocker.patch("udata_hydra.datalake_service.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
     rmock.head("https://example.com/harvested", headers={"content-length": "2"}, repeat=True)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(crawl(iterations=1))
@@ -379,3 +395,14 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loo
     data = requests[-1].kwargs["json"]
     assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000"
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
+
+
+async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, event_loop, fake_check, udata_url):
+    _date = "Thu, 09 Jan 2020 09:33:37 GMT"
+    await fake_check(detected_last_modified_at=date_parser(_date, ignoretz=True))
+    rmock.head("https://example.com/resource-1", headers={"last-modified": _date})
+    rmock.get("https://example.com/resource-1")
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    # udata has not been called: not first check, and last-modified stayed the same
+    assert ("PUT", URL(udata_url)) not in rmock.requests
