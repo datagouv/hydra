@@ -107,12 +107,12 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     has_changed_over_time = await detect_has_changed_over_time(change_analysis, resource_id, check_id)
 
-    change_analysis.update(dl_analysis)
-    if has_changed_over_time or (is_first_check and change_analysis):
+    analysis_results = {**dl_analysis, **change_analysis}
+    if has_changed_over_time or (is_first_check and analysis_results):
         await send(
             dataset_id=dataset_id,
             resource_id=resource_id,
-            document=change_analysis
+            document=analysis_results,
         )
 
 
@@ -122,25 +122,42 @@ async def detect_has_changed_over_time(change_analysis, resource_id, check_id) -
     because some methods (eg last-modified header) do not embed this
     """
     has_changed_over_time = False
+
     last_modified = change_analysis.get("analysis:last-modified-at")
-    if last_modified:
-        q = """
-        SELECT detected_last_modified_at
-        FROM checks
-        WHERE resource_id = $1 AND detected_last_modified_at IS NOT NULL
-        ORDER BY created_at DESC
-        LIMIT 1
-        """
-        pool = await context.pool()
+    if not last_modified:
+        return False
+    last_modified = datetime.fromisoformat(last_modified)
+
+    pool = await context.pool()
+
+    # those detection methods already embed comparison over time, we trust them
+    TRUSTED_METHODS = ["computed-checksum", "content-length-header"]
+    last_modified_method = change_analysis.get("analysis:last-modified-detection")
+    if last_modified_method in TRUSTED_METHODS:
         async with pool.acquire() as conn:
-            res = await conn.fetchrow(q, resource_id)
-            if res and res["detected_last_modified_at"] != last_modified:
-                has_changed_over_time = True
-            # keep date in store for next run
             await conn.execute(
                 "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
-                datetime.fromisoformat(last_modified), check_id
+                last_modified, check_id
             )
+        return True
+
+    q = """
+    SELECT detected_last_modified_at
+    FROM checks
+    WHERE resource_id = $1 AND detected_last_modified_at IS NOT NULL
+    ORDER BY created_at DESC
+    LIMIT 1
+    """
+    async with pool.acquire() as conn:
+        res = await conn.fetchrow(q, resource_id)
+        if res and res["detected_last_modified_at"] != last_modified:
+            has_changed_over_time = True
+        # keep date in store for next run
+        await conn.execute(
+            "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
+            last_modified, check_id
+        )
+
     return has_changed_over_time
 
 
