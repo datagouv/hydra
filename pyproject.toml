@@ -4,6 +4,7 @@ version = "1.0.0rc1"
 description = "Async crawler and datalake service for data.gouv.fr"
 authors = ["Opendata Team <opendatateam@data.gouv.fr>"]
 license = "MIT"
+readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.9"
