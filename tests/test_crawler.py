@@ -9,6 +9,7 @@ import nest_asyncio
 
 from aiohttp import ClientSession
 from aiohttp.client_exceptions import ClientError
+from aioresponses import CallbackResult
 from asyncio.exceptions import TimeoutError
 from dateutil.parser import parse as date_parser
 from minicli import run
@@ -456,3 +457,16 @@ async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, 
     event_loop.run_until_complete(crawl(iterations=1))
     # udata has not been called: not first check, and last-modified stayed the same
     assert ("PUT", URL(udata_url)) not in rmock.requests
+
+
+async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, produce_mock):
+    # very complicated stuff, thanks https://github.com/pnuckowski/aioresponses/issues/111#issuecomment-896585061
+    def callback(url, **kwargs):
+        import sys
+        assert config.USER_AGENT == sys._getframe(3).f_locals["orig_self"].headers["user-agent"]
+        # add content-length to avoid switching from HEAD to GET when crawling
+        return CallbackResult(status=200, payload={}, headers={"content-length": "1"})
+    rurl = "https://example.com/resource-1"
+    rmock.head(rurl, callback=callback)
+    rmock.get(rurl, callback=callback)
+    event_loop.run_until_complete(crawl(iterations=1))

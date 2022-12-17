@@ -274,7 +274,7 @@ async def check_url(row, session, sleep=0, method="head"):
 async def crawl_urls(to_parse):
     context.monitor().set_status("Crawling urls...")
     tasks = []
-    async with aiohttp.ClientSession(timeout=None) as session:
+    async with aiohttp.ClientSession(timeout=None, headers={"user-agent": config.USER_AGENT}) as session:
         for row in to_parse:
             tasks.append(check_url(row, session))
         for task in asyncio.as_completed(tasks):
