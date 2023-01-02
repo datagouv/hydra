@@ -197,6 +197,21 @@ async def migrate(revision=None):
         await execute(conn, backend, planned)
 
 
+@cli
+async def purge_checks(limit=2):
+    """Delete past checks for each resource_id, keeping only `limit` number of checks"""
+    q = "SELECT resource_id FROM checks GROUP BY resource_id HAVING count(id) > $1"
+    resources = await context["conn"].fetch(q, limit)
+    for r in resources:
+        resource_id = r["resource_id"]
+        log.debug(f"Deleting outdated checks for resource {resource_id}")
+        q = """DELETE FROM checks WHERE id IN (
+            SELECT id FROM checks WHERE resource_id = $1 ORDER BY created_at DESC OFFSET $2
+        )
+        """
+        await context["conn"].execute(q, resource_id, limit)
+
+
 @wrap
 async def cli_wrapper():
     dsn = config.DATABASE_URL
