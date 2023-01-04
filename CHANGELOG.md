@@ -1,6 +1,6 @@
 # Changelog
 
-## Current (in progress)
+## 1.0.1 (2023-01-04)
 
 - Nothing yet
 
