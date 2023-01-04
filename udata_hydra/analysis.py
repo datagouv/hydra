@@ -12,6 +12,7 @@ import magic
 from dateutil.parser import parse as date_parser, ParserError
 
 from udata_hydra import config, context
+from udata_hydra.utils import queue
 from udata_hydra.utils.db import update_check, get_check
 from udata_hydra.utils.file import compute_checksum_from_file
 from udata_hydra.utils.http import send
@@ -33,7 +34,7 @@ async def download_resource(url: str, headers: dict) -> BinaryIO:
 
     chunk_size = 1024
     i = 0
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers={"user-agent": config.USER_AGENT}) as session:
         async with session.get(url, allow_redirects=True) as response:
             async for chunk in response.content.iter_chunked(chunk_size):
                 if i * chunk_size < float(config.MAX_FILESIZE_ALLOWED):
@@ -108,10 +109,12 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     analysis_results = {**dl_analysis, **change_analysis}
     if has_changed_over_time or (is_first_check and analysis_results):
-        await send(
+        queue.enqueue(
+            send,
             dataset_id=dataset_id,
             resource_id=resource_id,
             document=analysis_results,
+            _priority="high",
         )
 
 

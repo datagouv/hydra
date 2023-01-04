@@ -1,4 +1,5 @@
 import json
+import os
 
 from datetime import datetime, timedelta
 
@@ -10,6 +11,7 @@ from udata_hydra import context, config
 from udata_hydra.crawl import get_excluded_clause
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils.minio import delete_resource_from_minio
+from udata_hydra.worker import QUEUES
 
 
 log = setup_logging()
@@ -186,8 +188,8 @@ async def get_checks(request):
     return web.json_response([CheckSchema().dump(dict(r)) for r in data])
 
 
-@routes.get("/api/status/")
-async def status(request):
+@routes.get("/api/status/crawler/")
+async def status_crawler(request):
     q = f"""
         SELECT
             SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END) AS count_left,
@@ -231,6 +233,14 @@ async def status(request):
             "fresh_checks_percentage": rate_checked_fresh,
         }
     )
+
+
+@routes.get("/api/status/worker/")
+async def status_worker(request):
+    res = {
+        "queued": {q: len(context.queue(q)) for q in QUEUES}
+    }
+    return web.json_response(res)
 
 
 @routes.get("/api/stats/")
@@ -318,5 +328,9 @@ async def app_factory():
     return app
 
 
+def run():
+    web.run_app(app_factory(), path=os.environ.get("HYDRA_APP_SOCKET_PATH"))
+
+
 if __name__ == "__main__":
-    web.run_app(app_factory())
+    run()

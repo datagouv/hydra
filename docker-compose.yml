@@ -11,10 +11,6 @@ services:
       - database-data:/var/lib/postgresql/data/ # persist data even if container shuts down
     ports:
       - 5432:5432
-  broker:
-    image: redis
-    ports:
-      - 6379:6379
 
 volumes:
   database-data: # named volumes can be managed easier using docker-compose

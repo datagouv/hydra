@@ -10,7 +10,9 @@ from rq import Queue
 from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
-context = {}
+context = {
+    "queues": {}
+}
 
 
 def monitor():
@@ -27,16 +29,15 @@ def monitor():
 
 async def pool():
     if "pool" not in context:
-        dsn = config.DATABASE_URL
-        context["pool"] = await asyncpg.create_pool(dsn=dsn, max_size=50)
+        context["pool"] = await asyncpg.create_pool(dsn=config.DATABASE_URL, max_size=config.MAX_POOL_SIZE)
     return context["pool"]
 
 
-def queue():
-    if "queue" not in context:
+def queue(name="default"):
+    if not context["queues"].get(name):
         # we dont need a queue while testing, make sure we're not using a real Redis connection
         if config.TESTING:
             return None
         connection = redis.from_url(config.REDIS_URL)
-        context["queue"] = Queue(connection=connection)
-    return context["queue"]
+        context["queues"][name] = Queue(name, connection=connection)
+    return context["queues"][name]

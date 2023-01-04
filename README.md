@@ -27,7 +27,7 @@ It will crawl (forever) the catalog according to config set in `config.py`.
 
 The crawler will start with URLs never checked and then proceed with URLs crawled before `SINCE` interval. It will then wait until something changes (catalog or time).
 
-There's a by-domain backoff mecanism. The crawler will wait when, for a given domain in a given batch, `BACKOFF_NB_REQ` is exceeded in a period of `BACKOFF_PERIOD` seconds. It will sleep and retry until the backoff is lifted.
+There's a by-domain backoff mecanism. The crawler will wait when, for a given domain in a given batch, `BACKOFF_NB_REQ` is exceeded in a period of `BACKOFF_PERIOD` seconds. It will retry until the backoff is lifted.
 
 If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
@@ -126,13 +126,26 @@ $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv
 ### Get crawling status
 
 ```
-$ curl -s "http://localhost:8000/api/status/" | json_pp
+$ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 {
    "fresh_checks_percentage" : 0.4,
    "pending_checks" : 142153,
    "total" : 142687,
    "fresh_checks" : 534,
    "checks_percentage" : 0.4
+}
+```
+
+### Get worker status
+
+```
+$ curl -s "http://localhost:8000/api/status/worker/" | json_pp
+{
+   "queued" : {
+      "default" : 0,
+      "high" : 825,
+      "low" : 655
+   }
 }
 ```
 
@@ -190,19 +203,14 @@ $ curl -s "http://localhost:8000/api/stats/" | json_pp
 
 ## Using Webhook integration
 
-** Set the environment variables **
-Rename the `.env.sample` to `.env` and fill it with the right values.
+** Set the config values**
 
-```shell
-UDATA_URI=https://dev.local./
-UDATA_URI_API_KEY=example.api.key
-MINIO_URL=https://object.local.dev/
-MINIO_USER=sample_user
-MINIO_BUCKET=benchmark-de
-MINIO_PWD=sample_pwd
-MINIO_FOLDER=data
-SENTRY_DSN=https://{my-sentry-dsn}
-WEBHOOK_ENABLED=True
+Create a `config.toml` where your service and commands are launched, or specify a path to a TOML file via the `HYDRA_SETTINGS` environment variable. `config.toml` or equivalent will override values from `udata_hydra/config_default.toml`, lookup there for values that can/need to be defined.
+
+```toml
+UDATA_URI = "https://dev.local:7000/api/2"
+UDATA_URI_API_KEY = "example.api.key"
+SENTRY_DSN = "https://{my-sentry-dsn}"
 ```
 
 The webhook integration sends HTTP messages to `udata` when resources are analyzed or checked to fill resources extras.
@@ -226,7 +234,17 @@ The payload should look something like:
 
 ## Development
 
+### docker-compose
+
+Multiple docker-compose files are provided:
+- a minimal `docker-compose.yml` with PostgreSQL
+- `docker-compose.broker.yml` adds a Redis broker
+- `docker-compose.test.yml` launches a test DB, needed to run tests
+
+NB: you can launch compose from multiple files like this: `docker-compose -f docker-compose.yml -f docker-compose.test.yml up`
+
 ### Logging & Debugging
+
 The log level can be adjusted using the environment variable LOG_LEVEL.
 For example, to set the log level to `DEBUG` when initializing the database, use `LOG_LEVEL="DEBUG" udata-hydra init_db `.
 
@@ -235,3 +253,14 @@ For example, to set the log level to `DEBUG` when initializing the database, use
 1. Add a file named `migrations/{YYYYMMDD}_{from}_up_{to}.sql` and write the SQL you need to perform migration. `from` should be the revision from before (eg `rev1`), `to` the revision you're aiming at (eg `rev2`)
 2. Modify the latest revision (eg `rev2`) in `migrations/_LATEST_REVISION`
 3. `udata-hydra migrate` will use the info from `_LATEST_REVISION` to upgrade to `rev2`. You can also specify `udata-hydra migrate --revision rev2`
+
+## Deployment
+
+3 services need to be deployed for the full stack to run:
+- worker
+- api / app
+- crawler
+
+Refer to each section to learn how to launch them. The only differences from dev to prod are:
+- use `HYDRA_SETTINGS` env var to point to your custom `config.toml`
+- use `HYDRA_APP_SOCKET_PATH` to configure where aiohttp should listen to a [reverse proxy connection (eg nginx)](https://docs.aiohttp.org/en/stable/deployment.html#nginx-configuration) and use `udata-hydra-app` to launch the app server

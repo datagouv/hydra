@@ -1,20 +1,24 @@
-from datetime import datetime, timedelta
 import hashlib
 import json
 import pytest
+import sys
 import tempfile
+
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
 import nest_asyncio
 
+from aiohttp import ClientSession
 from aiohttp.client_exceptions import ClientError
+from aioresponses import CallbackResult
 from asyncio.exceptions import TimeoutError
 from dateutil.parser import parse as date_parser
 from minicli import run
 from yarl import URL
 
 from udata_hydra import config
-from udata_hydra.crawl import crawl
+from udata_hydra.crawl import crawl, check_url, STATUS_BACKOFF
 from udata_hydra.analysis import process_resource
 from udata_hydra.utils.db import get_check
 
@@ -178,17 +182,66 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mo
         assert webhook.get("check:timeout") is False
 
 
-async def test_backoff(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock):
+async def test_backoff_nb_req(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock):
     await fake_check(resource=2, resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe")
     mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
     mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
-    magic = MagicMock()
-    mocker.patch("udata_hydra.context.monitor").return_value = magic
     rurl = "https://example.com/resource-1"
+    rmock.head(rurl, status=200)
+    event_loop.run_until_complete(crawl(iterations=1))
+    # verify that we actually backed-off
+    assert ("HEAD", URL(rurl)) not in rmock.requests
+
+
+@pytest.mark.parametrize(
+    "ratelimit",
+    [
+        # remain, limit, should_backoff
+        (0, 0, True),
+        (1, 100, True),
+        ("a", "b", False),
+        (20, 100, False),
+        (0, -1, False),
+    ],
+)
+async def test_backoff_rate_limiting(setup_catalog, event_loop, rmock, fake_check, produce_mock, ratelimit):
+    remain, limit, should_backoff = ratelimit
+    await fake_check(
+        resource=2,
+        resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe",
+        headers={
+            "x-ratelimit-remaining": remain,
+            "x-ratelimit-limit": limit,
+        }
+    )
+    rurl = "https://example.com/resource-1"
+    rmock.head(rurl, status=200)
     rmock.get(rurl, status=200)
     event_loop.run_until_complete(crawl(iterations=1))
     # verify that we actually backed-off
-    assert magic.add_backoff.called
+    if should_backoff:
+        assert ("HEAD", URL(rurl)) not in rmock.requests
+    else:
+        assert ("HEAD", URL(rurl)) in rmock.requests
+
+
+async def test_backoff_lifted(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock, db):
+    await fake_check(resource=2, resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe")
+    mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
+    mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
+    rurl = "https://example.com/resource-1"
+    rmock.head(rurl, status=200)
+    row = await db.fetchrow("SELECT * FROM catalog")
+    async with ClientSession() as session:
+        res = await check_url(row, session)
+    assert res == STATUS_BACKOFF
+    # verify that we actually backed-off
+    assert ("HEAD", URL(rurl)) not in rmock.requests
+    # we wait for BACKOFF_PERIOD before crawling again, it should _not_ backoff
+    async with ClientSession() as session:
+        res = await check_url(row, session, sleep=0.25)
+    assert res != STATUS_BACKOFF
+    assert ("HEAD", URL(rurl)) in rmock.requests
 
 
 async def test_no_backoff_domains(
@@ -406,3 +459,15 @@ async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, 
     event_loop.run_until_complete(crawl(iterations=1))
     # udata has not been called: not first check, and last-modified stayed the same
     assert ("PUT", URL(udata_url)) not in rmock.requests
+
+
+async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, produce_mock):
+    # very complicated stuff, thanks https://github.com/pnuckowski/aioresponses/issues/111#issuecomment-896585061
+    def callback(url, **kwargs):
+        assert config.USER_AGENT == sys._getframe(3).f_locals["orig_self"].headers["user-agent"]
+        # add content-length to avoid switching from HEAD to GET when crawling
+        return CallbackResult(status=200, payload={}, headers={"content-length": "1"})
+    rurl = "https://example.com/resource-1"
+    rmock.head(rurl, callback=callback)
+    rmock.get(rurl, callback=callback)
+    event_loop.run_until_complete(crawl(iterations=1))

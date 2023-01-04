@@ -1,0 +1,50 @@
+LOG_LEVEL = "DEBUG"
+DATABASE_URL = "postgres://postgres:postgres@localhost:5432/postgres"
+REDIS_URL = "redis://localhost:6379/0"
+SENTRY_DSN = ""
+TESTING = false
+# max postgres pool size
+MAX_POOL_SIZE = 50
+USER_AGENT = "udata-hydra/1.0"
+
+# -- crawler settings -- #
+
+CATALOG_URL = "https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d"
+# sql LIKE syntax
+EXCLUDED_PATTERNS = [
+    "http%geo.data.gouv.fr%",
+    # opendatasoft shp
+    "%?format=shp%",
+]
+# no backoff for those domains
+NO_BACKOFF_DOMAINS = [
+    "static.data.gouv.fr",
+    "www.data.gouv.fr",
+    # dead domain, no need to backoff
+    "inspire.data.gouv.fr",
+]
+# max number of _completed_ requests per domain per period
+BACKOFF_NB_REQ = 180
+BACKOFF_PERIOD = 360  # in seconds
+# crawl batch size, beware of open file limits
+# ⚠️ do not exceed MAX_POOL_SIZE
+BATCH_SIZE = 40
+# crawl url if last check is older than
+SINCE = "1w"
+# seconds to wait for between batches
+SLEEP_BETWEEN_BATCHES = 60
+# max download filesize in bytes (100 MB)
+MAX_FILESIZE_ALLOWED = 104857600
+
+# -- Webhook integration config -- #
+WEBHOOK_ENABLED = true
+UDATA_URI = ""
+UDATA_URI_API_KEY = ""
+
+# -- Minio / datalake settings -- #
+SAVE_TO_MINIO = false
+MINIO_FOLDER = ""
+MINIO_URL = ""
+MINIO_BUCKET = ""
+MINIO_USER = ""
+MINIO_PWD = ""

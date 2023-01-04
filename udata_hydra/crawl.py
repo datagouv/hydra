@@ -1,4 +1,3 @@
-import json
 import time
 
 from collections import defaultdict
@@ -23,6 +22,7 @@ results = defaultdict(int)
 STATUS_OK = "ok"
 STATUS_TIMEOUT = "timeout"
 STATUS_ERROR = "error"
+STATUS_BACKOFF = "backoff"
 
 log = setup_logging()
 
@@ -50,7 +50,6 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
         "status_no_longer_available": status_no_longer_available,
         "timeout_has_changed": timeout_has_changed,
     }
-    log.debug("crawl.py::update_checks_and_catalog:::criterions %s", json.dumps(criterions, indent=4))
 
     has_changed = any(criterions.values())
     if has_changed:
@@ -69,7 +68,8 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
             send,
             dataset_id=dataset["dataset_id"],
             resource_id=check_data["resource_id"],
-            document=document
+            document=document,
+            _priority="high",
         )
 
     return has_changed
@@ -77,7 +77,6 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
 
 async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     """Preprocess a check before saving it"""
-    context.monitor().set_status("Updating checks and catalog...")
     check_data["resource_id"] = str(check_data["resource_id"])
 
     pool = await context.pool()
@@ -101,12 +100,14 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     return await insert_check(check_data), is_first_check
 
 
-async def is_backoff(domain):
+async def is_backoff(domain) -> Tuple[bool, str]:
+    backoff = False, ""
     no_backoff = [f"'{d}'" for d in config.NO_BACKOFF_DOMAINS]
     no_backoff = f"({','.join(no_backoff)})"
     since = datetime.utcnow() - timedelta(seconds=config.BACKOFF_PERIOD)
     pool = await context.pool()
     async with pool.acquire() as connection:
+        # check if we trigger BACKOFF_NB_REQ for BACKOFF_PERIOD on this domain
         res = await connection.fetchrow(
             f"""
             SELECT COUNT(*) FROM checks
@@ -117,7 +118,33 @@ async def is_backoff(domain):
             domain,
             since,
         )
-        return res["count"] >= config.BACKOFF_NB_REQ, res["count"]
+        backoff = res["count"] >= config.BACKOFF_NB_REQ, f"Too many requests: {res['count']}"
+
+        if not backoff[0]:
+            # check if we hit a ratelimit on this domain
+            q = f"""
+                SELECT
+                    headers->>'x-ratelimit-remaining' as ratelimit_remaining,
+                    headers->>'x-ratelimit-limit' as ratelimit_limit
+                FROM checks
+                WHERE domain = $1 AND domain NOT IN {no_backoff}
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            res = await connection.fetchrow(q, domain)
+            if res:
+                try:
+                    remain, limit = float(res["ratelimit_remaining"]), float(res["ratelimit_limit"])
+                except (ValueError, TypeError):
+                    pass
+                else:
+                    if limit == -1:
+                        return False, ""
+                    very_limited = remain == 0 or limit == 0
+                    # we have really messed up or less than 10% left from our quota, we backoff
+                    backoff = very_limited or remain / limit <= 0.1, "X-ratelimit reached"
+
+    return backoff
 
 
 def fix_surrogates(value):
@@ -175,17 +202,11 @@ async def check_url(row, session, sleep=0, method="head"):
         )
         return STATUS_ERROR
 
-    should_backoff, nb_req = await is_backoff(domain)
+    should_backoff, reason = await is_backoff(domain)
     if should_backoff:
-        log.info(f"backoff {domain} ({nb_req})")
-        context.monitor().add_backoff(domain, nb_req)
-        # TODO: maybe just skip this url, it should come back in the next batch anyway
-        # but won't it accumulate too many backoffs in the end? is this a problem?
-        return await check_url(
-            row, session, sleep=config.BACKOFF_PERIOD / config.BACKOFF_NB_REQ
-        )
-    else:
-        context.monitor().remove_backoff(domain)
+        log.info(f"backoff {domain} ({reason})")
+        # skip this URL, it will come back in a next batch
+        return STATUS_BACKOFF
 
     try:
         start = time.time()
@@ -211,7 +232,7 @@ async def check_url(row, session, sleep=0, method="head"):
                 }
             )
 
-            queue.enqueue(process_resource, check_id, is_first_check)
+            queue.enqueue(process_resource, check_id, is_first_check, _priority="low")
 
             return STATUS_OK
     except asyncio.exceptions.TimeoutError:
@@ -253,7 +274,7 @@ async def check_url(row, session, sleep=0, method="head"):
 async def crawl_urls(to_parse):
     context.monitor().set_status("Crawling urls...")
     tasks = []
-    async with aiohttp.ClientSession(timeout=None) as session:
+    async with aiohttp.ClientSession(timeout=None, headers={"user-agent": config.USER_AGENT}) as session:
         for row in to_parse:
             tasks.append(check_url(row, session))
         for task in asyncio.as_completed(tasks):
