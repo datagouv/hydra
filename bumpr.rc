@@ -6,8 +6,7 @@ commit = true
 tag = true
 tag_format = v{version}
 push = true
-clean =
-    rm dist/*
+clean = rm -rf dist
 tests = pytest
 publish = poetry build
 files =
