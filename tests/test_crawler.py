@@ -1,8 +1,10 @@
-from datetime import datetime, timedelta
 import hashlib
 import json
 import pytest
+import sys
 import tempfile
+
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
 import nest_asyncio
@@ -462,7 +464,6 @@ async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, 
 async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, produce_mock):
     # very complicated stuff, thanks https://github.com/pnuckowski/aioresponses/issues/111#issuecomment-896585061
     def callback(url, **kwargs):
-        import sys
         assert config.USER_AGENT == sys._getframe(3).f_locals["orig_self"].headers["user-agent"]
         # add content-length to avoid switching from HEAD to GET when crawling
         return CallbackResult(status=200, payload={}, headers={"content-length": "1"})
