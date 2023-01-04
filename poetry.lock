@@ -346,6 +346,21 @@ urllib3 = ">=1.25.4,<1.27"
 crt = ["awscrt (==0.15.3)"]
 
 [[package]]
+name = "bumpr"
+version = "0.3.8"
+description = "Version bumper and Python package releaser"
+category = "dev"
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "bumpr-0.3.8-py3-none-any.whl", hash = "sha256:1cdfe40b618d97ee3af07f74b3983c0bc5c68a369cc317995259e241438b93a6"},
+    {file = "bumpr-0.3.8.tar.gz", hash = "sha256:6bfdda629f7816012c0e3dcaca54b6228e25b2159956049639b329389f0348ad"},
+]
+
+[package.extras]
+doc = ["mkdocs (>=1.2.3,<2.0.0)", "mkdocs-include-markdown-plugin (>=3.2.3,<4.0.0)", "mkdocs-material (>=7.3.5,<8.0.0)", "mkdocstrings (>=0.16.2,<0.17.0)"]
+
+[[package]]
 name = "cchardet"
 version = "2.1.7"
 description = "cChardet is high speed universal character encoding detector."
@@ -1411,4 +1426,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "fe52d916b926639773d217b6d9ecdc6bd76dd1f2a0d020aaff4122a052a38302"
+content-hash = "6c0d235bd396ca8f04bf4ff94035469c2bfc536d54e04aa64c235f1638f6b9f7"
