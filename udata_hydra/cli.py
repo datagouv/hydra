@@ -184,7 +184,7 @@ async def drop_db(tables=["checks", "catalog", "migrations"]):
 @cli
 async def migrate(revision=None):
     """Migrate the database to _LATEST_REVISION or specified one"""
-    migrations_dir = Path(__file__).parent / "../migrations"
+    migrations_dir = Path(__file__).parent / "migrations"
 
     if not revision:
         with open(migrations_dir / "_LATEST_REVISION", "r") as f:
