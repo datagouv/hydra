@@ -471,3 +471,33 @@ async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, p
     rmock.head(rurl, callback=callback)
     rmock.get(rurl, callback=callback)
     event_loop.run_until_complete(crawl(iterations=1))
+
+
+async def test_crawl_triggered_by_udata_entrypoint_clean_catalog(
+    client, udata_resource_payload, event_loop, db, rmock, analysis_mock, clean_db, produce_mock,
+):
+    rurl = udata_resource_payload["document"]["url"]
+    rmock.head(rurl, headers={"content-length": "1"})
+    res = await client.post("/api/resource/created/", json=udata_resource_payload)
+    assert res.status == 200
+    res = await db.fetch("SELECT * FROM catalog")
+    assert len(res) == 1
+    event_loop.run_until_complete(crawl(iterations=1))
+    assert ("HEAD", URL(rurl)) in rmock.requests
+    res = await db.fetch("SELECT * FROM checks")
+    assert len(res) == 1
+
+
+async def test_crawl_triggered_by_udata_entrypoint_existing_catalog(
+    setup_catalog, client, udata_resource_payload, event_loop, db, rmock, analysis_mock, produce_mock,
+):
+    rurl = udata_resource_payload["document"]["url"]
+    rmock.head(rurl, headers={"content-length": "1"})
+    res = await client.post("/api/resource/created/", json=udata_resource_payload)
+    assert res.status == 200
+    res = await db.fetch("SELECT * FROM catalog")
+    assert len(res) == 2
+    event_loop.run_until_complete(crawl(iterations=1))
+    assert ("HEAD", URL(rurl)) in rmock.requests
+    res = await db.fetch("SELECT * FROM checks")
+    assert len(res) == 2
