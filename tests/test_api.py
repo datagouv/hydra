@@ -4,20 +4,8 @@ it will interfere with the rest of our async code
 """
 from datetime import datetime
 import pytest
-import pytest_asyncio
-
-from aiohttp.test_utils import TestClient, TestServer
-
-from udata_hydra.app import app_factory
 
 pytestmark = pytest.mark.asyncio
-
-
-@pytest_asyncio.fixture
-async def client():
-    app = await app_factory()
-    async with TestClient(TestServer(app)) as client:
-        yield client
 
 
 @pytest.mark.parametrize(
@@ -124,33 +112,14 @@ async def test_api_stats(setup_catalog, client, fake_check):
     }
 
 
-async def test_api_resource_created(client):
-    payload = {
-        "resource_id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
-        "dataset_id": "61fd30cb29ea95c7bc0e1211",
-        "document": {
-            "id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
-            "url": "http://dev.local/",
-            "title": "random title",
-            "description": "random description",
-            "filetype": "file",
-            "type": "documentation",
-            "mime": "text/plain",
-            "filesize": 1024,
-            "checksum_type": "sha1",
-            "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
-            "created_at": datetime.now().isoformat(),
-            "modified": datetime.now().isoformat(),
-            "published": datetime.now().isoformat(),
-        }
-    }
-    resp = await client.post("/api/resource/created/", json=payload)
+async def test_api_resource_created(client, udata_resource_payload):
+    resp = await client.post("/api/resource/created/", json=udata_resource_payload)
     assert resp.status == 200
     data = await resp.json()
     assert data == {"message": "created"}
 
-    payload["document"] = None
-    resp = await client.post("/api/resource/created/", json=payload)
+    udata_resource_payload["document"] = None
+    resp = await client.post("/api/resource/created/", json=udata_resource_payload)
     assert resp.status == 400
     text = await resp.text()
     assert text == "Missing document body"

@@ -1,14 +1,18 @@
 import asyncio
 import os
 
-from aioresponses import aioresponses
+from datetime import datetime
+
 import asyncpg
 import pytest
 import pytest_asyncio
 
+from aioresponses import aioresponses
+from aiohttp.test_utils import TestClient, TestServer
 from minicli import run
 
 from udata_hydra import config
+from udata_hydra.app import app_factory
 import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra.utils.db import insert_check, update_check
 
@@ -78,11 +82,25 @@ async def patch_enqueue(mocker, event_loop):
     mocker.patch("udata_hydra.utils.queue.enqueue", _execute)
 
 
+@pytest_asyncio.fixture
+async def client():
+    app = await app_factory()
+    async with TestClient(TestServer(app)) as client:
+        yield client
+
+
 @pytest.fixture
 def catalog_content(is_harvested):
     filename = "catalog" if not is_harvested else "catalog_harvested"
     with open(f"tests/{filename}.csv", "rb") as cfile:
         return cfile.read()
+
+
+@pytest.fixture
+def clean_db():
+    run("drop_db")
+    run("migrate")
+    yield
 
 
 @pytest.fixture
@@ -163,3 +181,26 @@ async def fake_check(db):
 @pytest.fixture
 def udata_url():
     return f"{config.UDATA_URI}/datasets/{DATASET_ID}/resources/{RESOURCE_ID}/extras/"
+
+
+@pytest.fixture
+def udata_resource_payload():
+    return {
+        "resource_id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
+        "dataset_id": "61fd30cb29ea95c7bc0e1211",
+        "document": {
+            "id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
+            "url": "http://dev.local/",
+            "title": "random title",
+            "description": "random description",
+            "filetype": "file",
+            "type": "documentation",
+            "mime": "text/plain",
+            "filesize": 1024,
+            "checksum_type": "sha1",
+            "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
+            "created_at": datetime.now().isoformat(),
+            "modified": datetime.now().isoformat(),
+            "published": datetime.now().isoformat(),
+        }
+    }
