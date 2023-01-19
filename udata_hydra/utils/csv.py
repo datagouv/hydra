@@ -66,13 +66,15 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str):
     dialect = generate_dialect(inspection)
     columns = inspection["columns"]
     col_sql = [f"{k} {PYTHON_TYPE_TO_PG.get(c['python_type'], 'text')}" for k, c in columns.items()]
+    q = f"DROP TABLE IF EXISTS {table_name}"
+    db = await context.pool("csv")
+    await db.execute(q)
     q = f"""
-    CREATE TABLE IF NOT EXISTS {table_name} (
+    CREATE TABLE {table_name} (
         __id serial PRIMARY KEY,
         {", ".join(col_sql)}
     )
     """
-    db = await context.pool("csv")
     await db.execute(q)
     # also see copy_to_table for a file source
     with open(file_path, "r", encoding=inspection["encoding"]) as f:
