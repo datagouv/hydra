@@ -49,6 +49,8 @@ PYTHON_TYPE_TO_PY = {
 
 def generate_dialect(inspection: dict) -> csv.Dialect:
     class CustomDialect(csv.unix_dialect):
+        # TODO: it would be nice to have more info from csvdetective to feed the dialect
+        # in the meantime we might want to sniff the file a bit
         delimiter = inspection["separator"]
     return CustomDialect()
 
@@ -66,14 +68,14 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str):
     """Convert a csv file to database table using inspection data"""
     dialect = generate_dialect(inspection)
     columns = inspection["columns"]
+    # ["col_name float", "col_2_name bigint", "col_3_name text", ...]
     col_sql = [f"{k} {PYTHON_TYPE_TO_PG.get(c['python_type'], 'text')}" for k, c in columns.items()]
     q = f"DROP TABLE IF EXISTS {table_name}"
     db = await context.pool("csv")
     await db.execute(q)
     q = f"""
     CREATE TABLE {table_name} (
-        __id serial PRIMARY KEY,
-        {", ".join(col_sql)}
+        __id serial PRIMARY KEY, {", ".join(col_sql)}
     )
     """
     await db.execute(q)
@@ -82,6 +84,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str):
         # pop header row(s)
         for _ in range(inspection["header_row_idx"] + 1):
             f.readline()
+        # this is an iterator! noice.
         records = (
             [
                 smart_cast(t, v)
