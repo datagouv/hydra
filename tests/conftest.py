@@ -53,6 +53,7 @@ def setup():
         UDATA_URI_API_KEY="sup3rs3cr3t",
         TESTING=True,
         SLEEP_BETWEEN_BATCHES=0,
+        WEBHOOK_ENABLED=True,
     )
 
 

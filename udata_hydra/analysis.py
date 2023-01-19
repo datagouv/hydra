@@ -9,6 +9,7 @@ from typing import BinaryIO, Union
 import aiohttp
 import magic
 
+from csv_detective.explore_csv import routine as csv_detective_routine
 from dateutil.parser import parse as date_parser, ParserError
 
 from udata_hydra import config, context
@@ -75,9 +76,12 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     # if not, let's see if we can infer a modifification date from headers
     change_analysis = change_analysis or await detect_resource_change_from_headers(url) or {}
 
+    # could it be a CSV? If we get hints, we will download the file
+    is_csv = await detect_csv_from_headers(check)
+
     # if not, let's download the file to get some hints and other infos
     dl_analysis = {}
-    if not change_analysis:
+    if not change_analysis or is_csv:
         tmp_file = None
         try:
             tmp_file = await download_resource(url, headers)
@@ -96,7 +100,8 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             # TODO: this never seems to output text/csv, maybe override it later
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
-            if tmp_file:
+            # we keep the csv file for later analysis
+            if tmp_file and not is_csv:
                 os.remove(tmp_file.name)
             await update_check(check_id, {
                 "checksum": dl_analysis.get("analysis:checksum"),
@@ -108,7 +113,14 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     has_changed_over_time = await detect_has_changed_over_time(change_analysis, resource_id, check_id)
 
     analysis_results = {**dl_analysis, **change_analysis}
+    csv_analysis = {}
     if has_changed_over_time or (is_first_check and analysis_results):
+        if is_csv:
+            try:
+                csv_analysis = await perform_csv_analysis(tmp_file.name)
+                await update_check(check_id, {"csv_analysis": csv_analysis})
+            finally:
+                os.remove(tmp_file.name)
         queue.enqueue(
             send,
             dataset_id=dataset_id,
@@ -116,6 +128,21 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             document=analysis_results,
             _priority="high",
         )
+
+
+async def perform_csv_analysis(file_path):
+    """Launch csv-detective against given file"""
+    return csv_detective_routine(file_path)
+
+
+async def detect_csv_from_headers(check) -> bool:
+    """Determine if content-type header looks like a csv's one"""
+    headers = json.loads(check["headers"] or {})
+    return any([
+        headers.get("content-type", "").lower().startswith(ct) for ct in [
+            "application/csv", "text/plain", "text/csv"
+        ]
+    ])
 
 
 async def detect_has_changed_over_time(change_analysis, resource_id, check_id) -> bool:

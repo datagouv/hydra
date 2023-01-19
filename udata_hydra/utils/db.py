@@ -3,9 +3,19 @@ import json
 from udata_hydra import context
 
 
+def convert_dict_values_to_json(data: dict):
+    """
+    Convert values in dict that are dict to json for DB serialization
+    TODO: this is suboptimal from asyncpg, dig into this
+    """
+    for k, v in data.items():
+        if type(v) is dict:
+            data[k] = json.dumps(v)
+    return data
+
+
 async def insert_check(data: dict):
-    if "headers" in data:
-        data["headers"] = json.dumps(data["headers"])
+    data = convert_dict_values_to_json(data)
     columns = ",".join(data.keys())
     # $1, $2...
     placeholders = ",".join([f"${x + 1}" for x in range(len(data.values()))])
@@ -23,6 +33,7 @@ async def insert_check(data: dict):
 
 
 async def update_check(check_id: int, data: dict) -> int:
+    data = convert_dict_values_to_json(data)
     columns = data.keys()
     # $1, $2...
     placeholders = [f"${x + 1}" for x in range(len(data.values()))]
