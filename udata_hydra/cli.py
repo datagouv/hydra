@@ -17,6 +17,7 @@ from progressist import ProgressBar
 from udata_hydra import config
 from udata_hydra.crawl import check_url as crawl_check_url
 from udata_hydra.logger import setup_logging
+from udata_hydra.utils.csv import analyse_csv
 
 
 context = {}
@@ -104,6 +105,12 @@ async def check_resource(resource_id, method="get"):
         return
     async with aiohttp.ClientSession(timeout=None) as session:
         await crawl_check_url(res[0], session, method=method)
+
+
+@cli(name="analyse-csv")
+async def analyse_csv_cli(check_id: int):
+    """Trigger a csv analysis from a check_id"""
+    await analyse_csv(check_id)
 
 
 @cli

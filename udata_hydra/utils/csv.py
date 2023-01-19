@@ -1,8 +1,11 @@
+import csv
+import hashlib
 import json
 import os
 
 from csv_detective.explore_csv import routine as csv_detective_routine
 
+from udata_hydra import context
 from udata_hydra.utils.db import get_check, insert_csv_analysis
 from udata_hydra.utils.file import download_resource
 
@@ -25,13 +28,66 @@ async def analyse_csv(check_id: int):
             "check_id": check_id,
             "csv_detective": csv_inspection
         })
+        table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+        await csv_to_db(tmp_file.name, csv_inspection, table_name)
     finally:
         os.remove(tmp_file.name)
 
 
-async def csv_to_db(check_id: int):
-    """Convert a csv to database table from check result"""
-    pass
+PYTHON_TYPE_TO_PG = {
+    "string": "text",
+    "float": "float",
+    "int": "bigint",
+}
+
+PYTHON_TYPE_TO_PY = {
+    "string": str,
+    "float": float,
+    "int": int,
+}
+
+
+def generate_dialect(inspection: dict) -> csv.Dialect:
+    class CustomDialect(csv.unix_dialect):
+        delimiter = inspection["separator"]
+    return CustomDialect()
+
+
+def smart_cast(_type, value):
+    return PYTHON_TYPE_TO_PY[_type](value)
+    try:
+        return PYTHON_TYPE_TO_PY[_type](value)
+    except ValueError:
+        return value
+
+
+async def csv_to_db(file_path: str, inspection: dict, table_name: str):
+    """Convert a csv file to database table using inspection data"""
+    dialect = generate_dialect(inspection)
+    columns = inspection["columns"]
+    col_sql = [f"{k} {PYTHON_TYPE_TO_PG.get(c['python_type'], 'text')}" for k, c in columns.items()]
+    q = f"""
+    CREATE TABLE IF NOT EXISTS {table_name} (
+        __id serial PRIMARY KEY,
+        {", ".join(col_sql)}
+    )
+    """
+    db = await context.pool("csv")
+    await db.execute(q)
+    # also see copy_to_table for a file source
+    with open(file_path, "r", encoding=inspection["encoding"]) as f:
+        reader = csv.reader(f, dialect=dialect)
+        # pop header row(s)
+        for _ in range(inspection["header_row_idx"] + 1):
+            f.readline()
+        records = (
+            [
+                smart_cast(t, v)
+                for t, v in zip([c["python_type"] for c in columns.values()], line)
+            ]
+            for line in reader
+        )
+        await db.copy_records_to_table(table_name, records=records, columns=columns.keys())
 
 
 async def perform_csv_inspection(file_path):
