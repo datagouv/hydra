@@ -1,6 +1,7 @@
 import csv
 import hashlib
 import json
+import logging
 import os
 
 from csv_detective.explore_csv import routine as csv_detective_routine
@@ -8,6 +9,8 @@ from csv_detective.explore_csv import routine as csv_detective_routine
 from udata_hydra import context
 from udata_hydra.utils.db import get_check, insert_csv_analysis
 from udata_hydra.utils.file import download_resource
+
+log = logging.getLogger("udata-hydra")
 
 
 async def analyse_csv(check_id: int):
@@ -61,7 +64,8 @@ def smart_cast(_type, value, failsafe=False):
     except ValueError as e:
         if not failsafe:
             raise e
-        return value
+        log.warning(f'Could not convert "{value}" to {_type}, defaulting to null')
+        return None
 
 
 async def csv_to_db(file_path: str, inspection: dict, table_name: str):
@@ -69,12 +73,12 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str):
     dialect = generate_dialect(inspection)
     columns = inspection["columns"]
     # ["col_name float", "col_2_name bigint", "col_3_name text", ...]
-    col_sql = [f"{k} {PYTHON_TYPE_TO_PG.get(c['python_type'], 'text')}" for k, c in columns.items()]
-    q = f"DROP TABLE IF EXISTS {table_name}"
+    col_sql = [f'"{k}" {PYTHON_TYPE_TO_PG.get(c["python_type"], "text")}' for k, c in columns.items()]
+    q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
     await db.execute(q)
     q = f"""
-    CREATE TABLE {table_name} (
+    CREATE TABLE "{table_name}" (
         __id serial PRIMARY KEY, {", ".join(col_sql)}
     )
     """
@@ -87,7 +91,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str):
         # this is an iterator! noice.
         records = (
             [
-                smart_cast(t, v)
+                smart_cast(t, v, failsafe=True)
                 for t, v in zip([c["python_type"] for c in columns.values()], line)
             ]
             for line in reader
