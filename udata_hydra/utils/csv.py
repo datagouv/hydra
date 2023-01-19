@@ -1,27 +1,49 @@
-import csv
-from cchardet import UniversalDetector
+import json
+import os
+
+from csv_detective.explore_csv import routine as csv_detective_routine
+
+from udata_hydra.utils.db import get_check, insert_csv_analysis
+from udata_hydra.utils.file import download_resource
 
 
-def find_delimiter(filename, encoding="utf-8"):
-    """Find delimiter for eventual csv file"""
-    delimiter = None
-    sniffer = csv.Sniffer()
+async def analyse_csv(check_id: int):
+    """Launch csv analysis from a check"""
+    check = await get_check(check_id)
+
+    # ATM we (might) re-download the file, to avoid spaghetti code
+    # TODO: find a way to mutualize with main analysis
+    url = check["url"]
+    headers = json.loads(check["headers"] or "{}")
+    tmp_file = await download_resource(url, headers)
+
     try:
-        with open(filename, encoding=encoding) as fp:
-            delimiter = sniffer.sniff(fp.read(5000), delimiters=";,|\t").delimiter
-    # unknown encoding, utf-8 but not, sniffer failed
-    except (LookupError, UnicodeDecodeError, csv.Error):
-        pass
-    return delimiter
+        csv_inspection = await perform_csv_inspection(tmp_file.name)
+        await insert_csv_analysis({
+            "resource_id": check["resource_id"],
+            "url": check["url"],
+            "check_id": check_id,
+            "csv_detective": csv_inspection
+        })
+    finally:
+        os.remove(tmp_file.name)
 
 
-def detect_encoding(filename):
-    """Detects file encoding using cchardet"""
-    detector = UniversalDetector()
-    with open(filename, mode="rb") as f:
-        for line in f.readlines():
-            detector.feed(line)
-            if detector.done:
-                break
-    detector.close()
-    return detector.result.get("encoding")
+async def csv_to_db(check_id: int):
+    """Convert a csv to database table from check result"""
+    pass
+
+
+async def perform_csv_inspection(file_path):
+    """Launch csv-detective against given file"""
+    return csv_detective_routine(file_path)
+
+
+async def detect_csv_from_headers(check) -> bool:
+    """Determine if content-type header looks like a csv's one"""
+    headers = json.loads(check["headers"] or {})
+    return any([
+        headers.get("content-type", "").lower().startswith(ct) for ct in [
+            "application/csv", "text/plain", "text/csv"
+        ]
+    ])

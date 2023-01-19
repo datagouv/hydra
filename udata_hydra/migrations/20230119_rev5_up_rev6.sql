@@ -1,4 +1,11 @@
--- add a csv_analysis column on checks
+-- add a csv_analysis table
 
-ALTER TABLE checks
-ADD COLUMN csv_analysis JSONB;
+CREATE TABLE IF NOT EXISTS csv_analysis(
+    id serial PRIMARY KEY,
+    resource_id UUID,
+    url VARCHAR,
+    check_id int,
+    csv_detective JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    error VARCHAR
+);

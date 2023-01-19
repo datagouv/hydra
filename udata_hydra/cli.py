@@ -182,7 +182,7 @@ async def drop_db(tables=["checks", "catalog", "migrations"]):
 
 
 @cli
-async def migrate(revision=None):
+async def migrate(revision=None, direction="up"):
     """Migrate the database to _LATEST_REVISION or specified one"""
     migrations_dir = Path(__file__).parent / "migrations"
 
@@ -193,7 +193,8 @@ async def migrate(revision=None):
 
     backend = AsyncpgBackend(context["conn"])
     async with backend.connect() as conn:
-        planned = await plan(conn, backend, migrations_dir.resolve(), revision, Direction.up)
+        direction = getattr(Direction, direction)
+        planned = await plan(conn, backend, migrations_dir.resolve(), revision, direction)
         await execute(conn, backend, planned)
 
 

@@ -12,5 +12,5 @@ def enqueue(fn, *args, **kwargs):
         from udata_hydra.utils import queue
         queue.enqueue(fn, a, b=b, _priority="low")
     """
-    priority = kwargs.pop("_priority")
-    return context.queue(priority or "default").enqueue(fn, *args, **kwargs)
+    priority = kwargs.pop("_priority", "default")
+    return context.queue(priority).enqueue(fn, *args, **kwargs)

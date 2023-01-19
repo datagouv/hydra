@@ -1,52 +1,23 @@
 import json
 import logging
 import os
-import tempfile
 
 from datetime import datetime
-from typing import BinaryIO, Union
+from typing import Union
 
-import aiohttp
 import magic
 
-from csv_detective.explore_csv import routine as csv_detective_routine
 from dateutil.parser import parse as date_parser, ParserError
 
-from udata_hydra import config, context
+from udata_hydra import context
 from udata_hydra.utils import queue
+from udata_hydra.utils.csv import analyse_csv, detect_csv_from_headers
 from udata_hydra.utils.db import update_check, get_check
-from udata_hydra.utils.file import compute_checksum_from_file
+from udata_hydra.utils.file import compute_checksum_from_file, download_resource
 from udata_hydra.utils.http import send
 
 
 log = logging.getLogger("udata-hydra")
-
-
-async def download_resource(url: str, headers: dict) -> BinaryIO:
-    """
-    Attempts downloading a resource from a given url.
-    Returns the downloaded file object.
-    Raises IOError if the resource is too large.
-    """
-    tmp_file = tempfile.NamedTemporaryFile(delete=False)
-
-    if float(headers.get("content-length", -1)) > float(config.MAX_FILESIZE_ALLOWED):
-        raise IOError("File too large to download")
-
-    chunk_size = 1024
-    i = 0
-    async with aiohttp.ClientSession(headers={"user-agent": config.USER_AGENT}) as session:
-        async with session.get(url, allow_redirects=True) as response:
-            async for chunk in response.content.iter_chunked(chunk_size):
-                if i * chunk_size < float(config.MAX_FILESIZE_ALLOWED):
-                    tmp_file.write(chunk)
-                else:
-                    tmp_file.close()
-                    log.error(f"File {url} is too big, skipping")
-                    raise IOError("File too large to download")
-                i += 1
-    tmp_file.close()
-    return tmp_file
 
 
 async def process_resource(check_id: int, is_first_check: bool) -> None:
@@ -100,8 +71,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             # TODO: this never seems to output text/csv, maybe override it later
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
-            # we keep the csv file for later analysis
-            if tmp_file and not is_csv:
+            if tmp_file:
                 os.remove(tmp_file.name)
             await update_check(check_id, {
                 "checksum": dl_analysis.get("analysis:checksum"),
@@ -113,14 +83,9 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     has_changed_over_time = await detect_has_changed_over_time(change_analysis, resource_id, check_id)
 
     analysis_results = {**dl_analysis, **change_analysis}
-    csv_analysis = {}
     if has_changed_over_time or (is_first_check and analysis_results):
         if is_csv:
-            try:
-                csv_analysis = await perform_csv_analysis(tmp_file.name)
-                await update_check(check_id, {"csv_analysis": csv_analysis})
-            finally:
-                os.remove(tmp_file.name)
+            queue.enqueue(analyse_csv, check_id, _priority="low")
         queue.enqueue(
             send,
             dataset_id=dataset_id,
@@ -128,21 +93,6 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             document=analysis_results,
             _priority="high",
         )
-
-
-async def perform_csv_analysis(file_path):
-    """Launch csv-detective against given file"""
-    return csv_detective_routine(file_path)
-
-
-async def detect_csv_from_headers(check) -> bool:
-    """Determine if content-type header looks like a csv's one"""
-    headers = json.loads(check["headers"] or {})
-    return any([
-        headers.get("content-type", "").lower().startswith(ct) for ct in [
-            "application/csv", "text/plain", "text/csv"
-        ]
-    ])
 
 
 async def detect_has_changed_over_time(change_analysis, resource_id, check_id) -> bool:
