@@ -53,11 +53,12 @@ def generate_dialect(inspection: dict) -> csv.Dialect:
     return CustomDialect()
 
 
-def smart_cast(_type, value):
-    return PYTHON_TYPE_TO_PY[_type](value)
+def smart_cast(_type, value, failsafe=False):
     try:
         return PYTHON_TYPE_TO_PY[_type](value)
-    except ValueError:
+    except ValueError as e:
+        if not failsafe:
+            raise e
         return value
 
 
@@ -76,8 +77,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str):
     )
     """
     await db.execute(q)
-    # also see copy_to_table for a file source
-    with open(file_path, "r", encoding=inspection["encoding"]) as f:
+    with open(file_path, encoding=inspection["encoding"]) as f:
         reader = csv.reader(f, dialect=dialect)
         # pop header row(s)
         for _ in range(inspection["header_row_idx"] + 1):
@@ -89,6 +89,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str):
             ]
             for line in reader
         )
+        # NB: also see copy_to_table for a file source
         await db.copy_records_to_table(table_name, records=records, columns=columns.keys())
 
 
