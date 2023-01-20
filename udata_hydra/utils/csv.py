@@ -5,15 +5,17 @@ import logging
 import os
 
 from csv_detective.explore_csv import routine as csv_detective_routine
+from progressist import ProgressBar
 
 from udata_hydra import context
-from udata_hydra.utils.db import get_check, insert_csv_analysis
+from udata_hydra.utils.db import get_check, insert_csv_analysis, compute_insert_query
 from udata_hydra.utils.file import download_resource
+
 
 log = logging.getLogger("udata-hydra")
 
 
-async def analyse_csv(check_id: int):
+async def analyse_csv(check_id: int, optimized=True):
     """Launch csv analysis from a check"""
     check = await get_check(check_id)
 
@@ -32,7 +34,7 @@ async def analyse_csv(check_id: int):
             "csv_detective": csv_inspection
         })
         table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
-        await csv_to_db(tmp_file.name, csv_inspection, table_name)
+        await csv_to_db(tmp_file.name, csv_inspection, table_name, optimized=optimized)
     finally:
         os.remove(tmp_file.name)
 
@@ -41,12 +43,14 @@ PYTHON_TYPE_TO_PG = {
     "string": "text",
     "float": "float",
     "int": "bigint",
+    "bool": "bool",
 }
 
 PYTHON_TYPE_TO_PY = {
     "string": str,
     "float": float,
     "int": int,
+    "bool": bool,
 }
 
 
@@ -68,11 +72,15 @@ def smart_cast(_type, value, failsafe=False):
         return None
 
 
-async def csv_to_db(file_path: str, inspection: dict, table_name: str):
-    """Convert a csv file to database table using inspection data"""
+async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized=True):
+    """
+    Convert a csv file to database table using inspection data
+
+    :optimized: use postgres COPY if True, else insert record one by one
+    """
     dialect = generate_dialect(inspection)
     columns = inspection["columns"]
-    # ["col_name float", "col_2_name bigint", "col_3_name text", ...]
+    # ['"col_name" float', '"col_2_name" bigint', '"col_3_name" text', ...]
     col_sql = [f'"{k}" {PYTHON_TYPE_TO_PG.get(c["python_type"], "text")}' for k, c in columns.items()]
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
@@ -94,10 +102,19 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str):
                 smart_cast(t, v, failsafe=True)
                 for t, v in zip([c["python_type"] for c in columns.values()], line)
             ]
-            for line in reader
+            for line in reader if line
         )
-        # NB: also see copy_to_table for a file source
-        await db.copy_records_to_table(table_name, records=records, columns=columns.keys())
+        # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
+        if optimized:
+            # NB: also see copy_to_table for a file source
+            await db.copy_records_to_table(table_name, records=records, columns=columns.keys())
+        # this inserts rows from iterator one by one, slow but useful for debugging
+        else:
+            bar = ProgressBar(total=inspection["total_lines"])
+            for r in bar.iter(records):
+                data = {k: v for k, v in zip(columns.keys(), r)}
+                q = compute_insert_query(data, table_name, returning="__id")
+                await db.execute(q, *data.values())
 
 
 async def perform_csv_inspection(file_path):

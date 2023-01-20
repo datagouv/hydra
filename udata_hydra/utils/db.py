@@ -14,14 +14,14 @@ def convert_dict_values_to_json(data: dict) -> dict:
     return data
 
 
-def compute_insert_query(data: dict, table: str) -> str:
-    columns = ",".join(data.keys())
+def compute_insert_query(data: dict, table: str, returning: str = "id") -> str:
+    columns = ",".join([f'"{k}"' for k in data.keys()])
     # $1, $2...
     placeholders = ",".join([f"${x + 1}" for x in range(len(data.values()))])
     return f"""
-        INSERT INTO {table} ({columns})
+        INSERT INTO "{table}" ({columns})
         VALUES ({placeholders})
-        RETURNING id
+        RETURNING {returning}
     """
 
 
