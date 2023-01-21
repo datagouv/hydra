@@ -4,6 +4,7 @@ import json
 import logging
 import os
 
+from datetime import datetime
 from typing import Any
 
 from csv_detective.explore_csv import routine as csv_detective_routine
@@ -11,7 +12,7 @@ from progressist import ProgressBar
 from str2float import str2float
 
 from udata_hydra import context
-from udata_hydra.utils.db import get_check, insert_csv_analysis, compute_insert_query
+from udata_hydra.utils.db import get_check, insert_csv_analysis, compute_insert_query, update_csv_analysis
 from udata_hydra.utils.file import download_resource
 
 
@@ -45,7 +46,7 @@ async def analyse_csv(check_id: int = None, url: str = None, optimized: bool = T
 
     try:
         csv_inspection = await perform_csv_inspection(tmp_file.name)
-        await insert_csv_analysis({
+        ca_id = await insert_csv_analysis({
             "resource_id": check.get("resource_id"),
             "url": url,
             "check_id": check_id,
@@ -53,6 +54,10 @@ async def analyse_csv(check_id: int = None, url: str = None, optimized: bool = T
         })
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         await csv_to_db(tmp_file.name, csv_inspection, table_name, optimized=optimized)
+        await update_csv_analysis(ca_id, {
+            "parsing_table": table_name,
+            "parsing_date": datetime.utcnow(),
+        })
     finally:
         os.remove(tmp_file.name)
 

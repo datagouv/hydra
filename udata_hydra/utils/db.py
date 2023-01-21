@@ -37,21 +37,32 @@ async def insert_check(data: dict) -> int:
     return last_check["id"]
 
 
-async def update_check(check_id: int, data: dict) -> int:
-    data = convert_dict_values_to_json(data)
+def compute_update_query(table: str, data: dict):
     columns = data.keys()
     # $1, $2...
     placeholders = [f"${x + 1}" for x in range(len(data.values()))]
     set_clause = ",".join([f"{c} = {v}" for c, v in zip(columns, placeholders)])
-    q = f"""
-        UPDATE checks
+    return f"""
+        UPDATE "{table}"
         SET {set_clause}
         WHERE id = ${len(placeholders) + 1}
     """
+
+
+async def update_table_record(table: str, record_id: int, data: dict) -> int:
+    data = convert_dict_values_to_json(data)
+    q = compute_update_query(table, data)
     pool = await context.pool()
-    async with pool.acquire() as connection:
-        await connection.execute(q, *data.values(), check_id)
-    return check_id
+    await pool.execute(q, *data.values(), record_id)
+    return record_id
+
+
+async def update_check(check_id: int, data: dict) -> int:
+    return await update_table_record("checks", check_id, data)
+
+
+async def update_csv_analysis(csv_analysis_id: int, data: dict) -> int:
+    return await update_table_record("csv_analysis", csv_analysis_id, data)
 
 
 async def get_check(check_id):
