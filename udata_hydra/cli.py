@@ -183,9 +183,14 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
 
 
 @cli
-async def drop_db(tables=["checks", "catalog", "migrations"]):
+async def drop_db():
+    tables = await context["conn"].fetch("""
+        SELECT tablename FROM pg_catalog.pg_tables
+        WHERE schemaname != 'information_schema' AND
+        schemaname != 'pg_catalog';
+    """)
     for table in tables:
-        await context["conn"].execute(f"DROP TABLE IF EXISTS {table}")
+        await context["conn"].execute(f'DROP TABLE "{table["tablename"]}"')
 
 
 @cli

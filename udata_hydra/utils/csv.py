@@ -102,6 +102,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized
     """
     # FIXME: beware sql injections!
     # I'm not sure we can do anything but sanitizing (slugify?) the columns names and keep a mapping somewhere.
+    # also look at https://github.com/allisson/asyncpg-utils/blob/master/examples/table_manager.py
     await db.execute(q)
     with open(file_path, encoding=inspection["encoding"]) as f:
         reader = csv.reader(f, dialect=dialect)

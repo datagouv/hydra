@@ -49,6 +49,8 @@ def is_harvested(request):
 def setup():
     config.override(
         DATABASE_URL=DATABASE_URL,
+        # use same database for tests
+        DATABASE_URL_CSV=DATABASE_URL,
         UDATA_URI="https://udata.example.com",
         UDATA_URI_API_KEY="sup3rs3cr3t",
         TESTING=True,
