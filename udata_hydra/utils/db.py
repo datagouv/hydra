@@ -7,6 +7,7 @@ def convert_dict_values_to_json(data: dict) -> dict:
     """
     Convert values in dict that are dict to json for DB serialization
     TODO: this is suboptimal from asyncpg, dig into this
+    https://magicstack.github.io/asyncpg/current/usage.html#example-automatic-json-conversion
     """
     for k, v in data.items():
         if type(v) is dict:

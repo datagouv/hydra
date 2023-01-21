@@ -108,9 +108,9 @@ async def check_resource(resource_id, method="get"):
 
 
 @cli(name="analyse-csv")
-async def analyse_csv_cli(check_id: int, disable_optimization=False):
-    """Trigger a csv analysis from a check_id"""
-    await analyse_csv(check_id, optimized=(not disable_optimization))
+async def analyse_csv_cli(check_id: int = None, url: str = None, disable_optimization=False):
+    """Trigger a csv analysis from a check_id or an url"""
+    await analyse_csv(check_id=check_id, url=url, optimized=(not disable_optimization))
 
 
 @cli

@@ -1314,6 +1314,18 @@ files = [
 ]
 
 [[package]]
+name = "str2float"
+version = "0.0.9"
+description = "Convert float string (decimal point or decimal comma) to float"
+category = "main"
+optional = false
+python-versions = ">=3.0"
+files = [
+    {file = "str2float-0.0.9-py3-none-any.whl", hash = "sha256:6aa194116dc8c995e6740e3bd01b804fe1d1e9e3dbb11deb921d9b9cdb973eb1"},
+    {file = "str2float-0.0.9.tar.gz", hash = "sha256:097eee4adbbd101e45feb2675caebf995fa783d1d4c4f01e912ed2f79f050d7e"},
+]
+
+[[package]]
 name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
@@ -1472,4 +1484,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "9f09167233f07b2a2202544df2483ececae0ae3aa85fa2fb5b57b8cae5717e4e"
+content-hash = "ce824af692fcbf89ecc6251af7ce2e5155e08dea0fe5e3ebf6e4f4eacb58d2e0"
