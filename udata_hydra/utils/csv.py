@@ -9,6 +9,7 @@ from typing import Any
 
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
+from str2bool import str2bool
 from str2float import str2float
 
 from udata_hydra import context
@@ -72,6 +73,8 @@ def generate_dialect(inspection: dict) -> csv.Dialect:
 
 def smart_cast(_type, value, failsafe=False) -> Any:
     try:
+        if _type == "bool":
+            return str2bool(value)
         return PYTHON_TYPE_TO_PY[_type](value)
     except ValueError as e:
         if not failsafe:

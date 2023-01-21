@@ -2,7 +2,9 @@ import hashlib
 import json
 import pytest
 
-from udata_hydra.utils.csv import analyse_csv
+from tempfile import NamedTemporaryFile
+
+from udata_hydra.utils.csv import analyse_csv, csv_to_db
 
 from .conftest import RESOURCE_ID
 
@@ -41,3 +43,42 @@ async def test_analyse_csv_real_files(rmock, db, params, clean_db):
     await analyse_csv(url=url)
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
+
+
+# TODO: parametrize line
+async def test_csv_to_db_type_casting(db, clean_db):
+    with NamedTemporaryFile() as fp:
+        fp.write(b"""int, float, string, bool
+1,1 020.20,test,true
+2,"1 020,20",test,false
+""")
+        fp.seek(0)
+        inspection = {
+            "separator": ",",
+            "encoding": "utf-8",
+            "header_row_idx": 0,
+            "total_lines": 1,
+            "columns": {
+                "int": {"python_type": "int"},
+                "float": {"python_type": "float"},
+                "string": {"python_type": "string"},
+                "bool": {"python_type": "bool"},
+            }
+        }
+        await csv_to_db(fp.name, inspection, "test_table")
+        res = list(await db.fetch("SELECT * FROM test_table"))
+        assert len(res) == 2
+        assert dict(res[0]) == {
+            "__id": 1,
+            "int": 1,
+            "float": 1020.2,
+            "string": "test",
+            "bool": True,
+        }
+        assert dict(res[1]) == {
+            "__id": 2,
+            "int": 2,
+            "float": 1020.2,
+            "string": "test",
+            "bool": False,
+        }

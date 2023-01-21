@@ -1314,6 +1314,17 @@ files = [
 ]
 
 [[package]]
+name = "str2bool"
+version = "1.1"
+description = "Convert string to boolean"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "str2bool-1.1.zip", hash = "sha256:dbc3c917dca831904bce8568f6fb1f91435fcffc2ec4a46d62c9aa08d7cf77c3"},
+]
+
+[[package]]
 name = "str2float"
 version = "0.0.9"
 description = "Convert float string (decimal point or decimal comma) to float"
@@ -1484,4 +1495,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "ce824af692fcbf89ecc6251af7ce2e5155e08dea0fe5e3ebf6e4f4eacb58d2e0"
+content-hash = "a4106448abe55065d23bab3c899ec28a44c64a436084a37802e5247a6fe496c4"
