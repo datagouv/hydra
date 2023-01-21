@@ -95,7 +95,7 @@ async def client():
 @pytest.fixture
 def catalog_content(is_harvested):
     filename = "catalog" if not is_harvested else "catalog_harvested"
-    with open(f"tests/{filename}.csv", "rb") as cfile:
+    with open(f"tests/data/{filename}.csv", "rb") as cfile:
         return cfile.read()
 
 

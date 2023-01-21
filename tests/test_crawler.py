@@ -57,7 +57,7 @@ async def test_catalog(setup_catalog, db):
 async def test_catalog_deleted(setup_catalog, db, rmock):
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE")
     assert len(res) == 1
-    with open("tests/catalog.csv", "rb") as cfile:
+    with open("tests/data/catalog.csv", "rb") as cfile:
         catalog_content = cfile.readlines()
     catalog = "https://example.com/catalog"
     # feed empty catalog, should delete the previously loaded resource
@@ -79,7 +79,7 @@ async def test_catalog_deleted_with_checked_resource(setup_catalog, db, rmock, e
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE and last_check IS NOT NULL")
     assert len(res) == 1
 
-    with open("tests/catalog.csv", "rb") as cfile:
+    with open("tests/data/catalog.csv", "rb") as cfile:
         catalog_content = cfile.readlines()
     catalog = "https://example.com/catalog"
     # feed empty catalog, should delete the previously loaded resource
@@ -93,7 +93,7 @@ async def test_catalog_deleted_with_checked_resource(setup_catalog, db, rmock, e
 
 async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop, mocker, analysis_mock):
     # load a new catalog with a new URL for this resource
-    with open("tests/catalog.csv", "r") as cfile:
+    with open("tests/data/catalog.csv", "r") as cfile:
         catalog_content = cfile.readlines()
     catalog_content[-1] = catalog_content[-1].replace("resource-1", "resource-2")
     catalog_content = "\n".join(catalog_content)
