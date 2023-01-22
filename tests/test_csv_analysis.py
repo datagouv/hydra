@@ -45,13 +45,14 @@ async def test_analyse_csv_real_files(rmock, db, params, clean_db):
     assert count["count"] == expected_count
 
 
-# TODO: parametrize line
-async def test_csv_to_db_type_casting(db, clean_db):
+@pytest.mark.parametrize("line_expected", (
+    ("1,1 020.20,test,true", (1, 1, 1020.2, "test", True)),
+    ('2,"1 020,20",test,false', (1, 2, 1020.2, "test", False)),
+))
+async def test_csv_to_db_type_casting(db, line_expected, clean_db):
+    line, expected = line_expected
     with NamedTemporaryFile() as fp:
-        fp.write(b"""int, float, string, bool
-1,1 020.20,test,true
-2,"1 020,20",test,false
-""")
+        fp.write(f"int, float, string, bool\n\r{line}".encode("utf-8"))
         fp.seek(0)
         inspection = {
             "separator": ",",
@@ -66,19 +67,7 @@ async def test_csv_to_db_type_casting(db, clean_db):
             }
         }
         await csv_to_db(fp.name, inspection, "test_table")
-        res = list(await db.fetch("SELECT * FROM test_table"))
-        assert len(res) == 2
-        assert dict(res[0]) == {
-            "__id": 1,
-            "int": 1,
-            "float": 1020.2,
-            "string": "test",
-            "bool": True,
-        }
-        assert dict(res[1]) == {
-            "__id": 2,
-            "int": 2,
-            "float": 1020.2,
-            "string": "test",
-            "bool": False,
-        }
+    res = list(await db.fetch("SELECT * FROM test_table"))
+    assert len(res) == 1
+    cols = ["__id", "int", "float", "string", "bool"]
+    assert dict(res[0]) == {k: v for k, v in zip(cols, expected)}
