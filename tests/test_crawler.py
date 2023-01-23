@@ -501,3 +501,22 @@ async def test_crawl_triggered_by_udata_entrypoint_existing_catalog(
     assert ("HEAD", URL(rurl)) in rmock.requests
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 2
+
+
+async def test_crawl_triggers_csv_analysis(rmock, event_loop, db, produce_mock, setup_catalog):
+    """Crawl a CSV file, analyse and apify it, downloads only once"""
+    rurl = "https://example.com/resource-1"
+    # mock for check
+    rmock.head(rurl, status=200, headers={"content-length": "1", "content-type": "application/csv"})
+    # mock for analysis download
+    rmock.get(rurl, status=200, headers={"content-type": "application/csv"}, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+    event_loop.run_until_complete(crawl(iterations=1))
+    # GET called only once: HEAD is ok (no need for crawl) and analysis steps share the downloaded file
+    assert len(rmock.requests[("GET", URL(rurl))]) == 1
+    res = await db.fetch("SELECT * FROM checks")
+    assert len(res) == 1
+    res = await db.fetch("SELECT * FROM csv_analysis")
+    assert len(res) == 1
+    assert res[0]["parsing_table"] is not None
+    res = await db.fetch(f'SELECT * FROM "{res[0]["parsing_table"]}"')
+    assert len(res) == 2

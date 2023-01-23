@@ -38,16 +38,14 @@ PYTHON_TYPE_TO_PY = {
 }
 
 
-async def analyse_csv(check_id: int = None, url: str = None, optimized: bool = True) -> None:
-    """Launch csv analysis from a check or an URL"""
+async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, optimized: bool = True) -> None:
+    """Launch csv analysis from a check or an URL (debug), using previsous downloade file at file_path if any"""
     assert any([_ is not None for _ in (check_id, url)])
     check = await get_check(check_id) if check_id is not None else {}
     url = check.get("url") or url
 
-    # ATM we (might) re-download the file, to avoid spaghetti code
-    # TODO: find a way to mutualize with main analysis
     headers = json.loads(check.get("headers") or "{}")
-    tmp_file = await download_resource(url, headers)
+    tmp_file = open(file_path, "rb") if file_path else await download_resource(url, headers)
 
     try:
         csv_inspection = await perform_csv_inspection(tmp_file.name)
@@ -64,6 +62,7 @@ async def analyse_csv(check_id: int = None, url: str = None, optimized: bool = T
             "parsing_date": datetime.utcnow(),
         })
     finally:
+        tmp_file.close()
         os.remove(tmp_file.name)
 
 

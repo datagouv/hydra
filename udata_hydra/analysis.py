@@ -27,6 +27,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     - size (optionnal)
     - mime_type (optionnal)
     - checksum (optionnal)
+    - launch csv_analysis if looks like a CSV respone
 
     Will call udata if first check or changes found, and update check with optionnal infos
     """
@@ -71,7 +72,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             # TODO: this never seems to output text/csv, maybe override it later
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
-            if tmp_file:
+            if tmp_file and not is_csv:
                 os.remove(tmp_file.name)
             await update_check(check_id, {
                 "checksum": dl_analysis.get("analysis:checksum"),
@@ -85,7 +86,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     analysis_results = {**dl_analysis, **change_analysis}
     if has_changed_over_time or (is_first_check and analysis_results):
         if is_csv:
-            queue.enqueue(analyse_csv, check_id, _priority="low")
+            queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="low")
         queue.enqueue(
             send,
             dataset_id=dataset_id,
