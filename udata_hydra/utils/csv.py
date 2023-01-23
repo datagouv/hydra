@@ -39,7 +39,7 @@ PYTHON_TYPE_TO_PY = {
 
 
 async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, optimized: bool = True) -> None:
-    """Launch csv analysis from a check or an URL (debug), using previsous downloade file at file_path if any"""
+    """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
     assert any([_ is not None for _ in (check_id, url)])
     check = await get_check(check_id) if check_id is not None else {}
     url = check.get("url") or url
