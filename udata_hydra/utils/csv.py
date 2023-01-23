@@ -9,6 +9,10 @@ from typing import Any
 
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
+from sqlalchemy import MetaData
+from sqlalchemy import Table, Column, Integer, String, Float, Boolean
+from sqlalchemy.dialects.postgresql import asyncpg
+from sqlalchemy.schema import CreateTable
 from str2bool import str2bool
 from str2float import str2float
 
@@ -20,10 +24,10 @@ from udata_hydra.utils.file import download_resource
 log = logging.getLogger("udata-hydra")
 
 PYTHON_TYPE_TO_PG = {
-    "string": "text",
-    "float": "float",
-    "int": "bigint",
-    "bool": "bool",
+    "string": String,
+    "float": Float,
+    "int": Integer,
+    "bool": Boolean,
 }
 
 PYTHON_TYPE_TO_PY = {
@@ -85,6 +89,16 @@ def smart_cast(_type, value, failsafe=False) -> Any:
         return None
 
 
+def compute_create_table_query(table_name, columns):
+    """Use sqlalchemy to build a CREATE TABLE statement that should not be vulnerable to injections"""
+    metadata = MetaData()
+    table = Table(table_name, metadata, Column("__id", Integer, primary_key=True))
+    for col_name, col_info in columns.items():
+        table.append_column(Column(col_name, PYTHON_TYPE_TO_PG.get(col_info["python_type"], String)))
+    compiled = CreateTable(table).compile(dialect=asyncpg.dialect())
+    return compiled.string
+
+
 async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized=True):
     """
     Convert a csv file to database table using inspection data
@@ -93,19 +107,10 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized
     """
     dialect = generate_dialect(inspection)
     columns = inspection["columns"]
-    # ['"col_name" float', '"col_2_name" bigint', '"col_3_name" text', ...]
-    col_sql = [f'"{k}" {PYTHON_TYPE_TO_PG.get(c["python_type"], "text")}' for k, c in columns.items()]
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
     await db.execute(q)
-    q = f"""
-    CREATE TABLE "{table_name}" (
-        __id serial PRIMARY KEY, {", ".join(col_sql)}
-    )
-    """
-    # FIXME: beware sql injections!
-    # I'm not sure we can do anything but sanitizing (slugify?) the columns names and keep a mapping somewhere.
-    # also look at https://github.com/allisson/asyncpg-utils/blob/master/examples/table_manager.py
+    q = compute_create_table_query(table_name, columns)
     await db.execute(q)
     with open(file_path, encoding=inspection["encoding"]) as f:
         reader = csv.reader(f, dialect=dialect)

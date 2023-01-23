@@ -73,3 +73,23 @@ async def test_csv_to_db_type_casting(db, line_expected, clean_db):
     assert len(res) == 1
     cols = ["__id", "int", "float", "string", "bool"]
     assert dict(res[0]) == {k: v for k, v in zip(cols, expected)}
+
+
+async def test_basic_sql_injection(db, clean_db):
+    injection = 'col_name text"); --'
+    with NamedTemporaryFile() as fp:
+        fp.write(f"int, {injection}\n\r1,test".encode("utf-8"))
+        fp.seek(0)
+        inspection = {
+            "separator": ",",
+            "encoding": "utf-8",
+            "header_row_idx": 0,
+            "total_lines": 1,
+            "columns": {
+                "int": {"python_type": "int"},
+                injection: {"python_type": "string"},
+            }
+        }
+        await csv_to_db(fp.name, inspection, "test_table")
+    res = await db.fetchrow("SELECT * FROM test_table")
+    assert res[injection] == "test"
