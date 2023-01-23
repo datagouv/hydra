@@ -104,6 +104,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized
 
     :optimized: use postgres COPY if True, else insert record one by one
     """
+    log.debug(f"Converting from CSV to db for {table_name}")
     dialect = generate_dialect(inspection)
     columns = inspection["columns"]
     q = f'DROP TABLE IF EXISTS "{table_name}"'
@@ -151,3 +152,8 @@ async def detect_csv_from_headers(check) -> bool:
             "application/csv", "text/plain", "text/csv"
         ]
     ])
+
+
+async def delete_table(table_name: str):
+    db = await context.pool("csv")
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')

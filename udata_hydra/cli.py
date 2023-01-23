@@ -17,7 +17,7 @@ from progressist import ProgressBar
 from udata_hydra import config
 from udata_hydra.crawl import check_url as crawl_check_url
 from udata_hydra.logger import setup_logging
-from udata_hydra.utils.csv import analyse_csv
+from udata_hydra.utils.csv import analyse_csv, delete_table
 
 
 context = {}
@@ -41,7 +41,7 @@ async def load_catalog(url=None, drop=False):
         url = config.CATALOG_URL
 
     if drop:
-        await drop_db(["catalog", "checks", "migrations"])
+        await drop_db()
         await migrate()
 
     try:
@@ -223,6 +223,27 @@ async def purge_checks(limit=2):
         )
         """
         await context["conn"].execute(q, resource_id, limit)
+
+
+@cli
+async def purge_csv_tables():
+    """Delete converted CSV tables for resources no longer in catalog"""
+    q = """
+        SELECT parsing_table FROM csv_analysis
+        WHERE parsing_table IN (SELECT md5(url) FROM catalog WHERE deleted = TRUE)
+    """
+    res = await context["conn"].fetch(q)
+    for c, r in enumerate(res):
+        table = r["parsing_table"]
+        log.debug(f"Deleting table {table}")
+        await delete_table(table)
+        await context["conn"].execute(
+            "UPDATE csv_analysis SET parsing_table = NULL WHERE parsing_table = $1", table
+        )
+    if len(res):
+        log.info(f"Deleted {c + 1} table(s).")
+    else:
+        log.info("Nothing to delete.")
 
 
 @wrap
