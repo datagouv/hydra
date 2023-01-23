@@ -85,7 +85,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     analysis_results = {**dl_analysis, **change_analysis}
     if has_changed_over_time or (is_first_check and analysis_results):
-        if is_csv:
+        if is_csv and tmp_file:
             queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="low")
         queue.enqueue(
             send,

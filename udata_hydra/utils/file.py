@@ -42,7 +42,7 @@ async def download_resource(url: str, headers: dict) -> BinaryIO:
                     tmp_file.write(chunk)
                 else:
                     tmp_file.close()
-                    log.error(f"File {url} is too big, skipping")
+                    log.warning(f"File {url} is too big, skipping")
                     raise IOError("File too large to download")
                 i += 1
     tmp_file.close()

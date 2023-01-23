@@ -266,7 +266,7 @@ async def check_url(row, session, sleep=0, method="head"):
                 "status": getattr(e, "status", None),
             }
         )
-        log.error(f"Crawling error for url {row['url']}", exc_info=e)
+        log.warning(f"Crawling error for url {row['url']}", exc_info=e)
         return STATUS_ERROR
 
 
