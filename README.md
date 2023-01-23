@@ -4,6 +4,11 @@
 
 URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _PostgreSQL_ database.
 
+Since it's called _hydra_, it also has mythical powers embeded:
+- analyse remote resource metadata over time to detect changes in the smartest way possible
+- if the remote resource is a CSV, convert it to a PostgreSQL table, ready for APIfication
+- send crawl and analysis to a udata instance
+
 ## CLI
 
 ### Create database structure
@@ -40,6 +45,10 @@ A job queuing system is used to process long-running tasks. Launch the worker wi
 Monitor worker status:
 
 `poetry run rq info -c udata_hydra.worker --interval 1`
+
+## CSV conversion to database
+
+Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
 
 ## API
 
@@ -241,7 +250,7 @@ The payload should look something like:
 ### docker-compose
 
 Multiple docker-compose files are provided:
-- a minimal `docker-compose.yml` with PostgreSQL
+- a minimal `docker-compose.yml` with two PostgreSQL containers (one for catalog and metadata, the other for converted CSV to database)
 - `docker-compose.broker.yml` adds a Redis broker
 - `docker-compose.test.yml` launches a test DB, needed to run tests
 
