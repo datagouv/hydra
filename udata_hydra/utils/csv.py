@@ -11,7 +11,7 @@ from typing import Any
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
 from sqlalchemy import MetaData
-from sqlalchemy import Table, Column, Integer, String, Float, Boolean
+from sqlalchemy import Table, Column, BigInteger, String, Float, Boolean, Integer
 from sqlalchemy.dialects.postgresql import asyncpg
 from sqlalchemy.schema import CreateTable
 from str2bool import str2bool
@@ -37,7 +37,7 @@ while True:
 PYTHON_TYPE_TO_PG = {
     "string": String,
     "float": Float,
-    "int": Integer,
+    "int": BigInteger,
     "bool": Boolean,
 }
 
