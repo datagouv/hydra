@@ -77,8 +77,8 @@ async def test_csv_to_db_type_casting(db, line_expected, clean_db):
 
 async def test_basic_sql_injection(db, clean_db):
     # tries to execute
-    # CREATE TABLE table_name("int" integer, "col_name text");DROP TABLE toto;--)
-    injection = 'col_name text");DROP TABLE toto;--'
+    # CREATE TABLE table_name("int" integer, "col_name" text);DROP TABLE toto;--)
+    injection = 'col_name" text);DROP TABLE toto;--'
     with NamedTemporaryFile() as fp:
         fp.write(f"int, {injection}\n\r1,test".encode("utf-8"))
         fp.seek(0)
