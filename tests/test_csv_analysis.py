@@ -95,3 +95,22 @@ async def test_basic_sql_injection(db, clean_db):
         await csv_to_db(fp.name, inspection, "test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res[injection] == "test"
+
+
+async def test_percentage_column(db, clean_db):
+    with NamedTemporaryFile() as fp:
+        fp.write("int, % mon pourcent\n\r1,test".encode("utf-8"))
+        fp.seek(0)
+        inspection = {
+            "separator": ",",
+            "encoding": "utf-8",
+            "header_row_idx": 0,
+            "total_lines": 1,
+            "columns": {
+                "int": {"python_type": "int"},
+                "% mon pourcent": {"python_type": "string"},
+            }
+        }
+        await csv_to_db(fp.name, inspection, "test_table")
+    res = await db.fetchrow("SELECT * FROM test_table")
+    assert res["% mon pourcent"] == "test"
