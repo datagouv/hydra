@@ -129,6 +129,9 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized
     log.debug(f"Converting from CSV to db for {table_name}")
     dialect = generate_dialect(inspection)
     columns = inspection["columns"]
+    # explicitely rename reserved column names
+    RESERVED_COLS = ("tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
+    columns = {f"{c}__hydra_renamed" if c in RESERVED_COLS else c: v for c, v in columns.items()}
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
     await db.execute(q)

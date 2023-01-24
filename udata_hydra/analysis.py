@@ -69,7 +69,6 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
                 await detect_resource_change_from_checksum(resource_id, dl_analysis["analysis:checksum"])
                 or {}
             )
-            # TODO: this never seems to output text/csv, maybe override it later
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
             if tmp_file and not is_csv:
@@ -86,7 +85,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     analysis_results = {**dl_analysis, **change_analysis}
     if has_changed_over_time or (is_first_check and analysis_results):
         if is_csv and tmp_file:
-            queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="low")
+            queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="default")
         queue.enqueue(
             send,
             dataset_id=dataset_id,
