@@ -46,10 +46,12 @@ async def test_analyse_csv_real_files(rmock, db, params, clean_db):
 
 
 @pytest.mark.parametrize("line_expected", (
+    # (int, float, string, bool), (__id, int, float, string, bool)
     ("1,1 020.20,test,true", (1, 1, 1020.2, "test", True), ","),
     ('2,"1 020,20",test,false', (1, 2, 1020.2, "test", False), ","),
     ("1;1 020.20;test;true", (1, 1, 1020.2, "test", True), ";"),
     ("2;1 020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
+    ("2.0;1 020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
 ))
 async def test_csv_to_db_type_casting(db, line_expected, clean_db):
     line, expected, separator = line_expected

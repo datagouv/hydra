@@ -95,10 +95,14 @@ def smart_cast(_type, value, failsafe=False) -> Any:
             return str2bool(value)
         return PYTHON_TYPE_TO_PY[_type](value)
     except ValueError as e:
+        if _type == "int":
+            _value = str2float(value, default=None)
+            if _value:
+                return int(_value)
+        elif _type == "float":
+            return str2float(value, default=None)
         if not failsafe:
             raise e
-        if _type == "float":
-            return str2float(value, default=None)
         log.warning(f'Could not convert "{value}" to {_type}, defaulting to null')
         return None
 
