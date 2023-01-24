@@ -103,14 +103,17 @@ def smart_cast(_type, value, failsafe=False) -> Any:
         return None
 
 
-def compute_create_table_query(table_name, columns):
+def compute_create_table_query(table_name: str, columns: list) -> str:
     """Use sqlalchemy to build a CREATE TABLE statement that should not be vulnerable to injections"""
     metadata = MetaData()
     table = Table(table_name, metadata, Column("__id", Integer, primary_key=True))
     for col_name, col_info in columns.items():
         table.append_column(Column(col_name, PYTHON_TYPE_TO_PG.get(col_info["python_type"], String)))
     compiled = CreateTable(table).compile(dialect=asyncpg.dialect())
-    return compiled.string
+    # compiled query will want to write "%% mon pourcent" VARCHAR but will fail when querying "% mon pourcent"
+    # also, "% mon pourcent" works well in pg as a column
+    # TODO: dirty hack, maybe find an alternative
+    return compiled.string.replace("%%", "%")
 
 
 async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized=True):
