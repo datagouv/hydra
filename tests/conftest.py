@@ -69,6 +69,8 @@ async def mock_pool(mocker, event_loop):
     m = mocker.patch("udata_hydra.context.pool")
     pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50, loop=event_loop)
     m.return_value = pool
+    yield
+    await pool.close()
 
 
 @pytest_asyncio.fixture(autouse=True)
