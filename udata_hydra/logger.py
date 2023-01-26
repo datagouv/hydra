@@ -32,4 +32,5 @@ def setup_logging():
 
 def stop_sentry():
     """Stop sentry collection programatically"""
-    sentry_sdk.Hub.current.client.close()
+    if sentry_sdk.Hub.current.client:
+        sentry_sdk.Hub.current.client.close()
