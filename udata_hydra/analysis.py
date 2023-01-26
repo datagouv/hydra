@@ -53,6 +53,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     # if not, let's download the file to get some hints and other infos
     dl_analysis = {}
+    # TODO: we do not need re-download CSV if we alrady know it has not changed
     if not change_analysis or is_csv:
         tmp_file = None
         try:

@@ -14,6 +14,7 @@ from minicli import run
 from udata_hydra import config
 from udata_hydra.app import app_factory
 import udata_hydra.cli  # noqa - this register the cli cmds
+from udata_hydra.logger import stop_sentry
 from udata_hydra.utils.db import insert_check, update_check
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
@@ -56,7 +57,10 @@ def setup():
         TESTING=True,
         SLEEP_BETWEEN_BATCHES=0,
         WEBHOOK_ENABLED=True,
+        SENTRY_DSN=None,
     )
+    # prevent sentry from sending events in tests (config override is not enough)
+    stop_sentry()
 
 
 @pytest_asyncio.fixture(autouse=True)

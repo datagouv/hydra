@@ -8,6 +8,8 @@ import sys
 from datetime import datetime
 from typing import Any
 
+import sentry_sdk
+
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
 from sqlalchemy import MetaData
@@ -18,7 +20,10 @@ from str2bool import str2bool
 from str2float import str2float
 
 from udata_hydra import context, config
-from udata_hydra.utils.db import get_check, insert_csv_analysis, compute_insert_query, update_csv_analysis
+from udata_hydra.utils.db import (
+    get_check, insert_csv_analysis, compute_insert_query,
+    update_csv_analysis, get_csv_analysis,
+)
 from udata_hydra.utils.file import download_resource
 
 
@@ -63,15 +68,24 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     tmp_file = open(file_path, "rb") if file_path else await download_resource(url, headers)
 
     try:
-        csv_inspection = await perform_csv_inspection(tmp_file.name)
-        ca_id = await insert_csv_analysis({
-            "resource_id": check.get("resource_id"),
-            "url": url,
-            "check_id": check_id,
-            "csv_detective": csv_inspection
-        })
+        try:
+            err = None
+            csv_inspection = None
+            csv_inspection = await perform_csv_inspection(tmp_file.name)
+        except Exception as e:
+            err = e
+        finally:
+            ca_id = await insert_csv_analysis({
+                "resource_id": check.get("resource_id"),
+                "url": url,
+                "check_id": check_id,
+                "csv_detective": csv_inspection
+            })
+        if err:
+            await handle_parse_exception(err, "csv_detective", analysis_id=ca_id)
+            return
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
-        await csv_to_db(tmp_file.name, csv_inspection, table_name, optimized=optimized)
+        await csv_to_db(tmp_file.name, csv_inspection, table_name, optimized=optimized, analysis_id=ca_id)
         await update_csv_analysis(ca_id, {
             "parsing_table": table_name,
             "parsing_date": datetime.utcnow(),
@@ -120,7 +134,7 @@ def compute_create_table_query(table_name: str, columns: list) -> str:
     return compiled.string.replace("%%", "%")
 
 
-async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized=True):
+async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized: bool = True, analysis_id: int = None):
     """
     Convert a csv file to database table using inspection data
 
@@ -130,8 +144,8 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized
     dialect = generate_dialect(inspection)
     columns = inspection["columns"]
     # explicitely rename reserved column names
-    RESERVED_COLS = ("tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
-    columns = {f"{c}__hydra_renamed" if c in RESERVED_COLS else c: v for c, v in columns.items()}
+    RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
+    columns = {f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v for c, v in columns.items()}
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
     await db.execute(q)
@@ -153,7 +167,10 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized
         # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
         if optimized:
             # NB: also see copy_to_table for a file source
-            await db.copy_records_to_table(table_name, records=records, columns=columns.keys())
+            try:
+                await db.copy_records_to_table(table_name, records=records, columns=columns.keys())
+            except Exception as e:  # I know what I'm doing, pinky swear
+                await handle_parse_exception(e, "copy_records_to_table", analysis_id)
         # this inserts rows from iterator one by one, slow but useful for debugging
         else:
             bar = ProgressBar(total=inspection["total_lines"])
@@ -182,3 +199,24 @@ async def detect_csv_from_headers(check) -> bool:
 async def delete_table(table_name: str):
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+
+
+async def handle_parse_exception(e: Exception, step: str, analysis_id: int) -> None:
+    """Specific parsing_error handling. Enriches sentry w/ context if available,
+       and store error if in a check context"""
+    if analysis_id:
+        if config.SENTRY_DSN:
+            analysis = await get_csv_analysis(analysis_id)
+            url = analysis["url"]
+            with sentry_sdk.push_scope() as scope:
+                scope.set_extra("analysis_id", analysis_id)
+                scope.set_extra("csv_url", url)
+                scope.set_extra("resource_id", analysis["resource_id"])
+                event_id = sentry_sdk.capture_exception(e)
+        err = f"{step}:sentry:{event_id}" if config.SENTRY_DSN else f"{step}:{str(e)}"
+        q = "UPDATE csv_analysis SET parsing_error = $1 WHERE id = $2"
+        db = await context.pool()
+        await db.execute(q, err, analysis_id)
+        log.error("Parsing error", exc_info=e)
+        return
+    raise e

@@ -85,3 +85,9 @@ async def insert_csv_analysis(data: dict) -> int:
     async with pool.acquire() as connection:
         res = await connection.fetchrow(q, *data.values())
     return res["id"]
+
+
+async def get_csv_analysis(analysis_id: int):
+    q = "SELECT * FROM csv_analysis WHERE id = $1"
+    pool = await context.pool()
+    return await pool.fetchrow(q, analysis_id)

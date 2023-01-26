@@ -230,18 +230,26 @@ async def purge_csv_tables():
     """Delete converted CSV tables for resources no longer in catalog"""
     q = """
         SELECT parsing_table FROM csv_analysis
-        WHERE parsing_table IN (SELECT md5(url) FROM catalog WHERE deleted = TRUE)
-    """
-    res = await context["conn"].fetch(q)
-    for c, r in enumerate(res):
-        table = r["parsing_table"]
-        log.debug(f"Deleting table {table}")
-        await delete_table(table)
-        await context["conn"].execute(
-            "UPDATE csv_analysis SET parsing_table = NULL WHERE parsing_table = $1", table
+        WHERE parsing_table IN (
+            SELECT md5(url) FROM catalog WHERE deleted = TRUE
         )
-    if len(res):
-        log.info(f"Deleted {c + 1} table(s).")
+    """
+    count = 0
+    res = await context["conn"].fetch(q)
+    for r in res:
+        table = r["parsing_table"]
+        # check the URL is not used by another active resource
+        q = "SELECT id FROM catalog WHERE md5(url) = $1 and deleted = FALSE"
+        not_deleted = await context["conn"].fetch(q, table)
+        if not not_deleted:
+            log.debug(f"Deleting table {table}")
+            await delete_table(table)
+            await context["conn"].execute(
+                "UPDATE csv_analysis SET parsing_table = NULL WHERE parsing_table = $1", table
+            )
+            count += 1
+    if count:
+        log.info(f"Deleted {count} table(s).")
     else:
         log.info("Nothing to delete.")
 

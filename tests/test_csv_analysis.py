@@ -135,3 +135,22 @@ async def test_reserved_column_name(db, clean_db):
         await csv_to_db(fp.name, inspection, "test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["xmin__hydra_renamed"] == "test"
+
+
+async def test_error_reporting_csv_detective(rmock, catalog_content, db, clean_db):
+    url = "http://example.com/my.csv"
+    rmock.get(url, status=200, body="".encode("utf-8"))
+    await analyse_csv(url=url)
+    res = await db.fetchrow("SELECT * FROM csv_analysis")
+    assert res["parsing_table"] is None
+    assert res["parsing_error"] == "csv_detective:list index out of range"
+
+
+async def test_error_reporting_parsing(rmock, catalog_content, db, clean_db):
+    url = "http://example.com/my.csv"
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    rmock.get(url, status=200, body="a,b,c\n1,2".encode("utf-8"))
+    await analyse_csv(url=url)
+    res = await db.fetchrow("SELECT * FROM csv_analysis")
+    assert res["parsing_table"] == table_name
+    assert res["parsing_error"] == "copy_records_to_table:list index out of range"

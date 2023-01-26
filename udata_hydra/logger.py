@@ -28,3 +28,8 @@ def setup_logging():
     logging.getLogger("urllib3").setLevel("INFO")
     context["inited"] = True
     return log
+
+
+def stop_sentry():
+    """Stop sentry collection programatically"""
+    sentry_sdk.Hub.current.client.close()
