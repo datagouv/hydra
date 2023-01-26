@@ -70,10 +70,10 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     try:
         try:
             err = None
-            csv_inspection = None
             csv_inspection = await perform_csv_inspection(tmp_file.name)
         except Exception as e:
             err = e
+            csv_inspection = None
         finally:
             ca_id = await insert_csv_analysis({
                 "resource_id": check.get("resource_id"),
