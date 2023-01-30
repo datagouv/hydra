@@ -263,9 +263,8 @@ For example, to set the log level to `DEBUG` when initializing the database, use
 
 ### Writing a migration
 
-1. Add a file named `migrations/{YYYYMMDD}_{from}_up_{to}.sql` and write the SQL you need to perform migration. `from` should be the revision from before (eg `rev1`), `to` the revision you're aiming at (eg `rev2`)
-2. Modify the latest revision (eg `rev2`) in `migrations/_LATEST_REVISION`
-3. `udata-hydra migrate` will use the info from `_LATEST_REVISION` to upgrade to `rev2`. You can also specify `udata-hydra migrate --revision rev2`
+1. Add a file named `migrations/{YYYYMMDD}_{description}.sql` and write the SQL you need to perform migration.
+2. `udata-hydra migrate` will migrate the database as needeed.
 
 ## Deployment
 
