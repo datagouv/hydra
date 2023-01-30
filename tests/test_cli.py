@@ -34,6 +34,8 @@ async def test_purge_csv_tables(setup_catalog, db):
     # check table is gone
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
     assert res is None
+    res = await db.fetchrow("SELECT * FROM tables_index WHERE parsing_table = $1", md5)
+    assert res is None
 
 
 async def test_purge_csv_tables_url_used_by_other_resource(setup_catalog, db):

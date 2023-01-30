@@ -8,8 +8,6 @@ from tempfile import NamedTemporaryFile
 import aiohttp
 import asyncpg
 
-from asyncpg_trek import plan, execute, Direction
-from asyncpg_trek.asyncpg import AsyncpgBackend
 from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
@@ -17,6 +15,7 @@ from progressist import ProgressBar
 from udata_hydra import config
 from udata_hydra.crawl import check_url as crawl_check_url
 from udata_hydra.logger import setup_logging
+from udata_hydra.migrations import Migrator
 from udata_hydra.utils.csv import analyse_csv, delete_table
 
 
@@ -194,20 +193,12 @@ async def drop_db():
 
 
 @cli
-async def migrate(revision=None, direction="up"):
-    """Migrate the database to _LATEST_REVISION or specified one"""
-    migrations_dir = Path(__file__).parent / "migrations"
-
-    if not revision:
-        with open(migrations_dir / "_LATEST_REVISION", "r") as f:
-            revision = f.read().strip()
-        log.info(f"No revision asked, using from _LATEST_REVISION: {revision}")
-
-    backend = AsyncpgBackend(context["conn"])
-    async with backend.connect() as conn:
-        direction = getattr(Direction, direction)
-        planned = await plan(conn, backend, migrations_dir.resolve(), revision, direction)
-        await execute(conn, backend, planned)
+async def migrate(skip_errors=False, dbs=["main", "csv"]):
+    """Migrate the database(s)"""
+    for db in dbs:
+        log.info(f"Migrating db {db}...")
+        migrator = await Migrator.create(db, skip_errors=skip_errors)
+        await migrator.migrate()
 
 
 @cli
@@ -256,9 +247,7 @@ async def purge_csv_tables():
 
 @wrap
 async def cli_wrapper():
-    dsn = config.DATABASE_URL
-    context["conn"] = await asyncpg.connect(dsn=dsn)
-    context["dsn"] = dsn
+    context["conn"] = await asyncpg.connect(dsn=config.DATABASE_URL)
     yield
     await context["conn"].close()
 

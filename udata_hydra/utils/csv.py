@@ -69,20 +69,18 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
 
     try:
         try:
-            err = None
+            inspection_error = None
             csv_inspection = await perform_csv_inspection(tmp_file.name)
         except Exception as e:
-            err = e
-            csv_inspection = None
+            inspection_error = e
         finally:
             ca_id = await insert_csv_analysis({
                 "resource_id": check.get("resource_id"),
                 "url": url,
                 "check_id": check_id,
-                "csv_detective": csv_inspection
             })
-        if err:
-            await handle_parse_exception(err, "csv_detective", analysis_id=ca_id)
+        if inspection_error:
+            await handle_parse_exception(inspection_error, "csv_detective", analysis_id=ca_id)
             return
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         await csv_to_db(tmp_file.name, csv_inspection, table_name, optimized=optimized, analysis_id=ca_id)
@@ -90,6 +88,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
             "parsing_table": table_name,
             "parsing_date": datetime.utcnow(),
         })
+        await csv_to_db_index(table_name, csv_inspection, check)
     finally:
         tmp_file.close()
         os.remove(tmp_file.name)
@@ -136,9 +135,15 @@ def compute_create_table_query(table_name: str, columns: list) -> str:
 
 async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized: bool = True, analysis_id: int = None):
     """
-    Convert a csv file to database table using inspection data
+    Convert a csv file to database table using inspection data. It should (re)create one table:
+    - `table_name` with data from `file_path`
 
+    :file_path: CSV file path to convert
+    :inspection: CSV detective report
+    :table_name: used to create tables
     :optimized: use postgres COPY if True, else insert record one by one
+    # TODO: we might want to catch the error(s) a step above and get rid of this param
+    :analysis_id: used for reporting errors to the analysis object that lauched conversion
     """
     log.debug(f"Converting from CSV to db for {table_name}")
     dialect = generate_dialect(inspection)
@@ -181,6 +186,13 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized
                 await db.execute(q, *data.values())
 
 
+async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
+    """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
+    db = await context.pool("csv")
+    q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)"
+    await db.execute(q, table_name, json.dumps(inspection), check.get("resource_id"), check.get("url"))
+
+
 async def perform_csv_inspection(file_path):
     """Launch csv-detective against given file"""
     return csv_detective_routine(file_path)
@@ -199,6 +211,7 @@ async def detect_csv_from_headers(check) -> bool:
 async def delete_table(table_name: str):
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+    await db.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)
 
 
 async def handle_parse_exception(e: Exception, step: str, analysis_id: int) -> None:

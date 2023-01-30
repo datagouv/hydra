@@ -20,13 +20,14 @@ async def test_analyse_csv_on_catalog(rmock, catalog_content, db, optimized, cle
     res = await db.fetchrow("SELECT * FROM csv_analysis")
     assert res["parsing_table"] == table_name
     assert res["parsing_error"] is None
-    inspection = json.loads(res["csv_detective"])
-    assert all(k in inspection["columns"] for k in ["id", "url"])
     rows = list(await db.fetch(f'SELECT * FROM "{table_name}"'))
     assert len(rows) == 1
     row = rows[0]
     assert row["id"] == RESOURCE_ID
     assert row["url"] == "https://example.com/resource-1"
+    res = await db.fetchrow("SELECT * from tables_index")
+    inspection = json.loads(res["csv_detective"])
+    assert all(k in inspection["columns"] for k in ["id", "url"])
 
 
 @pytest.mark.parametrize("params", [

@@ -273,21 +273,6 @@ docs = ["Sphinx (>=4.1.2,<4.2.0)", "sphinx-rtd-theme (>=0.5.2,<0.6.0)", "sphinxc
 test = ["flake8 (>=5.0.4,<5.1.0)", "uvloop (>=0.15.3)"]
 
 [[package]]
-name = "asyncpg-trek"
-version = "0.2.1"
-description = "A simple migrations system for asyncpg"
-category = "main"
-optional = false
-python-versions = ">=3.7,<4"
-files = [
-    {file = "asyncpg_trek-0.2.1-py3-none-any.whl", hash = "sha256:918737f5e34a0217e58798bad471696d252ab4489a85cd68df540f354703ebc5"},
-    {file = "asyncpg_trek-0.2.1.tar.gz", hash = "sha256:2649ae68fee14acab21e0efabf809b2abeeb59ccc1c40934967dea1285264577"},
-]
-
-[package.dependencies]
-asyncpg = ">=0.26.0"
-
-[[package]]
 name = "attrs"
 version = "22.1.0"
 description = "Classes Without Boilerplate"
@@ -1629,4 +1614,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "7d49e46ff6bae0eaa9a2368fae27ac0b3953be6cbfb57bbf6531e1b7bbb80e7a"
+content-hash = "9a3cf22ea74779fe95708696968b44831f905f5440a83429f4003624afc84bac"
