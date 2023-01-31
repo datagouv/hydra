@@ -12,8 +12,7 @@ import sentry_sdk
 
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
-from sqlalchemy import MetaData
-from sqlalchemy import Table, Column, BigInteger, String, Float, Boolean, Integer
+from sqlalchemy import MetaData, Table, Column, BigInteger, String, Float, Boolean, Integer
 from sqlalchemy.dialects.postgresql import asyncpg
 from sqlalchemy.schema import CreateTable
 from str2bool import str2bool
