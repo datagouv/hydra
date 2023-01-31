@@ -4,7 +4,7 @@
 
 URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _PostgreSQL_ database.
 
-Since it's called _hydra_, it also has mythical powers embeded:
+Since it's called _hydra_, it also has mythical powers embedded:
 - analyse remote resource metadata over time to detect changes in the smartest way possible
 - if the remote resource is a CSV, convert it to a PostgreSQL table, ready for APIfication
 - send crawl and analysis to a udata instance
