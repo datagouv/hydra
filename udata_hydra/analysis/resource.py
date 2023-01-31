@@ -11,7 +11,8 @@ from dateutil.parser import parse as date_parser, ParserError
 
 from udata_hydra import context
 from udata_hydra.utils import queue
-from udata_hydra.utils.csv import analyse_csv, detect_csv_from_headers
+from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.utils.csv import detect_csv_from_headers
 from udata_hydra.utils.db import update_check, get_check
 from udata_hydra.utils.file import compute_checksum_from_file, download_resource
 from udata_hydra.utils.http import send

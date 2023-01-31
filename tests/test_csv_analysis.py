@@ -4,7 +4,7 @@ import pytest
 
 from tempfile import NamedTemporaryFile
 
-from udata_hydra.utils.csv import analyse_csv, csv_to_db
+from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 
 from .conftest import RESOURCE_ID
 

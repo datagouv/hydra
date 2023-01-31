@@ -16,7 +16,7 @@ from udata_hydra import config
 from udata_hydra.crawl import check_url as crawl_check_url
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
-from udata_hydra.utils.csv import analyse_csv, delete_table
+from udata_hydra.analysis.csv import analyse_csv, delete_table
 
 
 context = {}
