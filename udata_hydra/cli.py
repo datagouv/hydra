@@ -34,13 +34,19 @@ async def download_file(url, fd):
 
 
 @cli
-async def load_catalog(url=None, drop=False):
-    """Load the catalog into DB from CSV file"""
+async def load_catalog(url=None, drop_meta=False, drop_all=False):
+    """Load the catalog into DB from CSV file
+
+    :url: URL of the catalog to fetch, by default defined in config
+    :drop_meta: drop the metadata tables (catalog, checks...)
+    :drop_all: drop metadata tables and parsed csv content
+    """
     if not url:
         url = config.CATALOG_URL
 
-    if drop:
-        await drop_db()
+    if drop_meta or drop_all:
+        dbs = ["main"] if drop_meta else ["main", "csv"]
+        await drop_dbs(dbs=dbs)
         await migrate()
 
     try:
@@ -182,14 +188,20 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
 
 
 @cli
-async def drop_db():
-    tables = await context["conn"].fetch("""
-        SELECT tablename FROM pg_catalog.pg_tables
-        WHERE schemaname != 'information_schema' AND
-        schemaname != 'pg_catalog';
-    """)
-    for table in tables:
-        await context["conn"].execute(f'DROP TABLE "{table["tablename"]}"')
+async def drop_dbs(dbs=[]):
+    for db in dbs:
+        if db == "main":
+            conn = context["conn"]
+        else:
+            conn = await asyncpg.connect(dsn=getattr(config, f"DATABASE_URL_{db.upper()}"))
+
+        tables = await conn.fetch("""
+            SELECT tablename FROM pg_catalog.pg_tables
+            WHERE schemaname != 'information_schema' AND
+            schemaname != 'pg_catalog';
+        """)
+        for table in tables:
+            await conn.execute(f'DROP TABLE "{table["tablename"]}"')
 
 
 @cli

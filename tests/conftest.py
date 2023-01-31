@@ -107,7 +107,7 @@ def catalog_content(is_harvested):
 
 @pytest.fixture
 def clean_db():
-    run("drop_db")
+    run("drop_dbs", dbs=["main"])
     run("migrate")
     yield
 
@@ -116,7 +116,7 @@ def clean_db():
 def setup_catalog(catalog_content, rmock):
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    run("drop_db")
+    run("drop_dbs", dbs=["main"])
     run("migrate")
     run("load_catalog", url=catalog)
 
