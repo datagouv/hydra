@@ -59,7 +59,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
         log.debug("CSV_ANALYSIS_ENABLED turned off, skipping.")
         return
 
-    assert any([_ is not None for _ in (check_id, url)])
+    assert any(_ is not None for _ in (check_id, url))
     check = await get_check(check_id) if check_id is not None else {}
     url = check.get("url") or url
 
