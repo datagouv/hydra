@@ -52,8 +52,10 @@ PYTHON_TYPE_TO_PY = {
     "bool": bool,
 }
 
+RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 
-async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, optimized: bool = True) -> None:
+
+async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS_ENABLED:
         log.debug("CSV_ANALYSIS_ENABLED turned off, skipping.")
@@ -72,17 +74,16 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
             csv_inspection = await perform_csv_inspection(tmp_file.name)
         except Exception as e:
             inspection_error = e
-        finally:
-            ca_id = await insert_csv_analysis({
-                "resource_id": check.get("resource_id"),
-                "url": url,
-                "check_id": check_id,
-            })
+        ca_id = await insert_csv_analysis({
+            "resource_id": check.get("resource_id"),
+            "url": url,
+            "check_id": check_id,
+        })
         if inspection_error:
             await handle_parse_exception(inspection_error, "csv_detective", analysis_id=ca_id)
             return
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
-        await csv_to_db(tmp_file.name, csv_inspection, table_name, optimized=optimized, analysis_id=ca_id)
+        await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert, analysis_id=ca_id)
         await update_csv_analysis(ca_id, {
             "parsing_table": table_name,
             "parsing_date": datetime.utcnow(),
@@ -123,8 +124,8 @@ def compute_create_table_query(table_name: str, columns: list) -> str:
     """Use sqlalchemy to build a CREATE TABLE statement that should not be vulnerable to injections"""
     metadata = MetaData()
     table = Table(table_name, metadata, Column("__id", Integer, primary_key=True))
-    for col_name, col_info in columns.items():
-        table.append_column(Column(col_name, PYTHON_TYPE_TO_PG.get(col_info["python_type"], String)))
+    for col_name, col_type in columns.items():
+        table.append_column(Column(col_name, PYTHON_TYPE_TO_PG.get(col_type, String)))
     compiled = CreateTable(table).compile(dialect=asyncpg.dialect())
     # compiled query will want to write "%% mon pourcent" VARCHAR but will fail when querying "% mon pourcent"
     # also, "% mon pourcent" works well in pg as a column
@@ -132,7 +133,10 @@ def compute_create_table_query(table_name: str, columns: list) -> str:
     return compiled.string.replace("%%", "%")
 
 
-async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized: bool = True, analysis_id: int = None):
+async def csv_to_db(
+    file_path: str, inspection: dict, table_name: str,
+    debug_insert: bool = False, analysis_id: int = None,
+):
     """
     Convert a csv file to database table using inspection data. It should (re)create one table:
     - `table_name` with data from `file_path`
@@ -140,16 +144,18 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized
     :file_path: CSV file path to convert
     :inspection: CSV detective report
     :table_name: used to create tables
-    :optimized: use postgres COPY if True, else insert record one by one
+    :debug_insert: insert record one by one instead of using postgresql COPY
     # TODO: we might want to catch the error(s) a step above and get rid of this param
     :analysis_id: used for reporting errors to the analysis object that lauched conversion
     """
     log.debug(f"Converting from CSV to db for {table_name}")
     dialect = generate_dialect(inspection)
     columns = inspection["columns"]
-    # explicitely rename reserved column names
-    RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
-    columns = {f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v for c, v in columns.items()}
+    # build a `column_name: type` mapping and explicitely rename reserved column names
+    columns = {
+        f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
+        for c, v in columns.items()
+    }
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
     await db.execute(q)
@@ -164,12 +170,12 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, optimized
         records = (
             [
                 smart_cast(t, v, failsafe=True)
-                for t, v in zip([c["python_type"] for c in columns.values()], line)
+                for t, v in zip(columns.values(), line)
             ]
             for line in reader if line
         )
         # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
-        if optimized:
+        if not debug_insert:
             # NB: also see copy_to_table for a file source
             try:
                 await db.copy_records_to_table(table_name, records=records, columns=columns.keys())

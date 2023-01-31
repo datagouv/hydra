@@ -11,12 +11,12 @@ from .conftest import RESOURCE_ID
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.parametrize("optimized", [True, False])
-async def test_analyse_csv_on_catalog(rmock, catalog_content, db, optimized, clean_db):
+@pytest.mark.parametrize("debug_insert", [True, False])
+async def test_analyse_csv_on_catalog(rmock, catalog_content, db, debug_insert, clean_db):
     url = "http://example.com/my.csv"
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(url, status=200, body=catalog_content)
-    await analyse_csv(url=url, optimized=optimized)
+    await analyse_csv(url=url, debug_insert=debug_insert)
     res = await db.fetchrow("SELECT * FROM csv_analysis")
     assert res["parsing_table"] == table_name
     assert res["parsing_error"] is None
