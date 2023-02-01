@@ -8,8 +8,6 @@ from tempfile import NamedTemporaryFile
 import aiohttp
 import asyncpg
 
-from asyncpg_trek import plan, execute, Direction
-from asyncpg_trek.asyncpg import AsyncpgBackend
 from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
@@ -17,6 +15,8 @@ from progressist import ProgressBar
 from udata_hydra import config
 from udata_hydra.crawl import check_url as crawl_check_url
 from udata_hydra.logger import setup_logging
+from udata_hydra.migrations import Migrator
+from udata_hydra.analysis.csv import analyse_csv, delete_table
 
 
 context = {}
@@ -34,13 +34,19 @@ async def download_file(url, fd):
 
 
 @cli
-async def load_catalog(url=None, drop=False):
-    """Load the catalog into DB from CSV file"""
+async def load_catalog(url=None, drop_meta=False, drop_all=False):
+    """Load the catalog into DB from CSV file
+
+    :url: URL of the catalog to fetch, by default defined in config
+    :drop_meta: drop the metadata tables (catalog, checks...)
+    :drop_all: drop metadata tables and parsed csv content
+    """
     if not url:
         url = config.CATALOG_URL
 
-    if drop:
-        await drop_db(["catalog", "checks", "migrations"])
+    if drop_meta or drop_all:
+        dbs = ["main"] if drop_meta else ["main", "csv"]
+        await drop_dbs(dbs=dbs)
         await migrate()
 
     try:
@@ -104,6 +110,12 @@ async def check_resource(resource_id, method="get"):
         return
     async with aiohttp.ClientSession(timeout=None) as session:
         await crawl_check_url(res[0], session, method=method)
+
+
+@cli(name="analyse-csv")
+async def analyse_csv_cli(check_id: int = None, url: str = None, debug_insert=False):
+    """Trigger a csv analysis from a check_id or an url"""
+    await analyse_csv(check_id=check_id, url=url, debug_insert=debug_insert)
 
 
 @cli
@@ -176,25 +188,29 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
 
 
 @cli
-async def drop_db(tables=["checks", "catalog", "migrations"]):
-    for table in tables:
-        await context["conn"].execute(f"DROP TABLE IF EXISTS {table}")
+async def drop_dbs(dbs=[]):
+    for db in dbs:
+        if db == "main":
+            conn = context["conn"]
+        else:
+            conn = await asyncpg.connect(dsn=getattr(config, f"DATABASE_URL_{db.upper()}"))
+
+        tables = await conn.fetch("""
+            SELECT tablename FROM pg_catalog.pg_tables
+            WHERE schemaname != 'information_schema' AND
+            schemaname != 'pg_catalog';
+        """)
+        for table in tables:
+            await conn.execute(f'DROP TABLE "{table["tablename"]}"')
 
 
 @cli
-async def migrate(revision=None):
-    """Migrate the database to _LATEST_REVISION or specified one"""
-    migrations_dir = Path(__file__).parent / "migrations"
-
-    if not revision:
-        with open(migrations_dir / "_LATEST_REVISION", "r") as f:
-            revision = f.read().strip()
-        log.info(f"No revision asked, using from _LATEST_REVISION: {revision}")
-
-    backend = AsyncpgBackend(context["conn"])
-    async with backend.connect() as conn:
-        planned = await plan(conn, backend, migrations_dir.resolve(), revision, Direction.up)
-        await execute(conn, backend, planned)
+async def migrate(skip_errors=False, dbs=["main", "csv"]):
+    """Migrate the database(s)"""
+    for db in dbs:
+        log.info(f"Migrating db {db}...")
+        migrator = await Migrator.create(db, skip_errors=skip_errors)
+        await migrator.migrate()
 
 
 @cli
@@ -212,11 +228,38 @@ async def purge_checks(limit=2):
         await context["conn"].execute(q, resource_id, limit)
 
 
+@cli
+async def purge_csv_tables():
+    """Delete converted CSV tables for resources no longer in catalog"""
+    q = """
+        SELECT parsing_table FROM csv_analysis
+        WHERE parsing_table IN (
+            SELECT md5(url) FROM catalog WHERE deleted = TRUE
+        )
+    """
+    count = 0
+    res = await context["conn"].fetch(q)
+    for r in res:
+        table = r["parsing_table"]
+        # check the URL is not used by another active resource
+        q = "SELECT id FROM catalog WHERE md5(url) = $1 and deleted = FALSE"
+        not_deleted = await context["conn"].fetch(q, table)
+        if not not_deleted:
+            log.debug(f"Deleting table {table}")
+            await delete_table(table)
+            await context["conn"].execute(
+                "UPDATE csv_analysis SET parsing_table = NULL WHERE parsing_table = $1", table
+            )
+            count += 1
+    if count:
+        log.info(f"Deleted {count} table(s).")
+    else:
+        log.info("Nothing to delete.")
+
+
 @wrap
 async def cli_wrapper():
-    dsn = config.DATABASE_URL
-    context["conn"] = await asyncpg.connect(dsn=dsn)
-    context["dsn"] = dsn
+    context["conn"] = await asyncpg.connect(dsn=config.DATABASE_URL)
     yield
     await context["conn"].close()
 

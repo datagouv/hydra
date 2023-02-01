@@ -19,7 +19,7 @@ from yarl import URL
 
 from udata_hydra import config
 from udata_hydra.crawl import crawl, check_url, STATUS_BACKOFF
-from udata_hydra.analysis import process_resource
+from udata_hydra.analysis.resource import process_resource
 from udata_hydra.utils.db import get_check
 
 from .conftest import RESOURCE_ID as resource_id
@@ -57,7 +57,7 @@ async def test_catalog(setup_catalog, db):
 async def test_catalog_deleted(setup_catalog, db, rmock):
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE")
     assert len(res) == 1
-    with open("tests/catalog.csv", "rb") as cfile:
+    with open("tests/data/catalog.csv", "rb") as cfile:
         catalog_content = cfile.readlines()
     catalog = "https://example.com/catalog"
     # feed empty catalog, should delete the previously loaded resource
@@ -79,7 +79,7 @@ async def test_catalog_deleted_with_checked_resource(setup_catalog, db, rmock, e
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE and last_check IS NOT NULL")
     assert len(res) == 1
 
-    with open("tests/catalog.csv", "rb") as cfile:
+    with open("tests/data/catalog.csv", "rb") as cfile:
         catalog_content = cfile.readlines()
     catalog = "https://example.com/catalog"
     # feed empty catalog, should delete the previously loaded resource
@@ -93,7 +93,7 @@ async def test_catalog_deleted_with_checked_resource(setup_catalog, db, rmock, e
 
 async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop, mocker, analysis_mock):
     # load a new catalog with a new URL for this resource
-    with open("tests/catalog.csv", "r") as cfile:
+    with open("tests/data/catalog.csv", "r") as cfile:
         catalog_content = cfile.readlines()
     catalog_content[-1] = catalog_content[-1].replace("resource-1", "resource-2")
     catalog_content = "\n".join(catalog_content)
@@ -317,7 +317,7 @@ async def test_no_switch_head_to_get(setup_catalog, event_loop, rmock, produce_m
 
 
 async def test_process_resource(setup_catalog, mocker, fake_check):
-    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     # disable webhook, tested in following test
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
@@ -332,7 +332,7 @@ async def test_process_resource(setup_catalog, mocker, fake_check):
 
 
 async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_check, udata_url):
-    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
 
     check = await fake_check()
@@ -346,7 +346,7 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
 
 
 async def test_process_resource_send_udata_no_change(setup_catalog, mocker, rmock, fake_check, udata_url):
-    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
 
     # previous check with same checksum
@@ -422,7 +422,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
     await fake_check(checksum="136bd31d53340d234957650e042172705bf32984")
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
-    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.head("https://example.com/resource-1")
     rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
@@ -439,7 +439,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
 
 @pytest.mark.catalog_harvested
 async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loop, udata_url):
-    mocker.patch("udata_hydra.analysis.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.head("https://example.com/harvested", headers={"content-length": "2"}, repeat=True)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(crawl(iterations=1))
@@ -500,4 +500,23 @@ async def test_crawl_triggered_by_udata_entrypoint_existing_catalog(
     event_loop.run_until_complete(crawl(iterations=1))
     assert ("HEAD", URL(rurl)) in rmock.requests
     res = await db.fetch("SELECT * FROM checks")
+    assert len(res) == 2
+
+
+async def test_crawl_triggers_csv_analysis(rmock, event_loop, db, produce_mock, setup_catalog):
+    """Crawl a CSV file, analyse and apify it, downloads only once"""
+    rurl = "https://example.com/resource-1"
+    # mock for check
+    rmock.head(rurl, status=200, headers={"content-length": "1", "content-type": "application/csv"})
+    # mock for analysis download
+    rmock.get(rurl, status=200, headers={"content-type": "application/csv"}, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+    event_loop.run_until_complete(crawl(iterations=1))
+    # GET called only once: HEAD is ok (no need for crawl) and analysis steps share the downloaded file
+    assert len(rmock.requests[("GET", URL(rurl))]) == 1
+    res = await db.fetch("SELECT * FROM checks")
+    assert len(res) == 1
+    res = await db.fetch("SELECT * FROM csv_analysis")
+    assert len(res) == 1
+    assert res[0]["parsing_table"] is not None
+    res = await db.fetch(f'SELECT * FROM "{res[0]["parsing_table"]}"')
     assert len(res) == 2

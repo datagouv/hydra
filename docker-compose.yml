@@ -11,6 +11,17 @@ services:
       - database-data:/var/lib/postgresql/data/ # persist data even if container shuts down
     ports:
       - 5432:5432
+  database-csv:
+    image: "postgres" # use latest official postgres version
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - database-data-csv:/var/lib/postgresql/data/ # persist data even if container shuts down
+    ports:
+      - 5434:5432
 
 volumes:
   database-data: # named volumes can be managed easier using docker-compose
+  database-data-csv: # named volumes can be managed easier using docker-compose

@@ -3,17 +3,32 @@ import json
 from udata_hydra import context
 
 
-async def insert_check(data: dict):
-    if "headers" in data:
-        data["headers"] = json.dumps(data["headers"])
-    columns = ",".join(data.keys())
+def convert_dict_values_to_json(data: dict) -> dict:
+    """
+    Convert values in dict that are dict to json for DB serialization
+    TODO: this is suboptimal from asyncpg, dig into this
+    https://magicstack.github.io/asyncpg/current/usage.html#example-automatic-json-conversion
+    """
+    for k, v in data.items():
+        if type(v) is dict:
+            data[k] = json.dumps(v)
+    return data
+
+
+def compute_insert_query(data: dict, table: str, returning: str = "id") -> str:
+    columns = ",".join([f'"{k}"' for k in data.keys()])
     # $1, $2...
     placeholders = ",".join([f"${x + 1}" for x in range(len(data.values()))])
-    q = f"""
-        INSERT INTO checks ({columns})
+    return f"""
+        INSERT INTO "{table}" ({columns})
         VALUES ({placeholders})
-        RETURNING id
+        RETURNING {returning}
     """
+
+
+async def insert_check(data: dict) -> int:
+    data = convert_dict_values_to_json(data)
+    q = compute_insert_query(data, "checks")
     pool = await context.pool()
     async with pool.acquire() as connection:
         last_check = await connection.fetchrow(q, *data.values())
@@ -22,20 +37,32 @@ async def insert_check(data: dict):
     return last_check["id"]
 
 
-async def update_check(check_id: int, data: dict) -> int:
+def compute_update_query(table: str, data: dict):
     columns = data.keys()
     # $1, $2...
     placeholders = [f"${x + 1}" for x in range(len(data.values()))]
     set_clause = ",".join([f"{c} = {v}" for c, v in zip(columns, placeholders)])
-    q = f"""
-        UPDATE checks
+    return f"""
+        UPDATE "{table}"
         SET {set_clause}
         WHERE id = ${len(placeholders) + 1}
     """
+
+
+async def update_table_record(table: str, record_id: int, data: dict) -> int:
+    data = convert_dict_values_to_json(data)
+    q = compute_update_query(table, data)
     pool = await context.pool()
-    async with pool.acquire() as connection:
-        await connection.execute(q, *data.values(), check_id)
-    return check_id
+    await pool.execute(q, *data.values(), record_id)
+    return record_id
+
+
+async def update_check(check_id: int, data: dict) -> int:
+    return await update_table_record("checks", check_id, data)
+
+
+async def update_csv_analysis(csv_analysis_id: int, data: dict) -> int:
+    return await update_table_record("csv_analysis", csv_analysis_id, data)
 
 
 async def get_check(check_id):
@@ -49,3 +76,18 @@ async def get_check(check_id):
         """
         check = await connection.fetchrow(q, check_id)
     return check
+
+
+async def insert_csv_analysis(data: dict) -> int:
+    data = convert_dict_values_to_json(data)
+    q = compute_insert_query(data, "csv_analysis")
+    pool = await context.pool()
+    async with pool.acquire() as connection:
+        res = await connection.fetchrow(q, *data.values())
+    return res["id"]
+
+
+async def get_csv_analysis(analysis_id: int):
+    q = "SELECT * FROM csv_analysis WHERE id = $1"
+    pool = await context.pool()
+    return await pool.fetchrow(q, analysis_id)

@@ -1,5 +1,8 @@
 LOG_LEVEL = "DEBUG"
+# main database
 DATABASE_URL = "postgres://postgres:postgres@localhost:5432/postgres"
+# csv as database table
+DATABASE_URL_CSV = "postgres://postgres:postgres@localhost:5434/postgres"
 REDIS_URL = "redis://localhost:6379/0"
 SENTRY_DSN = ""
 TESTING = false
@@ -35,6 +38,7 @@ SINCE = "1w"
 SLEEP_BETWEEN_BATCHES = 60
 # max download filesize in bytes (100 MB)
 MAX_FILESIZE_ALLOWED = 104857600
+CSV_ANALYSIS_ENABLED = true
 
 # -- Webhook integration config -- #
 WEBHOOK_ENABLED = true

@@ -4,6 +4,11 @@
 
 URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _PostgreSQL_ database.
 
+Since it's called _hydra_, it also has mythical powers embedded:
+- analyse remote resource metadata over time to detect changes in the smartest way possible
+- if the remote resource is a CSV, convert it to a PostgreSQL table, ready for APIfication
+- send crawl and analysis info to a udata instance
+
 ## CLI
 
 ### Create database structure
@@ -36,6 +41,14 @@ If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 A job queuing system is used to process long-running tasks. Launch the worker with the following command:
 
 `poetry run rq worker -c udata_hydra.worker`
+
+Monitor worker status:
+
+`poetry run rq info -c udata_hydra.worker --interval 1`
+
+## CSV conversion to database
+
+Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
 
 ## API
 
@@ -237,7 +250,7 @@ The payload should look something like:
 ### docker-compose
 
 Multiple docker-compose files are provided:
-- a minimal `docker-compose.yml` with PostgreSQL
+- a minimal `docker-compose.yml` with two PostgreSQL containers (one for catalog and metadata, the other for converted CSV to database)
 - `docker-compose.broker.yml` adds a Redis broker
 - `docker-compose.test.yml` launches a test DB, needed to run tests
 
@@ -250,9 +263,8 @@ For example, to set the log level to `DEBUG` when initializing the database, use
 
 ### Writing a migration
 
-1. Add a file named `migrations/{YYYYMMDD}_{from}_up_{to}.sql` and write the SQL you need to perform migration. `from` should be the revision from before (eg `rev1`), `to` the revision you're aiming at (eg `rev2`)
-2. Modify the latest revision (eg `rev2`) in `migrations/_LATEST_REVISION`
-3. `udata-hydra migrate` will use the info from `_LATEST_REVISION` to upgrade to `rev2`. You can also specify `udata-hydra migrate --revision rev2`
+1. Add a file named `migrations/{YYYYMMDD}_{description}.sql` and write the SQL you need to perform migration.
+2. `udata-hydra migrate` will migrate the database as needeed.
 
 ## Deployment
 

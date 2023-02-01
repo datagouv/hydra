@@ -11,7 +11,8 @@ from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
 context = {
-    "queues": {}
+    "databases": {},
+    "queues": {},
 }
 
 
@@ -27,10 +28,11 @@ def monitor():
     return context["monitor"]
 
 
-async def pool():
-    if "pool" not in context:
-        context["pool"] = await asyncpg.create_pool(dsn=config.DATABASE_URL, max_size=config.MAX_POOL_SIZE)
-    return context["pool"]
+async def pool(db="main"):
+    if db not in context["databases"]:
+        dsn = config.DATABASE_URL if db == "main" else getattr(config, f"DATABASE_URL_{db.upper()}")
+        context["databases"][db] = await asyncpg.create_pool(dsn=dsn, max_size=config.MAX_POOL_SIZE)
+    return context["databases"][db]
 
 
 def queue(name="default"):

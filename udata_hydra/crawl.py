@@ -11,7 +11,7 @@ import asyncio
 from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
-from udata_hydra.analysis import process_resource
+from udata_hydra.analysis.resource import process_resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils import queue
 from udata_hydra.utils.db import insert_check
@@ -174,7 +174,6 @@ def convert_headers(headers):
 
 def has_nice_head(resp):
     """Check if a HEAD response looks useful to us"""
-    # TODO: 40x should not trigget GET
     if not is_valid_status(resp.status):
         return False
     if not any([k in resp.headers for k in ("content-length", "last-modified")]):
@@ -267,7 +266,7 @@ async def check_url(row, session, sleep=0, method="head"):
                 "status": getattr(e, "status", None),
             }
         )
-        log.error(f"Crawling error for url {row['url']}", exc_info=e)
+        log.warning(f"Crawling error for url {row['url']}", exc_info=e)
         return STATUS_ERROR
 
 

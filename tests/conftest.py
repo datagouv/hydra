@@ -14,6 +14,7 @@ from minicli import run
 from udata_hydra import config
 from udata_hydra.app import app_factory
 import udata_hydra.cli  # noqa - this register the cli cmds
+from udata_hydra.logger import stop_sentry
 from udata_hydra.utils.db import insert_check, update_check
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
@@ -49,11 +50,17 @@ def is_harvested(request):
 def setup():
     config.override(
         DATABASE_URL=DATABASE_URL,
+        # use same database for tests
+        DATABASE_URL_CSV=DATABASE_URL,
         UDATA_URI="https://udata.example.com",
         UDATA_URI_API_KEY="sup3rs3cr3t",
         TESTING=True,
         SLEEP_BETWEEN_BATCHES=0,
+        WEBHOOK_ENABLED=True,
+        SENTRY_DSN=None,
     )
+    # prevent sentry from sending events in tests (config override is not enough)
+    stop_sentry()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -62,6 +69,8 @@ async def mock_pool(mocker, event_loop):
     m = mocker.patch("udata_hydra.context.pool")
     pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50, loop=event_loop)
     m.return_value = pool
+    yield
+    await pool.close()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -92,13 +101,13 @@ async def client():
 @pytest.fixture
 def catalog_content(is_harvested):
     filename = "catalog" if not is_harvested else "catalog_harvested"
-    with open(f"tests/{filename}.csv", "rb") as cfile:
+    with open(f"tests/data/{filename}.csv", "rb") as cfile:
         return cfile.read()
 
 
 @pytest.fixture
 def clean_db():
-    run("drop_db")
+    run("drop_dbs", dbs=["main"])
     run("migrate")
     yield
 
@@ -107,7 +116,7 @@ def clean_db():
 def setup_catalog(catalog_content, rmock):
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    run("drop_db")
+    run("drop_dbs", dbs=["main"])
     run("migrate")
     run("load_catalog", url=catalog)
 
@@ -115,7 +124,7 @@ def setup_catalog(catalog_content, rmock):
 @pytest.fixture
 def produce_mock(mocker):
     mocker.patch("udata_hydra.crawl.send", dummy())
-    mocker.patch("udata_hydra.analysis.send", dummy())
+    mocker.patch("udata_hydra.analysis.resource.send", dummy())
 
 
 @pytest.fixture
