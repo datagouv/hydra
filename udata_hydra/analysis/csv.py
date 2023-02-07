@@ -12,13 +12,17 @@ import sentry_sdk
 
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
-from sqlalchemy import MetaData, Table, Column, BigInteger, String, Float, Boolean, Integer
+from sqlalchemy import (
+    MetaData, Table, Column,
+    BigInteger, String, Float, Boolean, Integer, JSON, Date, DateTime,
+)
 from sqlalchemy.dialects.postgresql import asyncpg
 from sqlalchemy.schema import CreateTable
 from str2bool import str2bool
 from str2float import str2float
 
 from udata_hydra import context, config
+from udata_hydra.analysis import helpers
 from udata_hydra.utils.db import (
     get_check, insert_csv_analysis, compute_insert_query,
     update_csv_analysis, get_csv_analysis,
@@ -43,6 +47,9 @@ PYTHON_TYPE_TO_PG = {
     "float": Float,
     "int": BigInteger,
     "bool": Boolean,
+    "json": JSON,
+    "date": Date,
+    "datetime": DateTime,
 }
 
 PYTHON_TYPE_TO_PY = {
@@ -50,6 +57,9 @@ PYTHON_TYPE_TO_PY = {
     "float": float,
     "int": int,
     "bool": bool,
+    "json": helpers.to_json,
+    "date": helpers.to_date,
+    "datetime": helpers.to_datetime,
 }
 
 RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")

@@ -7,7 +7,7 @@ from typing import Union
 
 import magic
 
-from dateutil.parser import parse as date_parser, ParserError
+from dateparser import parse as date_parser
 
 from udata_hydra import context
 from udata_hydra.utils import queue
@@ -198,15 +198,12 @@ async def detect_resource_change_from_headers(value: str, column: str = "url") -
 
     # last modified header check
     if data["last_modified"]:
-        try:
-            # this is GMT so we should be able to safely ignore tz info
-            last_modified_date = date_parser(data["last_modified"], ignoretz=True).isoformat()
+        last_modified_date = date_parser(data["last_modified"])
+        if last_modified_date:
             return {
-                "analysis:last-modified-at": last_modified_date,
+                "analysis:last-modified-at": last_modified_date.isoformat(),
                 "analysis:last-modified-detection": "last-modified-header",
             }
-        except ParserError:
-            pass
 
     # switch to content-length comparison
     if not data["content_length"]:

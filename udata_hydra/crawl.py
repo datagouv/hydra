@@ -1,7 +1,7 @@
 import time
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Tuple
 from urllib.parse import urlparse
 
@@ -104,7 +104,7 @@ async def is_backoff(domain) -> Tuple[bool, str]:
     backoff = False, ""
     no_backoff = [f"'{d}'" for d in config.NO_BACKOFF_DOMAINS]
     no_backoff = f"({','.join(no_backoff)})"
-    since = datetime.utcnow() - timedelta(seconds=config.BACKOFF_PERIOD)
+    since = datetime.now(timezone.utc) - timedelta(seconds=config.BACKOFF_PERIOD)
     pool = await context.pool()
     async with pool.acquire() as connection:
         # check if we trigger BACKOFF_NB_REQ for BACKOFF_PERIOD on this domain

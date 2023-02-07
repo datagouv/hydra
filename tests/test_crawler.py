@@ -4,7 +4,7 @@ import pytest
 import sys
 import tempfile
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import nest_asyncio
@@ -13,7 +13,7 @@ from aiohttp import ClientSession
 from aiohttp.client_exceptions import ClientError
 from aioresponses import CallbackResult
 from asyncio.exceptions import TimeoutError
-from dateutil.parser import parse as date_parser
+from dateparser import parse as date_parser
 from minicli import run
 from yarl import URL
 
@@ -394,7 +394,7 @@ async def test_change_analysis_last_modified_header(setup_catalog, rmock, event_
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
-    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37"
+    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37+00:00"
     assert data["analysis:last-modified-detection"] == "last-modified-header"
 
 
@@ -411,7 +411,7 @@ async def test_change_analysis_content_length_header(setup_catalog, rmock, event
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     # modified date should be pretty close from now, let's say 30 seconds
     assert (modified_date - now).total_seconds() < 30
     assert data["analysis:last-modified-detection"] == "content-length-header"
@@ -446,19 +446,31 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loo
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
-    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000"
+    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000+00:00"
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
 
 
 async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, event_loop, fake_check, udata_url):
     _date = "Thu, 09 Jan 2020 09:33:37 GMT"
-    await fake_check(detected_last_modified_at=date_parser(_date, ignoretz=True))
+    await fake_check(detected_last_modified_at=date_parser(_date), created_at=datetime.now() - timedelta(days=10))
     rmock.head("https://example.com/resource-1", headers={"last-modified": _date})
     rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(crawl(iterations=1))
-    # udata has not been called: not first check, and last-modified stayed the same
+    # udata has not been called: not first check, outdated check, and last-modified stayed the same
     assert ("PUT", URL(udata_url)) not in rmock.requests
+
+
+async def test_change_analysis_last_modified_header_twice_tz(setup_catalog, rmock, event_loop, fake_check, udata_url):
+    _date_1 = "Thu, 09 Jan 2020 09:33:37 GMT+1"
+    _date_2 = "Thu, 09 Jan 2020 09:33:37 GMT+4"
+    await fake_check(detected_last_modified_at=date_parser(_date_1), created_at=datetime.now() - timedelta(days=10))
+    rmock.head("https://example.com/resource-1", headers={"last-modified": _date_2})
+    rmock.get("https://example.com/resource-1")
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    # udata has been called: last-modified has changed (different timezones)
+    assert ("PUT", URL(udata_url)) in rmock.requests
 
 
 async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, produce_mock):
