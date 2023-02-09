@@ -1,7 +1,7 @@
 version: '3.7'
 services:
   test_database:
-    image: "postgres" # use latest official postgres version
+    image: "postgres:15" # target production version
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres

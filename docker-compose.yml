@@ -2,26 +2,26 @@ version: '3'
 
 services:
   database:
-    image: "postgres" # use latest official postgres version
+    image: "postgres:15"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=postgres
     volumes:
-      - database-data:/var/lib/postgresql/data/ # persist data even if container shuts down
+      - database-data-15:/var/lib/postgresql/data/ # persist data even if container shuts down
     ports:
       - 5432:5432
   database-csv:
-    image: "postgres" # use latest official postgres version
+    image: "postgres:15"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=postgres
     volumes:
-      - database-data-csv:/var/lib/postgresql/data/ # persist data even if container shuts down
+      - database-data-csv-15:/var/lib/postgresql/data/ # persist data even if container shuts down
     ports:
       - 5434:5432
 
 volumes:
-  database-data: # named volumes can be managed easier using docker-compose
-  database-data-csv: # named volumes can be managed easier using docker-compose
+  database-data-15: # named volumes can be managed easier using docker-compose
+  database-data-csv-15: # named volumes can be managed easier using docker-compose
