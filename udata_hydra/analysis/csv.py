@@ -23,6 +23,7 @@ from str2float import str2float
 
 from udata_hydra import context, config
 from udata_hydra.analysis import helpers
+from udata_hydra.analysis.errors import ParseException
 from udata_hydra.utils.db import (
     get_check, insert_csv_analysis, compute_insert_query,
     update_csv_analysis, get_csv_analysis,
@@ -77,28 +78,23 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
 
     headers = json.loads(check.get("headers") or "{}")
     tmp_file = open(file_path, "rb") if file_path else await download_resource(url, headers)
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
 
     try:
-        try:
-            inspection_error = None
-            csv_inspection = await perform_csv_inspection(tmp_file.name)
-        except Exception as e:
-            inspection_error = e
         ca_id = await insert_csv_analysis({
             "resource_id": check.get("resource_id"),
             "url": url,
             "check_id": check_id,
         })
-        if inspection_error:
-            await handle_parse_exception(inspection_error, "csv_detective", analysis_id=ca_id)
-            return
-        table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
-        await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert, analysis_id=ca_id)
+        csv_inspection = await perform_csv_inspection(tmp_file.name)
+        await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
         await update_csv_analysis(ca_id, {
             "parsing_table": table_name,
             "parsing_date": datetime.utcnow(),
         })
         await csv_to_db_index(table_name, csv_inspection, check)
+    except ParseException as e:
+        await handle_parse_exception(e, ca_id, table_name)
     finally:
         tmp_file.close()
         os.remove(tmp_file.name)
@@ -143,10 +139,7 @@ def compute_create_table_query(table_name: str, columns: list) -> str:
     return compiled.string.replace("%%", "%")
 
 
-async def csv_to_db(
-    file_path: str, inspection: dict, table_name: str,
-    debug_insert: bool = False, analysis_id: int = None,
-):
+async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_insert: bool = False):
     """
     Convert a csv file to database table using inspection data. It should (re)create one table:
     - `table_name` with data from `file_path`
@@ -155,8 +148,6 @@ async def csv_to_db(
     :inspection: CSV detective report
     :table_name: used to create tables
     :debug_insert: insert record one by one instead of using postgresql COPY
-    # TODO: we might want to catch the error(s) a step above and get rid of this param
-    :analysis_id: used for reporting errors to the analysis object that lauched conversion
     """
     log.debug(f"Converting from CSV to db for {table_name}")
     dialect = generate_dialect(inspection)
@@ -190,7 +181,7 @@ async def csv_to_db(
             try:
                 await db.copy_records_to_table(table_name, records=records, columns=columns.keys())
             except Exception as e:  # I know what I'm doing, pinky swear
-                await handle_parse_exception(e, "copy_records_to_table", analysis_id)
+                raise ParseException("copy_records_to_table") from e
         # this inserts rows from iterator one by one, slow but useful for debugging
         else:
             bar = ProgressBar(total=inspection["total_lines"])
@@ -210,7 +201,10 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
 
 async def perform_csv_inspection(file_path):
     """Launch csv-detective against given file"""
-    return csv_detective_routine(file_path)
+    try:
+        return csv_detective_routine(file_path)
+    except Exception as e:
+        raise ParseException("csv_detective") from e
 
 
 async def delete_table(table_name: str):
@@ -219,9 +213,11 @@ async def delete_table(table_name: str):
     await db.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)
 
 
-async def handle_parse_exception(e: Exception, step: str, analysis_id: int) -> None:
-    """Specific parsing_error handling. Enriches sentry w/ context if available,
-       and store error if in a check context"""
+async def handle_parse_exception(e: Exception, analysis_id: int, table_name: str) -> None:
+    """Specific ParsingError handling. Enriches sentry w/ context if available,
+       and store error if in a check context. Also cleanup :table_name: if needed."""
+    db = await context.pool("csv")
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if analysis_id:
         if config.SENTRY_DSN:
             analysis = await get_csv_analysis(analysis_id)
@@ -231,10 +227,12 @@ async def handle_parse_exception(e: Exception, step: str, analysis_id: int) -> N
                 scope.set_extra("csv_url", url)
                 scope.set_extra("resource_id", analysis["resource_id"])
                 event_id = sentry_sdk.capture_exception(e)
-        err = f"{step}:sentry:{event_id}" if config.SENTRY_DSN else f"{step}:{str(e)}"
+        # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
+        # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
+        err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
         q = "UPDATE csv_analysis SET parsing_error = $1 WHERE id = $2"
         db = await context.pool()
         await db.execute(q, err, analysis_id)
         log.error("Parsing error", exc_info=e)
-        return
-    raise e
+    else:
+        raise e
