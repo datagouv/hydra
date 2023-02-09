@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 
 import asyncpg
+import nest_asyncio
 import pytest
 import pytest_asyncio
 
@@ -21,6 +22,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 pytestmark = pytest.mark.asyncio
+
+nest_asyncio.apply()
 
 
 def dummy(return_value=None):
@@ -125,6 +128,7 @@ def setup_catalog(catalog_content, rmock):
 def produce_mock(mocker):
     mocker.patch("udata_hydra.crawl.send", dummy())
     mocker.patch("udata_hydra.analysis.resource.send", dummy())
+    mocker.patch("udata_hydra.analysis.csv.send", dummy())
 
 
 @pytest.fixture
@@ -153,7 +157,7 @@ async def db():
 
 
 @pytest_asyncio.fixture
-async def fake_check(db):
+async def fake_check():
     async def _fake_check(
         status=200,
         error=None,
@@ -165,8 +169,9 @@ async def fake_check(db):
         resource_id="c4e3a9fb-4415-488e-ba57-d05269b27adf",
         detected_last_modified_at=None,
     ):
+        url = f"https://example.com/resource-{resource}"
         data = {
-            "url": f"https://example.com/resource-{resource}",
+            "url": url,
             "domain": "example.com",
             "status": status,
             "headers": headers,

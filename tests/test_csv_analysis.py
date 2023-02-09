@@ -6,6 +6,7 @@ from datetime import date, datetime
 from tempfile import NamedTemporaryFile
 
 from asyncpg.exceptions import UndefinedTableError
+from yarl import URL
 
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 
@@ -15,11 +16,14 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.mark.parametrize("debug_insert", [True, False])
-async def test_analyse_csv_on_catalog(rmock, catalog_content, db, debug_insert, clean_db):
-    url = "http://example.com/my.csv"
+async def test_analyse_csv_on_catalog(
+    setup_catalog, rmock, catalog_content, db, debug_insert, fake_check, produce_mock
+):
+    check = await fake_check()
+    url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(url, status=200, body=catalog_content)
-    await analyse_csv(url=url, debug_insert=debug_insert)
+    await analyse_csv(check_id=check["id"], debug_insert=debug_insert)
     res = await db.fetchrow("SELECT * FROM csv_analysis")
     assert res["parsing_table"] == table_name
     assert res["parsing_error"] is None
@@ -37,14 +41,15 @@ async def test_analyse_csv_on_catalog(rmock, catalog_content, db, debug_insert, 
     # pretty big one, with empty lines
     ("20190618-annuaire-diagnostiqueurs.csv", 45522),
 ])
-async def test_analyse_csv_real_files(rmock, db, params, clean_db):
+async def test_analyse_csv_real_files(setup_catalog, rmock, db, params, fake_check, produce_mock):
+    check = await fake_check()
     filename, expected_count = params
-    url = "http://example.com/my.csv"
+    url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     with open(f"tests/data/{filename}", "rb") as f:
         data = f.read()
     rmock.get(url, status=200, body=data)
-    await analyse_csv(url=url)
+    await analyse_csv(check_id=check["id"])
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
 
@@ -175,22 +180,56 @@ async def test_reserved_column_name(db, clean_db):
     assert res["xmin__hydra_renamed"] == "test"
 
 
-async def test_error_reporting_csv_detective(rmock, catalog_content, db, clean_db):
-    url = "http://example.com/my.csv"
+async def test_error_reporting_csv_detective(rmock, catalog_content, db, setup_catalog, fake_check, produce_mock):
+    check = await fake_check()
+    url = check["url"]
     rmock.get(url, status=200, body="".encode("utf-8"))
-    await analyse_csv(url=url)
+    await analyse_csv(check_id=check["id"])
     res = await db.fetchrow("SELECT * FROM csv_analysis")
     assert res["parsing_table"] is None
     assert res["parsing_error"] == "csv_detective:list index out of range"
 
 
-async def test_error_reporting_parsing(rmock, catalog_content, db, clean_db):
-    url = "http://example.com/my.csv"
+async def test_error_reporting_parsing(rmock, catalog_content, db, setup_catalog, fake_check, produce_mock):
+    check = await fake_check()
+    url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(url, status=200, body="a,b,c\n1,2".encode("utf-8"))
-    await analyse_csv(url=url)
+    await analyse_csv(check_id=check["id"])
     res = await db.fetchrow("SELECT * FROM csv_analysis")
     assert res["parsing_table"] is None
     assert res["parsing_error"] == "copy_records_to_table:list index out of range"
     with pytest.raises(UndefinedTableError):
         await db.execute(f'SELECT * FROM "{table_name}"')
+
+
+async def test_analyse_csv_url_param(rmock, catalog_content, clean_db):
+    url = "https://example.com/another-url"
+    rmock.get(url, status=200, body=catalog_content)
+    await analyse_csv(url=url)
+
+
+async def test_analyse_csv_send_udata_webhook(setup_catalog, rmock, catalog_content, db, fake_check, udata_url):
+    check = await fake_check()
+    url = check["url"]
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    rmock.get(url, status=200, body=catalog_content)
+    rmock.put(udata_url, status=200)
+    await analyse_csv(check_id=check["id"])
+    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    assert webhook["analysis:parsing:table"] == table_name
+    assert webhook.get("analysis:parsing:created_at")
+    assert webhook.get("analysis:parsing:error") is None
+
+
+async def test_analyse_csv_send_udata_webhook_error(setup_catalog, rmock, catalog_content, db, fake_check, udata_url):
+    check = await fake_check()
+    url = check["url"]
+    # faulty csv payload
+    rmock.get(url, status=200, body="a,b,c\n1,2".encode("utf-8"))
+    rmock.put(udata_url, status=200)
+    await analyse_csv(check_id=check["id"])
+    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    assert webhook.get("analysis:parsing:table") is None
+    assert webhook.get("analysis:parsing:created_at")
+    assert webhook["analysis:parsing:error"] == "copy_records_to_table:list index out of range"

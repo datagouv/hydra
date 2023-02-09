@@ -24,10 +24,12 @@ from str2float import str2float
 from udata_hydra import context, config
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.errors import ParseException
+from udata_hydra.utils import queue
 from udata_hydra.utils.db import (
     get_check, insert_csv_analysis, compute_insert_query,
     update_csv_analysis, get_csv_analysis,
 )
+from udata_hydra.utils.http import send
 from udata_hydra.utils.file import download_resource
 
 
@@ -66,6 +68,25 @@ PYTHON_TYPE_TO_PY = {
 RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 
 
+async def notify_udata(ca_id):
+    """Notify udata of the result of a parsing"""
+    analysis = await get_csv_analysis(ca_id)
+    resource_id = analysis["resource_id"]
+    db = await context.pool()
+    record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
+    if record:
+        payload = {
+            "resource_id": resource_id,
+            "dataset_id": record["dataset_id"],
+            "document": {
+                "analysis:parsing:table": analysis["parsing_table"],
+                "analysis:parsing:error": analysis["parsing_error"],
+                "analysis:parsing:created_at": analysis["created_at"].isoformat(),
+            }
+        }
+        queue.enqueue(send, _priority="high", **payload)
+
+
 async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS_ENABLED:
@@ -98,6 +119,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     finally:
         tmp_file.close()
         os.remove(tmp_file.name)
+        await notify_udata(ca_id)
 
 
 def generate_dialect(inspection: dict) -> stdcsv.Dialect:
