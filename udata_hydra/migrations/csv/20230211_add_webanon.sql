@@ -8,6 +8,7 @@ BEGIN
         CREATE ROLE web_anon nologin;
         GRANT usage ON SCHEMA public TO web_anon;
         GRANT SELECT ON ALL TABLES IN SCHEMA public TO web_anon;
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO web_anon;
    END IF;
 END
 $do$;
