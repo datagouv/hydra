@@ -1,7 +1,7 @@
 import csv
 import os
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -73,7 +73,9 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False):
                     row["dataset.id"],
                     row["id"],
                     row["url"],
-                    datetime.fromisoformat(row["harvest.modified_at"]) if row["harvest.modified_at"] else None,
+                    # force timezone info to UTC (catalog data should be in UTC)
+                    datetime.fromisoformat(row["harvest.modified_at"]).replace(tzinfo=timezone.utc)
+                    if row["harvest.modified_at"] else None,
                 )
         log.info("Catalog successfully upserted into DB.")
     except Exception as e:
