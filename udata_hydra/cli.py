@@ -234,7 +234,7 @@ async def purge_checks(limit=2):
 async def purge_csv_tables():
     """Delete converted CSV tables for resources no longer in catalog"""
     q = """
-        SELECT parsing_table FROM csv_analysis
+        SELECT parsing_table FROM checks
         WHERE parsing_table IN (
             SELECT md5(url) FROM catalog WHERE deleted = TRUE
         )
@@ -250,7 +250,7 @@ async def purge_csv_tables():
             log.debug(f"Deleting table {table}")
             await delete_table(table)
             await context["conn"].execute(
-                "UPDATE csv_analysis SET parsing_table = NULL WHERE parsing_table = $1", table
+                "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
             )
             count += 1
     if count:

@@ -34,6 +34,10 @@ class CheckSchema(Schema):
     dataset_id = fields.Str()
     resource_id = fields.UUID()
     deleted = fields.Boolean()
+    parsing_started_at = fields.DateTime()
+    parsing_finished_at = fields.DateTime()
+    parsing_error = fields.Str()
+    parsing_table = fields.Str()
 
 
 class ResourceDocument(Schema):
@@ -62,12 +66,11 @@ class ResourceQuery(Schema):
     document = fields.Nested(ResourceDocument(), allow_none=True)
 
 
-def _get_args(request):
-    url = request.query.get("url")
-    resource_id = request.query.get("resource_id")
-    if not url and not resource_id:
+def _get_args(request, params=("url", "resource_id")):
+    data = [request.query.get(param) for param in params]
+    if not any(data):
         raise web.HTTPBadRequest()
-    return url, resource_id
+    return data
 
 
 @routes.post("/api/resource/created/")

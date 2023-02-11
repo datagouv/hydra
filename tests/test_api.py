@@ -2,7 +2,10 @@
 NB: we can't use pytest-aiohttp helpers beause
 it will interfere with the rest of our async code
 """
+import hashlib
+
 from datetime import datetime
+
 import pytest
 
 pytestmark = pytest.mark.asyncio
@@ -16,12 +19,13 @@ pytestmark = pytest.mark.asyncio
     ],
 )
 async def test_api_latest(setup_catalog, query, client, fake_check):
-    await fake_check()
+    await fake_check(parsing_table=True)
     resp = await client.get(f"/api/checks/latest/?{query}")
     assert resp.status == 200
     data = await resp.json()
     assert data.pop("created_at")
     assert data.pop("id")
+    url = "https://example.com/resource-1"
     assert data == {
         "response_time": 0.1,
         "deleted": False,
@@ -29,11 +33,15 @@ async def test_api_latest(setup_catalog, query, client, fake_check):
         "catalog_id": 1,
         "domain": "example.com",
         "error": None,
-        "url": "https://example.com/resource-1",
+        "url": url,
         "headers": {"x-do": "you"},
         "timeout": False,
         "dataset_id": "601ddcfc85a59c3a45c2435a",
         "status": 200,
+        "parsing_error": None,
+        "parsing_finished_at": None,
+        "parsing_started_at": None,
+        "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest(),
     }
 
 

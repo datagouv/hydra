@@ -25,10 +25,7 @@ from udata_hydra import context, config
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.errors import ParseException
 from udata_hydra.utils import queue
-from udata_hydra.utils.db import (
-    get_check, insert_csv_analysis, compute_insert_query,
-    update_csv_analysis, get_csv_analysis,
-)
+from udata_hydra.utils.db import get_check, compute_insert_query, update_check
 from udata_hydra.utils.http import send
 from udata_hydra.utils.file import download_resource
 
@@ -68,10 +65,10 @@ PYTHON_TYPE_TO_PY = {
 RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 
 
-async def notify_udata(ca_id):
+async def notify_udata(check_id):
     """Notify udata of the result of a parsing"""
-    analysis = await get_csv_analysis(ca_id)
-    resource_id = analysis["resource_id"]
+    check = await get_check(check_id)
+    resource_id = check["resource_id"]
     db = await context.pool()
     record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
     if record:
@@ -79,9 +76,12 @@ async def notify_udata(ca_id):
             "resource_id": resource_id,
             "dataset_id": record["dataset_id"],
             "document": {
-                "analysis:parsing:table": analysis["parsing_table"],
-                "analysis:parsing:error": analysis["parsing_error"],
-                "analysis:parsing:created_at": analysis["created_at"].isoformat(),
+                "analysis:parsing:table": check["parsing_table"],
+                "analysis:parsing:error": check["parsing_error"],
+                "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
+                if check["parsing_started_at"] else None,
+                "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
+                if check["parsing_finished_at"] else None,
             }
         }
         queue.enqueue(send, _priority="high", **payload)
@@ -102,24 +102,23 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
 
     try:
-        ca_id = await insert_csv_analysis({
-            "resource_id": check.get("resource_id"),
-            "url": url,
-            "check_id": check_id,
-        })
+        if check_id:
+            await update_check(check_id, {"parsing_started_at": datetime.utcnow()})
         csv_inspection = await perform_csv_inspection(tmp_file.name)
         await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
-        await update_csv_analysis(ca_id, {
-            "parsing_table": table_name,
-            "parsing_date": datetime.utcnow(),
-        })
+        if check_id:
+            await update_check(check_id, {
+                "parsing_table": table_name,
+                "parsing_finished_at": datetime.utcnow(),
+            })
         await csv_to_db_index(table_name, csv_inspection, check)
     except ParseException as e:
-        await handle_parse_exception(e, ca_id, table_name)
+        await handle_parse_exception(e, check_id, table_name)
     finally:
         tmp_file.close()
         os.remove(tmp_file.name)
-        await notify_udata(ca_id)
+        if check_id:
+            await notify_udata(check_id)
 
 
 def generate_dialect(inspection: dict) -> stdcsv.Dialect:
@@ -235,26 +234,24 @@ async def delete_table(table_name: str):
     await db.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)
 
 
-async def handle_parse_exception(e: Exception, analysis_id: int, table_name: str) -> None:
+async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -> None:
     """Specific ParsingError handling. Enriches sentry w/ context if available,
        and store error if in a check context. Also cleanup :table_name: if needed."""
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
-    if analysis_id:
+    if check_id:
         if config.SENTRY_DSN:
-            analysis = await get_csv_analysis(analysis_id)
-            url = analysis["url"]
+            check = await get_check(check_id)
+            url = check["url"]
             with sentry_sdk.push_scope() as scope:
-                scope.set_extra("analysis_id", analysis_id)
+                scope.set_extra("check_id", check_id)
                 scope.set_extra("csv_url", url)
-                scope.set_extra("resource_id", analysis["resource_id"])
+                scope.set_extra("resource_id", check_id["resource_id"])
                 event_id = sentry_sdk.capture_exception(e)
         # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
-        q = "UPDATE csv_analysis SET parsing_error = $1 WHERE id = $2"
-        db = await context.pool()
-        await db.execute(q, err, analysis_id)
+        await update_check(check_id, {"parsing_error": err})
         log.error("Parsing error", exc_info=e)
     else:
         raise e

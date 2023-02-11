@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import os
 
 from datetime import datetime
@@ -168,6 +169,7 @@ async def fake_check():
         checksum=None,
         resource_id="c4e3a9fb-4415-488e-ba57-d05269b27adf",
         detected_last_modified_at=None,
+        parsing_table=False,
     ):
         url = f"https://example.com/resource-{resource}"
         data = {
@@ -181,6 +183,7 @@ async def fake_check():
             "error": error,
             "checksum": checksum,
             "detected_last_modified_at": detected_last_modified_at,
+            "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest() if parsing_table else None,
         }
         id = await insert_check(data)
         data["id"] = id
