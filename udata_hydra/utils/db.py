@@ -61,10 +61,6 @@ async def update_check(check_id: int, data: dict) -> int:
     return await update_table_record("checks", check_id, data)
 
 
-async def update_csv_analysis(csv_analysis_id: int, data: dict) -> int:
-    return await update_table_record("csv_analysis", csv_analysis_id, data)
-
-
 async def get_check(check_id):
     pool = await context.pool()
     async with pool.acquire() as connection:
@@ -76,18 +72,3 @@ async def get_check(check_id):
         """
         check = await connection.fetchrow(q, check_id)
     return check
-
-
-async def insert_csv_analysis(data: dict) -> int:
-    data = convert_dict_values_to_json(data)
-    q = compute_insert_query(data, "csv_analysis")
-    pool = await context.pool()
-    async with pool.acquire() as connection:
-        res = await connection.fetchrow(q, *data.values())
-    return res["id"]
-
-
-async def get_csv_analysis(analysis_id: int):
-    q = "SELECT * FROM csv_analysis WHERE id = $1"
-    pool = await context.pool()
-    return await pool.fetchrow(q, analysis_id)

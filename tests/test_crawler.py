@@ -527,8 +527,6 @@ async def test_crawl_triggers_csv_analysis(rmock, event_loop, db, produce_mock, 
     assert len(rmock.requests[("GET", URL(rurl))]) == 1
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 1
-    res = await db.fetch("SELECT * FROM csv_analysis")
-    assert len(res) == 1
     assert res[0]["parsing_table"] is not None
     res = await db.fetch(f'SELECT * FROM "{res[0]["parsing_table"]}"')
     assert len(res) == 2

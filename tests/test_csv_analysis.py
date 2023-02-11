@@ -24,7 +24,7 @@ async def test_analyse_csv_on_catalog(
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(url, status=200, body=catalog_content)
     await analyse_csv(check_id=check["id"], debug_insert=debug_insert)
-    res = await db.fetchrow("SELECT * FROM csv_analysis")
+    res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table_name
     assert res["parsing_error"] is None
     rows = list(await db.fetch(f'SELECT * FROM "{table_name}"'))
@@ -185,7 +185,7 @@ async def test_error_reporting_csv_detective(rmock, catalog_content, db, setup_c
     url = check["url"]
     rmock.get(url, status=200, body="".encode("utf-8"))
     await analyse_csv(check_id=check["id"])
-    res = await db.fetchrow("SELECT * FROM csv_analysis")
+    res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
     assert res["parsing_error"] == "csv_detective:list index out of range"
 
@@ -196,7 +196,7 @@ async def test_error_reporting_parsing(rmock, catalog_content, db, setup_catalog
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(url, status=200, body="a,b,c\n1,2".encode("utf-8"))
     await analyse_csv(check_id=check["id"])
-    res = await db.fetchrow("SELECT * FROM csv_analysis")
+    res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
     assert res["parsing_error"] == "copy_records_to_table:list index out of range"
     with pytest.raises(UndefinedTableError):
@@ -218,7 +218,8 @@ async def test_analyse_csv_send_udata_webhook(setup_catalog, rmock, catalog_cont
     await analyse_csv(check_id=check["id"])
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook["analysis:parsing:table"] == table_name
-    assert webhook.get("analysis:parsing:created_at")
+    assert webhook.get("analysis:parsing:started_at")
+    assert webhook.get("analysis:parsing:finished_at")
     assert webhook.get("analysis:parsing:error") is None
 
 
@@ -231,5 +232,6 @@ async def test_analyse_csv_send_udata_webhook_error(setup_catalog, rmock, catalo
     await analyse_csv(check_id=check["id"])
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("analysis:parsing:table") is None
-    assert webhook.get("analysis:parsing:created_at")
+    assert webhook.get("analysis:parsing:started_at")
+    assert webhook.get("analysis:parsing:finished_at") is None
     assert webhook["analysis:parsing:error"] == "copy_records_to_table:list index out of range"

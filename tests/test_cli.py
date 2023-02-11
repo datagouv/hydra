@@ -1,5 +1,3 @@
-import hashlib
-
 import nest_asyncio
 import pytest
 
@@ -18,11 +16,10 @@ async def test_purge_checks(setup_catalog, db, fake_check):
     assert len(res) == 2
 
 
-async def test_purge_csv_tables(setup_catalog, db):
-    rurl = "https://example.com/resource-1"
-    md5 = hashlib.md5(rurl.encode("utf-8")).hexdigest()
+async def test_purge_csv_tables(setup_catalog, db, fake_check):
     # pretend we have a csv_analysis with a converted table for this url
-    await db.execute("INSERT INTO csv_analysis(url, parsing_table) VALUES ($1, $2)", rurl, md5)
+    check = await fake_check(parsing_table=True)
+    md5 = check["parsing_table"]
     await db.execute(f'CREATE TABLE "{md5}"(id serial)')
     # check table is there before purge
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
@@ -38,12 +35,11 @@ async def test_purge_csv_tables(setup_catalog, db):
     assert res is None
 
 
-async def test_purge_csv_tables_url_used_by_other_resource(setup_catalog, db):
+async def test_purge_csv_tables_url_used_by_other_resource(setup_catalog, db, fake_check):
     """We should not delete csv table if the url is used by a resource still active"""
-    rurl = "https://example.com/resource-1"
-    md5 = hashlib.md5(rurl.encode("utf-8")).hexdigest()
     # pretend we have a csv_analysis with a converted table for this url
-    await db.execute("INSERT INTO csv_analysis(url, parsing_table) VALUES ($1, $2)", rurl, md5)
+    check = await fake_check(parsing_table=True)
+    md5 = check["parsing_table"]
     await db.execute(f'CREATE TABLE "{md5}"(id serial)')
     # check table is there before purge
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
@@ -53,7 +49,7 @@ async def test_purge_csv_tables_url_used_by_other_resource(setup_catalog, db):
     # insert another resource with same url
     await db.execute(
         "INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority) VALUES($1, $2, $3, $4, $5)",
-        "6115eed4acb337ce13b83db3", "7a0c10a0-8e6f-403f-a987-2e223b22ee33", rurl, False, False
+        "6115eed4acb337ce13b83db3", "7a0c10a0-8e6f-403f-a987-2e223b22ee33", check["url"], False, False
     )
     # purge
     run("purge_csv_tables")
