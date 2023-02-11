@@ -100,7 +100,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
 async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     line, expected = line_expected
     with NamedTemporaryFile() as fp:
-        fp.write(f"int, float, string, bool\n\r{line}".encode("utf-8"))
+        fp.write(f"json, date, datetime\n\r{line}".encode("utf-8"))
         fp.seek(0)
         inspection = {
             "separator": ";",
