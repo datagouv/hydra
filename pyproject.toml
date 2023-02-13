@@ -52,6 +52,7 @@ build-backend = "poetry.core.masonry.api"
 asyncio_mode = "strict"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "catalog_harvested: use catalog_harvested.csv as source",
 ]
 
 [tool.poetry.scripts]
