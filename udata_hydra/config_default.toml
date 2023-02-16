@@ -3,6 +3,7 @@ LOG_LEVEL = "DEBUG"
 DATABASE_URL = "postgres://postgres:postgres@localhost:5432/postgres"
 # csv as database table
 DATABASE_URL_CSV = "postgres://postgres:postgres@localhost:5434/postgres"
+DATABASE_SCHEMA = "public"
 REDIS_URL = "redis://localhost:6379/0"
 SENTRY_DSN = ""
 TESTING = false
