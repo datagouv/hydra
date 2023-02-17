@@ -35,7 +35,7 @@ async def download_resource(url: str, headers: dict) -> BinaryIO:
 
     chunk_size = 1024
     i = 0
-    async with aiohttp.ClientSession(headers={"user-agent": config.USER_AGENT}) as session:
+    async with aiohttp.ClientSession(headers={"user-agent": config.USER_AGENT}, raise_for_status=True) as session:
         async with session.get(url, allow_redirects=True) as response:
             async for chunk in response.content.iter_chunked(chunk_size):
                 if i * chunk_size < float(config.MAX_FILESIZE_ALLOWED):

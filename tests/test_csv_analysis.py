@@ -37,13 +37,15 @@ async def test_analyse_csv_on_catalog(
     assert all(k in inspection["columns"] for k in ["id", "url"])
 
 
-@pytest.mark.parametrize("params", [
-    # pretty big one, with empty lines
-    ("20190618-annuaire-diagnostiqueurs.csv", 45522),
-])
-async def test_analyse_csv_real_files(setup_catalog, rmock, db, params, fake_check, produce_mock):
+@pytest.mark.slow
+async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produce_mock):
+    """
+    This test is slow because it parses a pretty big file.
+    It's meant to act as a "canary in the coal mine": if performance degrades too much, you or the CI should feel it.
+    You can deselect it by running `pytest -m "not slow"`.
+    """
     check = await fake_check()
-    filename, expected_count = params
+    filename, expected_count = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     with open(f"tests/data/{filename}", "rb") as f:
@@ -52,6 +54,11 @@ async def test_analyse_csv_real_files(setup_catalog, rmock, db, params, fake_che
     await analyse_csv(check_id=check["id"])
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
+    profile = await db.fetchrow("SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"])
+    profile = json.loads(profile["csv_detective"])
+    for attr in ("header", "columns", "formats", "profile"):
+        assert profile[attr]
+    assert profile["total_lines"] == expected_count
 
 
 @pytest.mark.parametrize("line_expected", (
