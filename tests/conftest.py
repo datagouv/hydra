@@ -38,12 +38,6 @@ def dummy(return_value=None):
     return fn
 
 
-def pytest_configure(config):
-    config.addinivalue_line(
-        "markers", "catalog_harvested: use catalog_harvested.csv as source"
-    )
-
-
 @pytest.fixture
 def is_harvested(request):
     return "catalog_harvested" in [m.name for m in request.node.iter_markers()]

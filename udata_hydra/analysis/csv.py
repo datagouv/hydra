@@ -28,6 +28,7 @@ from udata_hydra.utils import queue
 from udata_hydra.utils.db import get_check, compute_insert_query, update_check
 from udata_hydra.utils.http import send
 from udata_hydra.utils.file import download_resource
+from udata_hydra.utils.timer import Timer
 
 
 log = logging.getLogger("udata-hydra")
@@ -93,6 +94,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
         log.debug("CSV_ANALYSIS_ENABLED turned off, skipping.")
         return
 
+    timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
     check = await get_check(check_id) if check_id is not None else {}
     url = check.get("url") or url
@@ -100,12 +102,15 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     headers = json.loads(check.get("headers") or "{}")
     tmp_file = open(file_path, "rb") if file_path else await download_resource(url, headers)
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    timer.mark("download-file")
 
     try:
         if check_id:
             await update_check(check_id, {"parsing_started_at": datetime.utcnow()})
         csv_inspection = await perform_csv_inspection(tmp_file.name)
+        timer.mark("csv-inspection")
         await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
+        timer.mark("csv-to-db")
         if check_id:
             await update_check(check_id, {
                 "parsing_table": table_name,
@@ -115,6 +120,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     except ParseException as e:
         await handle_parse_exception(e, check_id, table_name)
     finally:
+        timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
         if check_id:
@@ -223,7 +229,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
 async def perform_csv_inspection(file_path):
     """Launch csv-detective against given file"""
     try:
-        return csv_detective_routine(file_path)
+        return csv_detective_routine(file_path, output_profile=True, num_rows=-1)
     except Exception as e:
         raise ParseException("csv_detective") from e
 
