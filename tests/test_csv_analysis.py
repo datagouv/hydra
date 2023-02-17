@@ -195,6 +195,7 @@ async def test_error_reporting_csv_detective(rmock, catalog_content, db, setup_c
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
     assert res["parsing_error"] == "csv_detective:list index out of range"
+    assert res["parsing_finished_at"]
 
 
 async def test_error_reporting_parsing(rmock, catalog_content, db, setup_catalog, fake_check, produce_mock):
@@ -206,6 +207,7 @@ async def test_error_reporting_parsing(rmock, catalog_content, db, setup_catalog
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
     assert res["parsing_error"] == "copy_records_to_table:list index out of range"
+    assert res["parsing_finished_at"]
     with pytest.raises(UndefinedTableError):
         await db.execute(f'SELECT * FROM "{table_name}"')
 
@@ -240,5 +242,5 @@ async def test_analyse_csv_send_udata_webhook_error(setup_catalog, rmock, catalo
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("analysis:parsing:table") is None
     assert webhook.get("analysis:parsing:started_at")
-    assert webhook.get("analysis:parsing:finished_at") is None
+    assert webhook.get("analysis:parsing:finished_at")
     assert webhook["analysis:parsing:error"] == "copy_records_to_table:list index out of range"

@@ -257,7 +257,7 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
         # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
-        await update_check(check_id, {"parsing_error": err})
+        await update_check(check_id, {"parsing_error": err, "parsing_finished_at": datetime.utcnow()})
         log.error("Parsing error", exc_info=e)
     else:
         raise e
