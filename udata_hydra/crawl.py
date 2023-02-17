@@ -14,7 +14,7 @@ from udata_hydra import config, context
 from udata_hydra.analysis.resource import process_resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils import queue
-from udata_hydra.utils.db import insert_check
+from udata_hydra.db import checks
 from udata_hydra.utils.http import send
 
 results = defaultdict(int)
@@ -97,7 +97,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
         )
 
     is_first_check = last_check is None
-    return await insert_check(check_data), is_first_check
+    return await checks.insert(check_data), is_first_check
 
 
 async def is_backoff(domain) -> Tuple[bool, str]:

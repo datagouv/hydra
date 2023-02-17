@@ -13,7 +13,7 @@ from udata_hydra import context
 from udata_hydra.utils import queue
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.utils.csv import detect_csv_from_headers
-from udata_hydra.utils.db import update_check, get_check
+from udata_hydra.db.checks import update, get
 from udata_hydra.utils.file import compute_checksum_from_file, download_resource
 from udata_hydra.utils.http import send
 
@@ -32,7 +32,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     Will call udata if first check or changes found, and update check with optionnal infos
     """
-    check = await get_check(check_id)
+    check = await get(check_id)
     if not check:
         log.error(f"Check not found by id {check_id}")
         return
@@ -75,7 +75,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         finally:
             if tmp_file and not is_csv:
                 os.remove(tmp_file.name)
-            await update_check(check_id, {
+            await update(check_id, {
                 "checksum": dl_analysis.get("analysis:checksum"),
                 "analysis_error": dl_analysis.get("analysis:error"),
                 "filesize": dl_analysis.get("analysis:filesize"),

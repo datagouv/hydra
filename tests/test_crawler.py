@@ -20,7 +20,7 @@ from yarl import URL
 from udata_hydra import config
 from udata_hydra.crawl import crawl, check_url, STATUS_BACKOFF
 from udata_hydra.analysis.resource import process_resource
-from udata_hydra.utils.db import get_check
+from udata_hydra.db import checks
 
 from .conftest import RESOURCE_ID as resource_id
 from .conftest import DATASET_ID as dataset_id
@@ -323,7 +323,7 @@ async def test_process_resource(setup_catalog, mocker, fake_check):
 
     check = await fake_check()
     await process_resource(check["id"], False)
-    result = await get_check(check["id"])
+    result = await checks.get(check["id"])
 
     assert result["error"] is None
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
