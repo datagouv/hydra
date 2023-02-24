@@ -35,7 +35,7 @@ async def pool(db="main"):
             dsn=dsn,
             max_size=config.MAX_POOL_SIZE,
             server_settings={
-                "search_path": getattr(config, "DATABASE_SCHEMA")
+                "search_path": config.DATABASE_SCHEMA
             }
         )
     return context["databases"][db]
