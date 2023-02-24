@@ -31,7 +31,13 @@ def monitor():
 async def pool(db="main"):
     if db not in context["databases"]:
         dsn = config.DATABASE_URL if db == "main" else getattr(config, f"DATABASE_URL_{db.upper()}")
-        context["databases"][db] = await asyncpg.create_pool(dsn=dsn, max_size=config.MAX_POOL_SIZE)
+        context["databases"][db] = await asyncpg.create_pool(
+            dsn=dsn,
+            max_size=config.MAX_POOL_SIZE,
+            server_settings={
+                "search_path": config.DATABASE_SCHEMA
+            }
+        )
     return context["databases"][db]
 
 
