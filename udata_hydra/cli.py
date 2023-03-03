@@ -195,7 +195,11 @@ async def drop_dbs(dbs=[]):
         if db == "main":
             conn = context["conn"]
         else:
-            conn = await asyncpg.connect(dsn=getattr(config, f"DATABASE_URL_{db.upper()}"))
+            conn = await asyncpg.connect(
+                dsn=getattr(config, f"DATABASE_URL_{db.upper()}"),
+                server_settings={
+                    "search_path": config.DATABASE_SCHEMA
+                })
 
         tables = await conn.fetch("""
             SELECT tablename FROM pg_catalog.pg_tables
@@ -261,7 +265,11 @@ async def purge_csv_tables():
 
 @wrap
 async def cli_wrapper():
-    context["conn"] = await asyncpg.connect(dsn=config.DATABASE_URL)
+    context["conn"] = await asyncpg.connect(
+        dsn=config.DATABASE_URL,
+        server_settings={
+            "search_path": config.DATABASE_SCHEMA
+        })
     yield
     await context["conn"].close()
 
