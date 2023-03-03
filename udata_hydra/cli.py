@@ -33,6 +33,17 @@ async def download_file(url, fd):
                 fd.write(chunk)
 
 
+async def connection(db="main"):
+    if db not in context["conn"]:
+        dsn = config.DATABASE_URL if db == "main" else getattr(config, f"DATABASE_URL_{db.upper()}")
+        context["conn"][db] = await asyncpg.connect(
+            dsn=dsn,
+            server_settings={
+                "search_path": config.DATABASE_SCHEMA
+            })
+    return context["conn"][db]
+
+
 @cli
 async def load_catalog(url=None, drop_meta=False, drop_all=False):
     """Load the catalog into DB from CSV file
@@ -55,13 +66,14 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False):
             await download_file(url, fd)
         log.info("Upserting catalog in database...")
         # consider everything deleted, deleted will be updated when loading new catalog
-        await context["conn"].execute("UPDATE catalog SET deleted = TRUE")
+        conn = await connection()
+        await conn.execute("UPDATE catalog SET deleted = TRUE")
         with open(fd.name) as fd:
             reader = csv.DictReader(fd, delimiter=";")
             rows = list(reader)
             bar = ProgressBar(total=len(rows))
             for row in bar.iter(rows):
-                await context["conn"].execute(
+                await conn.execute(
                     """
                     INSERT INTO catalog (
                         dataset_id, resource_id, url, harvest_modified_at,
@@ -106,7 +118,8 @@ async def check_url(url, method="get"):
 async def check_resource(resource_id, method="get"):
     """Trigger a complete check for a given resource_id"""
     q = "SELECT * FROM catalog WHERE resource_id = $1"
-    res = await context["conn"].fetch(q, resource_id)
+    conn = await connection()
+    res = await conn.fetch(q, resource_id)
     if not res:
         log.error("Resource not found in catalog")
         return
@@ -152,13 +165,14 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
         AND checks.domain <> 'static.data.gouv.fr'
         {end_q}
     """
-    res = await context["conn"].fetch(q)
+    conn = await connection()
+    res = await conn.fetch(q)
     # and from us for the rest
     q = f"""{start_q}
         AND checks.domain = 'static.data.gouv.fr'
         {end_q}
     """
-    res += await context["conn"].fetch(q)
+    res += await conn.fetch(q)
 
     data_path = Path("./data")
     dl_path = data_path / "downloaded"
@@ -192,15 +206,10 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
 @cli
 async def drop_dbs(dbs=[]):
     for db in dbs:
-        if db == "main":
-            conn = context["conn"]
-        else:
-            conn = await asyncpg.connect(dsn=getattr(config, f"DATABASE_URL_{db.upper()}"))
-
-        tables = await conn.fetch("""
+        conn = await connection(db)
+        tables = await conn.fetch(f"""
             SELECT tablename FROM pg_catalog.pg_tables
-            WHERE schemaname != 'information_schema' AND
-            schemaname != 'pg_catalog';
+            WHERE schemaname = '{config.DATABASE_SCHEMA}';
         """)
         for table in tables:
             await conn.execute(f'DROP TABLE "{table["tablename"]}"')
@@ -219,7 +228,8 @@ async def migrate(skip_errors=False, dbs=["main", "csv"]):
 async def purge_checks(limit=2):
     """Delete past checks for each resource_id, keeping only `limit` number of checks"""
     q = "SELECT resource_id FROM checks GROUP BY resource_id HAVING count(id) > $1"
-    resources = await context["conn"].fetch(q, limit)
+    conn = await connection()
+    resources = await conn.fetch(q, limit)
     for r in resources:
         resource_id = r["resource_id"]
         log.debug(f"Deleting outdated checks for resource {resource_id}")
@@ -227,7 +237,7 @@ async def purge_checks(limit=2):
             SELECT id FROM checks WHERE resource_id = $1 ORDER BY created_at DESC OFFSET $2
         )
         """
-        await context["conn"].execute(q, resource_id, limit)
+        await conn.execute(q, resource_id, limit)
 
 
 @cli
@@ -240,16 +250,17 @@ async def purge_csv_tables():
         )
     """
     count = 0
-    res = await context["conn"].fetch(q)
+    conn = await connection()
+    res = await conn.fetch(q)
     for r in res:
         table = r["parsing_table"]
         # check the URL is not used by another active resource
         q = "SELECT id FROM catalog WHERE md5(url) = $1 and deleted = FALSE"
-        not_deleted = await context["conn"].fetch(q, table)
+        not_deleted = await conn.fetch(q, table)
         if not not_deleted:
             log.debug(f"Deleting table {table}")
             await delete_table(table)
-            await context["conn"].execute(
+            await conn.execute(
                 "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
             )
             count += 1
@@ -261,9 +272,10 @@ async def purge_csv_tables():
 
 @wrap
 async def cli_wrapper():
-    context["conn"] = await asyncpg.connect(dsn=config.DATABASE_URL)
+    context["conn"] = {}
     yield
-    await context["conn"].close()
+    for db in context["conn"]:
+        await context["conn"][db].close()
 
 
 if __name__ == "__main__":

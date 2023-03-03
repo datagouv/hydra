@@ -252,7 +252,7 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
             with sentry_sdk.push_scope() as scope:
                 scope.set_extra("check_id", check_id)
                 scope.set_extra("csv_url", url)
-                scope.set_extra("resource_id", check_id["resource_id"])
+                scope.set_extra("resource_id", check["resource_id"])
                 event_id = sentry_sdk.capture_exception(e)
         # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
