@@ -262,7 +262,7 @@ async def purge_csv_tables():
             await delete_table(table)
             await conn.execute(
                 "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-            )   
+            )
             count += 1
     if count:
         log.info(f"Deleted {count} table(s).")
