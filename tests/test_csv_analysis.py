@@ -28,7 +28,7 @@ async def test_analyse_csv_on_catalog(
     assert res["parsing_table"] == table_name
     assert res["parsing_error"] is None
     rows = list(await db.fetch(f'SELECT * FROM "{table_name}"'))
-    assert len(rows) == 1
+    assert len(rows) == 2
     row = rows[0]
     assert row["id"] == RESOURCE_ID
     assert row["url"] == "https://example.com/resource-1"
