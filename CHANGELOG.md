@@ -11,6 +11,7 @@
 - Include migration files in package
 - Allow to configure a dedicated PostgreSQL schema [#56](https://github.com/etalab/udata-hydra/pull/56)
 - Fix typo in handle_parse_exception and schema in CLI [#57](https://github.com/etalab/udata-hydra/pull/57)
+- Skip archived dataset when loading catalog [#58](https://github.com/etalab/udata-hydra/pull/58)
 
 ## 1.0.1 (2023-01-04)
 

@@ -48,6 +48,7 @@ async def test_catalog(setup_catalog, db):
         "SELECT * FROM catalog WHERE resource_id = $1",
         "c4e3a9fb-4415-488e-ba57-d05269b27adf",
     )
+    # Only one resource because the other belonged to an archived dataset
     assert len(res) == 1
     resource = res[0]
     assert resource["url"] == "https://example.com/resource-1"
@@ -95,7 +96,7 @@ async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop
     # load a new catalog with a new URL for this resource
     with open("tests/data/catalog.csv", "r") as cfile:
         catalog_content = cfile.readlines()
-    catalog_content[-1] = catalog_content[-1].replace("resource-1", "resource-2")
+    catalog_content[1] = catalog_content[1].replace("resource-1", "resource-2")
     catalog_content = "\n".join(catalog_content)
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content.encode("utf-8"))

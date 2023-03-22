@@ -73,6 +73,11 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False):
             rows = list(reader)
             bar = ProgressBar(total=len(rows))
             for row in bar.iter(rows):
+
+                # Skip resources belonging to an archived dataset
+                if row.get("dataset.archived") != "False":
+                    continue
+
                 await conn.execute(
                     """
                     INSERT INTO catalog (
