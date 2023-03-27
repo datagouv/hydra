@@ -531,3 +531,27 @@ async def test_crawl_triggers_csv_analysis(rmock, event_loop, db, produce_mock, 
     assert res[0]["parsing_table"] is not None
     res = await db.fetch(f'SELECT * FROM "{res[0]["parsing_table"]}"')
     assert len(res) == 2
+
+
+async def test_recrawl_download_only_once(rmock, fake_check, event_loop, db, produce_mock, setup_catalog):
+    """On recrawl of a (CSV) file, if it hasn't change, downloads only once"""
+    await fake_check(
+        resource_id=resource_id,
+        headers={
+            "last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"
+        }
+    )
+    rurl = "https://example.com/resource-1"
+    # mock for check, with same last-modified header
+    rmock.head(rurl, status=200, headers={
+        "last-modified": "Thu, 09 Jan 2020 09:33:37 GMT",
+        "content-type": "application/csv"
+    })
+    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
+    event_loop.run_until_complete(crawl(iterations=1))
+
+    # HEAD should have been called
+    assert len(rmock.requests[("HEAD", URL(rurl))]) == 1
+
+    # GET shouldn't have been called
+    assert ("GET", URL(rurl)) not in rmock.requests
