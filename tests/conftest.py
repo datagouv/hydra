@@ -211,7 +211,6 @@ def udata_resource_payload():
             "checksum_type": "sha1",
             "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
             "created_at": datetime.now().isoformat(),
-            "modified": datetime.now().isoformat(),
-            "published": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat(),
         }
     }
