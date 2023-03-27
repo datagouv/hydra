@@ -52,10 +52,9 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     # could it be a CSV? If we get hints, we will download the file
     is_csv = await detect_csv_from_headers(check)
 
-    # if not, let's download the file to get some hints and other infos
+    # if no change analysis or first time csv let's download the file to get some hints and other infos
     dl_analysis = {}
-    # TODO: we do not need re-download CSV if we alrady know it has not changed
-    if not change_analysis or is_csv:
+    if not change_analysis or (is_csv and is_first_check):
         tmp_file = None
         try:
             tmp_file = await download_resource(url, headers)
