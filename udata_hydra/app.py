@@ -1,5 +1,6 @@
 import json
 import os
+import pytz
 
 from datetime import datetime, timedelta
 
@@ -203,7 +204,7 @@ async def status_crawler(request):
     stats_catalog = await request.app["pool"].fetchrow(q)
 
     since = parse_timespan(config.SINCE)
-    since = datetime.utcnow() - timedelta(seconds=since)
+    since = datetime.now(pytz.UTC) - timedelta(seconds=since)
     q = f"""
         SELECT
             SUM(CASE WHEN checks.created_at <= $1 THEN 1 ELSE 0 END) AS count_outdated
