@@ -6,7 +6,6 @@ from datetime import date, datetime
 from tempfile import NamedTemporaryFile
 
 from asyncpg.exceptions import UndefinedTableError
-from yarl import URL
 
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 
