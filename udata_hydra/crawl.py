@@ -34,6 +34,21 @@ def is_valid_status(status):
     return status >= 200 and status < 400
 
 
+async def get_content_type_from_header(headers):
+    """
+    Parse content-type header to retrieve only the mime type
+    """
+    content_type = headers.get("content-type")
+    if not content_type or ";" not in content_type:
+        return content_type
+    try:
+        content_type, _ = content_type.split(";")
+    except ValueError:
+        # Weird e.g.: text/html;h5ai=0.20;charset=UTF-8
+        content_type, _, _ = content_type.split(";")
+    return content_type
+
+
 async def compute_check_has_changed(check_data, last_check) -> bool:
     is_first_check = not last_check
     status_has_changed = last_check and check_data.get("status") != last_check.get("status")
@@ -59,6 +74,8 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
             "check:timeout": check_data["timeout"],
             "check:date": datetime.utcnow().isoformat(),
             "check:error": check_data.get("error"),
+            "check:headers:content-type": await get_content_type_from_header(check_data.get("headers", {})),
+            "check:headers:content-length": int(check_data.get("headers", {}).get("content-length", 0)) or None
         }
         pool = await context.pool()
         async with pool.acquire() as conn:

@@ -18,7 +18,7 @@ from minicli import run
 from yarl import URL
 
 from udata_hydra import config
-from udata_hydra.crawl import crawl, check_url, STATUS_BACKOFF
+from udata_hydra.crawl import crawl, check_url, get_content_type_from_header, STATUS_BACKOFF
 from udata_hydra.analysis.resource import process_resource
 from udata_hydra.utils.db import get_check
 
@@ -177,6 +177,8 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mo
         assert webhook.get("check:available") is False
     else:
         assert webhook.get("check:available")
+        assert webhook.get("check:headers:content-type") == "application/json"
+        assert webhook.get("check:headers:content-length") == 10
     if timeout:
         assert webhook.get("check:timeout")
     else:
@@ -555,3 +557,17 @@ async def test_recrawl_download_only_once(rmock, fake_check, event_loop, db, pro
 
     # GET shouldn't have been called
     assert ("GET", URL(rurl)) not in rmock.requests
+
+
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        # (content type header, parsed content type)
+        ("application/json", "application/json"),
+        ("text/html; charset=utf-8", "text/html"),
+        ("text/html;h5ai=0.20;charset=UTF-8", "text/html")
+    ],
+)
+async def test_content_type_from_header(content_type):
+    content_type_header, parsed_content_type = content_type
+    assert parsed_content_type == await get_content_type_from_header({"content-type": content_type_header})
