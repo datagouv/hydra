@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import os
+import pytz
 import sys
 
 from datetime import datetime
@@ -24,9 +25,7 @@ from str2float import str2float
 from udata_hydra import context, config
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.errors import ParseException
-from udata_hydra.utils import queue
 from udata_hydra.utils.db import get_check, compute_insert_query, update_check
-from udata_hydra.utils.http import send
 from udata_hydra.utils.file import download_resource
 from udata_hydra.utils.timer import Timer
 
@@ -66,28 +65,6 @@ PYTHON_TYPE_TO_PY = {
 RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 
 
-async def notify_udata(check_id):
-    """Notify udata of the result of a parsing"""
-    check = await get_check(check_id)
-    resource_id = check["resource_id"]
-    db = await context.pool()
-    record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
-    if record:
-        payload = {
-            "resource_id": resource_id,
-            "dataset_id": record["dataset_id"],
-            "document": {
-                "analysis:parsing:table": check["parsing_table"],
-                "analysis:parsing:error": check["parsing_error"],
-                "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
-                if check["parsing_started_at"] else None,
-                "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
-                if check["parsing_finished_at"] else None,
-            }
-        }
-        queue.enqueue(send, _priority="high", **payload)
-
-
 async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS_ENABLED:
@@ -106,7 +83,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
 
     try:
         if check_id:
-            await update_check(check_id, {"parsing_started_at": datetime.utcnow()})
+            await update_check(check_id, {"parsing_started_at": datetime.now(pytz.UTC)})
         csv_inspection = await perform_csv_inspection(tmp_file.name)
         timer.mark("csv-inspection")
         await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
@@ -114,7 +91,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
         if check_id:
             await update_check(check_id, {
                 "parsing_table": table_name,
-                "parsing_finished_at": datetime.utcnow(),
+                "parsing_finished_at": datetime.now(pytz.UTC),
             })
         await csv_to_db_index(table_name, csv_inspection, check)
     except ParseException as e:
@@ -123,8 +100,6 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
-        if check_id:
-            await notify_udata(check_id)
 
 
 def generate_dialect(inspection: dict) -> stdcsv.Dialect:
@@ -257,7 +232,7 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
         # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
-        await update_check(check_id, {"parsing_error": err, "parsing_finished_at": datetime.utcnow()})
+        await update_check(check_id, {"parsing_error": err, "parsing_finished_at": datetime.now(pytz.UTC)})
         log.error("Parsing error", exc_info=e)
     else:
         raise e

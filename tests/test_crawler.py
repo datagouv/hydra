@@ -1,6 +1,7 @@
 import hashlib
 import json
 import pytest
+import pytz
 import sys
 import tempfile
 
@@ -434,7 +435,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
-    now = datetime.utcnow()
+    now = datetime.now(pytz.UTC)
     # modified date should be pretty close from now, let's say 30 seconds
     assert (modified_date - now).total_seconds() < 30
     assert data["analysis:last-modified-detection"] == "computed-checksum"

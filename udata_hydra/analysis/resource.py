@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import pytz
 
 from datetime import datetime
 from typing import Union
@@ -161,7 +162,7 @@ async def detect_resource_change_from_checksum(resource_id, new_checksum) -> Uni
         data = await connection.fetchrow(q, resource_id)
         if data and data["checksum"] != new_checksum:
             return {
-                "analysis:last-modified-at": datetime.utcnow().isoformat(),
+                "analysis:last-modified-at": datetime.now(pytz.UTC).isoformat(),
                 "analysis:last-modified-detection": "computed-checksum",
             }
 

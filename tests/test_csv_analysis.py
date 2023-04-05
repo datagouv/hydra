@@ -6,7 +6,6 @@ from datetime import date, datetime
 from tempfile import NamedTemporaryFile
 
 from asyncpg.exceptions import UndefinedTableError
-from yarl import URL
 
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 
@@ -216,31 +215,3 @@ async def test_analyse_csv_url_param(rmock, catalog_content, clean_db):
     url = "https://example.com/another-url"
     rmock.get(url, status=200, body=catalog_content)
     await analyse_csv(url=url)
-
-
-async def test_analyse_csv_send_udata_webhook(setup_catalog, rmock, catalog_content, db, fake_check, udata_url):
-    check = await fake_check()
-    url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
-    rmock.get(url, status=200, body=catalog_content)
-    rmock.put(udata_url, status=200)
-    await analyse_csv(check_id=check["id"])
-    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
-    assert webhook["analysis:parsing:table"] == table_name
-    assert webhook.get("analysis:parsing:started_at")
-    assert webhook.get("analysis:parsing:finished_at")
-    assert webhook.get("analysis:parsing:error") is None
-
-
-async def test_analyse_csv_send_udata_webhook_error(setup_catalog, rmock, catalog_content, db, fake_check, udata_url):
-    check = await fake_check()
-    url = check["url"]
-    # faulty csv payload
-    rmock.get(url, status=200, body="a,b,c\n1,2".encode("utf-8"))
-    rmock.put(udata_url, status=200)
-    await analyse_csv(check_id=check["id"])
-    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
-    assert webhook.get("analysis:parsing:table") is None
-    assert webhook.get("analysis:parsing:started_at")
-    assert webhook.get("analysis:parsing:finished_at")
-    assert webhook["analysis:parsing:error"] == "copy_records_to_table:list index out of range"
