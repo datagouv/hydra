@@ -2,6 +2,7 @@ import time
 
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+import pytz
 from typing import Tuple
 from urllib.parse import urlparse
 
@@ -57,7 +58,7 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
             "check:available": is_valid_status(check_data.get("status")),
             "check:status": check_data.get("status"),
             "check:timeout": check_data["timeout"],
-            "check:date": datetime.utcnow().isoformat(),
+            "check:date": datetime.now(pytz.UTC).isoformat(),
             "check:error": check_data.get("error"),
         }
         pool = await context.pool()
@@ -323,7 +324,7 @@ async def crawl_batch():
         # if not enough for our batch size, handle outdated checks
         if len(to_check) < config.BATCH_SIZE:
             since = parse_timespan(config.SINCE)  # in seconds
-            since = datetime.utcnow() - timedelta(seconds=since)
+            since = datetime.now(pytz.UTC) - timedelta(seconds=since)
             limit = config.BATCH_SIZE - len(to_check)
             q = f"""
             SELECT * FROM (

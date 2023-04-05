@@ -14,6 +14,7 @@
 - Skip archived dataset when loading catalog [#58](https://github.com/etalab/udata-hydra/pull/58)
 - Update resources expected dates in API following udata refactoring [#60](https://github.com/etalab/udata-hydra/pull/60)
 - Download csv resource only if first check [#61](https://github.com/etalab/udata-hydra/pull/61)
+- Add timezone values to dates sent to udata [#63](https://github.com/etalab/udata-hydra/pull/63)
 
 ## 1.0.1 (2023-01-04)
 
