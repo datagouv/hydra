@@ -143,7 +143,9 @@ async def is_backoff(domain) -> Tuple[bool, str]:
             q = f"""
                 SELECT
                     headers->>'x-ratelimit-remaining' as ratelimit_remaining,
-                    headers->>'x-ratelimit-limit' as ratelimit_limit
+                    headers->>'x-ratelimit-limit' as ratelimit_limit,
+                    status,
+                    created_at
                 FROM checks
                 WHERE domain = $1 AND domain NOT IN {no_backoff}
                 ORDER BY created_at DESC
@@ -151,6 +153,9 @@ async def is_backoff(domain) -> Tuple[bool, str]:
             """
             res = await connection.fetchrow(q, domain)
             if res:
+                if res["status"] == 429 and res["created_at"] > since:
+                    # we have made too many requests already and haven't cooled off yet
+                    return True, "429 status code has been returned on the latest call"
                 try:
                     remain, limit = float(res["ratelimit_remaining"]), float(res["ratelimit_limit"])
                 except (ValueError, TypeError):
