@@ -248,6 +248,26 @@ async def test_backoff_lifted(setup_catalog, event_loop, rmock, mocker, fake_che
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
+async def test_backoff_on_429_status_code(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock, db):
+    resource_id = "c5187912-24a5-49ea-a725-5e1e3d472efe"
+    await fake_check(resource=2, resource_id=resource_id)
+    mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
+    rurl = "https://example.com/resource-1"
+    await db.execute("UPDATE checks SET status = 429 WHERE resource_id = $1", resource_id)
+    rmock.head(rurl, status=200)
+    row = await db.fetchrow("SELECT * FROM catalog")
+    async with ClientSession() as session:
+        res = await check_url(row, session)
+    assert res == STATUS_BACKOFF
+    # verify that we actually backed-off
+    assert ("HEAD", URL(rurl)) not in rmock.requests
+    # we wait for BACKOFF_PERIOD before crawling again, it should _not_ backoff
+    async with ClientSession() as session:
+        res = await check_url(row, session, sleep=0.25)
+    assert res != STATUS_BACKOFF
+    assert ("HEAD", URL(rurl)) in rmock.requests
+
+
 async def test_no_backoff_domains(
     setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock
 ):
