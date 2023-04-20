@@ -55,8 +55,8 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     # if no change analysis or first time csv let's download the file to get some hints and other infos
     dl_analysis = {}
+    tmp_file = None
     if not change_analysis or (is_csv and is_first_check):
-        tmp_file = None
         try:
             tmp_file = await download_resource(url, headers)
         except IOError:
