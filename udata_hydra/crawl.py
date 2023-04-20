@@ -367,7 +367,7 @@ async def crawl_batch():
         await crawl_urls(to_check)
     else:
         context.monitor().set_status("Nothing to crawl for now.")
-        await asyncio.sleep(config.SLEEP_BETWEEN_BATCHES)
+    await asyncio.sleep(config.SLEEP_BETWEEN_BATCHES)
 
 
 async def crawl(iterations=-1):
