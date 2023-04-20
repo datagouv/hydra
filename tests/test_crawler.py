@@ -365,7 +365,7 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
     req = rmock.requests[("PUT", URL(udata_url))]
     assert len(req) == 1
     document = req[0].kwargs["json"]
-    assert document["analysis:filesize"] == len(SIMPLE_CSV_CONTENT)
+    assert document["analysis:content-length"] == len(SIMPLE_CSV_CONTENT)
     assert document["analysis:mime-type"] == "text/plain"
 
 
