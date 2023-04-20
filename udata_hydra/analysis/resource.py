@@ -63,7 +63,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             dl_analysis["analysis:error"] = "File too large to download"
         else:
             # Get file size
-            dl_analysis["analysis:filesize"] = os.path.getsize(tmp_file.name)
+            dl_analysis["analysis:content-length"] = os.path.getsize(tmp_file.name)
             # Get checksum
             dl_analysis["analysis:checksum"] = compute_checksum_from_file(tmp_file.name)
             # Check if checksum has been modified if we don't have other hints
@@ -78,7 +78,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             await update_check(check_id, {
                 "checksum": dl_analysis.get("analysis:checksum"),
                 "analysis_error": dl_analysis.get("analysis:error"),
-                "filesize": dl_analysis.get("analysis:filesize"),
+                "filesize": dl_analysis.get("analysis:content-length"),
                 "mime_type": dl_analysis.get("analysis:mime-type"),
             })
 

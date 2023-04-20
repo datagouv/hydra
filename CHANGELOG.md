@@ -16,6 +16,7 @@
 - Download csv resource only if first check [#61](https://github.com/etalab/udata-hydra/pull/61)
 - Send content-type and content-length info from header to udata [#64](https://github.com/etalab/udata-hydra/pull/64)
 - Add timezone values to dates sent to udata [#63](https://github.com/etalab/udata-hydra/pull/63)
+- Rename analysis filesize to content-length [#66](https://github.com/etalab/udata-hydra/pull/66)
 
 ## 1.0.1 (2023-01-04)
 

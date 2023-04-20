@@ -237,7 +237,7 @@ The payload should look something like:
 
 ```json
 {
-   "analysis:filesize": 91661,
+   "analysis:content-length": 91661,
    "analysis:mime-type": "application/zip",
    "analysis:checksum": "bef1de04601dedaf2d127418759b16915ba083be",
    "analysis:last-modified-at": "2022-11-27T23:00:54.762000",
