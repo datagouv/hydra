@@ -17,6 +17,7 @@
 - Send content-type and content-length info from header to udata [#64](https://github.com/etalab/udata-hydra/pull/64)
 - Add timezone values to dates sent to udata [#63](https://github.com/etalab/udata-hydra/pull/63)
 - Rename analysis filesize to content-length [#66](https://github.com/etalab/udata-hydra/pull/66)
+- Sleep between all batches [#67](https://github.com/etalab/udata-hydra/pull/67)
 
 ## 1.0.1 (2023-01-04)
 
