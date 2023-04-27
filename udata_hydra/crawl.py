@@ -93,7 +93,7 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
     return has_changed
 
 
-async def process_check_data(check_data: dict) -> Tuple[int, bool]:
+async def process_check_data(check_data: dict) -> Tuple[int, bool, bool]:
     """Preprocess a check before saving it"""
     check_data["resource_id"] = str(check_data["resource_id"])
 
@@ -107,7 +107,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
         """
         last_check = await connection.fetchrow(q)
 
-        await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
+        check_has_changed = await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
         await connection.execute(
             "UPDATE catalog SET priority = FALSE WHERE resource_id = $1",
@@ -115,7 +115,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
         )
 
     is_first_check = last_check is None
-    return await insert_check(check_data), is_first_check
+    return await insert_check(check_data), is_first_check, check_has_changed
 
 
 async def is_backoff(domain) -> Tuple[bool, str]:
@@ -242,7 +242,7 @@ async def check_url(row, session, sleep=0, method="head"):
                 return await check_url(row, session, method="get")
             resp.raise_for_status()
 
-            check_id, is_first_check = await process_check_data(
+            check_id, is_first_check, check_has_changed = await process_check_data(
                 {
                     "resource_id": row["resource_id"],
                     "url": row["url"],
@@ -254,7 +254,7 @@ async def check_url(row, session, sleep=0, method="head"):
                 }
             )
 
-            queue.enqueue(process_resource, check_id, is_first_check, _priority="low")
+            queue.enqueue(process_resource, check_id, is_first_check, check_has_changed, _priority="low")
 
             return STATUS_OK
     except asyncio.exceptions.TimeoutError:

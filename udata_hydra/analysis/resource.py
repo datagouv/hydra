@@ -22,7 +22,7 @@ from udata_hydra.utils.http import send
 log = logging.getLogger("udata-hydra")
 
 
-async def process_resource(check_id: int, is_first_check: bool) -> None:
+async def process_resource(check_id: int, is_first_check: bool, check_has_changed: bool = False) -> None:
     """
     Perform analysis on the resource designated by check_id
     - change analysis
@@ -56,7 +56,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     # if no change analysis or first time csv let's download the file to get some hints and other infos
     dl_analysis = {}
     tmp_file = None
-    if not change_analysis or (is_csv and is_first_check):
+    if not change_analysis or (is_csv and (is_first_check or check_has_changed)):
         try:
             tmp_file = await download_resource(url, headers)
         except IOError:
@@ -68,7 +68,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             dl_analysis["analysis:checksum"] = compute_checksum_from_file(tmp_file.name)
             # Check if checksum has been modified if we don't have other hints
             change_analysis = (
-                await detect_resource_change_from_checksum(resource_id, dl_analysis["analysis:checksum"])
+                change_analysis or await detect_resource_change_from_checksum(resource_id, dl_analysis["analysis:checksum"])
                 or {}
             )
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
@@ -82,7 +82,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
                 "mime_type": dl_analysis.get("analysis:mime-type"),
             })
 
-    has_changed_over_time = await detect_has_changed_over_time(change_analysis, resource_id, check_id)
+    has_changed_over_time = check_has_changed or await detect_analysis_has_changed_over_time(change_analysis, resource_id, check_id)
 
     analysis_results = {**dl_analysis, **change_analysis}
     if has_changed_over_time or (is_first_check and analysis_results):
@@ -97,7 +97,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         )
 
 
-async def detect_has_changed_over_time(change_analysis, resource_id, check_id) -> bool:
+async def detect_analysis_has_changed_over_time(change_analysis, resource_id, check_id) -> bool:
     """
     Determine if our detected last modified date has changed since last check
     because some methods (eg last-modified header) do not embed this
