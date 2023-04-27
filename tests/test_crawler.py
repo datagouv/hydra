@@ -509,6 +509,24 @@ async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, p
     event_loop.run_until_complete(crawl(iterations=1))
 
 
+async def test_crawl_and_analysis_on_check_has_changed(setup_catalog, rmock, event_loop, fake_check, db, udata_url):
+    # First check is a 404, second is a 200
+    await fake_check(created_at=datetime.now() - timedelta(days=10), status=404)
+    # a nice head for a csv
+    rmock.head(
+        "https://example.com/resource-1",
+        headers={"content-type": "text/csv", "content-length": "10", "last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"},
+        status=200
+    )
+    rmock.get("https://example.com/resource-1", status=200, body="a;b;c\na;b;c".encode("utf-8"))
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    # even if not first check, download_resource and analysis are being called due to check change
+    assert ("GET", URL("https://example.com/resource-1")) in rmock.requests
+    res = await db.fetchrow("SELECT * FROM checks WHERE url = 'https://example.com/resource-1' ORDER BY created_at DESC")
+    assert res["parsing_table"] is not None
+
+
 async def test_crawl_triggered_by_udata_entrypoint_clean_catalog(
     client, udata_resource_payload, event_loop, db, rmock, analysis_mock, clean_db, produce_mock,
 ):
