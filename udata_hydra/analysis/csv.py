@@ -198,7 +198,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)"
-    await db.execute(q, table_name, json.dumps(inspection), check.get("resource_id"), check.get("url"))
+    await db.execute(q, table_name, json.dumps(inspection, allow_nan=False), check.get("resource_id"), check.get("url"))
 
 
 async def perform_csv_inspection(file_path):
