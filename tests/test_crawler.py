@@ -523,7 +523,9 @@ async def test_crawl_and_analysis_on_check_has_changed(setup_catalog, rmock, eve
     event_loop.run_until_complete(crawl(iterations=1))
     # even if not first check, download_resource and analysis are being called due to check change
     assert ("GET", URL("https://example.com/resource-1")) in rmock.requests
-    res = await db.fetchrow("SELECT * FROM checks WHERE url = 'https://example.com/resource-1' ORDER BY created_at DESC")
+    res = await db.fetchrow(
+        "SELECT * FROM checks WHERE url = 'https://example.com/resource-1' ORDER BY created_at DESC"
+    )
     assert res["parsing_table"] is not None
 
 
