@@ -68,7 +68,8 @@ async def process_resource(check_id: int, is_first_check: bool, check_has_change
             dl_analysis["analysis:checksum"] = compute_checksum_from_file(tmp_file.name)
             # Check if checksum has been modified if we don't have other hints
             change_analysis = (
-                change_analysis or await detect_resource_change_from_checksum(resource_id, dl_analysis["analysis:checksum"])
+                change_analysis
+                or await detect_resource_change_from_checksum(resource_id, dl_analysis["analysis:checksum"])
                 or {}
             )
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
@@ -82,7 +83,10 @@ async def process_resource(check_id: int, is_first_check: bool, check_has_change
                 "mime_type": dl_analysis.get("analysis:mime-type"),
             })
 
-    has_changed_over_time = check_has_changed or await detect_analysis_has_changed_over_time(change_analysis, resource_id, check_id)
+    has_changed_over_time = (
+        check_has_changed
+        or await detect_analysis_has_changed_over_time(change_analysis, resource_id, check_id)
+    )
 
     analysis_results = {**dl_analysis, **change_analysis}
     if has_changed_over_time or (is_first_check and analysis_results):
