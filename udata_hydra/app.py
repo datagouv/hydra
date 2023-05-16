@@ -25,7 +25,7 @@ class CheckSchema(Schema):
     url = fields.Str()
     domain = fields.Str()
     created_at = fields.DateTime()
-    status = fields.Integer()
+    check_status = fields.Integer(data_key="status")
     headers = fields.Function(
         lambda obj: json.loads(obj["headers"]) if obj["headers"] else {}
     )
@@ -161,7 +161,8 @@ async def get_check(request):
     url, resource_id = _get_args(request)
     column = "url" if url else "resource_id"
     q = f"""
-    SELECT catalog.id as catalog_id, checks.id as check_id, *
+    SELECT catalog.id as catalog_id, checks.id as check_id,
+           catalog.status as catalog_status, checks.status as check_status, *
     FROM checks, catalog
     WHERE checks.id = catalog.last_check
     AND catalog.{column} = $1
@@ -179,7 +180,8 @@ async def get_checks(request):
     url, resource_id = _get_args(request)
     column = "url" if url else "resource_id"
     q = f"""
-    SELECT catalog.id as catalog_id, checks.id as check_id, *
+    SELECT catalog.id as catalog_id, checks.id as check_id,
+           catalog.status as catalog_status, checks.status as check_status, *
     FROM checks, catalog
     WHERE catalog.{column} = $1
     AND catalog.url = checks.url
@@ -277,17 +279,16 @@ async def stats(request):
         )
 
     q = f"""
-        SELECT status, count(*) as count FROM checks, catalog
+        SELECT checks.status, count(*) as count FROM checks, catalog
         WHERE catalog.last_check = checks.id
-        AND status IS NOT NULL
+        AND checks.status IS NOT NULL
         AND {get_excluded_clause()}
         AND last_check IS NOT NULL
         AND catalog.deleted = False
-        GROUP BY status
+        GROUP BY checks.status
         ORDER BY count DESC;
     """
     res = await request.app["pool"].fetch(q)
-
     return web.json_response(
         {
             "status": sorted(

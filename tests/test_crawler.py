@@ -594,7 +594,7 @@ async def test_content_type_from_header(content_type):
     assert parsed_content_type == await get_content_type_from_header({"content-type": content_type_header})
 
 
-async def test_dont_crawl_pending(rmock, event_loop, db, produce_mock, setup_catalog):
+async def test_dont_crawl_urls_with_status_crawling(rmock, event_loop, db, produce_mock, setup_catalog):
     """Don't crawl urls that have a status state pending"""
     rurl = "https://example.com/resource-1"
     await db.execute("UPDATE catalog SET priority = TRUE, status = 'crawling' WHERE resource_id = $1", resource_id)
