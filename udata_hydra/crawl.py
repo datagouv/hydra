@@ -93,6 +93,15 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
     return has_changed
 
 
+async def update_catalog_following_check(resource_id):
+    pool = await context.pool()
+    async with pool.acquire() as connection:
+        await connection.execute(
+            "UPDATE catalog SET priority = FALSE, status = NULL WHERE resource_id = $1",
+            resource_id
+        )
+
+
 async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     """Preprocess a check before saving it"""
     check_data["resource_id"] = str(check_data["resource_id"])
@@ -109,10 +118,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
 
         await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
-        await connection.execute(
-            "UPDATE catalog SET priority = FALSE WHERE resource_id = $1",
-            check_data["resource_id"]
-        )
+    await update_catalog_following_check(check_data["resource_id"])
 
     is_first_check = last_check is None
     return await insert_check(check_data), is_first_check
@@ -228,6 +234,7 @@ async def check_url(row, session, sleep=0, method="head"):
     if should_backoff:
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
+        await update_catalog_following_check(row["resource_id"])
         return STATUS_BACKOFF
 
     try:
@@ -309,25 +316,34 @@ def get_excluded_clause():
     return " AND ".join(
         [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS] +
         [
-            "deleted = False",
-            "status != 'crawling'"
+            "catalog.deleted = False",
+            "(catalog.status <> 'crawling' OR catalog.status IS NULL)"
         ]
     )
 
 
 async def select_rows_based_on_query(connection, q, *args):
+    """
+    A transaction wrapper around a select query q pass as param with *args.
+    It first creates a temporary table based on this query,
+    then updates the status values from the rows selected,
+    fetches the selected rows and drops the temporary table.
+    It finally returns the selected (and updated) rows.
+    """
     temporary_table = "crawl_urls"
-    select_and_update_query = f"""
-        BEGIN;
+    create_temp_select_table_query = f"""
         CREATE TEMPORARY TABLE {temporary_table} AS
             {q} FOR UPDATE;
-        UPDATE catalog SET status = 'crawling' WHERE id in (select id from {temporary_table});
-        COMMIT;
+    """
+    update_select_catalog_query = f"""
+        UPDATE catalog SET status = 'crawling' WHERE resource_id in (select resource_id from {temporary_table});
     """
     async with connection.transaction():
-        breakpoint()
-        await connection.execute(select_and_update_query, args)
+        await connection.execute("BEGIN;")
+        await connection.execute(create_temp_select_table_query, *args)
+        await connection.execute(update_select_catalog_query)
         to_check = await connection.fetch(f"SELECT * FROM {temporary_table};")
+        await connection.execute("COMMIT;")
     await connection.execute(f"DROP TABLE {temporary_table};")
     return to_check
 
