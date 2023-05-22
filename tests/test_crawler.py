@@ -592,3 +592,16 @@ async def test_recrawl_download_only_once(rmock, fake_check, event_loop, db, pro
 async def test_content_type_from_header(content_type):
     content_type_header, parsed_content_type = content_type
     assert parsed_content_type == await get_content_type_from_header({"content-type": content_type_header})
+
+
+async def test_dont_crawl_urls_with_status_crawling(rmock, event_loop, db, produce_mock, setup_catalog):
+    """Don't crawl urls that have a status state pending"""
+    rurl = "https://example.com/resource-1"
+    await db.execute("UPDATE catalog SET priority = TRUE, status = 'crawling' WHERE resource_id = $1", resource_id)
+    event_loop.run_until_complete(crawl(iterations=1))
+
+    # HEAD shouldn't have been called
+    assert ("HEAD", URL(rurl)) not in rmock.requests
+
+    # GET shouldn't have been called
+    assert ("GET", URL(rurl)) not in rmock.requests

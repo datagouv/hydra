@@ -93,6 +93,15 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
     return has_changed
 
 
+async def update_catalog_following_check(resource_id):
+    pool = await context.pool()
+    async with pool.acquire() as connection:
+        await connection.execute(
+            "UPDATE catalog SET priority = FALSE, status = NULL WHERE resource_id = $1",
+            resource_id
+        )
+
+
 async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     """Preprocess a check before saving it"""
     check_data["resource_id"] = str(check_data["resource_id"])
@@ -109,10 +118,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
 
         await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
-        await connection.execute(
-            "UPDATE catalog SET priority = FALSE WHERE resource_id = $1",
-            check_data["resource_id"]
-        )
+    await update_catalog_following_check(check_data["resource_id"])
 
     is_first_check = last_check is None
     return await insert_check(check_data), is_first_check
@@ -228,6 +234,7 @@ async def check_url(row, session, sleep=0, method="head"):
     if should_backoff:
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
+        await update_catalog_following_check(row["resource_id"])
         return STATUS_BACKOFF
 
     try:
@@ -307,8 +314,38 @@ async def crawl_urls(to_parse):
 
 def get_excluded_clause():
     return " AND ".join(
-        [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS]
+        [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS] +
+        [
+            "catalog.deleted = False",
+            "(catalog.status != 'crawling' OR catalog.status IS NULL)"
+        ]
     )
+
+
+async def select_rows_based_on_query(connection, q, *args):
+    """
+    A transaction wrapper around a select query q pass as param with *args.
+    It first creates a temporary table based on this query,
+    then updates the status values from the rows selected,
+    fetches the selected rows and drops the temporary table.
+    It finally returns the selected (and updated) rows.
+    """
+    temporary_table = "crawl_urls"
+    create_temp_select_table_query = f"""
+        CREATE TEMPORARY TABLE {temporary_table} AS
+            {q} FOR UPDATE;
+    """
+    update_select_catalog_query = f"""
+        UPDATE catalog SET status = 'crawling' WHERE resource_id in (select resource_id from {temporary_table});
+    """
+    async with connection.transaction():
+        await connection.execute("BEGIN;")
+        await connection.execute(create_temp_select_table_query, *args)
+        await connection.execute(update_select_catalog_query)
+        to_check = await connection.fetch(f"SELECT * FROM {temporary_table};")
+        await connection.execute("COMMIT;")
+    await connection.execute(f"DROP TABLE {temporary_table};")
+    return to_check
 
 
 async def crawl_batch():
@@ -323,12 +360,11 @@ async def crawl_batch():
                 SELECT catalog.url, dataset_id, resource_id
                 FROM catalog
                 WHERE {excluded}
-                AND deleted = False
                 AND priority = True
             ) s
-            ORDER BY random() LIMIT {config.BATCH_SIZE};
+            ORDER BY random() LIMIT {config.BATCH_SIZE}
         """
-        to_check = await connection.fetch(q)
+        to_check = await select_rows_based_on_query(connection, q)
         # then urls without checks
         if len(to_check) < config.BATCH_SIZE:
             q = f"""
@@ -337,12 +373,11 @@ async def crawl_batch():
                     FROM catalog
                     WHERE catalog.last_check IS NULL
                     AND {excluded}
-                    AND deleted = False
                     AND priority = False
                 ) s
-                ORDER BY random() LIMIT {config.BATCH_SIZE};
+                ORDER BY random() LIMIT {config.BATCH_SIZE}
             """
-            to_check += await connection.fetch(q)
+            to_check += await select_rows_based_on_query(connection, q)
         # if not enough for our batch size, handle outdated checks
         if len(to_check) < config.BATCH_SIZE:
             since = parse_timespan(config.SINCE)  # in seconds
@@ -356,12 +391,11 @@ async def crawl_batch():
                 AND {excluded}
                 AND catalog.last_check = checks.id
                 AND checks.created_at <= $1
-                AND catalog.deleted = False
                 AND catalog.priority = False
             ) s
-            ORDER BY random() LIMIT {limit};
+            ORDER BY random() LIMIT {limit}
             """
-            to_check += await connection.fetch(q, since)
+            to_check += await select_rows_based_on_query(connection, q, since)
 
     if len(to_check):
         await crawl_urls(to_check)
