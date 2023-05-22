@@ -317,7 +317,7 @@ def get_excluded_clause():
         [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS] +
         [
             "catalog.deleted = False",
-            "(catalog.status <> 'crawling' OR catalog.status IS NULL)"
+            "(catalog.status != 'crawling' OR catalog.status IS NULL)"
         ]
     )
 
