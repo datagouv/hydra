@@ -317,6 +317,13 @@ async def stats(request):
     )
 
 
+@routes.get("/api/health/")
+async def health(request):
+    test_connection = await request.app["pool"].fetchrow("SELECT 1")
+    assert next(test_connection.values()) == 1
+    return web.HTTPOk()
+
+
 async def app_factory():
     async def app_startup(app):
         app["pool"] = await context.pool()
