@@ -600,7 +600,7 @@ async def test_dont_crawl_urls_with_status_crawling(rmock, event_loop, db, produ
     await db.execute("UPDATE catalog SET priority = TRUE, status = 'crawling' WHERE resource_id = $1", resource_id)
     event_loop.run_until_complete(crawl(iterations=1))
 
-    # HEAD should have been called
+    # HEAD shouldn't have been called
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # GET shouldn't have been called
