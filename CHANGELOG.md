@@ -19,6 +19,7 @@
 - Rename analysis filesize to content-length [#66](https://github.com/etalab/udata-hydra/pull/66)
 - Sleep between all batches [#67](https://github.com/etalab/udata-hydra/pull/67)
 - Support having multiple crawlers by setting a status column in the catalog table [#68](https://github.com/etalab/udata-hydra/pull/68)
+- Add a health route [#69](https://github.com/etalab/udata-hydra/pull/69)
 
 ## 1.0.1 (2023-01-04)
 
