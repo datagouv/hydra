@@ -28,7 +28,7 @@ async def download_resource(url: str, headers: dict) -> BinaryIO:
     Returns the downloaded file object.
     Raises IOError if the resource is too large.
     """
-    tmp_file = tempfile.NamedTemporaryFile(delete=False)
+    tmp_file = tempfile.NamedTemporaryFile(dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False)
 
     if float(headers.get("content-length", -1)) > float(config.MAX_FILESIZE_ALLOWED):
         raise IOError("File too large to download")

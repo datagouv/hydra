@@ -40,6 +40,7 @@ SLEEP_BETWEEN_BATCHES = 60
 # max download filesize in bytes (100 MB)
 MAX_FILESIZE_ALLOWED = 104857600
 CSV_ANALYSIS_ENABLED = true
+TEMPORARY_DOWNLOAD_FOLDER = ""
 
 # -- Webhook integration config -- #
 WEBHOOK_ENABLED = true

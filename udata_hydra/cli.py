@@ -62,7 +62,7 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False):
 
     try:
         log.info(f"Downloading catalog from {url}...")
-        with NamedTemporaryFile(delete=False) as fd:
+        with NamedTemporaryFile(dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False) as fd:
             await download_file(url, fd)
         log.info("Upserting catalog in database...")
         # consider everything deleted, deleted will be updated when loading new catalog
