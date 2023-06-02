@@ -30,6 +30,8 @@ NO_BACKOFF_DOMAINS = [
 # max number of _completed_ requests per domain per period
 BACKOFF_NB_REQ = 180
 BACKOFF_PERIOD = 360  # in seconds
+COOL_OFF_PERIOD = 86400 # 1 day to cool off when we've messed up
+
 # crawl batch size, beware of open file limits
 # ⚠️ do not exceed MAX_POOL_SIZE
 BATCH_SIZE = 40

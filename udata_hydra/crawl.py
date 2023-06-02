@@ -128,7 +128,7 @@ async def is_backoff(domain) -> Tuple[bool, str]:
     backoff = False, ""
     no_backoff = [f"'{d}'" for d in config.NO_BACKOFF_DOMAINS]
     no_backoff = f"({','.join(no_backoff)})"
-    since = datetime.now(timezone.utc) - timedelta(seconds=config.BACKOFF_PERIOD)
+    since_backoff_period = datetime.now(timezone.utc) - timedelta(seconds=config.BACKOFF_PERIOD)
     pool = await context.pool()
     async with pool.acquire() as connection:
         # check if we trigger BACKOFF_NB_REQ for BACKOFF_PERIOD on this domain
@@ -140,12 +140,13 @@ async def is_backoff(domain) -> Tuple[bool, str]:
             AND domain NOT IN {no_backoff}
         """,
             domain,
-            since,
+            since_backoff_period,
         )
         backoff = res["count"] >= config.BACKOFF_NB_REQ, f"Too many requests: {res['count']}"
 
         if not backoff[0]:
-            # check if we hit a ratelimit on this domain
+            # check if we hit a ratelimit or received a 429 on this domain since COOL_OFF_PERIOD
+            since_cool_off_period = datetime.now(timezone.utc) - timedelta(seconds=config.COOL_OFF_PERIOD)
             q = f"""
                 SELECT
                     headers->>'x-ratelimit-remaining' as ratelimit_remaining,
@@ -154,13 +155,15 @@ async def is_backoff(domain) -> Tuple[bool, str]:
                     created_at
                 FROM checks
                 WHERE domain = $1 AND domain NOT IN {no_backoff}
+                AND created_at >= $2
                 ORDER BY created_at DESC
                 LIMIT 1
             """
-            res = await connection.fetchrow(q, domain)
+            res = await connection.fetchrow(q, domain, since_cool_off_period)
             if res:
-                if res["status"] == 429 and res["created_at"] > since:
+                if res["status"] == 429:
                     # we have made too many requests already and haven't cooled off yet
+                    # TODO: we could also user Retry-after, but it isn't returned correctly on 429 we're getting
                     return True, "429 status code has been returned on the latest call"
                 try:
                     remain, limit = float(res["ratelimit_remaining"]), float(res["ratelimit_limit"])
@@ -169,9 +172,12 @@ async def is_backoff(domain) -> Tuple[bool, str]:
                 else:
                     if limit == -1:
                         return False, ""
-                    very_limited = remain == 0 or limit == 0
-                    # we have really messed up or less than 10% left from our quota, we backoff
-                    backoff = very_limited or remain / limit <= 0.1, "X-ratelimit reached"
+                    if remain == 0 or limit == 0:
+                        # we have really messed up
+                        backoff = True, "X-ratelimit reached"
+                    elif remain / limit <= 0.1 and res["created_at"] > since_backoff_period:
+                        # less than 10% left from our quota, we're backing off until backoff period
+                        backoff = True, "X-ratelimit reached"
 
     return backoff
 
