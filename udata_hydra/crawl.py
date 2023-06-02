@@ -162,7 +162,7 @@ async def is_backoff(domain) -> Tuple[bool, str]:
             res = await connection.fetchrow(q, domain, since_cool_off_period)
             if res:
                 if res["status"] == 429:
-                    # we have made too many requests already haven't cooled off yet
+                    # we have made too many requests already and haven't cooled off yet
                     # TODO: we could also user Retry-after, but it isn't returned correctly on 429 we're getting
                     return True, "429 status code has been returned on the latest call"
                 try:
