@@ -168,7 +168,8 @@ async def test_api_resource_updated_bug(setup_catalog, db, client):
 
     # We add a another entry of (dataset_id,resource_id) into the catalog with a different url
     await db.execute("INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority) "
-                     "VALUES('601ddcfc85a59c3a45c2435a', 'c4e3a9fb-4415-488e-ba57-d05269b27adf', 'https://example.com/resource-0', TRUE, FALSE)")
+                     "VALUES('601ddcfc85a59c3a45c2435a', 'c4e3a9fb-4415-488e-ba57-d05269b27adf', "
+                     "'https://example.com/resource-0', TRUE, FALSE)")
     # We have two entries for this (dataset_id,resource_id) tuple
     res = await db.fetch("SELECT * FROM catalog WHERE dataset_id = $1 AND resource_id = $2",
                          "601ddcfc85a59c3a45c2435a", "c4e3a9fb-4415-488e-ba57-d05269b27adf")
