@@ -83,6 +83,26 @@ async def test_purge_csv_tables_url_used_by_deleted_resource_only(setup_catalog,
     assert res is None
 
 
+async def test_purge_csv_tables_url_not_in_catalog(setup_catalog, db, fake_check):
+    """We should delete csv table if the url is not the catalog anymore"""
+    # pretend we have a csv_analysis with a converted table for this url
+    check = await fake_check(parsing_table=True)
+    md5 = check["parsing_table"]
+    await db.execute(f'CREATE TABLE "{md5}"(id serial)')
+    # check table is there before purge
+    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
+    assert res is not None
+    # pretend the resource URL have been updated
+    await db.execute("UPDATE catalog SET url = 'https://example.com/resource-0'")
+    # purge
+    run("purge_csv_tables")
+    # check table is gone
+    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
+    assert res is None
+    res = await db.fetchrow("SELECT * FROM tables_index WHERE parsing_table = $1", md5)
+    assert res is None
+
+
 async def test_load_catalog_url_has_changed(setup_catalog, rmock, db, catalog_content):
     # the resource url has changed in comparison to load_catalog
     catalog_content = catalog_content.replace(b"https://example.com/resource-1", b"https://example.com/resource-0")
