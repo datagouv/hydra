@@ -250,30 +250,31 @@ async def purge_checks(limit=2):
 
 @cli
 async def purge_csv_tables():
-    """Delete converted CSV tables for resources no longer in catalog"""
-    q = """
-        SELECT parsing_table FROM checks
-        WHERE parsing_table IN (
-            SELECT md5(url) FROM catalog WHERE deleted = TRUE
+    """Delete converted CSV tables for resources url no longer in catalog"""
+
+    q = "SELECT md5(catalog.url) as md5_url FROM catalog WHERE deleted = FALSE;"
+    conn_main = await connection()
+    active_catalog_urls = await conn_main.fetch(q)
+    active_catalog_urls = set(catalog_url["md5_url"] for catalog_url in active_catalog_urls)
+
+    conn_csv = await connection("csv")
+    q = "SELECT parsing_table FROM tables_index;"
+    parsing_tables = await conn_csv.fetch(q)
+    parsing_tables = [table["parsing_table"] for table in parsing_tables]
+
+    breakpoint()
+
+    # Filter on parsing tables with md5_url not in active catalog urls
+    tables_to_delete = [table for table in parsing_tables if table not in active_catalog_urls]
+
+    for table in tables_to_delete:
+        log.debug(f"Deleting table {table}")
+        await delete_table(table)
+        await conn_main.execute(
+            "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
         )
-    """
-    count = 0
-    conn = await connection()
-    res = await conn.fetch(q)
-    for r in res:
-        table = r["parsing_table"]
-        # check the URL is not used by another active resource
-        q = "SELECT id FROM catalog WHERE md5(url) = $1 and deleted = FALSE"
-        not_deleted = await conn.fetch(q, table)
-        if not not_deleted:
-            log.debug(f"Deleting table {table}")
-            await delete_table(table)
-            await conn.execute(
-                "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-            )
-            count += 1
-    if count:
-        log.info(f"Deleted {count} table(s).")
+    if len(tables_to_delete):
+        log.info(f"Deleted {len(tables_to_delete)} table(s).")
     else:
         log.info("Nothing to delete.")
 
