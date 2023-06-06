@@ -188,8 +188,8 @@ async def test_api_resource_updated_url_since_load_catalog(setup_catalog, db, cl
             "last_modified": datetime.now().isoformat(),
         }
     }
-    # It does not create any duplicated resource
-    # entries get updated and set the same url, leading to a conflict
+    # It does not create any duplicated resource.
+    # The existing entry get updated accordingly.
     resp = await client.post("/api/resource/updated/", json=payload)
     assert resp.status == 200
 
