@@ -59,22 +59,15 @@ async def test_purge_csv_tables_url_used_by_other_resource(setup_catalog, db, fa
 
 
 async def test_load_catalog_url_has_changed(setup_catalog, rmock, db, catalog_content):
-    # Check that we have one entry in the catalog for our resource of interest
-    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", "c4e3a9fb-4415-488e-ba57-d05269b27adf")
-    assert len(res) == 1
-
     # the resource url has changed in comparison to load_catalog
     catalog_content = catalog_content.replace(b"https://example.com/resource-1", b"https://example.com/resource-0")
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
     run("load_catalog", url=catalog)
 
-    # check that we now have two entries for this resource in the catalog
-    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1 ORDER BY url ASC",
+    # check that we still only have one entry for this resource in the catalog
+    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1",
                          "c4e3a9fb-4415-488e-ba57-d05269b27adf")
-    assert len(res) == 2
+    assert len(res) == 1
     assert res[0]["url"] == "https://example.com/resource-0"
     assert res[0]["deleted"] is False
-
-    assert res[1]["url"] == "https://example.com/resource-1"
-    assert res[1]["deleted"] is True

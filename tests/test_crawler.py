@@ -103,25 +103,11 @@ async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop
     rmock.get(catalog, status=200, body=catalog_content.encode("utf-8"))
     run("load_catalog", url=catalog)
 
-    # check catalog coherence
-    res = await db.fetch("SELECT id FROM catalog WHERE deleted = TRUE")
+    # check catalog coherence, replacing the URL in the existing entry
+    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", resource_id)
     assert len(res) == 1
-    res = await db.fetch("SELECT id FROM catalog WHERE resource_id = $1", resource_id)
-    assert len(res) == 2
-
-    # check that the crawler does not crawl the deleted resource
-    # check that udata is called only once
-    # udata is not called for analysis results since it's mocked, only for checks
-    rurl_1 = "https://example.com/resource-1"
-    rurl_2 = "https://example.com/resource-2"
-    rmock.head(rurl_1)
-    rmock.head(rurl_2)
-    udata_url = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
-    rmock.put(udata_url, status=200)
-    event_loop.run_until_complete(crawl(iterations=1))
-    assert ("HEAD", URL(rurl_1)) not in rmock.requests
-    assert ("HEAD", URL(rurl_2)) in rmock.requests
-    assert len(rmock.requests[("PUT", URL(udata_url))]) == 1
+    assert res[0]["deleted"] is False
+    assert "resource-2" in res[0]["url"]
 
 
 @pytest.mark.parametrize(

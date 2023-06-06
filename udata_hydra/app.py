@@ -94,7 +94,10 @@ async def resource_created(request):
         q = f"""
                 INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority)
                 VALUES ('{dataset_id}', '{resource_id}', '{resource["url"]}', FALSE, TRUE)
-                ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
+                ON CONFLICT (resource_id) DO UPDATE SET
+                    priority = TRUE,
+                    url = '{resource["url"]}',
+                    dataset_id = '{dataset_id}';"""
         await connection.execute(q)
 
     return web.json_response({"message": "created"})
@@ -128,7 +131,10 @@ async def resource_updated(request):
             q = f"""
                     INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority)
                     VALUES ('{dataset_id}', '{resource_id}', '{resource["url"]}', FALSE, TRUE)
-                    ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET priority = TRUE;"""
+                    ON CONFLICT (resource_id) DO UPDATE SET
+                        priority = TRUE,
+                        url = '{resource["url"]}',
+                        dataset_id = '{dataset_id}';"""
         await connection.execute(q)
 
     return web.json_response({"message": "updated"})

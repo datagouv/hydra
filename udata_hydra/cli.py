@@ -85,7 +85,10 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False):
                         deleted, priority
                     )
                     VALUES ($1, $2, $3, $4, FALSE, FALSE)
-                    ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET deleted = FALSE
+                    ON CONFLICT (resource_id) DO UPDATE SET
+                        dataset_id = $1,
+                        url = $3,
+                        deleted = FALSE;
                 """,
                     row["dataset.id"],
                     row["id"],

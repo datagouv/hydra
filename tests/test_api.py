@@ -164,25 +164,18 @@ async def test_api_resource_updated(client):
     assert text == "Missing document body"
 
 
-async def test_api_resource_updated_bug(setup_catalog, db, client):
+async def test_api_resource_updated_url_since_load_catalog(setup_catalog, db, client):
+    # We modify the url for this resource
+    await db.execute("UPDATE catalog SET url = 'https://example.com/resource-0' "
+                     "WHERE resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'")
 
-    # We add a another entry of (dataset_id,resource_id) into the catalog with a different url
-    await db.execute("INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority) "
-                     "VALUES('601ddcfc85a59c3a45c2435a', 'c4e3a9fb-4415-488e-ba57-d05269b27adf', "
-                     "'https://example.com/resource-0', TRUE, FALSE)")
-    # We have two entries for this (dataset_id,resource_id) tuple
-    res = await db.fetch("SELECT * FROM catalog WHERE dataset_id = $1 AND resource_id = $2",
-                         "601ddcfc85a59c3a45c2435a", "c4e3a9fb-4415-488e-ba57-d05269b27adf")
-    assert len(res) == 2
-
-    # We're sending an update signal on the (dataset_id,resource_id) with the same url as above
-    # (or a different one, it does not matter).
+    # We're sending an update signal on the (dataset_id,resource_id) with the previous url.
     payload = {
         "resource_id": "c4e3a9fb-4415-488e-ba57-d05269b27adf",
         "dataset_id": "601ddcfc85a59c3a45c2435a",
         "document": {
             "id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
-            "url": "https://example.com/resource-0",
+            "url": "https://example.com/resource-1",
             "title": "random title",
             "description": "random description",
             "filetype": "file",
@@ -195,12 +188,14 @@ async def test_api_resource_updated_bug(setup_catalog, db, client):
             "last_modified": datetime.now().isoformat(),
         }
     }
-    # It fails due to UNIQUE(dataset_id, resource_id, url) constraint. Both
+    # It does not create any duplicated resource
     # entries get updated and set the same url, leading to a conflict
     resp = await client.post("/api/resource/updated/", json=payload)
-    assert resp.status == 500
-    data = await resp.text()
-    assert data == "500 Internal Server Error\n\nServer got itself in trouble"
+    assert resp.status == 200
+
+    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'")
+    assert len(res) == 1
+    res[0]["url"] == "https://example.com/resource-1"
 
 
 async def test_api_resource_deleted(client):
