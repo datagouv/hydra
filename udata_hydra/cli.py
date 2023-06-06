@@ -251,26 +251,29 @@ async def purge_checks(limit=2):
 @cli
 async def purge_csv_tables():
     """Delete converted CSV tables for resources url no longer in catalog"""
+    # TODO: check if we should use parsing_table from table_index?
+    # And are they necessarily in sync?
 
-    q = "SELECT md5(catalog.url) as md5_url FROM catalog WHERE deleted = FALSE;"
-    conn_main = await connection()
-    active_catalog_urls = await conn_main.fetch(q)
-    active_catalog_urls = set(catalog_url["md5_url"] for catalog_url in active_catalog_urls)
-
-    conn_csv = await connection("csv")
-    q = "SELECT parsing_table FROM tables_index;"
-    parsing_tables = await conn_csv.fetch(q)
-    parsing_tables = [table["parsing_table"] for table in parsing_tables]
-
-    breakpoint()
-
-    # Filter on parsing tables with md5_url not in active catalog urls
-    tables_to_delete = [table for table in parsing_tables if table not in active_catalog_urls]
+    # Fetch all parsing tables from checks where we don't have any entry on
+    # md5(url) in catalog or all entries are marked as deleted.
+    q = """
+    SELECT checks.parsing_table
+    FROM checks
+    LEFT JOIN (
+        select url, MAX(id) as id, BOOL_AND(deleted) as deleted
+        FROM catalog
+        GROUP BY url) c
+    ON checks.parsing_table = md5(c.url)
+    WHERE checks.parsing_table IS NOT NULL AND (c.id IS NULL OR c.deleted = TRUE);
+    """
+    conn = await connection()
+    tables_to_delete = await conn.fetch(q)
+    tables_to_delete = [table["parsing_table"] for table in tables_to_delete]
 
     for table in tables_to_delete:
         log.debug(f"Deleting table {table}")
         await delete_table(table)
-        await conn_main.execute(
+        await conn.execute(
             "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
         )
     if len(tables_to_delete):
