@@ -24,7 +24,6 @@ from udata_hydra.analysis.resource import process_resource
 from udata_hydra.utils.db import get_check
 
 from .conftest import RESOURCE_ID as resource_id
-from .conftest import DATASET_ID as dataset_id
 
 
 # TODO: make file content configurable
