@@ -21,6 +21,7 @@
 - Support having multiple crawlers by setting a status column in the catalog table [#68](https://github.com/etalab/udata-hydra/pull/68)
 - Add a health route [#69](https://github.com/etalab/udata-hydra/pull/69)
 - Make temporary folder configurable [#70](https://github.com/etalab/udata-hydra/pull/70)
+- Fix conflict on updating catalog with multiple entries for a resource [#73](https://github.com/etalab/udata-hydra/pull/73)
 
 ## 1.0.1 (2023-01-04)
 
