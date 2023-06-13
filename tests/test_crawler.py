@@ -178,8 +178,8 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mo
     datetime.fromisoformat(webhook["check:date"])
     if exception or status == 500:
         if status == 429:
-            # In the case of a 429 status code, the error is on the crawler side and we can't give an availability status.
-            # We expect check:available to be None.
+            # In the case of a 429 status code, the error is on the crawler side and we can't give an
+            # availability status. We expect check:available to be None.
             assert webhook.get("check:available") is None
         else:
             assert webhook.get("check:available") is False
