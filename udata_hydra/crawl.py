@@ -32,6 +32,9 @@ def is_valid_status(status):
     if not status:
         return False
     status = int(status)
+    if status == 429:
+        # We can't say the status since it's our client's fault
+        return None
     return status >= 200 and status < 400
 
 
