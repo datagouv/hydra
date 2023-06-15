@@ -85,7 +85,10 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False):
                         deleted, priority
                     )
                     VALUES ($1, $2, $3, $4, FALSE, FALSE)
-                    ON CONFLICT (dataset_id, resource_id, url) DO UPDATE SET deleted = FALSE
+                    ON CONFLICT (resource_id) DO UPDATE SET
+                        dataset_id = $1,
+                        url = $3,
+                        deleted = FALSE;
                 """,
                     row["dataset.id"],
                     row["id"],
@@ -247,30 +250,34 @@ async def purge_checks(limit=2):
 
 @cli
 async def purge_csv_tables():
-    """Delete converted CSV tables for resources no longer in catalog"""
+    """Delete converted CSV tables for resources url no longer in catalog"""
+    # TODO: check if we should use parsing_table from table_index?
+    # And are they necessarily in sync?
+
+    # Fetch all parsing tables from checks where we don't have any entry on
+    # md5(url) in catalog or all entries are marked as deleted.
     q = """
-        SELECT parsing_table FROM checks
-        WHERE parsing_table IN (
-            SELECT md5(url) FROM catalog WHERE deleted = TRUE
-        )
+    SELECT checks.parsing_table
+    FROM checks
+    LEFT JOIN (
+        select url, MAX(id) as id, BOOL_AND(deleted) as deleted
+        FROM catalog
+        GROUP BY url) c
+    ON checks.parsing_table = md5(c.url)
+    WHERE checks.parsing_table IS NOT NULL AND (c.id IS NULL OR c.deleted = TRUE);
     """
-    count = 0
     conn = await connection()
-    res = await conn.fetch(q)
-    for r in res:
-        table = r["parsing_table"]
-        # check the URL is not used by another active resource
-        q = "SELECT id FROM catalog WHERE md5(url) = $1 and deleted = FALSE"
-        not_deleted = await conn.fetch(q, table)
-        if not not_deleted:
-            log.debug(f"Deleting table {table}")
-            await delete_table(table)
-            await conn.execute(
-                "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-            )
-            count += 1
-    if count:
-        log.info(f"Deleted {count} table(s).")
+    tables_to_delete = await conn.fetch(q)
+    tables_to_delete = [table["parsing_table"] for table in tables_to_delete]
+
+    for table in tables_to_delete:
+        log.debug(f"Deleting table {table}")
+        await delete_table(table)
+        await conn.execute(
+            "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
+        )
+    if len(tables_to_delete):
+        log.info(f"Deleted {len(tables_to_delete)} table(s).")
     else:
         log.info("Nothing to delete.")
 

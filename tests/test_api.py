@@ -164,6 +164,40 @@ async def test_api_resource_updated(client):
     assert text == "Missing document body"
 
 
+async def test_api_resource_updated_url_since_load_catalog(setup_catalog, db, client):
+    # We modify the url for this resource
+    await db.execute("UPDATE catalog SET url = 'https://example.com/resource-0' "
+                     "WHERE resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'")
+
+    # We're sending an update signal on the (dataset_id,resource_id) with the previous url.
+    payload = {
+        "resource_id": "c4e3a9fb-4415-488e-ba57-d05269b27adf",
+        "dataset_id": "601ddcfc85a59c3a45c2435a",
+        "document": {
+            "id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
+            "url": "https://example.com/resource-1",
+            "title": "random title",
+            "description": "random description",
+            "filetype": "file",
+            "type": "documentation",
+            "mime": "text/plain",
+            "filesize": 1024,
+            "checksum_type": "sha1",
+            "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
+            "created_at": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat(),
+        }
+    }
+    # It does not create any duplicated resource.
+    # The existing entry get updated accordingly.
+    resp = await client.post("/api/resource/updated/", json=payload)
+    assert resp.status == 200
+
+    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'")
+    assert len(res) == 1
+    res[0]["url"] == "https://example.com/resource-1"
+
+
 async def test_api_resource_deleted(client):
     payload = {
         "resource_id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
