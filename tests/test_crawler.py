@@ -10,8 +10,8 @@ from unittest.mock import MagicMock
 
 import nest_asyncio
 
-from aiohttp import ClientSession
-from aiohttp.client_exceptions import ClientError
+from aiohttp import ClientSession, RequestInfo
+from aiohttp.client_exceptions import ClientError, ClientResponseError
 from aioresponses import CallbackResult
 from asyncio.exceptions import TimeoutError
 from dateparser import parse as date_parser
@@ -119,6 +119,8 @@ async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, event_loop
         (None, False, AssertionError),
         (None, False, UnicodeError),
         (None, True, TimeoutError),
+        (429, False, ClientResponseError(RequestInfo(url="", method="", headers={}),
+                                         history=(), message="client error", status=429)),
     ],
 )
 async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mock, udata_url):
@@ -160,7 +162,12 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mo
     assert webhook.get("check:date")
     datetime.fromisoformat(webhook["check:date"])
     if exception or status == 500:
-        assert webhook.get("check:available") is False
+        if status == 429:
+            # In the case of a 429 status code, the error is on the crawler side and we can't give an
+            # availability status. We expect check:available to be None.
+            assert webhook.get("check:available") is None
+        else:
+            assert webhook.get("check:available") is False
     else:
         assert webhook.get("check:available")
         assert webhook.get("check:headers:content-type") == "application/json"

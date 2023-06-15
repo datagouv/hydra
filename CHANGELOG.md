@@ -22,6 +22,7 @@
 - Add a health route [#69](https://github.com/etalab/udata-hydra/pull/69)
 - Make temporary folder configurable [#70](https://github.com/etalab/udata-hydra/pull/70)
 - Fix conflict on updating catalog with multiple entries for a resource [#73](https://github.com/etalab/udata-hydra/pull/73)
+- Set check:available to None in case of a 429 [#75](https://github.com/etalab/udata-hydra/pull/75)
 
 ## 1.0.1 (2023-01-04)
 
