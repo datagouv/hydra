@@ -540,7 +540,7 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loo
 
 async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, event_loop, fake_check, udata_url):
     _date = "Thu, 09 Jan 2020 09:33:37 GMT"
-    await fake_check(detected_last_modified_at=date_parser(_date), created_at=datetime.now() - timedelta(days=10))
+    await fake_check(headers={"last-modified": _date}, created_at=datetime.now() - timedelta(days=10))
     rmock.head("https://example.com/resource-1", headers={"last-modified": _date})
     rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
