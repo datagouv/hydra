@@ -5,7 +5,7 @@ import os
 import pytz
 
 from datetime import datetime
-from typing import Union
+from typing import Tuple, Union
 
 import magic
 
@@ -52,27 +52,16 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     log.debug(f"Analysis for resource {resource_id} in dataset {dataset_id}")
 
-    # let's see if we can infer a modification date from harvest infos
-    change_status, change_payload = await detect_resource_change_from_harvest(resource_id) or {}
-    # if not, let's see if we can infer a modifification date from headers
-    if change_status == Change.NO_GUESS:
-        change_status,  change_payload = await detect_resource_change_from_headers(resource_id, column="resource_id")
+    # let's see if we can infer a modification date on early hints based on harvest infos and headers
+    change_status, change_payload = await detect_resource_change_on_early_hints(resource_id)
 
-    # could it be a CSV? If we get hints, we will download the file
+    # could it be a CSV? If we get hints, we will analyse the file further depending on change status
     is_csv = await detect_csv_from_headers(check)
 
-
-    # Compare previous header on last-modification header to know if it hasn't changed
-    # and if we should download to do more analysis
-
-    # if no change analysis or first time csv let's download the file to get some hints and other infos
-
-    # If we have detected a change, we want to download the file to
-
+    # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
     tmp_file = None
     if change_status != Change.HAS_NOT_CHANGED:
-        # We should enter this condition if change_analysis is None or an object, but not False
         try:
             tmp_file = await download_resource(url, headers)
         except IOError:
@@ -84,7 +73,8 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             dl_analysis["analysis:checksum"] = compute_checksum_from_file(tmp_file.name)
             # Check if checksum has been modified if we don't have other hints
             if change_status == Change.NO_GUESS:
-                change_status,  change_payload = await detect_resource_change_from_checksum(resource_id, dl_analysis["analysis:checksum"])
+                change_status,  change_payload = await detect_resource_change_from_checksum(
+                    resource_id, dl_analysis["analysis:checksum"])
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
             if tmp_file and not is_csv:
@@ -112,7 +102,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         )
 
 
-async def store_last_modified_date(change_analysis, resource_id, check_id) -> bool:
+async def store_last_modified_date(change_analysis, resource_id, check_id) -> None:
     """
     Store last modified date in checks because it may be useful for later comparison
     """
@@ -127,10 +117,10 @@ async def store_last_modified_date(change_analysis, resource_id, check_id) -> bo
             )
 
 
-async def detect_resource_change_from_checksum(resource_id, new_checksum) -> Union[dict, None]:
+async def detect_resource_change_from_checksum(resource_id, new_checksum) -> Tuple[Change, Union[dict, None]]:
     """
     Checks if resource checksum has changed over time
-    Returns a Change status and an optional payload:
+    Returns a tuple with a Change status and an optional payload:
     {
         "analysis:last-modified-at": last_modified_date,
         "analysis:last-modified-detection": "computed-checksum",
@@ -154,7 +144,7 @@ async def detect_resource_change_from_checksum(resource_id, new_checksum) -> Uni
     return Change.NO_GUESS, None
 
 
-async def detect_resource_change_from_last_modified_header(data: dict):
+async def detect_resource_change_from_last_modified_header(data: dict) -> Tuple[Change, Union[dict, None]]:
     # last modified header check
 
     if len(data) == 1 and data[0]["last_modified"]:
@@ -176,7 +166,7 @@ async def detect_resource_change_from_last_modified_header(data: dict):
     return Change.HAS_NOT_CHANGED, None
 
 
-async def detect_resource_change_from_content_length_header(data: dict):
+async def detect_resource_change_from_content_length_header(data: dict) -> Tuple[Change, Union[dict, None]]:
     # content-length variation between current and last check
     if len(data) <= 1 or not data[0]["content_length"]:
         return Change.NO_GUESS, None
@@ -189,67 +179,76 @@ async def detect_resource_change_from_content_length_header(data: dict):
     return Change.HAS_NOT_CHANGED, None
 
 
-async def detect_resource_change_from_headers(value: str, column: str = "url") -> Union[dict, None]:
+async def detect_resource_change_on_early_hints(resource_id: str) -> Tuple[Change, Union[dict, None]]:
     """
-    Try to guess if a resource has been modified from headers in check data:
+    Try to guess if a resource has been modified from harvest and headers in check data:
     - last-modified header value if it can be found and parsed
     - content-length if it is found and changed over time (vs last checks)
 
-    Returns a Change status and an optional payload:
+    Returns a tuple with a Change status and an optional payload:
     {
         "analysis:last-modified-at": last_modified_date,
         "analysis:last-modified-detection": "detection-method",
     }
-
-
     """
     # Fetch current and last check headers
-    q = f"""
+    q = """
     SELECT
         created_at,
         checks.headers->>'last-modified' as last_modified,
-        checks.headers->>'content-length' as content_length
+        checks.headers->>'content-length' as content_length,
+        detected_last_modified_at
     FROM checks, catalog
-    WHERE checks.{column} = $1
+    WHERE checks.resource_id = $1
     ORDER BY created_at DESC
     LIMIT 2
     """
     pool = await context.pool()
     async with pool.acquire() as connection:
-        data = await connection.fetch(q, value)
+        data = await connection.fetch(q, resource_id)
 
     # not enough checks to make a comparison
     if not data:
         return Change.NO_GUESS, None
 
+    # let's see if we can infer a modification date from harvest infos
+    change_status, change_payload = await detect_resource_change_from_harvest(data, resource_id)
+    if change_status != Change.NO_GUESS:
+        return change_status, change_payload
+
+    # if not, let's see if we can infer a modifification date from last-modified headers
     change_status, change_payload = await detect_resource_change_from_last_modified_header(data)
     if change_status != Change.NO_GUESS:
         return change_status, change_payload
+
+    # if not, let's see if we can infer a modifification date from content-length header
     return await detect_resource_change_from_content_length_header(data)
 
 
-async def detect_resource_change_from_harvest(resource_id) -> Union[dict, None]:
+async def detect_resource_change_from_harvest(checks_data: dict, resource_id: str) -> Tuple[Change, Union[dict, None]]:
     """
     Checks if resource has a harvest.modified_at
-    Returns a Change status and an optional payload:
+    Returns a tuple with a Change status and an optional payload:
     {
         "analysis:last-modified-at": last_modified_date,
         "analysis:last-modified-detection": "harvest-resource-metadata",
     }
     """
+    if len(checks_data) == 1:
+        return Change.NO_GUESS, None
+    last_check = checks_data[1]
     q = """
-        SELECT catalog.harvest_modified_at, checks.detected_last_modified_at FROM catalog, checks
+        SELECT catalog.harvest_modified_at FROM catalog
         WHERE catalog.resource_id = $1
-        AND checks.id = catalog.last_check
     """
     pool = await context.pool()
     async with pool.acquire() as connection:
-        data = await connection.fetchrow(q, resource_id)
-        if data and data["harvest_modified_at"]:
-            if data["harvest_modified_at"] == data["detected_last_modified_at"]:
+        catalog_data = await connection.fetchrow(q, resource_id)
+        if catalog_data and catalog_data["harvest_modified_at"]:
+            if catalog_data["harvest_modified_at"] == last_check["detected_last_modified_at"]:
                 return Change.HAS_NOT_CHANGED, None
             return Change.HAS_CHANGED, {
-                "analysis:last-modified-at": data["harvest_modified_at"].isoformat(),
+                "analysis:last-modified-at": catalog_data["harvest_modified_at"].isoformat(),
                 "analysis:last-modified-detection": "harvest-resource-metadata",
             }
     return Change.NO_GUESS, None
