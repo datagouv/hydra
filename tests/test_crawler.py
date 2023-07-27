@@ -526,7 +526,10 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
 
 
 @pytest.mark.catalog_harvested
-async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loop, udata_url):
+async def test_change_analysis_harvested(setup_catalog, mocker, rmock, fake_check, db, event_loop, udata_url):
+    await fake_check(detected_last_modified_at=datetime.now() - timedelta(days=10))
+    # force check execution at next run
+    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.head("https://example.com/harvested", headers={"content-length": "2"}, repeat=True)
     rmock.put(udata_url, repeat=True)
@@ -538,9 +541,22 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loo
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
 
 
+@pytest.mark.catalog_harvested
+async def test_no_change_analysis_harvested(setup_catalog, mocker, rmock, fake_check, db, event_loop, udata_url):
+    last_modfied_at = datetime.fromisoformat("2022-12-06T05:00:32.647000").replace(tzinfo=timezone.utc)
+    await fake_check(detected_last_modified_at=last_modfied_at)  # same date as harvest.modified_at in catalog
+    # force check execution at next run
+    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
+    mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
+    rmock.head("https://example.com/harvested", headers={"content-length": "2"}, repeat=True)
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    assert ("PUT", URL(udata_url)) not in rmock.requests
+
+
 async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, event_loop, fake_check, udata_url):
     _date = "Thu, 09 Jan 2020 09:33:37 GMT"
-    await fake_check(detected_last_modified_at=date_parser(_date), created_at=datetime.now() - timedelta(days=10))
+    await fake_check(headers={"last-modified": _date}, created_at=datetime.now() - timedelta(days=10))
     rmock.head("https://example.com/resource-1", headers={"last-modified": _date})
     rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
