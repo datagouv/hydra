@@ -63,10 +63,12 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
         and not is_valid_status(check_data.get("status"))
     )
     timeout_has_changed = last_check and check_data.get("timeout") != last_check.get("timeout")
+    current_headers = check_data.get("headers", {})
+    last_check_headers = json.loads(last_check.get("headers", {}))
     content_has_changed = (
         last_check
-        and (check_data.get("headers", {}).get("content-length") != json.loads(last_check.get("headers", {})).get("content-length")
-             or check_data.get("headers", {}).get("content-type") != json.loads(last_check.get("headers", {})).get("content-type"))
+        and (current_headers.get("content-length") != last_check_headers.get("content-length")
+             or current_headers.get("content-type") != last_check_headers.get("content-type"))
     )
 
     # TODO: Instead of computing criterions here, store payload and compare with previous one.
