@@ -64,7 +64,7 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
     )
     timeout_has_changed = last_check and check_data.get("timeout") != last_check.get("timeout")
     current_headers = check_data.get("headers", {})
-    last_check_headers = json.loads(last_check.get("headers", {}))
+    last_check_headers = json.loads(last_check.get("headers", {})) if last_check else None
     content_has_changed = (
         last_check
         and (current_headers.get("content-length") != last_check_headers.get("content-length")
