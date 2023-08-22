@@ -23,7 +23,7 @@
 - Make temporary folder configurable [#70](https://github.com/etalab/udata-hydra/pull/70)
 - Fix conflict on updating catalog with multiple entries for a resource [#73](https://github.com/etalab/udata-hydra/pull/73)
 - Set check:available to None in case of a 429 [#75](https://github.com/etalab/udata-hydra/pull/75)
-- Improve conditional analysis logic and readability [#76](https://github.com/etalab/udata-hydra/pull/76)
+- Improve conditional analysis logic and readability [#76](https://github.com/etalab/udata-hydra/pull/76) [#80](https://github.com/etalab/udata-hydra/pull/80)
 - Use latest csv-detective version [#77](https://github.com/etalab/udata-hydra/pull/77)
 - Compare content type / length to check if changed [#78](https://github.com/etalab/udata-hydra/pull/78) [#79](https://github.com/etalab/udata-hydra/pull/79)
 
