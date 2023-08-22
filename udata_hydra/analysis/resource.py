@@ -195,11 +195,11 @@ async def detect_resource_change_on_early_hints(resource_id: str) -> Tuple[Chang
     q = """
     SELECT
         created_at,
-        checks.headers->>'last-modified' as last_modified,
-        checks.headers->>'content-length' as content_length,
+        headers->>'last-modified' as last_modified,
+        headers->>'content-length' as content_length,
         detected_last_modified_at
-    FROM checks, catalog
-    WHERE checks.resource_id = $1
+    FROM checks
+    WHERE resource_id = $1
     ORDER BY created_at DESC
     LIMIT 2
     """
