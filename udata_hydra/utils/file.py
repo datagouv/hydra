@@ -1,6 +1,8 @@
 import hashlib
 import logging
 import tempfile
+import gzip
+import csv
 
 from typing import BinaryIO
 
@@ -47,3 +49,15 @@ async def download_resource(url: str, headers: dict) -> BinaryIO:
                 i += 1
     tmp_file.close()
     return tmp_file
+
+
+def gunzip_csv_to_tempfile(input_path):
+    with gzip.open(input_path, 'rt', encoding='utf-8') as gzipped_file:
+        reader = csv.reader(gzipped_file)
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', newline='', encoding='utf-8')
+        writer = csv.writer(tmp_file)
+        for row in reader:
+            writer.writerow(row)
+        tmp_file.seek(0)
+        tmp_file.close()
+        return tmp_file

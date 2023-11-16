@@ -15,7 +15,7 @@ from udata_hydra.utils import queue
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.utils.csv import detect_csv_from_headers
 from udata_hydra.utils.db import update_check, get_check
-from udata_hydra.utils.file import compute_checksum_from_file, download_resource
+from udata_hydra.utils.file import compute_checksum_from_file, download_resource, gunzip_csv_to_tempfile
 from udata_hydra.utils.http import send
 
 
@@ -29,7 +29,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     - size (optionnal)
     - mime_type (optionnal)
     - checksum (optionnal)
-    - launch csv_analysis if looks like a CSV respone
+    - launch csv_analysis if looks like a CSV response
 
     Will call udata if first check or changes found, and update check with optionnal infos
     """
@@ -51,12 +51,13 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     change_analysis = change_analysis or await detect_resource_change_from_headers(url) or {}
 
     # could it be a CSV? If we get hints, we will download the file
-    is_csv = await detect_csv_from_headers(check)
+    is_csv, is_binary = await detect_csv_from_headers(check)
+    is_csvgz = False
 
     # if no change analysis or first time csv let's download the file to get some hints and other infos
     dl_analysis = {}
     tmp_file = None
-    if not change_analysis or (is_csv and is_first_check):
+    if not change_analysis or ((is_csv or is_binary) and is_first_check):
         try:
             tmp_file = await download_resource(url, headers)
         except IOError:
@@ -72,8 +73,10 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
                 or {}
             )
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
+            if dl_analysis["analysis:mime-type"] == "application/x-gzip":
+                is_csvgz = True
         finally:
-            if tmp_file and not is_csv:
+            if tmp_file and not (is_csv or is_csvgz):
                 os.remove(tmp_file.name)
             await update_check(check_id, {
                 "checksum": dl_analysis.get("analysis:checksum"),
@@ -86,6 +89,9 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     analysis_results = {**dl_analysis, **change_analysis}
     if has_changed_over_time or (is_first_check and analysis_results):
+        if is_csvgz and tmp_file:
+            tmp_file = gunzip_csv_to_tempfile(tmp_file.name)
+            is_csv = True
         if is_csv and tmp_file:
             queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="default")
         queue.enqueue(
