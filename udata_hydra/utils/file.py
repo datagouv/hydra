@@ -25,8 +25,8 @@ def compute_checksum_from_file(filename):
 
 
 def read_csv_gz(file_path):
-    with gzip.open(file_path, 'rb') as gz_file:
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False) as temp_file:
+    with gzip.open(file_path, "rb") as gz_file:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as temp_file:
             temp_file.write(gz_file.read())
     return temp_file
 
