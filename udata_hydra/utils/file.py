@@ -3,6 +3,7 @@ import logging
 import tempfile
 import gzip
 import csv
+import magic
 
 from typing import BinaryIO
 
@@ -24,7 +25,14 @@ def compute_checksum_from_file(filename):
     return sha1sum.hexdigest()
 
 
-async def download_resource(url: str, headers: dict) -> BinaryIO:
+def read_csv_gz(file_path):
+    with gzip.open(file_path, 'rb') as gz_file:
+        with tempfile.NamedTemporaryFile(mode='wb', delete=False) as temp_file:
+            temp_file.write(gz_file.read())
+    return temp_file
+
+
+async def download_resource(url: str, headers: dict, is_csv=None) -> BinaryIO:
     """
     Attempts downloading a resource from a given url.
     Returns the downloaded file object.
@@ -48,16 +56,7 @@ async def download_resource(url: str, headers: dict) -> BinaryIO:
                     raise IOError("File too large to download")
                 i += 1
     tmp_file.close()
-    return tmp_file
-
-
-def gunzip_csv_to_tempfile(input_path):
-    with gzip.open(input_path, 'rt', encoding='utf-8') as gzipped_file:
-        reader = csv.reader(gzipped_file)
-        tmp_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', newline='', encoding='utf-8')
-        writer = csv.writer(tmp_file)
-        for row in reader:
-            writer.writerow(row)
-        tmp_file.seek(0)
-        tmp_file.close()
-        return tmp_file
+    if magic.from_file(tmp_file.name, mime=True) in ["application/x-gzip", "application/gzip"]:
+        tmp_file = read_csv_gz(tmp_file.name)
+        is_csv = True
+    return tmp_file, is_csv

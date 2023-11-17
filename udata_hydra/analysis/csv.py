@@ -5,6 +5,8 @@ import logging
 import os
 import pytz
 import sys
+import magic
+from cchardet import detect
 
 from datetime import datetime
 from typing import Any
@@ -77,7 +79,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     url = check.get("url") or url
 
     headers = json.loads(check.get("headers") or "{}")
-    tmp_file = open(file_path, "rb") if file_path else await download_resource(url, headers)
+    tmp_file, _ = (open(file_path, "rb"), None) if file_path else await download_resource(url, headers)
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     timer.mark("download-file")
 
