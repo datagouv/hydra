@@ -5,8 +5,6 @@ import logging
 import os
 import pytz
 import sys
-import magic
-from cchardet import detect
 
 from datetime import datetime
 from typing import Any

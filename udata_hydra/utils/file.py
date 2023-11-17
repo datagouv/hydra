@@ -2,7 +2,6 @@ import hashlib
 import logging
 import tempfile
 import gzip
-import csv
 import magic
 
 from typing import BinaryIO
