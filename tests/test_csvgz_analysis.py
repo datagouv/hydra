@@ -7,7 +7,7 @@ from udata_hydra.analysis.csv import analyse_csv
 pytestmark = pytest.mark.asyncio
 
 
-async def test_csvgz_analysis(rmock, db, fake_check):
+async def test_csvgz_analysis(setup_catalog, rmock, db, fake_check, produce_mock):
     check = await fake_check()
     filename, expected_count = ("donnee-dep-data.gouv-2022-geographie2023-produit-le2023-07-17.csv.gz", 9898)
     url = check["url"]
