@@ -52,11 +52,15 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     # could it be a CSV? If we get hints, we will download the file
     is_csv, is_binary = await detect_csv_from_headers(check)
+    # for compressed csv we have two checks:
+    # 1. is the file's content binary? (done in detect_csv_from_headers)
+    # 2. does the URL contain "csv.gz"?
+    is_csvgz = is_binary and "csv.gz" in url
 
     # if no change analysis or first time csv let's download the file to get some hints and other infos
     dl_analysis = {}
     tmp_file = None
-    if not change_analysis or ((is_csv or is_binary) and is_first_check):
+    if not change_analysis or ((is_csv or is_csvgz) and is_first_check):
         try:
             tmp_file, is_csv = await download_resource(url, headers, is_csv)
         except IOError:
