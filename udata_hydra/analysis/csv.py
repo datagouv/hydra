@@ -64,6 +64,10 @@ PYTHON_TYPE_TO_PY = {
 
 RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 
+with open("udata_hydra/analysis/exceptions.json") as f:
+    exceptions = json.load(f)
+    f.close()
+
 
 async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
@@ -75,9 +79,10 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     assert any(_ is not None for _ in (check_id, url))
     check = await get_check(check_id) if check_id is not None else {}
     url = check.get("url") or url
+    exception_file = check.get("resource_id", None) in exceptions
 
     headers = json.loads(check.get("headers") or "{}")
-    tmp_file = open(file_path, "rb") if file_path else await download_resource(url, headers)
+    tmp_file = open(file_path, "rb") if file_path else await download_resource(url, headers, exception_file)
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     timer.mark("download-file")
 

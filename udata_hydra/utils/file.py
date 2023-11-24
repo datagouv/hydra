@@ -22,7 +22,7 @@ def compute_checksum_from_file(filename):
     return sha1sum.hexdigest()
 
 
-async def download_resource(url: str, headers: dict) -> BinaryIO:
+async def download_resource(url: str, headers: dict, exception_file: bool = False) -> BinaryIO:
     """
     Attempts downloading a resource from a given url.
     Returns the downloaded file object.
@@ -30,7 +30,7 @@ async def download_resource(url: str, headers: dict) -> BinaryIO:
     """
     tmp_file = tempfile.NamedTemporaryFile(dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False)
 
-    if float(headers.get("content-length", -1)) > float(config.MAX_FILESIZE_ALLOWED):
+    if not exception_file and float(headers.get("content-length", -1)) > float(config.MAX_FILESIZE_ALLOWED):
         raise IOError("File too large to download")
 
     chunk_size = 1024
@@ -38,7 +38,7 @@ async def download_resource(url: str, headers: dict) -> BinaryIO:
     async with aiohttp.ClientSession(headers={"user-agent": config.USER_AGENT}, raise_for_status=True) as session:
         async with session.get(url, allow_redirects=True) as response:
             async for chunk in response.content.iter_chunked(chunk_size):
-                if i * chunk_size < float(config.MAX_FILESIZE_ALLOWED):
+                if exception_file or i * chunk_size < float(config.MAX_FILESIZE_ALLOWED):
                     tmp_file.write(chunk)
                 else:
                     tmp_file.close()

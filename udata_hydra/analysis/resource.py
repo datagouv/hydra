@@ -28,6 +28,10 @@ class Change(Enum):
 
 log = logging.getLogger("udata-hydra")
 
+with open("udata_hydra/analysis/exceptions.json") as f:
+    exceptions = json.load(f)
+    f.close()
+
 
 async def process_resource(check_id: int, is_first_check: bool) -> None:
     """
@@ -63,7 +67,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     tmp_file = None
     if change_status != Change.HAS_NOT_CHANGED:
         try:
-            tmp_file = await download_resource(url, headers)
+            tmp_file = await download_resource(url, headers, resource_id in exceptions)
         except IOError:
             dl_analysis["analysis:error"] = "File too large to download"
         else:
