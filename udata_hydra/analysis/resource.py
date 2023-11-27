@@ -28,10 +28,6 @@ class Change(Enum):
 
 log = logging.getLogger("udata-hydra")
 
-with open("udata_hydra/analysis/exceptions.json") as f:
-    exceptions = json.load(f)
-    f.close()
-
 
 async def process_resource(check_id: int, is_first_check: bool) -> None:
     """
@@ -48,6 +44,10 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     if not check:
         log.error(f"Check not found by id {check_id}")
         return
+
+    with open("udata_hydra/analysis/exceptions.json") as f:
+        exceptions = json.load(f)
+        f.close()
 
     resource_id = check["resource_id"]
     dataset_id = check["dataset_id"]

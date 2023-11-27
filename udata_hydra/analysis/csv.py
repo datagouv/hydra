@@ -64,16 +64,16 @@ PYTHON_TYPE_TO_PY = {
 
 RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 
-with open("udata_hydra/analysis/exceptions.json") as f:
-    exceptions = json.load(f)
-    f.close()
-
 
 async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS_ENABLED:
         log.debug("CSV_ANALYSIS_ENABLED turned off, skipping.")
         return
+
+    with open("udata_hydra/analysis/exceptions.json") as f:
+        exceptions = json.load(f)
+        f.close()
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
