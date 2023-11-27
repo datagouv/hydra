@@ -11,7 +11,7 @@ import magic
 
 from dateparser import parse as date_parser
 
-from udata_hydra import context
+from udata_hydra import context, config
 from udata_hydra.utils import queue
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.utils.csv import detect_csv_from_headers
@@ -45,9 +45,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         log.error(f"Check not found by id {check_id}")
         return
 
-    with open("udata_hydra/analysis/exceptions.json") as f:
-        exceptions = json.load(f)
-        f.close()
+    exceptions = config.LARGE_RESOURCES_EXCEPTIONS
 
     resource_id = check["resource_id"]
     dataset_id = check["dataset_id"]
