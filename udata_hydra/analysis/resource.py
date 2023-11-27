@@ -51,14 +51,14 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     change_analysis = change_analysis or await detect_resource_change_from_headers(url) or {}
 
     # could it be a CSV? If we get hints, we will download the file
-    is_csv, is_csvgz = await detect_csv_from_headers(check)
+    is_csv = await detect_csv_from_headers(check)
 
     # if no change analysis or first time csv let's download the file to get some hints and other infos
     dl_analysis = {}
     tmp_file = None
-    if not change_analysis or ((is_csv or is_csvgz) and is_first_check):
+    if not change_analysis or (is_csv and is_first_check):
         try:
-            tmp_file, is_csv = await download_resource(url, headers, is_csv)
+            tmp_file = await download_resource(url, headers)
         except IOError:
             dl_analysis["analysis:error"] = "File too large to download"
         else:

@@ -31,7 +31,7 @@ def read_csv_gz(file_path):
     return temp_file
 
 
-async def download_resource(url: str, headers: dict, is_csv=None) -> BinaryIO:
+async def download_resource(url: str, headers: dict) -> BinaryIO:
     """
     Attempts downloading a resource from a given url.
     Returns the downloaded file object.
@@ -57,5 +57,4 @@ async def download_resource(url: str, headers: dict, is_csv=None) -> BinaryIO:
     tmp_file.close()
     if magic.from_file(tmp_file.name, mime=True) in ["application/x-gzip", "application/gzip"]:
         tmp_file = read_csv_gz(tmp_file.name)
-        is_csv = True
-    return tmp_file, is_csv
+    return tmp_file

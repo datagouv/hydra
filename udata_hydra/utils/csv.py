@@ -14,8 +14,8 @@ async def detect_csv_from_headers(check) -> bool:
         headers.get("content-type", "").lower().startswith(ct) for ct in [
             "application/csv", "text/plain", "text/csv"
         ]
-    ), any([
+    ) or (any([
         headers.get("content-type", "").lower().startswith(ct) for ct in [
             "application/octet-stream", "application/x-gzip"
         ]
-    ]) and "csv.gz" in check.get("url", [])
+    ]) and "csv.gz" in check.get("url", []))
