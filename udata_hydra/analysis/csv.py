@@ -77,7 +77,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     assert any(_ is not None for _ in (check_id, url))
     check = await get_check(check_id) if check_id is not None else {}
     url = check.get("url") or url
-    exception_file = check.get("resource_id", None) in exceptions
+    exception_file = str(check.get("resource_id", None)) in exceptions
 
     headers = json.loads(check.get("headers") or "{}")
     tmp_file = open(file_path, "rb") if file_path else await download_resource(url, headers, exception_file)
