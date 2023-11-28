@@ -65,7 +65,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     tmp_file = None
     if change_status != Change.HAS_NOT_CHANGED:
         try:
-            tmp_file = await download_resource(url, headers, resource_id in exceptions)
+            tmp_file = await download_resource(url, headers, str(resource_id) in exceptions)
         except IOError:
             dl_analysis["analysis:error"] = "File too large to download"
         else:
