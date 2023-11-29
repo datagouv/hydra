@@ -67,9 +67,8 @@ async def test_exception_analysis(setup_catalog, rmock, db, fake_check, produce_
     Tests that exception resources (files that are too large to be normally processed) are indeed processed.
     """
     config.override(MAX_FILESIZE_ALLOWED=5000)
-    check = await fake_check(resource_id=config.LARGE_RESOURCES_EXCEPTIONS[0])
     await db.execute(f"UPDATE catalog SET resource_id = '{config.LARGE_RESOURCES_EXCEPTIONS[0]}' WHERE id=1")
-    await db.execute("UPDATE catalog SET last_check = 1 WHERE id=1")
+    check = await fake_check(resource_id=config.LARGE_RESOURCES_EXCEPTIONS[0])
     filename, expected_count = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
