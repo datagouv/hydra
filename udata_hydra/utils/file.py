@@ -1,6 +1,8 @@
 import hashlib
 import logging
 import tempfile
+import gzip
+import magic
 
 from typing import BinaryIO
 
@@ -20,6 +22,13 @@ def compute_checksum_from_file(filename):
             sha1sum.update(block)
             block = f.read(2**16)
     return sha1sum.hexdigest()
+
+
+def read_csv_gz(file_path):
+    with gzip.open(file_path, "rb") as gz_file:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as temp_file:
+            temp_file.write(gz_file.read())
+    return temp_file
 
 
 async def download_resource(url: str, headers: dict, ignore_size: bool = False) -> BinaryIO:
@@ -46,4 +55,6 @@ async def download_resource(url: str, headers: dict, ignore_size: bool = False) 
                     raise IOError("File too large to download")
                 i += 1
     tmp_file.close()
+    if magic.from_file(tmp_file.name, mime=True) in ["application/x-gzip", "application/gzip"]:
+        tmp_file = read_csv_gz(tmp_file.name)
     return tmp_file

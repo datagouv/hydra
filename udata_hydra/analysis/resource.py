@@ -36,7 +36,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     - size (optionnal)
     - mime_type (optionnal)
     - checksum (optionnal)
-    - launch csv_analysis if looks like a CSV respone
+    - launch csv_analysis if looks like a CSV response
 
     Will call udata if first check or changes found, and update check with optionnal infos
     """
