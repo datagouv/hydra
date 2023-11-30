@@ -9,7 +9,7 @@ pytestmark = pytest.mark.asyncio
 
 async def test_csvgz_analysis(setup_catalog, rmock, db, fake_check, produce_mock):
     check = await fake_check()
-    filename, expected_count = ("donnee-dep-data.gouv-2022-geographie2023-produit-le2023-07-17.csv.gz", 9898)
+    filename, expected_count = ("20190618-annuaire-diagnostiqueurs_compressed.csv.gz", 29)
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     with open(f"tests/data/{filename}", "rb") as f:
