@@ -36,7 +36,7 @@ pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
 
-async def mock_download_resource(url, headers):
+async def mock_download_resource(url, headers, ignore_size):
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
     tmp_file.write(SIMPLE_CSV_CONTENT.encode("utf-8"))
     tmp_file.close()
@@ -507,9 +507,8 @@ async def test_change_analysis_content_length_header(setup_catalog, rmock, event
 
 async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, rmock, event_loop, udata_url):
     # different checksum than mock file
-    await fake_check(checksum="136bd31d53340d234957650e042172705bf32984")
-    # force check execution at next run
-    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
+    await fake_check(created_at=datetime.now() - timedelta(days=10),
+                     checksum="136bd31d53340d234957650e042172705bf32984")
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.head("https://example.com/resource-1")
     rmock.get("https://example.com/resource-1")
@@ -526,7 +525,10 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
 
 
 @pytest.mark.catalog_harvested
-async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loop, udata_url):
+async def test_change_analysis_harvested(setup_catalog, mocker, rmock, fake_check, db, event_loop, udata_url):
+    await fake_check(detected_last_modified_at=datetime.now() - timedelta(days=10))
+    # force check execution at next run
+    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.head("https://example.com/harvested", headers={"content-length": "2"}, repeat=True)
     rmock.put(udata_url, repeat=True)
@@ -538,10 +540,24 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, event_loo
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
 
 
+@pytest.mark.catalog_harvested
+async def test_no_change_analysis_harvested(setup_catalog, mocker, rmock, fake_check, db, event_loop, udata_url):
+    last_modfied_at = datetime.fromisoformat("2022-12-06T05:00:32.647000").replace(tzinfo=timezone.utc)
+    await fake_check(headers={"content-type": "application/json"},
+                     created_at=datetime.now() - timedelta(days=10),
+                     detected_last_modified_at=last_modfied_at)  # same date as harvest.modified_at in catalog
+    rmock.head("https://example.com/harvested", headers={"content-type": "application/json"})
+    rmock.get("https://example.com/harvested")
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    assert ("PUT", URL(udata_url)) not in rmock.requests
+
+
 async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, event_loop, fake_check, udata_url):
     _date = "Thu, 09 Jan 2020 09:33:37 GMT"
-    await fake_check(detected_last_modified_at=date_parser(_date), created_at=datetime.now() - timedelta(days=10))
-    rmock.head("https://example.com/resource-1", headers={"last-modified": _date})
+    await fake_check(headers={"last-modified": _date, "content-type": "application/json"},
+                     created_at=datetime.now() - timedelta(days=10))
+    rmock.head("https://example.com/resource-1", headers={"last-modified": _date, "content-type": "application/json"})
     rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(crawl(iterations=1))
@@ -552,13 +568,64 @@ async def test_change_analysis_last_modified_header_twice(setup_catalog, rmock, 
 async def test_change_analysis_last_modified_header_twice_tz(setup_catalog, rmock, event_loop, fake_check, udata_url):
     _date_1 = "Thu, 09 Jan 2020 09:33:37 GMT+1"
     _date_2 = "Thu, 09 Jan 2020 09:33:37 GMT+4"
-    await fake_check(detected_last_modified_at=date_parser(_date_1), created_at=datetime.now() - timedelta(days=10))
-    rmock.head("https://example.com/resource-1", headers={"last-modified": _date_2})
+    await fake_check(detected_last_modified_at=date_parser(_date_1), created_at=datetime.now() - timedelta(days=10),
+                     headers={"content-type": "application/json"})
+    rmock.head("https://example.com/resource-1", headers={"last-modified": _date_2, "content-type": "application/json"})
     rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(crawl(iterations=1))
     # udata has been called: last-modified has changed (different timezones)
     assert ("PUT", URL(udata_url)) in rmock.requests
+    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    assert webhook.get("analysis:last-modified-at") == date_parser(_date_2).isoformat()
+
+
+async def test_check_changed_content_length_header(setup_catalog, rmock, event_loop, fake_check, udata_url):
+    await fake_check(created_at=datetime.now() - timedelta(days=10),
+                     headers={"content-type": "application/json", "content-length": "10"})
+    rmock.head("https://example.com/resource-1", headers={"content-length": "15", "content-type": "application/json"})
+    rmock.get("https://example.com/resource-1")
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    # udata has been called in compute_check_has_changed: content-length has changed
+    assert ("PUT", URL(udata_url)) in rmock.requests
+    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    assert webhook.get("check:headers:content-length") == 15
+
+
+async def test_no_check_changed_content_length_header(setup_catalog, rmock, event_loop, fake_check, udata_url):
+    await fake_check(created_at=datetime.now() - timedelta(days=10),
+                     headers={"content-type": "application/json", "content-length": "10"})
+    rmock.head("https://example.com/resource-1", headers={"content-length": "10", "content-type": "application/json"})
+    rmock.get("https://example.com/resource-1")
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    # udata has not been called: not first check, outdated check, and content-length stayed the same
+    assert ("PUT", URL(udata_url)) not in rmock.requests
+
+
+async def test_check_changed_content_type_header(setup_catalog, rmock, event_loop, fake_check, udata_url):
+    await fake_check(created_at=datetime.now() - timedelta(days=10),
+                     headers={"content-type": "application/json", "content-length": "10"})
+    rmock.head("https://example.com/resource-1", headers={"content-length": "10", "content-type": "text/csv"})
+    rmock.get("https://example.com/resource-1")
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    # udata has been called in compute_check_has_changed: content-type has changed
+    assert ("PUT", URL(udata_url)) in rmock.requests
+    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    assert webhook.get("check:headers:content-type") == "text/csv"
+
+
+async def test_no_check_changed_content_type_header(setup_catalog, rmock, event_loop, fake_check, udata_url):
+    await fake_check(created_at=datetime.now() - timedelta(days=10),
+                     headers={"content-type": "application/json", "content-length": "10"})
+    rmock.head("https://example.com/resource-1", headers={"content-length": "10", "content-type": "application/json"})
+    rmock.get("https://example.com/resource-1")
+    rmock.put(udata_url, repeat=True)
+    event_loop.run_until_complete(crawl(iterations=1))
+    # udata has not been called: not first check, outdated check, and content-type stayed the same
+    assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
 async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, produce_mock):

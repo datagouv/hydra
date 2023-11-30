@@ -31,6 +31,13 @@ NO_BACKOFF_DOMAINS = [
 BACKOFF_NB_REQ = 180
 BACKOFF_PERIOD = 360  # in seconds
 COOL_OFF_PERIOD = 86400  # 1 day to cool off when we've messed up
+# ids of the resources that are too large to be processed normally
+# but that we want to have anyway
+LARGE_RESOURCES_EXCEPTIONS = [
+    # catalog of datasets and resources
+    "f868cca6-8da1-4369-a78d-47463f19a9a3",
+    "4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d",
+]
 
 # crawl batch size, beware of open file limits
 # ⚠️ do not exceed MAX_POOL_SIZE

@@ -7,6 +7,7 @@ from tempfile import NamedTemporaryFile
 
 from asyncpg.exceptions import UndefinedTableError
 
+from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 
 from .conftest import RESOURCE_ID
@@ -44,6 +45,30 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     You can deselect it by running `pytest -m "not slow"`.
     """
     check = await fake_check()
+    filename, expected_count = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
+    url = check["url"]
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    with open(f"tests/data/{filename}", "rb") as f:
+        data = f.read()
+    rmock.get(url, status=200, body=data)
+    await analyse_csv(check_id=check["id"])
+    count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
+    assert count["count"] == expected_count
+    profile = await db.fetchrow("SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"])
+    profile = json.loads(profile["csv_detective"])
+    for attr in ("header", "columns", "formats", "profile"):
+        assert profile[attr]
+    assert profile["total_lines"] == expected_count
+
+
+@pytest.mark.slow
+async def test_exception_analysis(setup_catalog, rmock, db, fake_check, produce_mock):
+    """
+    Tests that exception resources (files that are too large to be normally processed) are indeed processed.
+    """
+    config.override(MAX_FILESIZE_ALLOWED=5000)
+    await db.execute(f"UPDATE catalog SET resource_id = '{config.LARGE_RESOURCES_EXCEPTIONS[0]}' WHERE id=1")
+    check = await fake_check(resource_id=config.LARGE_RESOURCES_EXCEPTIONS[0])
     filename, expected_count = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
