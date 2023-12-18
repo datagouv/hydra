@@ -28,6 +28,7 @@
 - Compare content type / length to check if changed [#78](https://github.com/etalab/udata-hydra/pull/78) [#79](https://github.com/etalab/udata-hydra/pull/79)
 - Create a list of exceptions to analyse despite larger size [#85](https://github.com/etalab/udata-hydra/pull/85)
 - Enable csv.gz analysis [#84](https://github.com/etalab/udata-hydra/pull/84)
+- Add worker default timeout config [#86](https://github.com/etalab/udata-hydra/pull/86)
 
 
 ## 1.0.1 (2023-01-04)
