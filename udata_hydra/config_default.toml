@@ -51,6 +51,9 @@ MAX_FILESIZE_ALLOWED = 104857600
 CSV_ANALYSIS_ENABLED = true
 TEMPORARY_DOWNLOAD_FOLDER = ""
 
+# -- Worker settings -- #
+RQ_DEFAULT_TIMEOUT = 180
+
 # -- Webhook integration config -- #
 WEBHOOK_ENABLED = true
 UDATA_URI = ""

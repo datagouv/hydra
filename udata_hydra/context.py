@@ -47,5 +47,5 @@ def queue(name="default"):
         if config.TESTING:
             return None
         connection = redis.from_url(config.REDIS_URL)
-        context["queues"][name] = Queue(name, connection=connection)
+        context["queues"][name] = Queue(name, connection=connection, default_timeout=config.RQ_DEFAULT_TIMEOUT)
     return context["queues"][name]
