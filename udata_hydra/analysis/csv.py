@@ -115,6 +115,8 @@ def generate_dialect(inspection: dict) -> stdcsv.Dialect:
 
 def smart_cast(_type, value, failsafe=False) -> Any:
     try:
+        if value is None or value == "":
+            return None
         if _type == "bool":
             return str2bool(value)
         return PYTHON_TYPE_TO_PY[_type](value)
