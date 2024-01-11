@@ -29,7 +29,7 @@
 - Create a list of exceptions to analyse despite larger size [#85](https://github.com/etalab/udata-hydra/pull/85)
 - Enable csv.gz analysis [#84](https://github.com/etalab/udata-hydra/pull/84)
 - Add worker default timeout config [#86](https://github.com/etalab/udata-hydra/pull/86)
-
+- Return None value early when casting in csv analysis [#87](https://github.com/etalab/udata-hydra/pull/87)
 
 ## 1.0.1 (2023-01-04)
 
