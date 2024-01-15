@@ -20,11 +20,11 @@ Install udata-hydra dependencies and cli.
 
 ### Load (UPSERT) latest catalog version from data.gouv.fr
 
-`udata-hydra load-catalog`
+`poetry run udata-hydra load-catalog`
 
 ## Crawler
 
-`udata-hydra-crawl`
+`poetry run udata-hydra-crawl`
 
 It will crawl (forever) the catalog according to config set in `config.py`.
 
