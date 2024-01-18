@@ -230,7 +230,7 @@ async def test_error_reporting_parsing(rmock, catalog_content, db, setup_catalog
     await analyse_csv(check_id=check["id"])
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
-    assert res["parsing_error"] == "copy_records_to_table:list index out of range"
+    assert res["parsing_error"] == "csv_detective:Number of columns is not even across the first 10 rows."
     assert res["parsing_finished_at"]
     with pytest.raises(UndefinedTableError):
         await db.execute(f'SELECT * FROM "{table_name}"')
