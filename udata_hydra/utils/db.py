@@ -67,8 +67,7 @@ async def get_check(check_id):
         q = """
             SELECT * FROM catalog JOIN checks
             ON catalog.last_check = checks.id
-            WHERE checks.id = $1
-            AND catalog.deleted = FALSE;
+            WHERE checks.id = $1;
         """
         check = await connection.fetchrow(q, check_id)
     return check
