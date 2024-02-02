@@ -102,7 +102,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
             dataset_id=check["dataset_id"],
             resource_id=check["resource_id"],
             document={
-                "analysis:apification:date": datetime.now(pytz.UTC),
+                "analysis:apification:date": datetime.now(pytz.UTC).isoformat(),
                 "analysis:apification:url": "",
             },
         )
