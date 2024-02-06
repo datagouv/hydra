@@ -78,7 +78,6 @@ async def notify_udata(check_id):
             "resource_id": resource_id,
             "dataset_id": record["dataset_id"],
             "document": {
-                "analysis:parsing:table": check["parsing_table"],
                 "analysis:parsing:error": check["parsing_error"],
                 "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
                 if check["parsing_started_at"] else None,
