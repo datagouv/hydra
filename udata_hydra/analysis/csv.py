@@ -121,11 +121,11 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
                 "parsing_finished_at": datetime.now(pytz.UTC),
             })
         await csv_to_db_index(table_name, csv_inspection, check)
-        if check_id:
-            await notify_udata(check_id)
     except ParseException as e:
         await handle_parse_exception(e, check_id, table_name)
     finally:
+        if check_id:
+            await notify_udata(check_id)
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
