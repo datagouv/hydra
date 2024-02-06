@@ -30,6 +30,7 @@
 - Enable csv.gz analysis [#84](https://github.com/etalab/udata-hydra/pull/84)
 - Add worker default timeout config [#86](https://github.com/etalab/udata-hydra/pull/86)
 - Return None value early when casting in csv analysis [#87](https://github.com/etalab/udata-hydra/pull/87)
+- Ping udata after loading a csv to database [#91](https://github.com/etalab/udata-hydra/pull/91)
 
 ## 1.0.1 (2023-01-04)
 
