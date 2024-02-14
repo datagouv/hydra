@@ -28,6 +28,8 @@ from udata_hydra.analysis.errors import ParseException
 from udata_hydra.utils.db import get_check, compute_insert_query, update_check
 from udata_hydra.utils.file import download_resource
 from udata_hydra.utils.timer import Timer
+from udata_hydra.utils.http import send
+from udata_hydra.utils import queue
 
 
 log = logging.getLogger("udata-hydra")
@@ -65,6 +67,27 @@ PYTHON_TYPE_TO_PY = {
 RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 
 
+async def notify_udata(check_id):
+    """Notify udata of the result of a parsing"""
+    check = await get_check(check_id)
+    resource_id = check["resource_id"]
+    db = await context.pool()
+    record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
+    if record:
+        payload = {
+            "resource_id": resource_id,
+            "dataset_id": record["dataset_id"],
+            "document": {
+                "analysis:parsing:error": check["parsing_error"],
+                "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
+                if check["parsing_started_at"] else None,
+                "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
+                if check["parsing_finished_at"] else None,
+            }
+        }
+        queue.enqueue(send, _priority="high", **payload)
+
+
 async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS_ENABLED:
@@ -100,6 +123,8 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     except ParseException as e:
         await handle_parse_exception(e, check_id, table_name)
     finally:
+        if check_id:
+            await notify_udata(check_id)
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)

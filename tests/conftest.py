@@ -123,6 +123,7 @@ def setup_catalog(catalog_content, rmock):
 def produce_mock(mocker):
     mocker.patch("udata_hydra.crawl.send", dummy())
     mocker.patch("udata_hydra.analysis.resource.send", dummy())
+    mocker.patch("udata_hydra.analysis.csv.send", dummy())
 
 
 @pytest.fixture

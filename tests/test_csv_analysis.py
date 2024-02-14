@@ -1,6 +1,7 @@
 import hashlib
 import json
 import pytest
+from yarl import URL
 
 from datetime import date, datetime
 from tempfile import NamedTemporaryFile
@@ -240,3 +241,15 @@ async def test_analyse_csv_url_param(rmock, catalog_content, clean_db):
     url = "https://example.com/another-url"
     rmock.get(url, status=200, body=catalog_content)
     await analyse_csv(url=url)
+
+
+async def test_analyse_csv_send_udata_webhook(setup_catalog, rmock, catalog_content, db, fake_check, udata_url):
+    check = await fake_check()
+    url = check["url"]
+    rmock.get(url, status=200, body=catalog_content)
+    rmock.put(udata_url, status=200)
+    await analyse_csv(check_id=check["id"])
+    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    assert webhook.get("analysis:parsing:started_at")
+    assert webhook.get("analysis:parsing:finished_at")
+    assert webhook.get("analysis:parsing:error") is None
