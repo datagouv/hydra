@@ -12,6 +12,7 @@ from typing import Any
 import sentry_sdk
 
 from csv_detective.explore_csv import routine as csv_detective_routine
+from csv_detective.detection import engine_to_file
 from progressist import ProgressBar
 from sqlalchemy import (
     MetaData, Table, Column,
@@ -29,6 +30,7 @@ from udata_hydra.utils.db import get_check, compute_insert_query, update_check
 from udata_hydra.utils.file import download_resource
 from udata_hydra.utils.timer import Timer
 from udata_hydra.utils.http import send
+from udata_hydra.utils.reader import Reader
 from udata_hydra.utils import queue
 
 
@@ -130,14 +132,6 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
         os.remove(tmp_file.name)
 
 
-def generate_dialect(inspection: dict) -> stdcsv.Dialect:
-    class CustomDialect(stdcsv.unix_dialect):
-        # TODO: it would be nice to have more info from csvdetective to feed the dialect
-        # in the meantime we might want to sniff the file a bit
-        delimiter = inspection["separator"]
-    return CustomDialect()
-
-
 def smart_cast(_type, value, failsafe=False) -> Any:
     try:
         if value is None or value == "":
@@ -181,8 +175,10 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     :table_name: used to create tables
     :debug_insert: insert record one by one instead of using postgresql COPY
     """
-    log.debug(f"Converting from CSV to db for {table_name}")
-    dialect = generate_dialect(inspection)
+    log.debug(
+        f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
+        f"to db for {table_name}"
+    )
     columns = inspection["columns"]
     # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {
@@ -194,12 +190,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     await db.execute(q)
     q = compute_create_table_query(table_name, columns)
     await db.execute(q)
-    with open(file_path, encoding=inspection["encoding"]) as f:
-        reader = stdcsv.reader(f, dialect=dialect)
-        # pop header row(s)
-        for _ in range(inspection["header_row_idx"] + 1):
-            f.readline()
-        # this is an iterator! noice.
+    with Reader(file_path, inspection) as reader:
         records = (
             [
                 smart_cast(t, v, failsafe=True)
@@ -234,7 +225,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
 async def perform_csv_inspection(file_path):
     """Launch csv-detective against given file"""
     try:
-        return csv_detective_routine(file_path, output_profile=True, num_rows=-1)
+        return csv_detective_routine(file_path, output_profile=True, num_rows=-1, verbose=True)
     except Exception as e:
         raise ParseException("csv_detective") from e
 
