@@ -14,6 +14,30 @@ def generate_dialect(inspection: dict) -> stdcsv.Dialect:
     return CustomDialect()
 
 
+def process_ods(value):
+    # OK this is messed up:
+    # csv-detective reads ods files with pandas, and columns with percentages
+    # appear directly as numbers between 0 and 1(even when loaded as str)
+    # so csv-detective processes them as floats (which I think is what they are, how they are stored)
+    # BUT loading the *same* file with odfpy returns percentages as strings for the *same* cells
+    # for instance where pandas reads "0.215", odfpy reads "21.5%" or even "22%"
+    # I've tried a lot of things but I can't manage to load the float values with odfpy
+    # I dont think this shoud be solved on csv-detective's side, the values *are* floats
+    # so a couple of options (non-exhaustive):
+    #   - process the percentages to cast them as floats in smart_cast
+    #   - process the percentages to store them as floats when loaded (which is what this function does)
+    #   - use pandas to load ods files in here (do we want pandas in hydra)
+    #   - store them as strings in db? (what about the column type)
+    #   - default to null (but the column has been check and is safely castable, that's a shame)
+    # but who knows maybe ods does the same kind of trick for other types...
+    if not value:
+        return value
+    no_blank = value.replace(' ', '')
+    if no_blank and all([k.isnumeric() for k in no_blank[:-1]]) and no_blank[-1] == "%":
+        return float(value[:-1]) / 100
+    return value
+
+
 class Reader:
     def __init__(self, file_path, inspection):
         self.file_path = file_path
@@ -83,7 +107,7 @@ class Reader:
                 cell_text = ""
                 for paragraph in cell.getElementsByType(text.P):
                     cell_text += teletype.extractText(paragraph)
-                row_data.append(cell_text.strip())
+                row_data.append(process_ods(cell_text.strip()))
             # handling end of file
             if all([not c for c in row_data]):
                 break

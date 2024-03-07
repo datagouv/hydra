@@ -225,7 +225,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
 async def perform_csv_inspection(file_path):
     """Launch csv-detective against given file"""
     try:
-        return csv_detective_routine(file_path, output_profile=True, num_rows=-1, verbose=True)
+        return csv_detective_routine(file_path, output_profile=True, num_rows=-1, save_results=False)
     except Exception as e:
         raise ParseException("csv_detective") from e
 

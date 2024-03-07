@@ -35,6 +35,7 @@ async def detect_tabular_from_headers(check) -> bool:
             headers.get("content-type", "").lower().startswith(ct) for ct in [
                 "application/vnd.oasis.opendocument.spreadsheet",
                 # https://www.data.gouv.fr/api/1/datasets/liste-des-immeubles-proteges-au-titre-des-monuments-historiques-archives/resources/e898c3bd-ecd9-4ab2-b633-7ef2c075d842/
+                # https://www.data.gouv.fr/api/1/datasets/observatoire-de-la-qualite-des-demarches-en-ligne/resources/9cb0e3a4-fd7d-458b-8ed4-d20312eeef41
             ]
         ])
         # and "ods" in check.get("url", "")
