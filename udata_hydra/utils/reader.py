@@ -42,6 +42,12 @@ class Reader:
     def __init__(self, file_path, inspection):
         self.file_path = file_path
         self.inspection = inspection
+        self.nb_skip = self.inspection["header_row_idx"]
+        self.mapping = {
+            'openpyxl': 'iter_rows',
+            'xlrd': 'get_rows',
+        }
+        self.nb_columns = len(self.inspection['header'])
         self.reader = None
 
     def __enter__(self):
@@ -79,28 +85,22 @@ class Reader:
 
     def _skip_rows(self):
         # skipping header
-        nb_skip = self.inspection.get("header_row_idx", 0) + 1
-        for _ in range(nb_skip):
+        for _ in range(self.nb_skip + 1):
             next(self.file)
         return self.file
 
     def _excel_reader(self):
-        mapping = {
-            'openpyxl': 'iter_rows',
-            'xlrd': 'get_rows',
-        }
-        _method = getattr(self.sheet, mapping[self.inspection['engine']])
+        _method = getattr(self.sheet, self.mapping[self.inspection['engine']])
         for idx, row in enumerate(_method()):
             # skipping header
-            if idx == 0:
+            if idx <= self.nb_skip:
                 continue
             yield [c.value for c in row]
 
     def _ods_reader(self):
-        nb_columns = len(self.inspection['header'])
         for idx, row in enumerate(self.sheet.getElementsByType(table.TableRow)):
             # skipping header
-            if idx == 0:
+            if idx <= self.nb_skip:
                 continue
             row_data = []
             for cell in row.getElementsByType(table.TableCell):
@@ -111,15 +111,18 @@ class Reader:
             # handling end of file
             if all([not c for c in row_data]):
                 break
-            if len(row_data) > nb_columns:
+            if len(row_data) > self.nb_columns:
                 if row_data[-1]:
-                    raise ValueError('A row has more fields than the number of columns of the file.')
+                    raise ValueError(
+                        f'A row has more fields ({len(row_data)}) '
+                        f'than the number of columns of the file ({self.nb_columns}).'
+                    )
                 else:
                     # handling case where reader considers one column too many but it's empty
                     row_data = row_data[:-1]
             # handling empty last column(s)
-            if len(row_data) < nb_columns:
-                row_data += [''] * (nb_columns - len(row_data))
+            if len(row_data) < self.nb_columns:
+                row_data += [''] * (self.nb_columns - len(row_data))
             yield row_data
 
     def __iter__(self):
