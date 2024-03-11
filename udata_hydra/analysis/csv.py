@@ -105,7 +105,13 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     exception_file = str(check.get("resource_id", "")) in exceptions
 
     headers = json.loads(check.get("headers") or "{}")
-    tmp_file = open(file_path, "rb") if file_path else await download_resource(url, headers, exception_file)
+    tmp_file = open(file_path, "rb") if file_path else await download_resource(
+        url=url,
+        headers=headers,
+        # do we want to detect the format here?
+        file_format='csv',
+        ignore_size=exception_file
+    )
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     timer.mark("download-file")
 
