@@ -63,14 +63,6 @@ class Reader:
             self.sheet = self.file[self.inspection['sheet_name']]
             self.reader = self._excel_reader()
 
-        elif self.inspection.get('engine') == 'odf':
-            self.file = load(self.file_path)
-            self.sheet = [
-                s for s in self.file.spreadsheet.getElementsByType(table.Table)
-                if s.getAttribute('name') == self.inspection['sheet_name']
-            ][0]
-            self.reader = self._ods_reader()
-
         else:
             self.file = open(self.file_path, encoding=self.inspection["encoding"])
             self.reader = stdcsv.reader(
@@ -96,34 +88,6 @@ class Reader:
             if idx <= self.nb_skip:
                 continue
             yield [c.value for c in row]
-
-    def _ods_reader(self):
-        for idx, row in enumerate(self.sheet.getElementsByType(table.TableRow)):
-            # skipping header
-            if idx <= self.nb_skip:
-                continue
-            row_data = []
-            for cell in row.getElementsByType(table.TableCell):
-                cell_text = ""
-                for paragraph in cell.getElementsByType(text.P):
-                    cell_text += teletype.extractText(paragraph)
-                row_data.append(process_ods(cell_text.strip()))
-            # handling end of file
-            if all([not c for c in row_data]):
-                break
-            if len(row_data) > self.nb_columns:
-                if row_data[-1]:
-                    raise ValueError(
-                        f'A row has more fields ({len(row_data)}) '
-                        f'than the number of columns of the file ({self.nb_columns}).'
-                    )
-                else:
-                    # handling case where reader considers one column too many but it's empty
-                    row_data = row_data[:-1]
-            # handling empty last column(s)
-            if len(row_data) < self.nb_columns:
-                row_data += [''] * (self.nb_columns - len(row_data))
-            yield row_data
 
     def __iter__(self):
         return self.reader

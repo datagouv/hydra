@@ -7,7 +7,6 @@ async def detect_tabular_from_headers(check) -> bool:
         - a csv
         - a csv.gz (1. is the file's content binary?, 2. does the URL contain "csv.gz"?)
         - a xls(x)
-        - an ods
     """
     headers = json.loads(check["headers"] or "{}")
 
@@ -40,13 +39,5 @@ async def detect_tabular_from_headers(check) -> bool:
     ]):
         # and "xlsx" in check.get("url", "")
         return True, 'xlsx'
-
-    if any([
-        headers.get("content-type", "").lower().startswith(ct) for ct in [
-            "application/vnd.oasis.opendocument.spreadsheet",
-        ]
-    ]):
-        # and "ods" in check.get("url", "")
-        return True, 'ods'
 
     return False, None
