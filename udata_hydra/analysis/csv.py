@@ -109,7 +109,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
         url=url,
         headers=headers,
         # do we want to detect the format here?
-        file_format='csv',
+        file_format="csv",
         ignore_size=exception_file
     )
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()

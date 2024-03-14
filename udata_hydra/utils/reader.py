@@ -1,8 +1,6 @@
 import csv as stdcsv
 import openpyxl
 import xlrd
-from odf.opendocument import load
-from odf import text, table, teletype
 from io import BytesIO
 
 
@@ -20,23 +18,23 @@ class Reader:
         self.inspection = inspection
         self.nb_skip = self.inspection["header_row_idx"]
         self.mapping = {
-            'openpyxl': 'iter_rows',
-            'xlrd': 'get_rows',
+            "openpyxl": "iter_rows",
+            "xlrd": "get_rows",
         }
-        self.nb_columns = len(self.inspection['header'])
+        self.nb_columns = len(self.inspection["header"])
         self.reader = None
 
     def __enter__(self):
-        if self.inspection.get('engine') == 'openpyxl':
-            with open(self.file_path, 'rb') as f:
+        if self.inspection.get("engine") == "openpyxl":
+            with open(self.file_path, "rb") as f:
                 content = BytesIO(f.read())
             self.file = openpyxl.load_workbook(content)
-            self.sheet = self.file[self.inspection['sheet_name']]
+            self.sheet = self.file[self.inspection["sheet_name"]]
             self.reader = self._excel_reader()
 
-        elif self.inspection.get('engine') == 'xlrd':
+        elif self.inspection.get("engine") == "xlrd":
             self.file = xlrd.open_workbook(self.file_path)
-            self.sheet = self.file[self.inspection['sheet_name']]
+            self.sheet = self.file[self.inspection["sheet_name"]]
             self.reader = self._excel_reader()
 
         else:
@@ -48,7 +46,7 @@ class Reader:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if self.file is not None and hasattr(self.file, 'close'):
+        if self.file is not None and hasattr(self.file, "close"):
             self.file.close()
 
     def _skip_rows(self):
@@ -58,7 +56,7 @@ class Reader:
         return self.file
 
     def _excel_reader(self):
-        _method = getattr(self.sheet, self.mapping[self.inspection['engine']])
+        _method = getattr(self.sheet, self.mapping[self.inspection["engine"]])
         for idx, row in enumerate(_method()):
             # skipping header
             if idx <= self.nb_skip:

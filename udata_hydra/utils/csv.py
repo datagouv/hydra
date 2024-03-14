@@ -15,14 +15,14 @@ async def detect_tabular_from_headers(check) -> bool:
             "application/csv", "text/plain", "text/csv"
         ]
     ):
-        return True, 'csv'
+        return True, "csv"
 
     if any([
         headers.get("content-type", "").lower().startswith(ct) for ct in [
             "application/octet-stream", "application/x-gzip"
         ]
     ]) and "csv.gz" in check.get("url", ""):
-        return True, 'csvgz'
+        return True, "csvgz"
 
     if any([
         headers.get("content-type", "").lower().startswith(ct) for ct in [
@@ -30,7 +30,7 @@ async def detect_tabular_from_headers(check) -> bool:
         ]
     ]):
         # and "xls" in check.get("url", "")
-        return True, 'xls'
+        return True, "xls"
 
     if any([
         headers.get("content-type", "").lower().startswith(ct) for ct in [
@@ -38,6 +38,6 @@ async def detect_tabular_from_headers(check) -> bool:
         ]
     ]):
         # and "xlsx" in check.get("url", "")
-        return True, 'xlsx'
+        return True, "xlsx"
 
     return False, None
