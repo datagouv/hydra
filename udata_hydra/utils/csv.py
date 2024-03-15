@@ -40,4 +40,4 @@ async def detect_tabular_from_headers(check) -> bool:
         # and "xlsx" in check.get("url", "")
         return True, "xlsx"
 
-    return False, None
+    return False, "csv"

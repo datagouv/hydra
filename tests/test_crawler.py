@@ -36,7 +36,7 @@ pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
 
-async def mock_download_resource(url, headers, ignore_size):
+async def mock_download_resource(url, headers, file_format, ignore_size):
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
     tmp_file.write(SIMPLE_CSV_CONTENT.encode("utf-8"))
     tmp_file.close()
