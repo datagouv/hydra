@@ -17,26 +17,26 @@ async def detect_tabular_from_headers(check) -> bool:
     ):
         return True, "csv"
 
-    if any([
+    if any(
         headers.get("content-type", "").lower().startswith(ct) for ct in [
             "application/octet-stream", "application/x-gzip"
         ]
-    ]) and "csv.gz" in check.get("url", ""):
+    ) and "csv.gz" in check.get("url", ""):
         return True, "csvgz"
 
-    if any([
+    if any(
         headers.get("content-type", "").lower().startswith(ct) for ct in [
             "application/vnd.ms-excel",
         ]
-    ]):
+    ):
         # and "xls" in check.get("url", "")
         return True, "xls"
 
-    if any([
+    if any(
         headers.get("content-type", "").lower().startswith(ct) for ct in [
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         ]
-    ]):
+    ):
         # and "xlsx" in check.get("url", "")
         return True, "xlsx"
 
