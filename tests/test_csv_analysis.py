@@ -62,7 +62,6 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     assert profile["total_lines"] == expected_count
 
 
-# @pytest.mark.slow
 async def test_exception_analysis(setup_catalog, rmock, db, fake_check, produce_mock):
     """
     Tests that exception resources (files that are too large to be normally processed) are indeed processed.
