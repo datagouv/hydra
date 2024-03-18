@@ -4,7 +4,7 @@ import tempfile
 import gzip
 import magic
 
-from typing import BinaryIO
+from typing import BinaryIO, Union
 
 import aiohttp
 
@@ -34,8 +34,7 @@ def read_csv_gz(file_path):
 async def download_resource(
     url: str,
     headers: dict,
-    file_format: str,
-    ignore_size: bool = False
+    max_size_allowed: Union[int, None],
 ) -> BinaryIO:
     """
     Attempts downloading a resource from a given url.
@@ -43,9 +42,8 @@ async def download_resource(
     Raises IOError if the resource is too large.
     """
     tmp_file = tempfile.NamedTemporaryFile(dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False)
-    max_size_allowed = float(config.MAX_FILESIZE_ALLOWED[file_format])
 
-    if not ignore_size and float(headers.get("content-length", -1)) > max_size_allowed:
+    if max_size_allowed is not None and float(headers.get("content-length", -1)) > max_size_allowed:
         raise IOError("File too large to download")
 
     chunk_size = 1024
@@ -53,7 +51,7 @@ async def download_resource(
     async with aiohttp.ClientSession(headers={"user-agent": config.USER_AGENT}, raise_for_status=True) as session:
         async with session.get(url, allow_redirects=True) as response:
             async for chunk in response.content.iter_chunked(chunk_size):
-                if ignore_size or i * chunk_size < max_size_allowed:
+                if max_size_allowed is None or i * chunk_size < max_size_allowed:
                     tmp_file.write(chunk)
                 else:
                     tmp_file.close()

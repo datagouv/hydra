@@ -59,13 +59,17 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     # could it be a CSV? If we get hints, we will analyse the file further depending on change status
     is_tabular, file_format = await detect_tabular_from_headers(check)
+    max_size_allowed = (
+        None if str(resource_id) in exceptions
+        else float(config.MAX_FILESIZE_ALLOWED[file_format])
+    )
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
     tmp_file = None
     if change_status != Change.HAS_NOT_CHANGED:
         try:
-            tmp_file = await download_resource(url, headers, file_format, str(resource_id) in exceptions)
+            tmp_file = await download_resource(url, headers, max_size_allowed)
         except IOError:
             dl_analysis["analysis:error"] = "File too large to download"
         else:
