@@ -207,6 +207,7 @@ def udata_resource_payload():
             "filetype": "file",
             "type": "documentation",
             "mime": "text/plain",
+            "schema": None,
             "filesize": 1024,
             "checksum_type": "sha1",
             "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
