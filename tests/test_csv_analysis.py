@@ -62,12 +62,12 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     assert profile["total_lines"] == expected_count
 
 
-@pytest.mark.slow
 async def test_exception_analysis(setup_catalog, rmock, db, fake_check, produce_mock):
     """
     Tests that exception resources (files that are too large to be normally processed) are indeed processed.
     """
-    config.override(MAX_FILESIZE_ALLOWED=5000)
+    save_config = config.MAX_FILESIZE_ALLOWED
+    config.override(MAX_FILESIZE_ALLOWED={"csv": 5000})
     await db.execute(f"UPDATE catalog SET resource_id = '{config.LARGE_RESOURCES_EXCEPTIONS[0]}' WHERE id=1")
     check = await fake_check(resource_id=config.LARGE_RESOURCES_EXCEPTIONS[0])
     filename, expected_count = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
@@ -84,6 +84,7 @@ async def test_exception_analysis(setup_catalog, rmock, db, fake_check, produce_
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == expected_count
+    config.override(MAX_FILESIZE_ALLOWED=save_config)
 
 
 @pytest.mark.parametrize("line_expected", (
@@ -99,17 +100,19 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"int, float, string, bool\n\r{line}".encode("utf-8"))
         fp.seek(0)
+        columns = {
+            "int": {"python_type": "int"},
+            "float": {"python_type": "float"},
+            "string": {"python_type": "string"},
+            "bool": {"python_type": "bool"},
+        }
         inspection = {
             "separator": separator,
             "encoding": "utf-8",
             "header_row_idx": 0,
             "total_lines": 1,
-            "columns": {
-                "int": {"python_type": "int"},
-                "float": {"python_type": "float"},
-                "string": {"python_type": "string"},
-                "bool": {"python_type": "bool"},
-            }
+            "header": list(columns.keys()),
+            "columns": columns,
         }
         await csv_to_db(fp.name, inspection, "test_table")
     res = list(await db.fetch("SELECT * FROM test_table"))
@@ -134,16 +137,18 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"json, date, datetime\n\r{line}".encode("utf-8"))
         fp.seek(0)
+        columns = {
+            "json": {"python_type": "json"},
+            "date": {"python_type": "date"},
+            "datetime": {"python_type": "datetime"},
+        }
         inspection = {
             "separator": ";",
             "encoding": "utf-8",
             "header_row_idx": 0,
             "total_lines": 1,
-            "columns": {
-                "json": {"python_type": "json"},
-                "date": {"python_type": "date"},
-                "datetime": {"python_type": "datetime"},
-            }
+            "header": list(columns.keys()),
+            "columns": columns,
         }
         await csv_to_db(fp.name, inspection, "test_table")
     res = list(await db.fetch("SELECT * FROM test_table"))
@@ -159,15 +164,17 @@ async def test_basic_sql_injection(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"int, {injection}\n\r1,test".encode("utf-8"))
         fp.seek(0)
+        columns = {
+            "int": {"python_type": "int"},
+            injection: {"python_type": "string"},
+        }
         inspection = {
             "separator": ",",
             "encoding": "utf-8",
             "header_row_idx": 0,
             "total_lines": 1,
-            "columns": {
-                "int": {"python_type": "int"},
-                injection: {"python_type": "string"},
-            }
+            "header": list(columns.keys()),
+            "columns": columns,
         }
         await csv_to_db(fp.name, inspection, "test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
@@ -178,15 +185,17 @@ async def test_percentage_column(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write("int, % mon pourcent\n\r1,test".encode("utf-8"))
         fp.seek(0)
+        columns = {
+            "int": {"python_type": "int"},
+            "% mon pourcent": {"python_type": "string"},
+        }
         inspection = {
             "separator": ",",
             "encoding": "utf-8",
             "header_row_idx": 0,
             "total_lines": 1,
-            "columns": {
-                "int": {"python_type": "int"},
-                "% mon pourcent": {"python_type": "string"},
-            }
+            "header": list(columns.keys()),
+            "columns": columns,
         }
         await csv_to_db(fp.name, inspection, "test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
@@ -197,15 +206,17 @@ async def test_reserved_column_name(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write("int, xmin\n\r1,test".encode("utf-8"))
         fp.seek(0)
+        columns = {
+            "int": {"python_type": "int"},
+            "xmin": {"python_type": "string"},
+        }
         inspection = {
             "separator": ",",
             "encoding": "utf-8",
             "header_row_idx": 0,
             "total_lines": 1,
-            "columns": {
-                "int": {"python_type": "int"},
-                "xmin": {"python_type": "string"},
-            }
+            "header": list(columns.keys()),
+            "columns": columns
         }
         await csv_to_db(fp.name, inspection, "test_table")
     res = await db.fetchrow("SELECT * FROM test_table")

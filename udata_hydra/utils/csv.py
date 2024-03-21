@@ -1,21 +1,43 @@
 import json
 
 
-async def detect_csv_from_headers(check) -> bool:
+async def detect_tabular_from_headers(check) -> bool:
     """
-    Determine if content-type header looks like a csv's one
-    or if it's csv.gz.
-    For compressed csv we have two checks:
-    1. is the file's content binary?
-    2. does the URL contain "csv.gz"?
+    Determine from content-type header if file looks like:
+        - a csv
+        - a csv.gz (1. is the file's content binary?, 2. does the URL contain "csv.gz"?)
+        - a xls(x)
     """
     headers = json.loads(check["headers"] or "{}")
-    return any(
+
+    if any(
         headers.get("content-type", "").lower().startswith(ct) for ct in [
             "application/csv", "text/plain", "text/csv"
         ]
-    ) or (any([
+    ):
+        return True, "csv"
+
+    if any(
         headers.get("content-type", "").lower().startswith(ct) for ct in [
             "application/octet-stream", "application/x-gzip"
         ]
-    ]) and "csv.gz" in check.get("url", []))
+    ) and "csv.gz" in check.get("url", ""):
+        return True, "csvgz"
+
+    if any(
+        headers.get("content-type", "").lower().startswith(ct) for ct in [
+            "application/vnd.ms-excel",
+        ]
+    ):
+        # and "xls" in check.get("url", "")
+        return True, "xls"
+
+    if any(
+        headers.get("content-type", "").lower().startswith(ct) for ct in [
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ]
+    ):
+        # and "xlsx" in check.get("url", "")
+        return True, "xlsx"
+
+    return False, "csv"

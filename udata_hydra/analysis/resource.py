@@ -14,7 +14,7 @@ from dateparser import parse as date_parser
 from udata_hydra import context, config
 from udata_hydra.utils import queue
 from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.utils.csv import detect_csv_from_headers
+from udata_hydra.utils.csv import detect_tabular_from_headers
 from udata_hydra.utils.db import update_check, get_check
 from udata_hydra.utils.file import compute_checksum_from_file, download_resource
 from udata_hydra.utils.http import send
@@ -58,14 +58,18 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     change_status, change_payload = await detect_resource_change_on_early_hints(resource_id)
 
     # could it be a CSV? If we get hints, we will analyse the file further depending on change status
-    is_csv = await detect_csv_from_headers(check)
+    is_tabular, file_format = await detect_tabular_from_headers(check)
+    max_size_allowed = (
+        None if str(resource_id) in exceptions
+        else float(config.MAX_FILESIZE_ALLOWED[file_format])
+    )
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
     tmp_file = None
     if change_status != Change.HAS_NOT_CHANGED:
         try:
-            tmp_file = await download_resource(url, headers, str(resource_id) in exceptions)
+            tmp_file = await download_resource(url, headers, max_size_allowed)
         except IOError:
             dl_analysis["analysis:error"] = "File too large to download"
         else:
@@ -79,7 +83,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
                     resource_id, dl_analysis["analysis:checksum"])
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
-            if tmp_file and not is_csv:
+            if tmp_file and not is_tabular:
                 os.remove(tmp_file.name)
             await update_check(check_id, {
                 "checksum": dl_analysis.get("analysis:checksum"),
@@ -93,7 +97,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     analysis_results = {**dl_analysis, **(change_payload or {})}
     if change_status == Change.HAS_CHANGED or is_first_check:
-        if is_csv and tmp_file:
+        if is_tabular and tmp_file:
             queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="default")
         queue.enqueue(
             send,
