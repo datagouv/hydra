@@ -46,7 +46,7 @@ class ResourceDocument(Schema):
     url = fields.Str(required=True)
     format = fields.Str(allow_none=True)
     title = fields.Str(required=True)
-    schema = fields.Dict()
+    schema = fields.Dict(allow_none=True)
     description = fields.Str(allow_none=True)
     filetype = fields.Str(required=True)
     type = fields.Str(required=True)
