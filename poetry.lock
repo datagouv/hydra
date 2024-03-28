@@ -473,12 +473,12 @@ cron = ["capturer (>=2.4)"]
 
 [[package]]
 name = "csv-detective"
-version = "0.7.0"
+version = "0.7.1"
 description = "Detect CSV column content"
 optional = false
 python-versions = "*"
 files = [
-    {file = "csv_detective-0.7.0-py3-none-any.whl", hash = "sha256:8e8c4c1b7143135cfe7ea9e1f848c8364d4187993b1deec1b76db585bf2d5280"},
+    {file = "csv_detective-0.7.1-py3-none-any.whl", hash = "sha256:3654240799140c9b4e7c585437188541dac675f5ee7c0fb7622e03a9a585b2c3"},
 ]
 
 [package.dependencies]
@@ -2008,4 +2008,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "1ba0e050b24bdfdac70d3ee598f0d045d007fd42447b4608c774a1b19313fec0"
+content-hash = "e282dc087cb891be0573e13b801422ac6106feebf6f7bb1d8953017197d7a919"
