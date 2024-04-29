@@ -26,6 +26,7 @@ def setup_logging():
     coloredlogs.install(level=config.LOG_LEVEL)
     # silence urllib3 a bit
     logging.getLogger("urllib3").setLevel("INFO")
+    logging.getLogger('asyncio').setLevel("INFO")
     context["inited"] = True
     return log
 
