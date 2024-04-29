@@ -2,6 +2,7 @@ import csv
 import os
 
 from datetime import datetime, timezone
+import logging
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -45,13 +46,17 @@ async def connection(db="main"):
 
 
 @cli
-async def load_catalog(url=None, drop_meta=False, drop_all=False):
+async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
     """Load the catalog into DB from CSV file
 
     :url: URL of the catalog to fetch, by default defined in config
     :drop_meta: drop the metadata tables (catalog, checks...)
     :drop_all: drop metadata tables and parsed csv content
+    :quiet: ingore logs except for errors
     """
+    if quiet:
+        log.setLevel(logging.ERROR)
+
     if not url:
         url = config.CATALOG_URL
 
@@ -59,6 +64,15 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False):
         dbs = ["main"] if drop_meta else ["main", "csv"]
         await drop_dbs(dbs=dbs)
         await migrate()
+
+    def iter_with_progressbar_or_quiet(rows, quiet):
+        if quiet:
+            for row in rows:
+                yield row
+        else:
+            bar = ProgressBar(total=len(rows))
+            for row in bar.iter(rows):
+                yield row
 
     try:
         log.info(f"Downloading catalog from {url}...")
@@ -71,8 +85,7 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False):
         with open(fd.name) as fd:
             reader = csv.DictReader(fd, delimiter=";")
             rows = list(reader)
-            bar = ProgressBar(total=len(rows))
-            for row in bar.iter(rows):
+            for row in iter_with_progressbar_or_quiet(rows, quiet):
 
                 # Skip resources belonging to an archived dataset
                 if row.get("dataset.archived") != "False":
