@@ -270,7 +270,7 @@ async def purge_csv_tables():
     # Fetch all parsing tables from checks where we don't have any entry on
     # md5(url) in catalog or all entries are marked as deleted.
     q = """
-    SELECT checks.parsing_table
+    SELECT DISTINCT checks.parsing_table
     FROM checks
     LEFT JOIN (
         select url, MAX(id) as id, BOOL_AND(deleted) as deleted
