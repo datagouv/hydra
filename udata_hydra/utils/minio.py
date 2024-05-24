@@ -1,9 +1,6 @@
 import logging
-from typing import BinaryIO
-
-import boto3
-from botocore.client import Config
-from botocore.exceptions import ClientError
+import os
+from minio import Minio
 
 from udata_hydra import config
 
@@ -11,51 +8,41 @@ from udata_hydra import config
 log = logging.getLogger("udata-hydra")
 
 
-def get_resource_minio_url(key: str, resource_id: str) -> str:
-    """Returns location of given resource in minio once it is saved"""
-    return f"{config.MINIO_URL}/{config.MINIO_BUCKET}/{config.MINIO_FOLDER}/{key}/{resource_id}"
+class MinIOClient:
+    def __init__(self, bucket=config.MINIO_BUCKET):
+        self.url = config.MINIO_URL
+        self.user = config.MINIO_USER
+        self.password = config.MINIO_PWD
+        self.bucket = bucket
+        self.client = Minio(
+            self.url,
+            access_key=self.user,
+            secret_key=self.password,
+            secure=True,
+        )
+        if self.bucket:
+            self.bucket_exists = self.client.bucket_exists(self.bucket)
+            if not self.bucket_exists:
+                raise ValueError(f"Bucket '{self.bucket}' does not exist.")
 
-
-def save_resource_to_minio(resource_file: BinaryIO, key: str, resource_id: str) -> None:
-    log.info("Saving to minio")
-    log.debug(f"Bucket is {config.MINIO_BUCKET}")
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=config.MINIO_URL,
-        aws_access_key_id=config.MINIO_USER,
-        aws_secret_access_key=config.MINIO_PWD,
-        config=Config(signature_version="s3v4"),
-    )
-    try:
-        with open(resource_file.name, "rb") as f:
-            s3.upload_fileobj(
-                f,
-                config.MINIO_BUCKET,
-                config.MINIO_FOLDER + "/" + key + "/" + resource_id,
+    def send_file(
+        self,
+        file_path,
+        delete_source=True,
+    ):
+        if self.bucket is None:
+            raise AttributeError("A bucket has to be specified.")
+        is_file = os.path.isfile(
+            os.path.join(file_path)
+        )
+        if is_file:
+            dest_path = f"{config.MINIO_FOLDER}{file_path.split('/')[-1]}"
+            self.client.fput_object(
+                self.bucket,
+                dest_path,
+                file_path,
             )
-        log.info(
-            f"Resource saved into minio at {get_resource_minio_url(key, resource_id)}"
-        )
-    except ClientError as e:
-        log.error(e)
-
-
-def delete_resource_from_minio(key: str, resource_id: str) -> None:
-    log.info("Deleting from minio")
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=config.MINIO_URL,
-        aws_access_key_id=config.MINIO_USER,
-        aws_secret_access_key=config.MINIO_PWD,
-        config=Config(signature_version="s3v4"),
-    )
-    try:
-        s3.delete_object(
-            Bucket=config.MINIO_BUCKET,
-            Key=config.MINIO_FOLDER + "/" + key + "/" + resource_id,
-        )
-        log.info(
-            f"Resource deleted from minio at {get_resource_minio_url(key, resource_id)}"
-        )
-    except ClientError as e:
-        log.error(e)
+            if delete_source:
+                os.remove(file_path)
+        else:
+            raise Exception(f"file '{file_path}' does not exists")

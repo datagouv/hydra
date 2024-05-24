@@ -32,6 +32,8 @@ from udata_hydra.utils.timer import Timer
 from udata_hydra.utils.http import send
 from udata_hydra.utils.reader import Reader
 from udata_hydra.utils import queue
+from udata_hydra.utils.parquet import save_as_parquet
+from udata_hydra.utils.minio import MinIOClient
 
 
 log = logging.getLogger("udata-hydra")
@@ -67,6 +69,7 @@ PYTHON_TYPE_TO_PY = {
 }
 
 RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
+minio_client = MinIOClient()
 
 
 async def notify_udata(check_id):
@@ -179,9 +182,22 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     :table_name: used to create tables
     :debug_insert: insert record one by one instead of using postgresql COPY
     """
+    def generate_records(file_path, inspection, columns):
+        # because we need the iterator twice, not possible to
+        # handle parquet and db through the same iteration
+        def _records():
+            with Reader(file_path, inspection) as reader:
+                for line in reader:
+                    if line:
+                        yield [
+                            smart_cast(t, v, failsafe=True)
+                            for t, v in zip(columns.values(), line)
+                        ]
+        return _records()
+
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
-        f"to db for {table_name}"
+        f"to db {'and parquet ' if config.SAVE_TO_MINIO else ''}for {table_name}"
     )
     columns = inspection["columns"]
     # build a `column_name: type` mapping and explicitely rename reserved column names
@@ -194,29 +210,33 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     await db.execute(q)
     q = compute_create_table_query(table_name, columns)
     await db.execute(q)
-    with Reader(file_path, inspection) as reader:
-        records = (
-            [
-                smart_cast(t, v, failsafe=True)
-                for t, v in zip(columns.values(), line)
-            ]
-            for line in reader if line
+    # save the file as parquet and store it on Minio instance
+    if config.SAVE_TO_MINIO:
+        parquet_file = save_as_parquet(
+            records=generate_records(file_path, inspection, columns),
+            columns=columns,
+            output_name=table_name,
         )
-        # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
-        if not debug_insert:
-            # NB: also see copy_to_table for a file source
-            try:
-                await db.copy_records_to_table(table_name, records=records, columns=columns.keys())
-            except Exception as e:  # I know what I'm doing, pinky swear
-                raise ParseException("copy_records_to_table") from e
-        # this inserts rows from iterator one by one, slow but useful for debugging
-        else:
-            bar = ProgressBar(total=inspection["total_lines"])
-            for r in bar.iter(records):
-                data = {k: v for k, v in zip(columns.keys(), r)}
-                # NB: possible sql injection here, but should not be used in prod
-                q = compute_insert_query(data, table_name, returning="__id")
-                await db.execute(q, *data.values())
+        minio_client.send_file(parquet_file)
+    # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
+    if not debug_insert:
+        # NB: also see copy_to_table for a file source
+        try:
+            await db.copy_records_to_table(
+                table_name,
+                records=generate_records(file_path, inspection, columns),
+                columns=columns.keys()
+            )
+        except Exception as e:  # I know what I'm doing, pinky swear
+            raise ParseException("copy_records_to_table") from e
+    # this inserts rows from iterator one by one, slow but useful for debugging
+    else:
+        bar = ProgressBar(total=inspection["total_lines"])
+        for r in bar.iter(generate_records(file_path, inspection, columns)):
+            data = {k: v for k, v in zip(columns.keys(), r)}
+            # NB: possible sql injection here, but should not be used in prod
+            q = compute_insert_query(data, table_name, returning="__id")
+            await db.execute(q, *data.values())
 
 
 async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
