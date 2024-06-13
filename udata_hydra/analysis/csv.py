@@ -185,19 +185,17 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     def generate_records(file_path, inspection, columns):
         # because we need the iterator twice, not possible to
         # handle parquet and db through the same iteration
-        def _records():
-            with Reader(file_path, inspection) as reader:
-                for line in reader:
-                    if line:
-                        yield [
-                            smart_cast(t, v, failsafe=True)
-                            for t, v in zip(columns.values(), line)
-                        ]
-        return _records()
+        with Reader(file_path, inspection) as reader:
+            for line in reader:
+                if line:
+                    yield [
+                        smart_cast(t, v, failsafe=True)
+                        for t, v in zip(columns.values(), line)
+                    ]
 
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
-        f"to db {'and parquet ' if config.SAVE_TO_MINIO else ''}for {table_name}"
+        f"to db {'and parquet ' if config.SAVE_PARQUET_TO_MINIO else ''}for {table_name}"
     )
     columns = inspection["columns"]
     # build a `column_name: type` mapping and explicitely rename reserved column names
@@ -211,7 +209,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     q = compute_create_table_query(table_name, columns)
     await db.execute(q)
     # save the file as parquet and store it on Minio instance
-    if config.SAVE_TO_MINIO:
+    if config.SAVE_PARQUET_TO_MINIO:
         parquet_file = save_as_parquet(
             records=generate_records(file_path, inspection, columns),
             columns=columns,

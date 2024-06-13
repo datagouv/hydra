@@ -66,7 +66,7 @@ UDATA_URI = ""
 UDATA_URI_API_KEY = ""
 
 # -- Minio / datalake settings -- #
-SAVE_TO_MINIO = false
+SAVE_PARQUET_TO_MINIO = false
 MINIO_FOLDER = ""
 MINIO_URL = ""
 MINIO_BUCKET = ""
