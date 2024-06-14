@@ -15,9 +15,9 @@ class MinIOClient:
         self.password = config.MINIO_PWD
         self.bucket = bucket
         self.client = Minio(
-            self.url,
-            access_key=self.user,
-            secret_key=self.password,
+            self.url or "test",
+            access_key=self.user or "test",
+            secret_key=self.password or "test",
             secure=True,
         )
         if self.bucket:
