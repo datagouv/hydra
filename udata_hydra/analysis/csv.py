@@ -172,6 +172,18 @@ def compute_create_table_query(table_name: str, columns: list) -> str:
     return compiled.string.replace("%%", "%")
 
 
+def generate_records(file_path, inspection, columns):
+    # because we need the iterator twice, not possible to
+    # handle parquet and db through the same iteration
+    with Reader(file_path, inspection) as reader:
+        for line in reader:
+            if line:
+                yield [
+                    smart_cast(t, v, failsafe=True)
+                    for t, v in zip(columns.values(), line)
+                ]
+
+
 async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_insert: bool = False):
     """
     Convert a csv file to database table using inspection data. It should (re)create one table:
@@ -182,17 +194,6 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     :table_name: used to create tables
     :debug_insert: insert record one by one instead of using postgresql COPY
     """
-    def generate_records(file_path, inspection, columns):
-        # because we need the iterator twice, not possible to
-        # handle parquet and db through the same iteration
-        with Reader(file_path, inspection) as reader:
-            for line in reader:
-                if line:
-                    yield [
-                        smart_cast(t, v, failsafe=True)
-                        for t, v in zip(columns.values(), line)
-                    ]
-
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
         f"to db {'and parquet ' if config.SAVE_PARQUET_TO_MINIO else ''}for {table_name}"
@@ -210,7 +211,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     await db.execute(q)
     # save the file as parquet and store it on Minio instance
     if config.SAVE_PARQUET_TO_MINIO:
-        parquet_file = save_as_parquet(
+        parquet_file, _ = save_as_parquet(
             records=generate_records(file_path, inspection, columns),
             columns=columns,
             output_name=table_name,

@@ -13,7 +13,8 @@ PYTHON_TYPE_TO_PA = {
 }
 
 
-def save_as_parquet(records, columns, output_name):
+def save_as_parquet(records, columns, output_name, save_output=True):
+    # the "save_output" argument is only used in tests
     table = pa.Table.from_pylist(
         [{
             c: v
@@ -27,5 +28,6 @@ def save_as_parquet(records, columns, output_name):
             for c in columns
         ])
     )
-    pq.write_table(table, f"{output_name}.parquet")
-    return f"{output_name}.parquet"
+    if save_output:
+        pq.write_table(table, f"{output_name}.parquet")
+    return f"{output_name}.parquet", table
