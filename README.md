@@ -37,7 +37,8 @@ Install udata-hydra dependencies and cli.
 
 `poetry run udata-hydra-crawl`
 
-It will crawl (forever) the catalog according to config set in `config.py`.
+It will crawl (forever) the catalog according to config set in `config.toml`.
+A example config file is provided in `udata_hydra/config_default.toml`.
 
 `BATCH_SIZE` URLs are queued at each loop run.
 
