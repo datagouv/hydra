@@ -99,7 +99,10 @@ async def notify_udata(check_id):
 
 
 async def analyse_csv(
-    check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False
+    check_id: int = None,
+    url: str = None,
+    file_path: str = None,
+    debug_insert: bool = False,
 ) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS_ENABLED:
@@ -239,7 +242,11 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)"
     await db.execute(
-        q, table_name, json.dumps(inspection), check.get("resource_id"), check.get("url")
+        q,
+        table_name,
+        json.dumps(inspection),
+        check.get("resource_id"),
+        check.get("url"),
     )
 
 
@@ -277,7 +284,8 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
         await update_check(
-            check_id, {"parsing_error": err, "parsing_finished_at": datetime.now(pytz.UTC)}
+            check_id,
+            {"parsing_error": err, "parsing_finished_at": datetime.now(pytz.UTC)},
         )
         log.error("Parsing error", exc_info=e)
     else:

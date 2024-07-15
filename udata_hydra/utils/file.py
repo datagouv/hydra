@@ -62,6 +62,9 @@ async def download_resource(
                     raise IOError("File too large to download")
                 i += 1
     tmp_file.close()
-    if magic.from_file(tmp_file.name, mime=True) in ["application/x-gzip", "application/gzip"]:
+    if magic.from_file(tmp_file.name, mime=True) in [
+        "application/x-gzip",
+        "application/gzip",
+    ]:
         tmp_file = read_csv_gz(tmp_file.name)
     return tmp_file

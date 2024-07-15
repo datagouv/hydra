@@ -115,7 +115,8 @@ async def update_catalog_following_check(resource_id):
     pool = await context.pool()
     async with pool.acquire() as connection:
         await connection.execute(
-            "UPDATE catalog SET priority = FALSE, status = NULL WHERE resource_id = $1", resource_id
+            "UPDATE catalog SET priority = FALSE, status = NULL WHERE resource_id = $1",
+            resource_id,
         )
 
 
@@ -159,7 +160,10 @@ async def is_backoff(domain) -> Tuple[bool, str]:
             domain,
             since_backoff_period,
         )
-        backoff = res["count"] >= config.BACKOFF_NB_REQ, f"Too many requests: {res['count']}"
+        backoff = (
+            res["count"] >= config.BACKOFF_NB_REQ,
+            f"Too many requests: {res['count']}",
+        )
 
         if not backoff[0]:
             # check if we hit a ratelimit or received a 429 on this domain since COOL_OFF_PERIOD
@@ -185,7 +189,10 @@ async def is_backoff(domain) -> Tuple[bool, str]:
                     # TODO: we could also user Retry-after, but it isn't returned correctly on 429 we're getting
                     return True, "429 status code has been returned on the latest call"
                 try:
-                    remain, limit = float(res["ratelimit_remaining"]), float(res["ratelimit_limit"])
+                    remain, limit = (
+                        float(res["ratelimit_remaining"]),
+                        float(res["ratelimit_limit"]),
+                    )
                 except (ValueError, TypeError):
                     pass
                 else:
@@ -340,7 +347,10 @@ async def crawl_urls(to_parse):
 def get_excluded_clause():
     return " AND ".join(
         [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS]
-        + ["catalog.deleted = False", "(catalog.status != 'crawling' OR catalog.status IS NULL)"]
+        + [
+            "catalog.deleted = False",
+            "(catalog.status != 'crawling' OR catalog.status IS NULL)",
+        ]
     )
 
 

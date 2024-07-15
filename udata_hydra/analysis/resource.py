@@ -76,7 +76,10 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             dl_analysis["analysis:checksum"] = compute_checksum_from_file(tmp_file.name)
             # Check if checksum has been modified if we don't have other hints
             if change_status == Change.NO_GUESS:
-                change_status, change_payload = await detect_resource_change_from_checksum(
+                (
+                    change_status,
+                    change_payload,
+                ) = await detect_resource_change_from_checksum(
                     resource_id, dl_analysis["analysis:checksum"]
                 )
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
@@ -233,7 +236,10 @@ async def detect_resource_change_on_early_hints(
         return change_status, change_payload
 
     # if not, let's see if we can infer a modifification date from last-modified headers
-    change_status, change_payload = await detect_resource_change_from_last_modified_header(data)
+    (
+        change_status,
+        change_payload,
+    ) = await detect_resource_change_from_last_modified_header(data)
     if change_status != Change.NO_GUESS:
         return change_status, change_payload
 

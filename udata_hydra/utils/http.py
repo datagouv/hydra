@@ -22,7 +22,10 @@ async def send(dataset_id: str, resource_id: str, document: dict) -> None:
         return
 
     uri = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
-    headers = {"content-type": "application/json", "X-API-KEY": config.UDATA_URI_API_KEY}
+    headers = {
+        "content-type": "application/json",
+        "X-API-KEY": config.UDATA_URI_API_KEY,
+    }
 
     async with aiohttp.ClientSession() as session:
         async with session.put(uri, json=document, headers=headers) as resp:
