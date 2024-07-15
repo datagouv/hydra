@@ -9,6 +9,17 @@ Since it's called _hydra_, it also has mythical powers embedded:
 - if the remote resource is a CSV, convert it to a PostgreSQL table, ready for APIfication
 - send crawl and analysis info to a udata instance
 
+## Architecture schema
+
+The architecture for the ful workflow is the following:
+
+![Full workflow architecture](docs/archi-idd-IDD.drawio.png)
+
+
+The hydra crawler is one of the components of the architecture. It will check if resource is available, analyze the type of file if the resource has been modified, and analyze the CSV content. It will also convert CSV resources to database tables and send the data to a udata instance. 
+
+![Crawler architecture](docs/hydra.drawio.png)
+
 ## CLI
 
 ### Create database structure
