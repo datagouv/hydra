@@ -14,6 +14,7 @@ class Timer:
     timer.stop()
     ```
     """
+
     steps = []
 
     def __init__(self, name) -> None:

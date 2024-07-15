@@ -6,6 +6,7 @@ import toml
 
 class Configurator:
     """Loads a dict of config from TOML file(s) and behaves like an object, ie config.VALUE"""
+
     configuration = None
 
     def __init__(self):

@@ -9,7 +9,9 @@ log = logging.getLogger("udata-hydra")
 
 
 async def send(dataset_id: str, resource_id: str, document: dict) -> None:
-    log.debug(f"Sending payload to udata {dataset_id}/{resource_id}: {json.dumps(document, indent=4)}")
+    log.debug(
+        f"Sending payload to udata {dataset_id}/{resource_id}: {json.dumps(document, indent=4)}"
+    )
 
     if not config.WEBHOOK_ENABLED:
         log.debug("Webhook disabled, skipping send")

@@ -54,7 +54,9 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     await analyse_csv(check_id=check["id"])
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
-    profile = await db.fetchrow("SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"])
+    profile = await db.fetchrow(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
+    )
     profile = json.loads(profile["csv_detective"])
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
@@ -67,7 +69,9 @@ async def test_exception_analysis(setup_catalog, rmock, db, fake_check, produce_
     """
     save_config = config.MAX_FILESIZE_ALLOWED
     config.override(MAX_FILESIZE_ALLOWED={"csv": 5000})
-    await db.execute(f"UPDATE catalog SET resource_id = '{config.LARGE_RESOURCES_EXCEPTIONS[0]}' WHERE id=1")
+    await db.execute(
+        f"UPDATE catalog SET resource_id = '{config.LARGE_RESOURCES_EXCEPTIONS[0]}' WHERE id=1"
+    )
     check = await fake_check(resource_id=config.LARGE_RESOURCES_EXCEPTIONS[0])
     filename, expected_count = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
     url = check["url"]
@@ -78,7 +82,9 @@ async def test_exception_analysis(setup_catalog, rmock, db, fake_check, produce_
     await analyse_csv(check_id=check["id"])
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
-    profile = await db.fetchrow("SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"])
+    profile = await db.fetchrow(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
+    )
     profile = json.loads(profile["csv_detective"])
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
@@ -86,14 +92,17 @@ async def test_exception_analysis(setup_catalog, rmock, db, fake_check, produce_
     config.override(MAX_FILESIZE_ALLOWED=save_config)
 
 
-@pytest.mark.parametrize("line_expected", (
-    # (int, float, string, bool), (__id, int, float, string, bool)
-    ("1,1 020.20,test,true", (1, 1, 1020.2, "test", True), ","),
-    ('2,"1 020,20",test,false', (1, 2, 1020.2, "test", False), ","),
-    ("1;1 020.20;test;true", (1, 1, 1020.2, "test", True), ";"),
-    ("2;1 020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
-    ("2.0;1 020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
-))
+@pytest.mark.parametrize(
+    "line_expected",
+    (
+        # (int, float, string, bool), (__id, int, float, string, bool)
+        ("1,1 020.20,test,true", (1, 1, 1020.2, "test", True), ","),
+        ('2,"1 020,20",test,false', (1, 2, 1020.2, "test", False), ","),
+        ("1;1 020.20;test;true", (1, 1, 1020.2, "test", True), ";"),
+        ("2;1 020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
+        ("2.0;1 020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
+    ),
+)
 async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
     line, expected, separator = line_expected
     with NamedTemporaryFile() as fp:
@@ -120,17 +129,25 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
     assert dict(res[0]) == {k: v for k, v in zip(cols, expected)}
 
 
-@pytest.mark.parametrize("line_expected", (
-    # (json, date, datetime), (__id, json, date, datetime)
+@pytest.mark.parametrize(
+    "line_expected",
     (
-        '{"a": 1};31 décembre 2022;2022-31-12 12:00:00',
-        (1, json.dumps({"a": 1}), date(2022, 12, 31), datetime(2022, 12, 31, 12, 0, 0))
+        # (json, date, datetime), (__id, json, date, datetime)
+        (
+            '{"a": 1};31 décembre 2022;2022-31-12 12:00:00',
+            (1, json.dumps({"a": 1}), date(2022, 12, 31), datetime(2022, 12, 31, 12, 0, 0)),
+        ),
+        (
+            '[{"a": 1, "b": 2}];31st december 2022;12-31-2022 12:00:00',
+            (
+                1,
+                json.dumps([{"a": 1, "b": 2}]),
+                date(2022, 12, 31),
+                datetime(2022, 12, 31, 12, 0, 0),
+            ),
+        ),
     ),
-    (
-        '[{"a": 1, "b": 2}];31st december 2022;12-31-2022 12:00:00',
-        (1, json.dumps([{"a": 1, "b": 2}]), date(2022, 12, 31), datetime(2022, 12, 31, 12, 0, 0))
-    ),
-))
+)
 async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     line, expected = line_expected
     with NamedTemporaryFile() as fp:
@@ -215,14 +232,16 @@ async def test_reserved_column_name(db, clean_db):
             "header_row_idx": 0,
             "total_lines": 1,
             "header": list(columns.keys()),
-            "columns": columns
+            "columns": columns,
         }
         await csv_to_db(fp.name, inspection, "test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["xmin__hydra_renamed"] == "test"
 
 
-async def test_error_reporting_csv_detective(rmock, catalog_content, db, setup_catalog, fake_check, produce_mock):
+async def test_error_reporting_csv_detective(
+    rmock, catalog_content, db, setup_catalog, fake_check, produce_mock
+):
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body="".encode("utf-8"))
@@ -233,7 +252,9 @@ async def test_error_reporting_csv_detective(rmock, catalog_content, db, setup_c
     assert res["parsing_finished_at"]
 
 
-async def test_error_reporting_parsing(rmock, catalog_content, db, setup_catalog, fake_check, produce_mock):
+async def test_error_reporting_parsing(
+    rmock, catalog_content, db, setup_catalog, fake_check, produce_mock
+):
     check = await fake_check()
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
@@ -241,7 +262,10 @@ async def test_error_reporting_parsing(rmock, catalog_content, db, setup_catalog
     await analyse_csv(check_id=check["id"])
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
-    assert res["parsing_error"] == "csv_detective:Number of columns is not even across the first 10 rows."
+    assert (
+        res["parsing_error"]
+        == "csv_detective:Number of columns is not even across the first 10 rows."
+    )
     assert res["parsing_finished_at"]
     with pytest.raises(UndefinedTableError):
         await db.execute(f'SELECT * FROM "{table_name}"')
@@ -253,7 +277,9 @@ async def test_analyse_csv_url_param(rmock, catalog_content, clean_db):
     await analyse_csv(url=url)
 
 
-async def test_analyse_csv_send_udata_webhook(setup_catalog, rmock, catalog_content, db, fake_check, udata_url):
+async def test_analyse_csv_send_udata_webhook(
+    setup_catalog, rmock, catalog_content, db, fake_check, udata_url
+):
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)

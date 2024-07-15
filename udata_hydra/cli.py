@@ -35,10 +35,8 @@ async def connection(db="main"):
     if db not in context["conn"]:
         dsn = config.DATABASE_URL if db == "main" else getattr(config, f"DATABASE_URL_{db.upper()}")
         context["conn"][db] = await asyncpg.connect(
-            dsn=dsn,
-            server_settings={
-                "search_path": config.DATABASE_SCHEMA
-            })
+            dsn=dsn, server_settings={"search_path": config.DATABASE_SCHEMA}
+        )
     return context["conn"][db]
 
 
@@ -83,7 +81,6 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
             reader = csv.DictReader(fd, delimiter=";")
             rows = list(reader)
             for row in iter_with_progressbar_or_quiet(rows, quiet):
-
                 # Skip resources belonging to an archived dataset
                 if row.get("dataset.archived") != "False":
                     continue
@@ -105,7 +102,8 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
                     row["url"],
                     # force timezone info to UTC (catalog data should be in UTC)
                     datetime.fromisoformat(row["harvest.modified_at"]).replace(tzinfo=timezone.utc)
-                    if row["harvest.modified_at"] else None,
+                    if row["harvest.modified_at"]
+                    else None,
                 )
         log.info("Catalog successfully upserted into DB.")
     except Exception as e:
@@ -123,9 +121,7 @@ async def check_url(url, method="get"):
         timeout = aiohttp.ClientTimeout(total=5)
         _method = getattr(session, method)
         try:
-            async with _method(
-                url, timeout=timeout, allow_redirects=True
-            ) as resp:
+            async with _method(url, timeout=timeout, allow_redirects=True) as resp:
                 print("Status :", resp.status)
                 print("Headers:", resp.headers)
         except Exception as e:
@@ -283,9 +279,7 @@ async def purge_csv_tables():
     for table in tables_to_delete:
         log.debug(f"Deleting table {table}")
         await delete_table(table)
-        await conn.execute(
-            "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-        )
+        await conn.execute("UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table)
     if len(tables_to_delete):
         log.info(f"Deleted {len(tables_to_delete)} table(s).")
     else:

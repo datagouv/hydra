@@ -11,21 +11,20 @@ async def detect_tabular_from_headers(check) -> bool:
     headers = json.loads(check["headers"] or "{}")
 
     if any(
-        headers.get("content-type", "").lower().startswith(ct) for ct in [
-            "application/csv", "text/plain", "text/csv"
-        ]
+        headers.get("content-type", "").lower().startswith(ct)
+        for ct in ["application/csv", "text/plain", "text/csv"]
     ):
         return True, "csv"
 
     if any(
-        headers.get("content-type", "").lower().startswith(ct) for ct in [
-            "application/octet-stream", "application/x-gzip"
-        ]
+        headers.get("content-type", "").lower().startswith(ct)
+        for ct in ["application/octet-stream", "application/x-gzip"]
     ) and "csv.gz" in check.get("url", ""):
         return True, "csvgz"
 
     if any(
-        headers.get("content-type", "").lower().startswith(ct) for ct in [
+        headers.get("content-type", "").lower().startswith(ct)
+        for ct in [
             "application/vnd.ms-excel",
         ]
     ):
@@ -33,7 +32,8 @@ async def detect_tabular_from_headers(check) -> bool:
         return True, "xls"
 
     if any(
-        headers.get("content-type", "").lower().startswith(ct) for ct in [
+        headers.get("content-type", "").lower().startswith(ct)
+        for ct in [
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         ]
     ):

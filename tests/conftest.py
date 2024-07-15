@@ -31,8 +31,10 @@ def dummy(return_value=None):
     A kind of MagicMock but pickle-able for workers
     You should use this when mocking an enqueued function
     """
+
     async def fn(*args, **kwargs):
         return return_value
+
     return fn
 
 
@@ -76,6 +78,7 @@ async def patch_enqueue(mocker, event_loop):
     This bypasses rq totally by executing the function in the same event loop
     This also has the advantage of bubbling up errors in queued functions
     """
+
     def _execute(fn, *args, **kwargs):
         kwargs.pop("_priority")
         result = fn(*args, **kwargs)
@@ -84,6 +87,7 @@ async def patch_enqueue(mocker, event_loop):
             coro_result = loop.run_until_complete(result)
             return coro_result
         return result
+
     mocker.patch("udata_hydra.utils.queue.enqueue", _execute)
 
 
@@ -127,12 +131,10 @@ def produce_mock(mocker):
 @pytest.fixture
 def analysis_mock(mocker):
     """Disable process_resource while crawling"""
-    mocker.patch("udata_hydra.crawl.process_resource", dummy({
-        "error": None,
-        "checksum": None,
-        "filesize": None,
-        "mime_type": None
-    }))
+    mocker.patch(
+        "udata_hydra.crawl.process_resource",
+        dummy({"error": None, "checksum": None, "filesize": None, "mime_type": None}),
+    )
 
 
 @pytest.fixture
@@ -175,7 +177,9 @@ async def fake_check():
             "error": error,
             "checksum": checksum,
             "detected_last_modified_at": detected_last_modified_at,
-            "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest() if parsing_table else None,
+            "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest()
+            if parsing_table
+            else None,
         }
         id = await insert_check(data)
         data["id"] = id
@@ -211,5 +215,5 @@ def udata_resource_payload():
             "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
             "created_at": datetime.now().isoformat(),
             "last_modified": datetime.now().isoformat(),
-        }
+        },
     }

@@ -24,9 +24,7 @@ class CheckSchema(Schema):
     domain = fields.Str()
     created_at = fields.DateTime()
     check_status = fields.Integer(data_key="status")
-    headers = fields.Function(
-        lambda obj: json.loads(obj["headers"]) if obj["headers"] else {}
-    )
+    headers = fields.Function(lambda obj: json.loads(obj["headers"]) if obj["headers"] else {})
     timeout = fields.Boolean()
     response_time = fields.Float()
     error = fields.Str()
@@ -222,13 +220,9 @@ async def status_crawler(request):
     """
     stats_checks = await request.app["pool"].fetchrow(q, since)
 
-    count_left = stats_catalog["count_left"] + (
-        stats_checks["count_outdated"] or 0
-    )
+    count_left = stats_catalog["count_left"] + (stats_checks["count_outdated"] or 0)
     # all w/ a check, minus those with an outdated checked
-    count_checked = stats_catalog["count_checked"] - (
-        stats_checks["count_outdated"] or 0
-    )
+    count_checked = stats_catalog["count_checked"] - (stats_checks["count_outdated"] or 0)
     total = stats_catalog["count_left"] + stats_catalog["count_checked"]
     rate_checked = round(stats_catalog["count_checked"] / total * 100, 1)
     rate_checked_fresh = round(count_checked / total * 100, 1)
@@ -246,9 +240,7 @@ async def status_crawler(request):
 
 @routes.get("/api/status/worker/")
 async def status_worker(request):
-    res = {
-        "queued": {q: len(context.queue(q)) for q in QUEUES}
-    }
+    res = {"queued": {q: len(context.queue(q)) for q in QUEUES}}
     return web.json_response(res)
 
 
@@ -278,9 +270,7 @@ async def stats(request):
     def cmp_rate(key):
         if stats_catalog["count_checked"] == 0:
             return 0
-        return round(
-            stats_status[key] / stats_catalog["count_checked"] * 100, 1
-        )
+        return round(stats_status[key] / stats_catalog["count_checked"] * 100, 1)
 
     q = f"""
         SELECT checks.status, count(*) as count FROM checks, catalog
@@ -311,9 +301,7 @@ async def stats(request):
                 {
                     "code": r["status"],
                     "count": r["count"],
-                    "percentage": round(
-                        r["count"] / sum(r["count"] for r in res) * 100, 1
-                    ),
+                    "percentage": round(r["count"] / sum(r["count"] for r in res) * 100, 1),
                 }
                 for r in res
             ],

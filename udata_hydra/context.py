@@ -19,9 +19,7 @@ def monitor():
         return context["monitor"]
     monitor = MagicMock()
     monitor.set_status = lambda x: log.debug(x)
-    monitor.init = lambda **kwargs: log.debug(
-        f"Starting udata-hydra... {kwargs}"
-    )
+    monitor.init = lambda **kwargs: log.debug(f"Starting udata-hydra... {kwargs}")
     context["monitor"] = monitor
     return context["monitor"]
 
@@ -32,9 +30,7 @@ async def pool(db="main"):
         context["databases"][db] = await asyncpg.create_pool(
             dsn=dsn,
             max_size=config.MAX_POOL_SIZE,
-            server_settings={
-                "search_path": config.DATABASE_SCHEMA
-            }
+            server_settings={"search_path": config.DATABASE_SCHEMA},
         )
     return context["databases"][db]
 
@@ -45,5 +41,7 @@ def queue(name="default"):
         if config.TESTING:
             return None
         connection = redis.from_url(config.REDIS_URL)
-        context["queues"][name] = Queue(name, connection=connection, default_timeout=config.RQ_DEFAULT_TIMEOUT)
+        context["queues"][name] = Queue(
+            name, connection=connection, default_timeout=config.RQ_DEFAULT_TIMEOUT
+        )
     return context["queues"][name]

@@ -8,11 +8,14 @@ from udata_hydra.analysis.csv import analyse_csv
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.parametrize("file_and_count", (
-    ("20190618-annuaire-diagnostiqueurs_compressed.csv.gz", 29),
-    ("catalog.xls", 2),
-    ("catalog.xlsx", 2),
-))
+@pytest.mark.parametrize(
+    "file_and_count",
+    (
+        ("20190618-annuaire-diagnostiqueurs_compressed.csv.gz", 29),
+        ("catalog.xls", 2),
+        ("catalog.xlsx", 2),
+    ),
+)
 async def test_formats_analysis(setup_catalog, rmock, db, fake_check, produce_mock, file_and_count):
     check = await fake_check()
     filename, expected_count = file_and_count
@@ -24,7 +27,9 @@ async def test_formats_analysis(setup_catalog, rmock, db, fake_check, produce_mo
     await analyse_csv(check_id=check["id"])
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
-    profile = await db.fetchrow("SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"])
+    profile = await db.fetchrow(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
+    )
     profile = json.loads(profile["csv_detective"])
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]

@@ -88,15 +88,19 @@ async def notify_udata(check_id):
             "document": {
                 "analysis:parsing:error": check["parsing_error"],
                 "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
-                if check["parsing_started_at"] else None,
+                if check["parsing_started_at"]
+                else None,
                 "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
-                if check["parsing_finished_at"] else None,
-            }
+                if check["parsing_finished_at"]
+                else None,
+            },
         }
         queue.enqueue(send, _priority="high", **payload)
 
 
-async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False) -> None:
+async def analyse_csv(
+    check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False
+) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS_ENABLED:
         log.debug("CSV_ANALYSIS_ENABLED turned off, skipping.")
@@ -111,10 +115,14 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
     exception_file = str(check.get("resource_id", "")) in exceptions
 
     headers = json.loads(check.get("headers") or "{}")
-    tmp_file = open(file_path, "rb") if file_path else await download_resource(
-        url=url,
-        headers=headers,
-        max_size_allowed=None if exception_file else float(config.MAX_FILESIZE_ALLOWED["csv"]),
+    tmp_file = (
+        open(file_path, "rb")
+        if file_path
+        else await download_resource(
+            url=url,
+            headers=headers,
+            max_size_allowed=None if exception_file else float(config.MAX_FILESIZE_ALLOWED["csv"]),
+        )
     )
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     timer.mark("download-file")
@@ -127,10 +135,13 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
         await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
         timer.mark("csv-to-db")
         if check_id:
-            await update_check(check_id, {
-                "parsing_table": table_name,
-                "parsing_finished_at": datetime.now(pytz.UTC),
-            })
+            await update_check(
+                check_id,
+                {
+                    "parsing_table": table_name,
+                    "parsing_finished_at": datetime.now(pytz.UTC),
+                },
+            )
         await csv_to_db_index(table_name, csv_inspection, check)
     except ParseException as e:
         await handle_parse_exception(e, check_id, table_name)
@@ -202,11 +213,9 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     await db.execute(q)
     with Reader(file_path, inspection) as reader:
         records = (
-            [
-                smart_cast(t, v, failsafe=True)
-                for t, v in zip(columns.values(), line)
-            ]
-            for line in reader if line
+            [smart_cast(t, v, failsafe=True) for t, v in zip(columns.values(), line)]
+            for line in reader
+            if line
         )
         # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
         if not debug_insert:
@@ -229,13 +238,17 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)"
-    await db.execute(q, table_name, json.dumps(inspection), check.get("resource_id"), check.get("url"))
+    await db.execute(
+        q, table_name, json.dumps(inspection), check.get("resource_id"), check.get("url")
+    )
 
 
 async def perform_csv_inspection(file_path):
     """Launch csv-detective against given file"""
     try:
-        return csv_detective_routine(file_path, output_profile=True, num_rows=-1, save_results=False)
+        return csv_detective_routine(
+            file_path, output_profile=True, num_rows=-1, save_results=False
+        )
     except Exception as e:
         raise ParseException("csv_detective") from e
 
@@ -248,7 +261,7 @@ async def delete_table(table_name: str):
 
 async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -> None:
     """Specific ParsingError handling. Enriches sentry w/ context if available,
-       and store error if in a check context. Also cleanup :table_name: if needed."""
+    and store error if in a check context. Also cleanup :table_name: if needed."""
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if check_id:
@@ -263,7 +276,9 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
         # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
-        await update_check(check_id, {"parsing_error": err, "parsing_finished_at": datetime.now(pytz.UTC)})
+        await update_check(
+            check_id, {"parsing_error": err, "parsing_finished_at": datetime.now(pytz.UTC)}
+        )
         log.error("Parsing error", exc_info=e)
     else:
         raise e
