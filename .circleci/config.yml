@@ -58,15 +58,8 @@ jobs:
           # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
           # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
-            poetry run ruff check --select I << pipeline.parameters.python-module >>
-            poetry run ruff format --check << pipeline.parameters.python-module >>
-      - run:
-          name: Lint and format tests and sort imports
-          # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
-          # ruff format --check . : check code formatting without fixing (to fix, remove --check)
-          command: |
-            poetry run ruff check --select I tests/.
-            poetry run ruff format --check tests/.
+            poetry run ruff check --select I .
+            poetry run ruff format --check .
 
   tests:
     docker:
