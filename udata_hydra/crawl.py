@@ -1,15 +1,13 @@
+import asyncio
+import json
 import time
-
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-import json
-import pytz
 from typing import Tuple
 from urllib.parse import urlparse
 
 import aiohttp
-import asyncio
-
+import pytz
 from humanfriendly import parse_timespan
 
 from udata_hydra import config, context

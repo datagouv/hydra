@@ -3,7 +3,6 @@ NB: we can't use pytest-aiohttp helpers beause
 it will interfere with the rest of our async code
 """
 import hashlib
-
 from datetime import datetime
 
 import pytest

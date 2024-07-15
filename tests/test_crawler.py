@@ -1,30 +1,32 @@
 import hashlib
 import json
-import pytest
-import pytz
 import sys
 import tempfile
-
+from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import nest_asyncio
-
+import pytest
+import pytz
 from aiohttp import ClientSession, RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
 from aioresponses import CallbackResult
-from asyncio.exceptions import TimeoutError
 from dateparser import parse as date_parser
 from minicli import run
 from yarl import URL
 
 from udata_hydra import config
-from udata_hydra.crawl import crawl, check_url, get_content_type_from_header, STATUS_BACKOFF
 from udata_hydra.analysis.resource import process_resource
+from udata_hydra.crawl import (
+    STATUS_BACKOFF,
+    check_url,
+    crawl,
+    get_content_type_from_header,
+)
 from udata_hydra.utils.db import get_check
 
 from .conftest import RESOURCE_ID as resource_id
-
 
 # TODO: make file content configurable
 SIMPLE_CSV_CONTENT = """code_insee,number

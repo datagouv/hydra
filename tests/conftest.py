@@ -1,21 +1,19 @@
 import asyncio
 import hashlib
 import os
-
 from datetime import datetime
 
 import asyncpg
 import nest_asyncio
 import pytest
 import pytest_asyncio
-
-from aioresponses import aioresponses
 from aiohttp.test_utils import TestClient, TestServer
+from aioresponses import aioresponses
 from minicli import run
 
+import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra import config
 from udata_hydra.app import app_factory
-import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra.logger import stop_sentry
 from udata_hydra.utils.db import insert_check, update_check
 

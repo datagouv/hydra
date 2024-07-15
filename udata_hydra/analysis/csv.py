@@ -3,36 +3,42 @@ import hashlib
 import json
 import logging
 import os
-import pytz
 import sys
-
 from datetime import datetime
 from typing import Any
 
+import pytz
 import sentry_sdk
-
-from csv_detective.explore_csv import routine as csv_detective_routine
 from csv_detective.detection import engine_to_file
+from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
 from sqlalchemy import (
-    MetaData, Table, Column,
-    BigInteger, String, Float, Boolean, Integer, JSON, Date, DateTime,
+    JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    Integer,
+    MetaData,
+    String,
+    Table,
 )
 from sqlalchemy.dialects.postgresql import asyncpg
 from sqlalchemy.schema import CreateTable
 from str2bool import str2bool
 from str2float import str2float
 
-from udata_hydra import context, config
+from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.errors import ParseException
-from udata_hydra.utils.db import get_check, compute_insert_query, update_check
+from udata_hydra.utils import queue
+from udata_hydra.utils.db import compute_insert_query, get_check, update_check
 from udata_hydra.utils.file import download_resource
-from udata_hydra.utils.timer import Timer
 from udata_hydra.utils.http import send
 from udata_hydra.utils.reader import Reader
-from udata_hydra.utils import queue
-
+from udata_hydra.utils.timer import Timer
 
 log = logging.getLogger("udata-hydra")
 

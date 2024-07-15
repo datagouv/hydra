@@ -1,12 +1,11 @@
 import hashlib
 import json
-import pytest
-from yarl import URL
-
 from datetime import date, datetime
 from tempfile import NamedTemporaryFile
 
+import pytest
 from asyncpg.exceptions import UndefinedTableError
+from yarl import URL
 
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db

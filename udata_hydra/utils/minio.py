@@ -7,7 +7,6 @@ from botocore.exceptions import ClientError
 
 from udata_hydra import config
 
-
 log = logging.getLogger("udata-hydra")
 
 

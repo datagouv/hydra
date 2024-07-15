@@ -1,24 +1,21 @@
 import csv
-import os
-
-from datetime import datetime, timezone
 import logging
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import aiohttp
 import asyncpg
-
 from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
 
 from udata_hydra import config
+from udata_hydra.analysis.csv import analyse_csv, delete_table
 from udata_hydra.crawl import check_url as crawl_check_url
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
-from udata_hydra.analysis.csv import analyse_csv, delete_table
-
 
 context = {}
 log = setup_logging()

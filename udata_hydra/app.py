@@ -1,19 +1,17 @@
 import json
 import os
-import pytz
-
 from datetime import datetime, timedelta
 
+import pytz
 from aiohttp import web
 from humanfriendly import parse_timespan
-from marshmallow import Schema, fields, ValidationError
+from marshmallow import Schema, ValidationError, fields
 
-from udata_hydra import context, config
+from udata_hydra import config, context
 from udata_hydra.crawl import get_excluded_clause
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils.minio import delete_resource_from_minio
 from udata_hydra.worker import QUEUES
-
 
 log = setup_logging()
 routes = web.RouteTableDef()

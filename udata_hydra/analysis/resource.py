@@ -1,21 +1,19 @@
-from enum import Enum
 import json
 import logging
 import os
-import pytz
-
 from datetime import datetime
+from enum import Enum
 from typing import Tuple, Union
 
 import magic
-
+import pytz
 from dateparser import parse as date_parser
 
-from udata_hydra import context, config
-from udata_hydra.utils import queue
+from udata_hydra import config, context
 from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.utils import queue
 from udata_hydra.utils.csv import detect_tabular_from_headers
-from udata_hydra.utils.db import update_check, get_check
+from udata_hydra.utils.db import get_check, update_check
 from udata_hydra.utils.file import compute_checksum_from_file, download_resource
 from udata_hydra.utils.http import send
 

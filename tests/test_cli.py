@@ -1,6 +1,5 @@
 import nest_asyncio
 import pytest
-
 from minicli import run
 
 pytestmark = pytest.mark.asyncio

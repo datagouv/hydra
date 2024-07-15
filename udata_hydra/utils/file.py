@@ -1,12 +1,11 @@
+import gzip
 import hashlib
 import logging
 import tempfile
-import gzip
-import magic
-
 from typing import BinaryIO, Union
 
 import aiohttp
+import magic
 
 from udata_hydra import config
 

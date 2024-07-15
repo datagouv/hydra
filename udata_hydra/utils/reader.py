@@ -1,7 +1,8 @@
 import csv as stdcsv
+from io import BytesIO
+
 import openpyxl
 import xlrd
-from io import BytesIO
 
 
 def generate_dialect(inspection: dict) -> stdcsv.Dialect:

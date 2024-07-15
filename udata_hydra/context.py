@@ -1,10 +1,8 @@
 import logging
-
 from unittest.mock import MagicMock
 
 import asyncpg
 import redis
-
 from rq import Queue
 
 from udata_hydra import config
