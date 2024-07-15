@@ -54,7 +54,7 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 
 ### Run
 
-```
+```bash
 poetry install
 poetry run adev runserver udata_hydra/app.py
 ```
@@ -63,7 +63,7 @@ poetry run adev runserver udata_hydra/app.py
 
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.saintdenis.re/datasets/661e19974bcc48849bbff7c9637c5c28_1.csv" | json_pp
 {
    "status" : 200,
@@ -100,7 +100,7 @@ $ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.sain
 
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv.fr/IMG/xls/er864.xls" | json_pp
 [
    {
@@ -138,7 +138,7 @@ $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv
 
 ### Get crawling status
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 {
    "fresh_checks_percentage" : 0.4,
@@ -151,7 +151,7 @@ $ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 
 ### Get worker status
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/status/worker/" | json_pp
 {
    "queued" : {
@@ -164,7 +164,7 @@ $ curl -s "http://localhost:8000/api/status/worker/" | json_pp
 
 ### Get crawling stats
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/stats/" | json_pp
 {
    "status" : [
