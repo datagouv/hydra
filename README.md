@@ -11,7 +11,7 @@ Since it's called _hydra_, it also has mythical powers embedded:
 
 ## Architecture schema
 
-The architecture for the ful workflow is the following:
+The architecture for the full workflow is the following:
 
 ![Full workflow architecture](docs/archi-idd-IDD.drawio.png)
 
