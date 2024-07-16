@@ -1,7 +1,6 @@
 import os
+import tomllib
 from pathlib import Path
-
-import toml
 
 
 class Configurator:
@@ -15,12 +14,14 @@ class Configurator:
 
     def configure(self):
         # load default settings
-        configuration = toml.load(Path(__file__).parent / "config_default.toml")
+        with open(Path(__file__).parent / "config_default.toml", "rb") as f:
+            configuration = tomllib.load(f)
 
         # override with local settings
         local_settings = os.environ.get("HYDRA_SETTINGS", Path.cwd() / "config.toml")
         if Path(local_settings).exists():
-            configuration.update(toml.load(local_settings))
+            with open(Path(local_settings), "rb") as f:
+                configuration.update(tomllib.load(f))
 
         self.configuration = configuration
         self.check()

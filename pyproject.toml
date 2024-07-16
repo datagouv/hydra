@@ -3,7 +3,7 @@ name = "udata-hydra"
 version = "2.0.0.dev"
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = [{ name = "Opendata Team", email = "opendatateam@data.gouv.fr" }]
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.11,<3.13"
 license = { text = "MIT" }
 readme = "README.md"
 
@@ -16,7 +16,7 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.11"
 aiohttp = "^3.8.1"
 asyncpg = "^0.27.0"
 boto3 = "^1.21.21"
@@ -30,7 +30,6 @@ sentry-sdk = "^1.11.1"
 aiocontextvars = "^0.2.2"
 coloredlogs = "^15.0.1"
 rq = "^1.11.1"
-toml = "^0.10.2"
 str2float = "^0.0.9"
 str2bool = "^1.1"
 sqlalchemy = "^1.4.46"
