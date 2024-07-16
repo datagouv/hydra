@@ -1,8 +1,7 @@
 import logging
 import os
+import tomllib
 from pathlib import Path
-
-import toml
 
 log = logging.getLogger("udata-hydra")
 
@@ -19,12 +18,14 @@ class Configurator:
 
     def configure(self) -> None:
         # load default settings
-        configuration: dict = toml.load(Path(__file__).parent / "config_default.toml")
+        with open(Path(__file__).parent / "config_default.toml", "rb") as f:
+            configuration: dict = tomllib.load(f)
 
         # override with local settings
         local_settings = os.environ.get("HYDRA_SETTINGS", Path.cwd() / "config.toml")
         if Path(local_settings).exists():
-            configuration.update(toml.load(local_settings))
+            with open(Path(local_settings), "rb") as f:
+                configuration.update(tomllib.load(f))
 
         self.configuration = configuration
         self.check()
@@ -33,7 +34,8 @@ class Configurator:
         """Get more info about the app from pyproject.toml"""
         project_info: dict = {}
         try:
-            project_info = toml.load("pyproject.toml")["project"]
+            with open(Path("pyproject.toml"), "rb") as f:
+                project_info = tomllib.load(f)["project"]
         except Exception as e:
             log.error(f"Error while getting pyproject.toml info: {str(e)}")
         self.configuration["APP_NAME"] = project_info.get("name", "udata-hydra")
