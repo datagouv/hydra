@@ -9,6 +9,17 @@ Since it's called _hydra_, it also has mythical powers embedded:
 - if the remote resource is a CSV, convert it to a PostgreSQL table, ready for APIfication
 - send crawl and analysis info to a udata instance
 
+## Architecture schema
+
+The architecture for the full workflow is the following:
+
+![Full workflow architecture](docs/archi-idd-IDD.drawio.png)
+
+
+The hydra crawler is one of the components of the architecture. It will check if resource is available, analyze the type of file if the resource has been modified, and analyze the CSV content. It will also convert CSV resources to database tables and send the data to a udata instance. 
+
+![Crawler architecture](docs/hydra.drawio.png)
+
 ## CLI
 
 ### Create database structure
@@ -26,7 +37,7 @@ Install udata-hydra dependencies and cli.
 
 `poetry run udata-hydra-crawl`
 
-It will crawl (forever) the catalog according to config set in `config.py`.
+It will crawl (forever) the catalog according to config set in `udata_hydra/config.toml`, with a default config in `udata_hydra/config_default.toml`.
 
 `BATCH_SIZE` URLs are queued at each loop run.
 
@@ -54,7 +65,7 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 
 ### Run
 
-```
+```bash
 poetry install
 poetry run adev runserver udata_hydra/app.py
 ```
@@ -63,7 +74,7 @@ poetry run adev runserver udata_hydra/app.py
 
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.saintdenis.re/datasets/661e19974bcc48849bbff7c9637c5c28_1.csv" | json_pp
 {
    "status" : 200,
@@ -100,7 +111,7 @@ $ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.sain
 
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv.fr/IMG/xls/er864.xls" | json_pp
 [
    {
@@ -138,7 +149,7 @@ $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv
 
 ### Get crawling status
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 {
    "fresh_checks_percentage" : 0.4,
@@ -151,7 +162,7 @@ $ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 
 ### Get worker status
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/status/worker/" | json_pp
 {
    "queued" : {
@@ -164,7 +175,7 @@ $ curl -s "http://localhost:8000/api/status/worker/" | json_pp
 
 ### Get crawling stats
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/stats/" | json_pp
 {
    "status" : [
