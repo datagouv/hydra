@@ -1,15 +1,13 @@
+import asyncio
+import json
 import time
-
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-import json
-import pytz
 from typing import Tuple
 from urllib.parse import urlparse
 
 import aiohttp
-import asyncio
-
+import pytz
 from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
@@ -64,11 +62,12 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
     )
     timeout_has_changed = last_check and check_data.get("timeout") != last_check.get("timeout")
     current_headers = check_data.get("headers", {})
-    last_check_headers = json.loads(last_check.get("headers")) if last_check and last_check.get("headers") else {}
-    content_has_changed = (
-        last_check
-        and (current_headers.get("content-length") != last_check_headers.get("content-length")
-             or current_headers.get("content-type") != last_check_headers.get("content-type"))
+    last_check_headers = (
+        json.loads(last_check.get("headers")) if last_check and last_check.get("headers") else {}
+    )
+    content_has_changed = last_check and (
+        current_headers.get("content-length") != last_check_headers.get("content-length")
+        or current_headers.get("content-type") != last_check_headers.get("content-type")
     )
 
     # TODO: Instead of computing criterions here, store payload and compare with previous one.
@@ -89,8 +88,13 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
             "check:timeout": check_data["timeout"],
             "check:date": datetime.now(pytz.UTC).isoformat(),
             "check:error": check_data.get("error"),
-            "check:headers:content-type": await get_content_type_from_header(check_data.get("headers", {})),
-            "check:headers:content-length": int(check_data.get("headers", {}).get("content-length", 0)) or None
+            "check:headers:content-type": await get_content_type_from_header(
+                check_data.get("headers", {})
+            ),
+            "check:headers:content-length": int(
+                check_data.get("headers", {}).get("content-length", 0)
+            )
+            or None,
         }
         pool = await context.pool()
         async with pool.acquire() as conn:
@@ -112,7 +116,7 @@ async def update_catalog_following_check(resource_id):
     async with pool.acquire() as connection:
         await connection.execute(
             "UPDATE catalog SET priority = FALSE, status = NULL WHERE resource_id = $1",
-            resource_id
+            resource_id,
         )
 
 
@@ -156,11 +160,16 @@ async def is_backoff(domain) -> Tuple[bool, str]:
             domain,
             since_backoff_period,
         )
-        backoff = res["count"] >= config.BACKOFF_NB_REQ, f"Too many requests: {res['count']}"
+        backoff = (
+            res["count"] >= config.BACKOFF_NB_REQ,
+            f"Too many requests: {res['count']}",
+        )
 
         if not backoff[0]:
             # check if we hit a ratelimit or received a 429 on this domain since COOL_OFF_PERIOD
-            since_cool_off_period = datetime.now(timezone.utc) - timedelta(seconds=config.COOL_OFF_PERIOD)
+            since_cool_off_period = datetime.now(timezone.utc) - timedelta(
+                seconds=config.COOL_OFF_PERIOD
+            )
             q = f"""
                 SELECT
                     headers->>'x-ratelimit-remaining' as ratelimit_remaining,
@@ -180,7 +189,10 @@ async def is_backoff(domain) -> Tuple[bool, str]:
                     # TODO: we could also user Retry-after, but it isn't returned correctly on 429 we're getting
                     return True, "429 status code has been returned on the latest call"
                 try:
-                    remain, limit = float(res["ratelimit_remaining"]), float(res["ratelimit_limit"])
+                    remain, limit = (
+                        float(res["ratelimit_remaining"]),
+                        float(res["ratelimit_limit"]),
+                    )
                 except (ValueError, TypeError):
                     pass
                 else:
@@ -261,9 +273,7 @@ async def check_url(row, session, sleep=0, method="head"):
         start = time.time()
         timeout = aiohttp.ClientTimeout(total=5)
         _method = getattr(session, method)
-        async with _method(
-            row["url"], timeout=timeout, allow_redirects=True
-        ) as resp:
+        async with _method(row["url"], timeout=timeout, allow_redirects=True) as resp:
             end = time.time()
             if method != "get" and not has_nice_head(resp):
                 return await check_url(row, session, method="get")
@@ -323,7 +333,9 @@ async def check_url(row, session, sleep=0, method="head"):
 async def crawl_urls(to_parse):
     context.monitor().set_status("Crawling urls...")
     tasks = []
-    async with aiohttp.ClientSession(timeout=None, headers={"user-agent": config.USER_AGENT}) as session:
+    async with aiohttp.ClientSession(
+        timeout=None, headers={"user-agent": config.USER_AGENT}
+    ) as session:
         for row in to_parse:
             tasks.append(check_url(row, session))
         for task in asyncio.as_completed(tasks):
@@ -334,10 +346,10 @@ async def crawl_urls(to_parse):
 
 def get_excluded_clause():
     return " AND ".join(
-        [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS] +
-        [
+        [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS]
+        + [
             "catalog.deleted = False",
-            "(catalog.status != 'crawling' OR catalog.status IS NULL)"
+            "(catalog.status != 'crawling' OR catalog.status IS NULL)",
         ]
     )
 

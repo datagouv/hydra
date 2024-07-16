@@ -7,7 +7,6 @@ from botocore.exceptions import ClientError
 
 from udata_hydra import config
 
-
 log = logging.getLogger("udata-hydra")
 
 
@@ -33,9 +32,7 @@ def save_resource_to_minio(resource_file: BinaryIO, key: str, resource_id: str) 
                 config.MINIO_BUCKET,
                 config.MINIO_FOLDER + "/" + key + "/" + resource_id,
             )
-        log.info(
-            f"Resource saved into minio at {get_resource_minio_url(key, resource_id)}"
-        )
+        log.info(f"Resource saved into minio at {get_resource_minio_url(key, resource_id)}")
     except ClientError as e:
         log.error(e)
 
@@ -54,8 +51,6 @@ def delete_resource_from_minio(key: str, resource_id: str) -> None:
             Bucket=config.MINIO_BUCKET,
             Key=config.MINIO_FOLDER + "/" + key + "/" + resource_id,
         )
-        log.info(
-            f"Resource deleted from minio at {get_resource_minio_url(key, resource_id)}"
-        )
+        log.info(f"Resource deleted from minio at {get_resource_minio_url(key, resource_id)}")
     except ClientError as e:
         log.error(e)

@@ -1,5 +1,4 @@
 import logging
-
 from pathlib import Path
 
 from asyncpg.exceptions import SyntaxOrAccessError

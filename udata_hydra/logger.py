@@ -2,7 +2,6 @@ import logging
 
 import coloredlogs
 import sentry_sdk
-
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 from sentry_sdk.integrations.rq import RqIntegration
 

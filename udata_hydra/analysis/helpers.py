@@ -1,7 +1,8 @@
 from datetime import date, datetime
 
 from dateparser import parse as date_parser
-from dateutil.parser import parse as dateutil_parser, ParserError
+from dateutil.parser import ParserError
+from dateutil.parser import parse as dateutil_parser
 
 
 def to_json(value: str) -> str:

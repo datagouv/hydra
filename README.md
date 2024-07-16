@@ -287,3 +287,17 @@ For example, to set the log level to `DEBUG` when initializing the database, use
 Refer to each section to learn how to launch them. The only differences from dev to prod are:
 - use `HYDRA_SETTINGS` env var to point to your custom `config.toml`
 - use `HYDRA_APP_SOCKET_PATH` to configure where aiohttp should listen to a [reverse proxy connection (eg nginx)](https://docs.aiohttp.org/en/stable/deployment.html#nginx-configuration) and use `udata-hydra-app` to launch the app server
+
+## Contributing
+
+Before contributing to the repository and making any PR, it is necessary to initialize the pre-commit hooks:
+```bash
+pre-commit install
+```
+Once this is done, code formatting and linting, as well as import sorting, will be automatically checked before each commit.
+
+If you cannot use pre-commit, it is necessary to format, lint, and sort imports with [Ruff](https://docs.astral.sh/ruff/) before committing:
+```bash
+ruff check --fix --select I .
+ruff format .
+```

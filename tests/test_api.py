@@ -2,8 +2,8 @@
 NB: we can't use pytest-aiohttp helpers beause
 it will interfere with the rest of our async code
 """
-import hashlib
 
+import hashlib
 from datetime import datetime
 
 import pytest
@@ -150,7 +150,7 @@ async def test_api_resource_updated(client):
             "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
             "created_at": datetime.now().isoformat(),
             "last_modified": datetime.now().isoformat(),
-        }
+        },
     }
     resp = await client.post("/api/resource/updated/", json=payload)
     assert resp.status == 200
@@ -166,8 +166,10 @@ async def test_api_resource_updated(client):
 
 async def test_api_resource_updated_url_since_load_catalog(setup_catalog, db, client):
     # We modify the url for this resource
-    await db.execute("UPDATE catalog SET url = 'https://example.com/resource-0' "
-                     "WHERE resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'")
+    await db.execute(
+        "UPDATE catalog SET url = 'https://example.com/resource-0' "
+        "WHERE resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'"
+    )
 
     # We're sending an update signal on the (dataset_id,resource_id) with the previous url.
     payload = {
@@ -186,14 +188,16 @@ async def test_api_resource_updated_url_since_load_catalog(setup_catalog, db, cl
             "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
             "created_at": datetime.now().isoformat(),
             "last_modified": datetime.now().isoformat(),
-        }
+        },
     }
     # It does not create any duplicated resource.
     # The existing entry get updated accordingly.
     resp = await client.post("/api/resource/updated/", json=payload)
     assert resp.status == 200
 
-    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'")
+    res = await db.fetch(
+        "SELECT * FROM catalog WHERE resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'"
+    )
     assert len(res) == 1
     res[0]["url"] == "https://example.com/resource-1"
 
@@ -202,7 +206,7 @@ async def test_api_resource_deleted(client):
     payload = {
         "resource_id": "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
         "dataset_id": "61fd30cb29ea95c7bc0e1211",
-        "document": None
+        "document": None,
     }
     resp = await client.post("/api/resource/deleted/", json=payload)
     assert resp.status == 200

@@ -1,12 +1,11 @@
+import gzip
 import hashlib
 import logging
 import tempfile
-import gzip
-import magic
-
 from typing import BinaryIO, Union
 
 import aiohttp
+import magic
 
 from udata_hydra import config
 
@@ -41,14 +40,18 @@ async def download_resource(
     Returns the downloaded file object.
     Raises IOError if the resource is too large.
     """
-    tmp_file = tempfile.NamedTemporaryFile(dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False)
+    tmp_file = tempfile.NamedTemporaryFile(
+        dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False
+    )
 
     if max_size_allowed is not None and float(headers.get("content-length", -1)) > max_size_allowed:
         raise IOError("File too large to download")
 
     chunk_size = 1024
     i = 0
-    async with aiohttp.ClientSession(headers={"user-agent": config.USER_AGENT}, raise_for_status=True) as session:
+    async with aiohttp.ClientSession(
+        headers={"user-agent": config.USER_AGENT}, raise_for_status=True
+    ) as session:
         async with session.get(url, allow_redirects=True) as response:
             async for chunk in response.content.iter_chunked(chunk_size):
                 if max_size_allowed is None or i * chunk_size < max_size_allowed:
@@ -59,6 +62,9 @@ async def download_resource(
                     raise IOError("File too large to download")
                 i += 1
     tmp_file.close()
-    if magic.from_file(tmp_file.name, mime=True) in ["application/x-gzip", "application/gzip"]:
+    if magic.from_file(tmp_file.name, mime=True) in [
+        "application/x-gzip",
+        "application/gzip",
+    ]:
         tmp_file = read_csv_gz(tmp_file.name)
     return tmp_file
