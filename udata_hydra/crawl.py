@@ -3,7 +3,6 @@ import json
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Tuple
 from urllib.parse import urlparse
 
 import aiohttp
@@ -120,7 +119,7 @@ async def update_catalog_following_check(resource_id):
         )
 
 
-async def process_check_data(check_data: dict) -> Tuple[int, bool]:
+async def process_check_data(check_data: dict) -> tuple[int, bool]:
     """Preprocess a check before saving it"""
     check_data["resource_id"] = str(check_data["resource_id"])
 
@@ -142,7 +141,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     return await insert_check(check_data), is_first_check
 
 
-async def is_backoff(domain) -> Tuple[bool, str]:
+async def is_backoff(domain) -> tuple[bool, str]:
     backoff = False, ""
     no_backoff = [f"'{d}'" for d in config.NO_BACKOFF_DOMAINS]
     no_backoff = f"({','.join(no_backoff)})"

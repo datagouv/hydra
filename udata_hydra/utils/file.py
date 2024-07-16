@@ -2,7 +2,7 @@ import gzip
 import hashlib
 import logging
 import tempfile
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 import aiohttp
 import magic
@@ -33,7 +33,7 @@ def read_csv_gz(file_path):
 async def download_resource(
     url: str,
     headers: dict,
-    max_size_allowed: Union[int, None],
+    max_size_allowed: int | None,
 ) -> BinaryIO:
     """
     Attempts downloading a resource from a given url.
