@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Union
 
 import coloredlogs
@@ -28,7 +29,7 @@ def setup_logging():
                 RqIntegration(),
             ],
             release=release,
-            # environment=config.SENTRY_ENVIRONMENT, # TODO: get the environment from os.environ
+            environment=os.getenv("HYDRA_ENV", "unknown"),
             # Set traces_sample_rate to 1.0 to capture 100%
             # of transactions for performance monitoring.
             # Sentry recommends adjusting this value in production.
