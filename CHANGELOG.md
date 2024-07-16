@@ -2,6 +2,7 @@
 
 ## Current (in progress)
 
+- Use Python 3.11 instead of 3.9 for performance improvements and future compatibility [#101](https://github.com/datagouv/hydra/pull/101)
 - Add linter and formatter with `pyproject.toml` config, add lint and formatting step in CI, add pre-commit hook to lint and format, update docs and lint and format the code [#99](https://github.com/datagouv/hydra/pull/99)
 - Use profiling option from csv-detective [#54](https://github.com/etalab/udata-hydra/pull/54)
 - Remove csv_analysis, integrate into checks [#52](https://github.com/etalab/udata-hydra/pull/52)
