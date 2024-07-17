@@ -124,7 +124,7 @@ async def analyse_csv(
         else await download_resource(
             url=url,
             headers=headers,
-            max_size_allowed=None if exception_file else float(config.MAX_FILESIZE_ALLOWED["csv"]),
+            max_size_allowed=None if exception_file else int(config.MAX_FILESIZE_ALLOWED["csv"]),
         )
     )
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
