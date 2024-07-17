@@ -1,14 +1,14 @@
 import json
 
 
-async def detect_tabular_from_headers(check) -> bool:
+async def detect_tabular_from_headers(check: dict) -> tuple[bool, str]:
     """
     Determine from content-type header if file looks like:
         - a csv
         - a csv.gz (1. is the file's content binary?, 2. does the URL contain "csv.gz"?)
         - a xls(x)
     """
-    headers = json.loads(check["headers"] or "{}")
+    headers: dict = json.loads(check["headers"] or "{}")
 
     if any(
         headers.get("content-type", "").lower().startswith(ct)

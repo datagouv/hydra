@@ -62,7 +62,7 @@ class ResourceQuery(Schema):
     document = fields.Nested(ResourceDocument(), allow_none=True)
 
 
-def _get_args(request, params=("url", "resource_id")):
+def _get_args(request, params=("url", "resource_id")) -> list:
     data = [request.query.get(param) for param in params]
     if not any(data):
         raise web.HTTPBadRequest()
@@ -70,7 +70,7 @@ def _get_args(request, params=("url", "resource_id")):
 
 
 @routes.post("/api/resource/created/")
-async def resource_created(request):
+async def resource_created(request) -> web.Response:
     try:
         payload = await request.json()
         valid_payload = ResourceQuery().load(payload)
@@ -159,7 +159,7 @@ async def resource_deleted(request):
 
 
 @routes.get("/api/checks/latest/")
-async def get_check(request):
+async def get_check(request) -> web.Response:
     url, resource_id = _get_args(request)
     column = "url" if url else "resource_id"
     q = f"""
@@ -178,7 +178,7 @@ async def get_check(request):
 
 
 @routes.get("/api/checks/all/")
-async def get_checks(request):
+async def get_checks(request) -> web.Response:
     url, resource_id = _get_args(request)
     column = "url" if url else "resource_id"
     q = f"""
@@ -196,7 +196,7 @@ async def get_checks(request):
 
 
 @routes.get("/api/status/crawler/")
-async def status_crawler(request):
+async def status_crawler(request) -> web.Response:
     q = f"""
         SELECT
             SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END) AS count_left,
@@ -239,13 +239,13 @@ async def status_crawler(request):
 
 
 @routes.get("/api/status/worker/")
-async def status_worker(request):
+async def status_worker(request) -> web.Response:
     res = {"queued": {q: len(context.queue(q)) for q in QUEUES}}
     return web.json_response(res)
 
 
 @routes.get("/api/stats/")
-async def stats(request):
+async def stats(request) -> web.Response:
     q = f"""
         SELECT count(*) AS count_checked
         FROM catalog
@@ -310,7 +310,7 @@ async def stats(request):
 
 
 @routes.get("/api/health/")
-async def health(request):
+async def health(request) -> web.Response:
     test_connection = await request.app["pool"].fetchrow("SELECT 1")
     assert next(test_connection.values()) == 1
     return web.HTTPOk()

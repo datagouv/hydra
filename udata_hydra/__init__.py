@@ -12,7 +12,7 @@ class Configurator:
         if not self.configuration:
             self.configure()
 
-    def configure(self):
+    def configure(self) -> None:
         # load default settings
         with open(Path(__file__).parent / "config_default.toml", "rb") as f:
             configuration = tomllib.load(f)
@@ -26,11 +26,11 @@ class Configurator:
         self.configuration = configuration
         self.check()
 
-    def override(self, **kwargs):
+    def override(self, **kwargs) -> None:
         self.configuration.update(kwargs)
         self.check()
 
-    def check(self):
+    def check(self) -> None:
         """Sanity check on config"""
         assert self.MAX_POOL_SIZE >= self.BATCH_SIZE, "BATCH_SIZE cannot exceed MAX_POOL_SIZE"
 

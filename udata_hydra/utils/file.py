@@ -12,7 +12,7 @@ from udata_hydra import config
 log = logging.getLogger("udata-hydra")
 
 
-def compute_checksum_from_file(filename):
+def compute_checksum_from_file(filename: str) -> str:
     """Compute sha1 in blocks"""
     sha1sum = hashlib.sha1()
     with open(filename, "rb") as f:
@@ -23,7 +23,7 @@ def compute_checksum_from_file(filename):
     return sha1sum.hexdigest()
 
 
-def read_csv_gz(file_path):
+def read_csv_gz(file_path: str):
     with gzip.open(file_path, "rb") as gz_file:
         with tempfile.NamedTemporaryFile(mode="wb", delete=False) as temp_file:
             temp_file.write(gz_file.read())

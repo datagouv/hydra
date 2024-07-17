@@ -28,7 +28,7 @@ class Migrator:
         self.db_name = db_name
         self.table_name = f"migrations_{db_name}"
 
-    async def get(self, name):
+    async def get(self, name) -> dict:
         q = f"SELECT * FROM {self.table_name} WHERE name = $1 AND status = $2"
         return await self.db.fetchrow(q, name, "DONE")
 
