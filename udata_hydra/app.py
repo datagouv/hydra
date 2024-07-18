@@ -1,11 +1,10 @@
-import json
 import os
 from datetime import datetime, timedelta
 
 import pytz
 from aiohttp import web
 from humanfriendly import parse_timespan
-from marshmallow import ValidationError
+from pydantic import ValidationError
 
 from udata_hydra import config, context
 from udata_hydra.crawl import get_excluded_clause
@@ -29,26 +28,26 @@ def _get_args(request, params=("url", "resource_id")) -> list:
 async def resource_created(request) -> web.Response:
     try:
         payload = await request.json()
-        valid_payload = ResourceQuery().load(payload)
+        valid_payload = ResourceQuery.model_validate(payload)
     except ValidationError as err:
-        raise web.HTTPBadRequest(text=json.dumps(err.messages))
+        raise web.HTTPBadRequest(text=err.json())
 
-    resource = valid_payload["document"]
+    resource = valid_payload.document
     if not resource:
         raise web.HTTPBadRequest(text="Missing document body")
 
-    dataset_id = valid_payload["dataset_id"]
-    resource_id = valid_payload["resource_id"]
+    dataset_id = valid_payload.dataset_id
+    resource_id = valid_payload.resource_id
 
     pool = request.app["pool"]
     async with pool.acquire() as connection:
         # Insert new resource in catalog table and mark as high priority for crawling
         q = f"""
                 INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority)
-                VALUES ('{dataset_id}', '{resource_id}', '{resource["url"]}', FALSE, TRUE)
+                VALUES ('{dataset_id}', '{resource_id}', '{resource.url}', FALSE, TRUE)
                 ON CONFLICT (resource_id) DO UPDATE SET
                     priority = TRUE,
-                    url = '{resource["url"]}',
+                    url = '{resource.url}',
                     dataset_id = '{dataset_id}';"""
         await connection.execute(q)
 
@@ -61,7 +60,7 @@ async def resource_updated(request):
         payload = await request.json()
         valid_payload = ResourceQuery().load(payload)
     except ValidationError as err:
-        raise web.HTTPBadRequest(text=json.dumps(err.messages))
+        raise web.HTTPBadRequest(text=err.json())
 
     resource = valid_payload["document"]
     if not resource:
@@ -96,12 +95,12 @@ async def resource_updated(request):
 async def resource_deleted(request):
     try:
         payload = await request.json()
-        valid_payload = ResourceQuery().load(payload)
+        valid_payload = ResourceQuery.model_validate(payload)
     except ValidationError as err:
-        raise web.HTTPBadRequest(text=json.dumps(err.messages))
+        raise web.HTTPBadRequest(text=err.json())
 
-    dataset_id = valid_payload["dataset_id"]
-    resource_id = valid_payload["resource_id"]
+    dataset_id = valid_payload.dataset_id
+    resource_id = valid_payload.resource_id
 
     pool = request.app["pool"]
     async with pool.acquire() as connection:
@@ -130,7 +129,8 @@ async def get_check(request) -> web.Response:
         raise web.HTTPNotFound()
     if data["deleted"]:
         raise web.HTTPGone()
-    return web.json_response(CheckSchema().dump(dict(data)))
+    check = CheckSchema.model_validate(dict(data))
+    return web.json_response(check.model_dump())
 
 
 @routes.get("/api/checks/all/")
@@ -148,7 +148,8 @@ async def get_checks(request) -> web.Response:
     data = await request.app["pool"].fetch(q, url or resource_id)
     if not data:
         raise web.HTTPNotFound()
-    return web.json_response([CheckSchema().dump(dict(r)) for r in data])
+    checks: list = [CheckSchema.model_validate(dict(r)) for r in data]
+    return web.json_response(checks)
 
 
 @routes.get("/api/status/crawler/")
