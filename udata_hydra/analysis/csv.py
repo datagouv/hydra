@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from datetime import datetime
-from typing import Any
+from typing import Any, Union
 
 import pytz
 import sentry_sdk
@@ -75,7 +75,7 @@ PYTHON_TYPE_TO_PY = {
 RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 
 
-async def notify_udata(check_id):
+async def notify_udata(check_id: int) -> None:
     """Notify udata of the result of a parsing"""
     check = await get_check(check_id)
     resource_id = check["resource_id"]
@@ -99,9 +99,9 @@ async def notify_udata(check_id):
 
 
 async def analyse_csv(
-    check_id: int = None,
-    url: str = None,
-    file_path: str = None,
+    check_id: int | None = None,
+    url: Union[str, None] = None,
+    file_path: Union[str, None] = None,
     debug_insert: bool = False,
 ) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
@@ -156,7 +156,7 @@ async def analyse_csv(
         os.remove(tmp_file.name)
 
 
-def smart_cast(_type, value, failsafe=False) -> Any:
+def smart_cast(_type: str, value, failsafe: bool = False) -> Any:
     try:
         if value is None or value == "":
             return None
@@ -189,7 +189,9 @@ def compute_create_table_query(table_name: str, columns: list) -> str:
     return compiled.string.replace("%%", "%")
 
 
-async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_insert: bool = False):
+async def csv_to_db(
+    file_path: str, inspection: dict, table_name: str, debug_insert: bool = False
+) -> None:
     """
     Convert a csv file to database table using inspection data. It should (re)create one table:
     - `table_name` with data from `file_path`
@@ -237,7 +239,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
                 await db.execute(q, *data.values())
 
 
-async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
+async def csv_to_db_index(table_name: str, inspection: dict, check: dict) -> None:
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)"
@@ -250,7 +252,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
     )
 
 
-async def perform_csv_inspection(file_path):
+async def perform_csv_inspection(file_path: str) -> Union[dict, None]:
     """Launch csv-detective against given file"""
     try:
         return csv_detective_routine(
@@ -260,7 +262,7 @@ async def perform_csv_inspection(file_path):
         raise ParseException("csv_detective") from e
 
 
-async def delete_table(table_name: str):
+async def delete_table(table_name: str) -> None:
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     await db.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)

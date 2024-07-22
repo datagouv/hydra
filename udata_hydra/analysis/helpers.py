@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Union
 
 from dateparser import parse as date_parser
 from dateutil.parser import ParserError
@@ -18,7 +19,7 @@ def _parse_dt(value: str) -> datetime:
         return date_parser(value)
 
 
-def to_date(value: str) -> date:
+def to_date(value: str) -> Union[date, None]:
     parsed = _parse_dt(value)
     return parsed.date() if parsed else None
 

@@ -11,7 +11,7 @@ log = logging.getLogger("udata-hydra")
 context = {"inited": False}
 
 
-def setup_logging():
+def setup_logging() -> logging.Logger:
     if context.get("inited"):
         return log
     if config.SENTRY_DSN:
@@ -30,7 +30,7 @@ def setup_logging():
     return log
 
 
-def stop_sentry():
+def stop_sentry() -> None:
     """Stop sentry collection programatically"""
     if sentry_sdk.Hub.current.client:
         sentry_sdk.Hub.current.client.close()

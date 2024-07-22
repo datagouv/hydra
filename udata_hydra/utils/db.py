@@ -37,7 +37,7 @@ async def insert_check(data: dict) -> int:
     return last_check["id"]
 
 
-def compute_update_query(table: str, data: dict):
+def compute_update_query(table: str, data: dict) -> str:
     columns = data.keys()
     # $1, $2...
     placeholders = [f"${x + 1}" for x in range(len(data.values()))]
@@ -61,7 +61,7 @@ async def update_check(check_id: int, data: dict) -> int:
     return await update_table_record("checks", check_id, data)
 
 
-async def get_check(check_id):
+async def get_check(check_id: int) -> dict:
     pool = await context.pool()
     async with pool.acquire() as connection:
         q = """

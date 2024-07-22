@@ -11,7 +11,7 @@ log = logging.getLogger("udata-hydra")
 class Migrator:
     # NB: we can't use async __init__, hence the workaround
     @classmethod
-    async def create(cls, db_name, skip_errors=False):
+    async def create(cls, db_name, skip_errors=False) -> "Migrator":
         self = Migrator(db_name)
         self.skip_errors = skip_errors
         self.db = await context.pool(db=db_name)
@@ -28,11 +28,11 @@ class Migrator:
         self.db_name = db_name
         self.table_name = f"migrations_{db_name}"
 
-    async def get(self, name):
+    async def get(self, name) -> dict:
         q = f"SELECT * FROM {self.table_name} WHERE name = $1 AND status = $2"
         return await self.db.fetchrow(q, name, "DONE")
 
-    async def register(self, name):
+    async def register(self, name) -> dict:
         q = f"INSERT INTO {self.table_name}(name, status) VALUES($1, $2)"
         await self.db.execute(q, name, "DONE")
 

@@ -1,5 +1,6 @@
 import csv as stdcsv
 from io import BytesIO
+from typing import Generator
 
 import openpyxl
 import xlrd
@@ -56,7 +57,7 @@ class Reader:
             next(self.file)
         return self.file
 
-    def _excel_reader(self):
+    def _excel_reader(self) -> Generator:
         _method = getattr(self.sheet, self.mapping[self.inspection["engine"]])
         for idx, row in enumerate(_method()):
             # skipping header

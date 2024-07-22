@@ -21,7 +21,7 @@ context = {}
 log = setup_logging()
 
 
-async def download_file(url, fd):
+async def download_file(url: str, fd):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             while True:
@@ -114,7 +114,7 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
 
 
 @cli
-async def check_url(url, method="get"):
+async def check_url(url: str, method: str = "get"):
     """Quickly check an URL"""
     log.info(f"Checking url {url}")
     async with aiohttp.ClientSession(timeout=None) as session:
@@ -129,7 +129,7 @@ async def check_url(url, method="get"):
 
 
 @cli
-async def check_resource(resource_id, method="get"):
+async def check_resource(resource_id, method: str = "get"):
     """Trigger a complete check for a given resource_id"""
     q = "SELECT * FROM catalog WHERE resource_id = $1"
     conn = await connection()
@@ -142,13 +142,15 @@ async def check_resource(resource_id, method="get"):
 
 
 @cli(name="analyse-csv")
-async def analyse_csv_cli(check_id: int = None, url: str = None, debug_insert=False):
+async def analyse_csv_cli(
+    check_id: int | None = None, url: str | None = None, debug_insert: bool = False
+):
     """Trigger a csv analysis from a check_id or an url"""
     await analyse_csv(check_id=check_id, url=url, debug_insert=debug_insert)
 
 
 @cli
-async def csv_sample(size=1000, download=False, max_size="100M"):
+async def csv_sample(size=1000, download: bool = False, max_size: str = "100M"):
     """Get a csv sample from latest checks
 
     :size: Size of the sample (how many files to query)
@@ -218,7 +220,7 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
 
 
 @cli
-async def drop_dbs(dbs=[]):
+async def drop_dbs(dbs: list = []):
     for db in dbs:
         conn = await connection(db)
         tables = await conn.fetch(f"""
@@ -230,7 +232,7 @@ async def drop_dbs(dbs=[]):
 
 
 @cli
-async def migrate(skip_errors=False, dbs=["main", "csv"]):
+async def migrate(skip_errors: bool = False, dbs: list[str] = ["main", "csv"]):
     """Migrate the database(s)"""
     for db in dbs:
         log.info(f"Migrating db {db}...")
@@ -239,7 +241,7 @@ async def migrate(skip_errors=False, dbs=["main", "csv"]):
 
 
 @cli
-async def purge_checks(limit=2):
+async def purge_checks(limit: int = 2):
     """Delete past checks for each resource_id, keeping only `limit` number of checks"""
     q = "SELECT resource_id FROM checks GROUP BY resource_id HAVING count(id) > $1"
     conn = await connection()
