@@ -3,7 +3,6 @@ import json
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Tuple, Union
 from urllib.parse import urlparse
 
 import aiohttp
@@ -26,7 +25,7 @@ STATUS_BACKOFF = "backoff"
 log = setup_logging()
 
 
-def is_valid_status(status: str) -> Union[bool, None]:
+def is_valid_status(status: str) -> bool | None:
     if not status:
         return False
     status_nb = int(status)
@@ -107,7 +106,7 @@ async def compute_check_has_changed(check_data: dict, last_check: dict) -> bool:
     return has_changed
 
 
-async def process_check_data(check_data: dict) -> Tuple[int, bool]:
+async def process_check_data(check_data: dict) -> tuple[int, bool]:
     """Preprocess a check before saving it"""
     check_data["resource_id"] = str(check_data["resource_id"])
 
@@ -131,7 +130,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     return await Check.insert(check_data), is_first_check
 
 
-async def is_backoff(domain: str) -> Tuple[bool, str]:
+async def is_backoff(domain: str) -> tuple[bool, str]:
     backoff = False, ""
     no_backoff = [f"'{d}'" for d in config.NO_BACKOFF_DOMAINS]
     no_backoff = f"({','.join(no_backoff)})"

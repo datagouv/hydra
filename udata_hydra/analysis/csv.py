@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Union
+from typing import Any
 
 import sentry_sdk
 from csv_detective.detection import engine_to_file
@@ -95,9 +95,9 @@ async def notify_udata(check_id: int) -> None:
 
 
 async def analyse_csv(
-    check_id: Union[int, None] = None,
-    url: Union[str, None] = None,
-    file_path: Union[str, None] = None,
+    check_id: int | None = None,
+    url: str | None = None,
+    file_path: str | None = None,
     debug_insert: bool = False,
 ) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
@@ -248,7 +248,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict) -> Non
     )
 
 
-async def perform_csv_inspection(file_path: str) -> Union[dict, None]:
+async def perform_csv_inspection(file_path: str) -> dict | None:
     """Launch csv-detective against given file"""
     try:
         return csv_detective_routine(

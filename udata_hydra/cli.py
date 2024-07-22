@@ -4,7 +4,6 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Union
 
 import aiohttp
 import asyncpg
@@ -143,7 +142,7 @@ async def check_resource(resource_id, method: str = "get"):
 
 @cli(name="analyse-csv")
 async def analyse_csv_cli(
-    check_id: Union[int, None] = None, url: Union[str, None] = None, debug_insert: bool = False
+    check_id: int | None = None, url: str | None = None, debug_insert: bool = False
 ):
     """Trigger a csv analysis from a check_id or an url"""
     await analyse_csv(check_id=check_id, url=url, debug_insert=debug_insert)
