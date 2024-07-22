@@ -54,7 +54,8 @@ MAX_FILESIZE_ALLOWED.xlsx = 13107200 # /8
 MAX_FILESIZE_ALLOWED.ods = 10485760 # /10
 
 
-CSV_ANALYSIS_ENABLED = true
+CSV_ANALYSIS = true
+CSV_TO_DB = true
 TEMPORARY_DOWNLOAD_FOLDER = ""
 
 # -- Worker settings -- #
@@ -66,7 +67,7 @@ UDATA_URI = ""
 UDATA_URI_API_KEY = ""
 
 # -- Minio / datalake settings -- #
-SAVE_PARQUET_TO_MINIO = false
+CSV_TO_PARQUET = false
 MINIO_FOLDER = ""
 MINIO_URL = ""
 MINIO_BUCKET = ""

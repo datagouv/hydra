@@ -95,8 +95,8 @@ async def notify_udata(check_id):
 
 async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
-    if not config.CSV_ANALYSIS_ENABLED:
-        log.debug("CSV_ANALYSIS_ENABLED turned off, skipping.")
+    if not config.CSV_ANALYSIS:
+        log.debug("CSV_ANALYSIS turned off, skipping.")
         return
 
     exceptions = config.LARGE_RESOURCES_EXCEPTIONS
@@ -196,7 +196,7 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     """
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
-        f"to db {'and parquet ' if config.SAVE_PARQUET_TO_MINIO else ''}for {table_name}"
+        f"to db {'and parquet ' if config.CSV_TO_PARQUET else ''}for {table_name}"
     )
     columns = inspection["columns"]
     # build a `column_name: type` mapping and explicitely rename reserved column names
@@ -204,38 +204,44 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
         f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
         for c, v in columns.items()
     }
-    q = f'DROP TABLE IF EXISTS "{table_name}"'
-    db = await context.pool("csv")
-    await db.execute(q)
-    q = compute_create_table_query(table_name, columns)
-    await db.execute(q)
     # save the file as parquet and store it on Minio instance
-    if config.SAVE_PARQUET_TO_MINIO:
+    if config.CSV_TO_PARQUET:
         parquet_file, _ = save_as_parquet(
             records=generate_records(file_path, inspection, columns),
             columns=columns,
             output_name=table_name,
         )
         minio_client.send_file(parquet_file)
-    # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
-    if not debug_insert:
-        # NB: also see copy_to_table for a file source
-        try:
-            await db.copy_records_to_table(
-                table_name,
-                records=generate_records(file_path, inspection, columns),
-                columns=columns.keys()
-            )
-        except Exception as e:  # I know what I'm doing, pinky swear
-            raise ParseException("copy_records_to_table") from e
-    # this inserts rows from iterator one by one, slow but useful for debugging
     else:
-        bar = ProgressBar(total=inspection["total_lines"])
-        for r in bar.iter(generate_records(file_path, inspection, columns)):
-            data = {k: v for k, v in zip(columns.keys(), r)}
-            # NB: possible sql injection here, but should not be used in prod
-            q = compute_insert_query(data, table_name, returning="__id")
-            await db.execute(q, *data.values())
+        log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
+
+    if not config.CSV_TO_DB:
+        log.debug("CSV_TO_DB turned off, skipping.")
+    else:
+        q = f'DROP TABLE IF EXISTS "{table_name}"'
+        db = await context.pool("csv")
+        await db.execute(q)
+        q = compute_create_table_query(table_name, columns)
+        await db.execute(q)
+        # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
+        if not debug_insert:
+            # NB: also see copy_to_table for a file source
+            try:
+                await db.copy_records_to_table(
+                    table_name,
+                    records=generate_records(file_path, inspection, columns),
+                    columns=columns.keys()
+                )
+            except Exception as e:  # I know what I'm doing, pinky swear
+                raise ParseException("copy_records_to_table") from e
+        # this inserts rows from iterator one by one, slow but useful for debugging
+        else:
+            bar = ProgressBar(total=inspection["total_lines"])
+            for r in bar.iter(generate_records(file_path, inspection, columns)):
+                data = {k: v for k, v in zip(columns.keys(), r)}
+                # NB: possible sql injection here, but should not be used in prod
+                q = compute_insert_query(data, table_name, returning="__id")
+                await db.execute(q, *data.values())
 
 
 async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
