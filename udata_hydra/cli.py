@@ -4,7 +4,6 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Optional
 
 import aiohttp
 import asyncpg
@@ -48,7 +47,7 @@ async def connection(db_name: str = "main"):
 
 @cli
 async def load_catalog(
-    url: Optional[str] = None, drop_meta: bool = False, drop_all: bool = False, quiet: bool = False
+    url: str | None = None, drop_meta: bool = False, drop_all: bool = False, quiet: bool = False
 ):
     """Load the catalog into DB from CSV file
 
@@ -155,7 +154,7 @@ async def check_resource(resource_id: str, method: str = "get"):
 
 @cli(name="analyse-csv")
 async def analyse_csv_cli(
-    check_id: Optional[int] = None, url: Optional[str] = None, debug_insert: bool = False
+    check_id: int | None = None, url: str | None = None, debug_insert: bool = False
 ):
     """Trigger a csv analysis from a check_id or an url"""
     await analyse_csv(check_id=check_id, url=url, debug_insert=debug_insert)

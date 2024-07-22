@@ -1,12 +1,12 @@
 import re
-from typing import Coroutine, Tuple
+from typing import Coroutine
 
 from aiohttp import web
 
 from udata_hydra import config
 
 
-def _is_exclude(request, exclude: Tuple[str]) -> bool:
+def _is_exclude(request, exclude: tuple[str]) -> bool:
     for pattern in exclude:
         if re.fullmatch(pattern, request.path):
             return True
@@ -16,8 +16,8 @@ def _is_exclude(request, exclude: Tuple[str]) -> bool:
 def token_auth_middleware(
     request_property: str = "user",
     auth_scheme: str = "Bearer",
-    exclude_routes: Tuple[str] = tuple(),
-    exclude_methods: Tuple[str] = tuple(),
+    exclude_routes: tuple[str] = tuple(),
+    exclude_methods: tuple[str] = tuple(),
 ) -> Coroutine:
     """Checks a auth token and adds a user in request.
 
@@ -28,9 +28,9 @@ def token_auth_middleware(
             Defaults to 'user'.
         auth_scheme (str, optional): Prefix for value in "Authorization" header.
             Defaults to 'Bearer'.
-        exclude_routes: (Tuple, optional): Tuple of pathes that will be excluded.
+        exclude_routes: (tuple, optional): Tuple of pathes that will be excluded.
             Defaults to empty tuple.
-        exclude_methods(Tuple, optional): Tuple of http methods that will be
+        exclude_methods(tuple, optional): Tuple of http methods that will be
             excluded. Defaults to empty tuple.
 
     Raises:

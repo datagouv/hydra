@@ -1,5 +1,3 @@
-from typing import Optional
-
 from udata_hydra import context
 from udata_hydra.db import (
     compute_insert_query,
@@ -12,7 +10,7 @@ class Check:
     """Represents a check in the "checks" DB table"""
 
     @classmethod
-    async def get(cls, check_id: int) -> Optional[dict]:
+    async def get(cls, check_id: int) -> dict | None:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
@@ -24,8 +22,8 @@ class Check:
 
     @classmethod
     async def get_latest(
-        cls, url: Optional[str] = None, resource_id: Optional[str] = None
-    ) -> Optional[dict]:
+        cls, url: str | None = None, resource_id: str | None = None
+    ) -> dict | None:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -39,9 +37,7 @@ class Check:
             return await connection.fetchrow(q, url or resource_id)
 
     @classmethod
-    async def get_all(
-        cls, url: Optional[str] = None, resource_id: Optional[str] = None
-    ) -> Optional[list]:
+    async def get_all(cls, url: str | None = None, resource_id: str | None = None) -> list | None:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
