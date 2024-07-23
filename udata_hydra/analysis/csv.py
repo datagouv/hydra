@@ -7,7 +7,7 @@ import pytz
 import sys
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Iterator
 
 import sentry_sdk
 
@@ -72,7 +72,7 @@ RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 minio_client = MinIOClient()
 
 
-async def notify_udata(check_id, table_name):
+async def notify_udata(check_id: str, table_name: str) -> None:
     """Notify udata of the result of a parsing"""
     check = await get_check(check_id)
     resource_id = check["resource_id"]
@@ -95,7 +95,12 @@ async def notify_udata(check_id, table_name):
         queue.enqueue(send, _priority="high", **payload)
 
 
-async def analyse_csv(check_id: int = None, url: str = None, file_path: str = None, debug_insert: bool = False) -> None:
+async def analyse_csv(
+    check_id: int = None,
+    url: str = None,
+    file_path: str = None,
+    debug_insert: bool = False,
+) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS:
         log.debug("CSV_ANALYSIS turned off, skipping.")
@@ -143,7 +148,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
         os.remove(tmp_file.name)
 
 
-def smart_cast(_type, value, failsafe=False) -> Any:
+def smart_cast(_type: str, value: Any, failsafe: bool = False) -> Any:
     try:
         if value is None or value == "":
             return None
@@ -176,7 +181,7 @@ def compute_create_table_query(table_name: str, columns: list) -> str:
     return compiled.string.replace("%%", "%")
 
 
-def generate_records(file_path, inspection, columns):
+def generate_records(file_path: str, inspection: dict, columns: dict) -> Iterator[list]:
     # because we need the iterator twice, not possible to
     # handle parquet and db through the same iteration
     with Reader(file_path, inspection) as reader:
@@ -188,7 +193,7 @@ def generate_records(file_path, inspection, columns):
                 ]
 
 
-async def csv_to_parquet(file_path: str, inspection: dict, table_name: str):
+async def csv_to_parquet(file_path: str, inspection: dict, table_name: str) -> None:
     """
     Convert a csv file to parquet using inspection data.
 
@@ -213,7 +218,7 @@ async def csv_to_parquet(file_path: str, inspection: dict, table_name: str):
     minio_client.send_file(parquet_file)
 
 
-async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_insert: bool = False):
+async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_insert: bool = False) -> None:
     """
     Convert a csv file to database table using inspection data. It should (re)create one table:
     - `table_name` with data from `file_path`
@@ -261,14 +266,14 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
             await db.execute(q, *data.values())
 
 
-async def csv_to_db_index(table_name: str, inspection: dict, check: dict):
+async def csv_to_db_index(table_name: str, inspection: dict, check: dict) -> None:
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)"
     await db.execute(q, table_name, json.dumps(inspection), check.get("resource_id"), check.get("url"))
 
 
-async def perform_csv_inspection(file_path):
+async def perform_csv_inspection(file_path: str) -> dict:
     """Launch csv-detective against given file"""
     try:
         return csv_detective_routine(file_path, output_profile=True, num_rows=-1, save_results=False)
@@ -276,7 +281,7 @@ async def perform_csv_inspection(file_path):
         raise ParseException("csv_detective") from e
 
 
-async def delete_table(table_name: str):
+async def delete_table(table_name: str) -> None:
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     await db.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)

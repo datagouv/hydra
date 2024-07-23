@@ -1,7 +1,7 @@
 import json
 
 
-async def detect_tabular_from_headers(check) -> bool:
+async def detect_tabular_from_headers(check: str) -> bool:
     """
     Determine from content-type header if file looks like:
         - a csv

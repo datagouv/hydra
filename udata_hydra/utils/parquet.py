@@ -1,5 +1,6 @@
 import pyarrow as pa
 import pyarrow.parquet as pq
+from typing import Generator
 
 
 PYTHON_TYPE_TO_PA = {
@@ -13,7 +14,12 @@ PYTHON_TYPE_TO_PA = {
 }
 
 
-def save_as_parquet(records, columns, output_name, save_output=True):
+def save_as_parquet(
+    records: Generator,
+    columns: dict,
+    output_name: str,
+    save_output: bool = True,
+) -> tuple[str, pa.Table]:
     # the "save_output" argument is only used in tests
     table = pa.Table.from_pylist(
         [{
