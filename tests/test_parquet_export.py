@@ -2,7 +2,6 @@ import pytest
 from io import BytesIO
 import pyarrow.parquet as pq
 
-from udata_hydra import config
 from udata_hydra.utils.parquet import save_as_parquet
 from udata_hydra.analysis.csv import (
     RESERVED_COLS,
