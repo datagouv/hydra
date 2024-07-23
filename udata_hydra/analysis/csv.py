@@ -72,7 +72,7 @@ RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 minio_client = MinIOClient()
 
 
-async def notify_udata(check_id):
+async def notify_udata(check_id, table_name):
     """Notify udata of the result of a parsing"""
     check = await get_check(check_id)
     resource_id = check["resource_id"]
@@ -90,6 +90,8 @@ async def notify_udata(check_id):
                 if check["parsing_finished_at"] else None,
             }
         }
+        if config.CSV_TO_PARQUET:
+            payload["parquet_id"] = table_name
         queue.enqueue(send, _priority="high", **payload)
 
 
@@ -135,7 +137,7 @@ async def analyse_csv(check_id: int = None, url: str = None, file_path: str = No
         await handle_parse_exception(e, check_id, table_name)
     finally:
         if check_id:
-            await notify_udata(check_id)
+            await notify_udata(check_id, table_name)
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
