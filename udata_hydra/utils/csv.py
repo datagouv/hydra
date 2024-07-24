@@ -18,7 +18,7 @@ async def detect_tabular_from_headers(check) -> bool:
 
     if any(
         headers.get("content-type", "").lower().startswith(ct)
-        for ct in ["application/octet-stream", "application/x-gzip"]
+        for ct in ["application/octet-stream", "application/x-gzip", "application/gzip"]
     ) and "csv.gz" in check.get("url", ""):
         return True, "csvgz"
 
