@@ -39,15 +39,33 @@ python-dateutil = "^2.8.2"
 csv-detective = "0.7.1"
 
 [tool.poetry.group.dev.dependencies]
-gunicorn = "^20.1.0"
 aiohttp-devtools = "^1.0.post0"
 aioresponses = "^0.7.3"
+bumpr = "^0.3.8"
+gunicorn = "^20.1.0"
+mypy = "^1.11.0"
 nest_asyncio = "^1.5.5"
 pytest = "^7.1.1"
-pytest-mock = "^3.7.0"
 pytest-asyncio = "^0.18.3"
-bumpr = "^0.3.8"
+pytest-mock = "^3.7.0"
 ruff = "^0.5.2"
+
+[tool.mypy]
+[[tool.mypy.overrides]]
+module = [
+    "asyncpg.*",
+    "boto3.*",
+    "botocore.*",
+    "csv_detective.*",
+    "humanfriendly.*",
+    "minicli.*",
+    "pytz.*",
+    "sqlalchemy.*",
+    "str2bool.*",
+    "str2float.*",
+    "toml.*",
+]
+ignore_missing_imports = true
 
 [tool.ruff]
 lint = { select = ["I"] } # also sort imports with an isort rule
