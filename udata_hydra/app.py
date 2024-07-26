@@ -1,6 +1,8 @@
 import json
 import os
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from typing import Union
 
 from aiohttp import web
 from humanfriendly import parse_timespan
@@ -25,6 +27,28 @@ def _get_args(request, params=("url", "resource_id")) -> list:
     if not any(data):
         raise web.HTTPBadRequest()
     return data
+
+
+@routes.get("/api/resource/status/")
+async def get_resource_status(request: web.Request) -> web.Response:
+    """Get the current status of a resource"""
+    try:
+        payload = await request.json()
+        valid_payload: Union[dict, list, None] = ResourceQuerySchema().load(payload)
+        if not isinstance(valid_payload, dict):
+            raise ValidationError("Invalid payload")
+    except ValidationError as err:
+        raise web.HTTPBadRequest(text=json.dumps(err.messages))
+
+    resource_id = valid_payload["resource_id"]
+
+    res = await Resource.get(resource_id)
+    if not res:
+        raise web.HTTPNotFound()
+    status: str = res[0]["status"]
+    verbose: str = Resource.STATUSES[status]
+
+    return web.json_response({"resource_id": resource_id, "status": status, "verbose": verbose})
 
 
 @routes.post("/api/resource/created/")
@@ -78,7 +102,7 @@ async def resource_updated(request: web.Request) -> web.Response:
     resource_id = valid_payload["resource_id"]
 
     await Resource.update_or_insert(
-        dataset_id=dataset_id, resource_id=resource_id, url=resource["url"]
+        dataset_id=dataset_id, resource_id=resource_id, url=resource["url"], status="TO_CHECK"
     )
 
     return web.json_response({"message": "updated"})

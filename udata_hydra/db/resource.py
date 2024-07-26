@@ -4,6 +4,13 @@ from udata_hydra import context
 class Resource:
     """Represents a resource in the "catalog" DB table"""
 
+    STATUSES = {
+        "TO_CHECK": "to be checked",
+        "TO_ANALYZE": "to be analyzed by CSV detective",
+        "TO_INSERT": "to be inserted in DB",
+        "CHECKED": "check finished",
+    }
+
     @classmethod
     async def get(cls, resource_id: str, column_name: str = "*") -> dict:
         pool = await context.pool()
@@ -18,6 +25,7 @@ class Resource:
         dataset_id: str,
         resource_id: str,
         url: str,
+        status: str = "TO_CHECK",
         priority: bool = True,
     ) -> None:
         pool = await context.pool()
@@ -25,7 +33,7 @@ class Resource:
             # Insert new resource in catalog table and mark as high priority for crawling
             q = f"""
                     INSERT INTO catalog (dataset_id, resource_id, url, deleted, status, priority)
-                    VALUES ('{dataset_id}', '{resource_id}', '{url}', FALSE, 'TO_CHECK', '{priority}')
+                    VALUES ('{dataset_id}', '{resource_id}', '{url}', FALSE, '{status}', '{priority}')
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = '{dataset_id}',
                         url = '{url}',
@@ -53,20 +61,24 @@ class Resource:
         dataset_id: str,
         resource_id: str,
         url: str,
+        status: str = "TO_CHECK",
         priority: bool = True,  # Make resource high priority by default for crawling
     ) -> None:
+        if status not in cls.STATUSES.keys():
+            raise ValueError(f"Invalid status: {status}")
+
         pool = await context.pool()
         async with pool.acquire() as connection:
             # Check if resource is in catalog then insert or update into table
             if await Resource.get(resource_id):
                 q = f"""
                         UPDATE catalog
-                        SET url = '{url}', priority = '{priority}'
+                        SET url = '{url}', status = '{status}', priority = '{priority}'
                         WHERE resource_id = '{resource_id}';"""
             else:
                 q = f"""
                         INSERT INTO catalog (dataset_id, resource_id, url, deleted, status, priority)
-                        VALUES ('{dataset_id}', '{resource_id}', '{url}', FALSE, '{priority}')
+                        VALUES ('{dataset_id}', '{resource_id}', '{url}', FALSE, '{status}', '{priority}')
                         ON CONFLICT (resource_id) DO UPDATE SET
                             dataset_id = '{dataset_id}',
                             url = '{url}',
