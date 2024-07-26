@@ -94,8 +94,31 @@ async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
     assert second["error"] == "no-can-do"
 
 
-async def test_api_get_resource(db, client, insert_fake_resource):
-    await insert_fake_resource(db)
+@pytest.mark.parametrize(
+    "post_data",
+    [
+        {"resource_id": RESOURCE_ID},
+        {"url": "https://example.com/resource-1"},
+        {"stupid_data": "stupid"},
+    ],
+)
+async def test_api_create_check_wrongly(setup_catalog, post_data, client, fake_check):
+    await fake_check(status=500, error="no-can-do")
+    await fake_check()
+    resp = await client.post("/api/checks/", json=post_data)
+    assert resp.status == 400
+
+
+async def test_api_create_check(setup_catalog, client, fake_check):
+    await fake_check(status=500, error="no-can-do")
+    await fake_check()
+    post_data: dict = {"resource_id": RESOURCE_ID, "url": "https://example.com/resource-1"}
+    resp = await client.post("/api/checks/", json=post_data)
+    assert resp.status == 201
+    # TODO: check what was created in DB?
+
+
+async def test_api_get_resource(setup_catalog, client):
     query: str = f"dataset_id={DATASET_ID}&resource_id={RESOURCE_ID}"
     resp = await client.get(f"/api/resources/?{query}")
     assert resp.status == 200
