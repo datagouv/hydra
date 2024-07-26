@@ -63,12 +63,12 @@ class Check:
         This use the info from the last check of the same resource
         """
         data = convert_dict_values_to_json(data)
-        q = compute_insert_query(table_name="checks", data=data)
+        q1: str = compute_insert_query(table_name="checks", data=data)
         pool = await context.pool()
         async with pool.acquire() as connection:
-            last_check = await connection.fetchrow(q, *data.values())
-            q = """UPDATE catalog SET last_check = $1 WHERE resource_id = $2"""
-            await connection.execute(q, last_check["id"], data["resource_id"])
+            last_check = await connection.fetchrow(q1, *data.values())
+            q2 = """UPDATE catalog SET last_check = $1 WHERE resource_id = $2"""
+            await connection.execute(q2, last_check["id"], data["resource_id"])
         return last_check["id"]
 
     @classmethod
