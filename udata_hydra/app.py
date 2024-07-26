@@ -77,7 +77,9 @@ async def resource_updated(request: web.Request) -> web.Response:
     dataset_id = valid_payload["dataset_id"]
     resource_id = valid_payload["resource_id"]
 
-    await Resource.update_or_insert(dataset_id, resource_id, resource["url"])
+    await Resource.update_or_insert(
+        dataset_id=dataset_id, resource_id=resource_id, url=resource["url"]
+    )
 
     return web.json_response({"message": "updated"})
 

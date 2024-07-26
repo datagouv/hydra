@@ -65,7 +65,7 @@ class Resource:
                         WHERE resource_id = '{resource_id}';"""
             else:
                 q = f"""
-                        INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority)
+                        INSERT INTO catalog (dataset_id, resource_id, url, deleted, status, priority)
                         VALUES ('{dataset_id}', '{resource_id}', '{url}', FALSE, '{priority}')
                         ON CONFLICT (resource_id) DO UPDATE SET
                             dataset_id = '{dataset_id}',
