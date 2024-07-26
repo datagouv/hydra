@@ -15,6 +15,7 @@ from progressist import ProgressBar
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, delete_table
 from udata_hydra.crawl import check_url as crawl_check_url
+from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
 
@@ -71,10 +72,10 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
                 yield row
 
     try:
-        log.info(f"Downloading catalog from {url}...")
+        log.info(f"Downloading resources catalog from {url}...")
         with NamedTemporaryFile(dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False) as fd:
             await download_file(url, fd)
-        log.info("Upserting catalog in database...")
+        log.info("Upserting resources catalog in database...")
         # consider everything deleted, deleted will be updated when loading new catalog
         conn = await connection()
         await conn.execute("UPDATE catalog SET deleted = TRUE")
@@ -106,7 +107,7 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
                     if row["harvest.modified_at"]
                     else None,
                 )
-        log.info("Catalog successfully upserted into DB.")
+        log.info("Resources catalog successfully upserted into DB.")
     except Exception as e:
         raise e
     finally:
@@ -132,14 +133,12 @@ async def check_url(url: str, method: str = "get"):
 @cli
 async def check_resource(resource_id, method: str = "get"):
     """Trigger a complete check for a given resource_id"""
-    q = "SELECT * FROM catalog WHERE resource_id = $1"
-    conn = await connection()
-    res = await conn.fetch(q, resource_id)
+    res = await Resource.get(resource_id)
     if not res:
         log.error("Resource not found in catalog")
         return
     async with aiohttp.ClientSession(timeout=None) as session:
-        await crawl_check_url(res[0], session, method=method)
+        await crawl_check_url(url=res[0], resource_id=None, session=session, method=method)
 
 
 @cli(name="analyse-csv")

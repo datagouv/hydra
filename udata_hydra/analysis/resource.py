@@ -10,9 +10,9 @@ from dateparser import parse as date_parser
 
 from udata_hydra import config, context
 from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.db.check import Check
 from udata_hydra.utils import queue
 from udata_hydra.utils.csv import detect_tabular_from_headers
-from udata_hydra.utils.db import get_check, update_check
 from udata_hydra.utils.file import compute_checksum_from_file, download_resource
 from udata_hydra.utils.http import send
 
@@ -37,7 +37,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     Will call udata if first check or changes found, and update check with optionnal infos
     """
-    check: dict = await get_check(check_id)
+    check: dict = await Check.get(check_id)
     if not check:
         log.error(f"Check not found by id {check_id}")
         return
@@ -85,7 +85,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         finally:
             if tmp_file and not is_tabular:
                 os.remove(tmp_file.name)
-            await update_check(
+            await Check.update(
                 check_id,
                 {
                     "checksum": dl_analysis.get("analysis:checksum"),
@@ -96,7 +96,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             )
 
     if change_status == Change.HAS_CHANGED:
-        await store_last_modified_date(change_payload or {}, resource_id, check_id)
+        await store_last_modified_date(change_payload or {}, check_id)
 
     analysis_results = {**dl_analysis, **(change_payload or {})}
     if change_status == Change.HAS_CHANGED or is_first_check:
@@ -111,20 +111,14 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         )
 
 
-async def store_last_modified_date(change_analysis, resource_id, check_id) -> None:
+async def store_last_modified_date(change_analysis: dict, check_id: int) -> None:
     """
     Store last modified date in checks because it may be useful for later comparison
     """
-    pool = await context.pool()
     last_modified = change_analysis.get("analysis:last-modified-at")
     if last_modified:
         last_modified = datetime.fromisoformat(last_modified)
-        async with pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
-                last_modified,
-                check_id,
-            )
+        await Check.update(check_id, {"detected_last_modified_at": last_modified})
 
 
 async def detect_resource_change_from_checksum(

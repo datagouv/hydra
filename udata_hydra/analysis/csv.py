@@ -32,8 +32,9 @@ from str2float import str2float
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.errors import ParseException
+from udata_hydra.db import compute_insert_query
+from udata_hydra.db.check import Check
 from udata_hydra.utils import queue
-from udata_hydra.utils.db import compute_insert_query, get_check, update_check
 from udata_hydra.utils.file import download_resource
 from udata_hydra.utils.http import send
 from udata_hydra.utils.reader import Reader
@@ -76,7 +77,7 @@ RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 
 async def notify_udata(check_id: int) -> None:
     """Notify udata of the result of a parsing"""
-    check = await get_check(check_id)
+    check = await Check.get(check_id)
     resource_id = check["resource_id"]
     db = await context.pool()
     record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
@@ -112,7 +113,7 @@ async def analyse_csv(
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
-    check = await get_check(check_id) if check_id is not None else {}
+    check = await Check.get(check_id) if check_id is not None else {}
     url = check.get("url") or url
     exception_file = str(check.get("resource_id", "")) in exceptions
 
@@ -131,13 +132,13 @@ async def analyse_csv(
 
     try:
         if check_id:
-            await update_check(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
+            await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
         csv_inspection = await perform_csv_inspection(tmp_file.name)
         timer.mark("csv-inspection")
         await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
         timer.mark("csv-to-db")
         if check_id:
-            await update_check(
+            await Check.update(
                 check_id,
                 {
                     "parsing_table": table_name,
@@ -234,7 +235,7 @@ async def csv_to_db(
             for r in bar.iter(records):
                 data = {k: v for k, v in zip(columns.keys(), r)}
                 # NB: possible sql injection here, but should not be used in prod
-                q = compute_insert_query(data, table_name, returning="__id")
+                q = compute_insert_query(table_name=table_name, data=data, returning="__id")
                 await db.execute(q, *data.values())
 
 
@@ -274,7 +275,7 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if check_id:
         if config.SENTRY_DSN:
-            check = await get_check(check_id)
+            check = await Check.get(check_id)
             url = check["url"]
             with sentry_sdk.push_scope() as scope:
                 scope.set_extra("check_id", check_id)
@@ -284,7 +285,7 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
         # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
-        await update_check(
+        await Check.update(
             check_id,
             {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
         )

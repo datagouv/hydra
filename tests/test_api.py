@@ -18,7 +18,7 @@ pytestmark = pytest.mark.asyncio
         "resource_id=c4e3a9fb-4415-488e-ba57-d05269b27adf",
     ],
 )
-async def test_api_latest(setup_catalog, query, client, fake_check):
+async def test_api_checks_latest(setup_catalog, query, client, fake_check):
     await fake_check(parsing_table=True)
     resp = await client.get(f"/api/checks/latest/?{query}")
     assert resp.status == 200
@@ -52,7 +52,7 @@ async def test_api_latest(setup_catalog, query, client, fake_check):
         "resource_id=c4e3a9fb-4415-488e-ba57-d05269b27adf",
     ],
 )
-async def test_api_all(setup_catalog, query, client, fake_check):
+async def test_api_checks_all(setup_catalog, query, client, fake_check):
     await fake_check(status=500, error="no-can-do")
     await fake_check()
     resp = await client.get(f"/api/checks/all/?{query}")

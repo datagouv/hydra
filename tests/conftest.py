@@ -14,8 +14,8 @@ from minicli import run
 import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra import config
 from udata_hydra.app import app_factory
+from udata_hydra.db.check import Check
 from udata_hydra.logger import stop_sentry
-from udata_hydra.utils.db import insert_check, update_check
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
@@ -181,10 +181,10 @@ async def fake_check():
             if parsing_table
             else None,
         }
-        id = await insert_check(data)
+        id = await Check.insert(data)
         data["id"] = id
         if created_at:
-            await update_check(id, {"created_at": created_at})
+            await Check.update(id, {"created_at": created_at})
             data["created_at"] = created_at
         return data
 
