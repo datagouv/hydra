@@ -65,6 +65,29 @@ async def test_api_checks_all(setup_catalog, query, client, fake_check):
     assert second["error"] == "no-can-do"
 
 
+@pytest.mark.parametrize(
+    "post_data",
+    [
+        {
+            "resource_id": "c4e3a9fb-4415-488e-ba57-d05269b27adf",
+        },
+        {
+            "url": "https://example.com/resource-1",
+        },
+        {
+            "resource_id": "c4e3a9fb-4415-488e-ba57-d05269b27adf",
+            "url": "https://example.com/resource-1",
+        },
+    ],
+)
+async def test_api_checks_create(setup_catalog, post_data, client, fake_check):
+    await fake_check(status=500, error="no-can-do")
+    await fake_check()
+    resp = await client.post(f"/api/checks/create/", json=post_data)
+    assert resp.status == 201
+    # TODO: check what was created in DB?
+
+
 async def test_api_status_crawler(setup_catalog, client, fake_check):
     resp = await client.get("/api/status/crawler/")
     assert resp.status == 200
