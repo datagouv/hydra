@@ -1,4 +1,5 @@
 import logging
+from typing import Union
 from unittest.mock import MagicMock
 
 import asyncpg
@@ -14,7 +15,7 @@ context = {
 }
 
 
-def monitor():
+def monitor() -> MagicMock:
     if "monitor" in context:
         return context["monitor"]
     monitor = MagicMock()
@@ -24,7 +25,7 @@ def monitor():
     return context["monitor"]
 
 
-async def pool(db="main"):
+async def pool(db: str = "main") -> asyncpg.pool.Pool:
     if db not in context["databases"]:
         dsn = config.DATABASE_URL if db == "main" else getattr(config, f"DATABASE_URL_{db.upper()}")
         context["databases"][db] = await asyncpg.create_pool(
@@ -35,7 +36,7 @@ async def pool(db="main"):
     return context["databases"][db]
 
 
-def queue(name="default"):
+def queue(name: str = "default") -> Union[Queue, None]:
     if not context["queues"].get(name):
         # we dont need a queue while testing, make sure we're not using a real Redis connection
         if config.TESTING:

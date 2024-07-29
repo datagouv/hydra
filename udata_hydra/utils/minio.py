@@ -28,9 +28,9 @@ def save_resource_to_minio(resource_file: BinaryIO, key: str, resource_id: str) 
     try:
         with open(resource_file.name, "rb") as f:
             s3.upload_fileobj(
-                f,
-                config.MINIO_BUCKET,
-                config.MINIO_FOLDER + "/" + key + "/" + resource_id,
+                Fileobj=f,
+                Bucket=config.MINIO_BUCKET,
+                Key=f"{config.MINIO_FOLDER}/{key}/{resource_id}",
             )
         log.info(f"Resource saved into minio at {get_resource_minio_url(key, resource_id)}")
     except ClientError as e:
@@ -49,7 +49,7 @@ def delete_resource_from_minio(key: str, resource_id: str) -> None:
     try:
         s3.delete_object(
             Bucket=config.MINIO_BUCKET,
-            Key=config.MINIO_FOLDER + "/" + key + "/" + resource_id,
+            Key=f"{config.MINIO_FOLDER}/{key}/{resource_id}",
         )
         log.info(f"Resource deleted from minio at {get_resource_minio_url(key, resource_id)}")
     except ClientError as e:

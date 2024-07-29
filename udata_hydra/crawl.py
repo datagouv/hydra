@@ -3,7 +3,7 @@ import json
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Tuple
+from typing import Tuple, Union
 from urllib.parse import urlparse
 
 import aiohttp
@@ -27,17 +27,17 @@ STATUS_BACKOFF = "backoff"
 log = setup_logging()
 
 
-def is_valid_status(status):
+def is_valid_status(status: str) -> Union[bool, None]:
     if not status:
         return False
-    status = int(status)
-    if status == 429:
+    status_nb = int(status)
+    if status_nb == 429:
         # We can't say the status since it's our client's fault
         return None
-    return status >= 200 and status < 400
+    return status_nb >= 200 and status_nb < 400
 
 
-async def get_content_type_from_header(headers):
+async def get_content_type_from_header(headers: dict) -> str:
     """
     Parse content-type header to retrieve only the mime type
     """
@@ -111,7 +111,7 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
     return has_changed
 
 
-async def update_catalog_following_check(resource_id):
+async def update_catalog_following_check(resource_id: int):
     pool = await context.pool()
     async with pool.acquire() as connection:
         await connection.execute(
