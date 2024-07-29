@@ -7,7 +7,6 @@ from typing import Tuple, Union
 from urllib.parse import urlparse
 
 import aiohttp
-import pytz
 from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
@@ -86,7 +85,7 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
             "check:available": is_valid_status(check_data.get("status")),
             "check:status": check_data.get("status"),
             "check:timeout": check_data["timeout"],
-            "check:date": datetime.now(pytz.UTC).isoformat(),
+            "check:date": datetime.now(timezone.utc).isoformat(),
             "check:error": check_data.get("error"),
             "check:headers:content-type": await get_content_type_from_header(
                 check_data.get("headers", {})
@@ -413,7 +412,7 @@ async def crawl_batch():
         # if not enough for our batch size, handle outdated checks
         if len(to_check) < config.BATCH_SIZE:
             since = parse_timespan(config.SINCE)  # in seconds
-            since = datetime.now(pytz.UTC) - timedelta(seconds=since)
+            since = datetime.now(timezone.utc) - timedelta(seconds=since)
             limit = config.BATCH_SIZE - len(to_check)
             q = f"""
             SELECT * FROM (

@@ -1,12 +1,11 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Tuple, Union
 
 import magic
-import pytz
 from dateparser import parse as date_parser
 
 from udata_hydra import config, context
@@ -151,7 +150,7 @@ async def detect_resource_change_from_checksum(
         data = await connection.fetchrow(q, resource_id)
         if data and data["checksum"] != new_checksum:
             return Change.HAS_CHANGED, {
-                "analysis:last-modified-at": datetime.now(pytz.UTC).isoformat(),
+                "analysis:last-modified-at": datetime.now(timezone.utc).isoformat(),
                 "analysis:last-modified-detection": "computed-checksum",
             }
     return Change.NO_GUESS, None
