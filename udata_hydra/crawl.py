@@ -3,7 +3,7 @@ import json
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Tuple
+from typing import Tuple, Union
 from urllib.parse import urlparse
 
 import aiohttp
@@ -27,7 +27,7 @@ STATUS_BACKOFF = "backoff"
 log = setup_logging()
 
 
-def is_valid_status(status: str) -> bool | None:
+def is_valid_status(status: str) -> Union[bool, None]:
     if not status:
         return False
     status_nb = int(status)

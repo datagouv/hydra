@@ -99,7 +99,7 @@ async def notify_udata(check_id: int) -> None:
 
 
 async def analyse_csv(
-    check_id: int | None = None,
+    check_id: Union[int, None] = None,
     url: Union[str, None] = None,
     file_path: Union[str, None] = None,
     debug_insert: bool = False,
