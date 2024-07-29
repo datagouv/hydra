@@ -16,7 +16,7 @@ The architecture for the full workflow is the following:
 ![Full workflow architecture](docs/archi-idd-IDD.drawio.png)
 
 
-The hydra crawler is one of the components of the architecture. It will check if resource is available, analyze the type of file if the resource has been modified, and analyze the CSV content. It will also convert CSV resources to database tables and send the data to a udata instance. 
+The hydra crawler is one of the components of the architecture. It will check if resource is available, analyze the type of file if the resource has been modified, and analyze the CSV content. It will also convert CSV resources to database tables and send the data to a udata instance.
 
 ![Crawler architecture](docs/hydra.drawio.png)
 
@@ -60,6 +60,15 @@ Monitor worker status:
 ## CSV conversion to database
 
 Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
+
+## Tests
+
+To run the tests, you need to launch the database, the test database, and the Redis broker with `docker-compose -f docker-compose.yml -f docker-compose.test.yml up -f docker-compose.broker.yml up -d`.
+
+Then you can run the tests with `poetry run pytest`.
+
+If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`).test. However, note that this can sometimes be difficult to parse.
+
 
 ## API
 
