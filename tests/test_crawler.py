@@ -440,7 +440,7 @@ async def test_process_resource(setup_catalog, mocker, fake_check):
     assert result["error"] is None
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
     assert result["filesize"] == len(SIMPLE_CSV_CONTENT)
-    assert result["mime_type"] == "text/plain"
+    assert result["mime_type"] == "text/csv"
 
 
 async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_check, udata_url):
@@ -454,7 +454,7 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
     assert len(req) == 1
     document = req[0].kwargs["json"]
     assert document["analysis:content-length"] == len(SIMPLE_CSV_CONTENT)
-    assert document["analysis:mime-type"] == "text/plain"
+    assert document["analysis:mime-type"] == "text/csv"
 
 
 async def test_process_resource_send_udata_no_change(
