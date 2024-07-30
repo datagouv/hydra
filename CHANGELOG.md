@@ -41,6 +41,7 @@
 - Basic cleaning: use Python 3.11 in Sentry, remove Pandas in project dependencies, add type hints, fix wrong type hints, remove deprecated version field in docker compose files, updata .gitignore [#102] [https://github.com/datagouv/hydra/pull/102] and [#107](https://github.com/datagouv/hydra/pull/107)
 - Add missing content-type for csv.gz [#103](https://github.com/datagouv/hydra/pull/103)
 - Remove deprecated `pytz` module [#109](https://github.com/datagouv/hydra/pull/109)
+- Refactor project structure to use DB classes for each DB table, with their factorized DB methods [#112](https://github.com/datagouv/hydra/pull/112) and [#55](https://github.com/datagouv/hydra/pull/55)
 
 ## 1.0.1 (2023-01-04)
 
