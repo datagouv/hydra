@@ -11,7 +11,7 @@ def to_json(value: str) -> str:
     return value
 
 
-def _parse_dt(value: str) -> datetime:
+def _parse_dt(value: str) -> Union[datetime, None]:
     """For performance reasons, we try first with dateutil and fallback on dateparser"""
     try:
         return dateutil_parser(value)
@@ -24,5 +24,5 @@ def to_date(value: str) -> Union[date, None]:
     return parsed.date() if parsed else None
 
 
-def to_datetime(value: str) -> datetime:
+def to_datetime(value: str) -> Union[datetime, None]:
     return _parse_dt(value)
