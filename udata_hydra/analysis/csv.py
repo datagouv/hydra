@@ -4,10 +4,9 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Union
 
-import pytz
 import sentry_sdk
 from csv_detective.detection import engine_to_file
 from csv_detective.explore_csv import routine as csv_detective_routine
@@ -132,7 +131,7 @@ async def analyse_csv(
 
     try:
         if check_id:
-            await update_check(check_id, {"parsing_started_at": datetime.now(pytz.UTC)})
+            await update_check(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
         csv_inspection = await perform_csv_inspection(tmp_file.name)
         timer.mark("csv-inspection")
         await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
@@ -142,7 +141,7 @@ async def analyse_csv(
                 check_id,
                 {
                     "parsing_table": table_name,
-                    "parsing_finished_at": datetime.now(pytz.UTC),
+                    "parsing_finished_at": datetime.now(timezone.utc),
                 },
             )
         await csv_to_db_index(table_name, csv_inspection, check)
@@ -287,7 +286,7 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
         err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
         await update_check(
             check_id,
-            {"parsing_error": err, "parsing_finished_at": datetime.now(pytz.UTC)},
+            {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
         )
         log.error("Parsing error", exc_info=e)
     else:

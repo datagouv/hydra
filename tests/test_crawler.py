@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 
 import nest_asyncio
 import pytest
-import pytz
 from aiohttp import ClientSession, RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
 from aioresponses import CallbackResult
@@ -552,7 +551,7 @@ async def test_change_analysis_checksum(
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
-    now = datetime.now(pytz.UTC)
+    now = datetime.now(timezone.utc)
     # modified date should be pretty close from now, let's say 30 seconds
     assert (modified_date - now).total_seconds() < 30
     assert data["analysis:last-modified-detection"] == "computed-checksum"
