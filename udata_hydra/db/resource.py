@@ -53,11 +53,10 @@ class Resource:
         dataset_id: str,
         resource_id: str,
         url: str,
-        priority: bool = True,
+        priority: bool = True,  # Make resource high priority by default for crawling
     ) -> None:
         pool = await context.pool()
         async with pool.acquire() as connection:
-            # Make resource high priority for crawling
             # Check if resource is in catalog then insert or update into table
             if await Resource.get(resource_id):
                 q = f"""
