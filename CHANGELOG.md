@@ -2,9 +2,6 @@
 
 ## Current (in progress)
 
-
-- Update `sentry-sdk` dependency, and update Sentry logic to be able to send environment, app version and profiling/performance info [#100](https://github.com/datagouv/hydra/pull/100)
-- Add linter and formatter with `pyproject.toml` config, add lint and formatting step in CI, add pre-commit hook to lint and format, update docs and lint and format the code [#99](https://github.com/datagouv/hydra/pull/99)
 - Use profiling option from csv-detective [#54](https://github.com/etalab/udata-hydra/pull/54)
 - Remove csv_analysis, integrate into checks [#52](https://github.com/etalab/udata-hydra/pull/52)
 - Add new types for csv parsing: json, date and datetime [#51](https://github.com/etalab/udata-hydra/pull/51)
@@ -38,7 +35,12 @@
 - Handle other file formats [#92](https://github.com/etalab/udata-hydra/pull/92)
 - Add a quiet option on load catalog [#95](https://github.com/datagouv/hydra/pull/95)
 - Select distinct parsing tables to delete [#96](https://github.com/datagouv/hydra/pull/96)
+- Update documentation [#98](https://github.com/datagouv/hydra/pull/98) and [#106](https://github.com/datagouv/hydra/pull/106)
+- Add linter and formatter with `pyproject.toml` config, add lint and formatting step in CI, add pre-commit hook to lint and format, update docs and lint and format the code [#99](https://github.com/datagouv/hydra/pull/99)
+- Update `sentry-sdk` dependency, and update Sentry logic to be able to send environment, app version and profiling/performance info [#100](https://github.com/datagouv/hydra/pull/100)
+- Basic cleaning: use Python 3.11 in Sentry, remove Pandas in project dependencies, add type hints, fix wrong type hints, remove deprecated version field in docker compose files, updata .gitignore [#102] [https://github.com/datagouv/hydra/pull/102] and [#107](https://github.com/datagouv/hydra/pull/107)
 - Add missing content-type for csv.gz [#103](https://github.com/datagouv/hydra/pull/103)
+- Remove deprecated `pytz` module [#109](https://github.com/datagouv/hydra/pull/109)
 
 ## 1.0.1 (2023-01-04)
 
