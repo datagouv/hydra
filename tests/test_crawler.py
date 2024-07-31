@@ -23,7 +23,7 @@ from udata_hydra.crawl import (
     crawl,
     get_content_type_from_header,
 )
-from udata_hydra.utils.db import get_check
+from udata_hydra.db.check import Check
 
 from .conftest import RESOURCE_ID as resource_id
 
@@ -254,13 +254,15 @@ async def test_backoff_rate_limiting_lifted(
     # We should backoff
     row = await db.fetchrow("SELECT * FROM catalog")
     async with ClientSession() as session:
-        res = await check_url(row, session)
+        res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
     assert res == STATUS_BACKOFF
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # we wait for BACKOFF_PERIOD before crawling again, it should _not_ backoff
     async with ClientSession() as session:
-        res = await check_url(row, session, sleep=0.25)
+        res = await check_url(
+            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
+        )
     assert res != STATUS_BACKOFF
     assert ("HEAD", URL(rurl)) in rmock.requests
 
@@ -284,20 +286,24 @@ async def test_backoff_rate_limiting_cooled_off(
     # We should backoff
     row = await db.fetchrow("SELECT * FROM catalog")
     async with ClientSession() as session:
-        res = await check_url(row, session)
+        res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
     assert res == STATUS_BACKOFF
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # waiting for BACKOFF_PERIOD is not enough since we've messed up already
     async with ClientSession() as session:
-        res = await check_url(row, session, sleep=0.25)
+        res = await check_url(
+            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
+        )
     assert res == STATUS_BACKOFF
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # we wait until COOL_OFF_PERIOD (0.25+0.25) before crawling again,
     # it should _not_ backoff
     async with ClientSession() as session:
-        res = await check_url(row, session, sleep=0.25)
+        res = await check_url(
+            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
+        )
     assert res != STATUS_BACKOFF
     assert ("HEAD", URL(rurl)) in rmock.requests
 
@@ -312,13 +318,15 @@ async def test_backoff_nb_req_lifted(
     rmock.head(rurl, status=200)
     row = await db.fetchrow("SELECT * FROM catalog")
     async with ClientSession() as session:
-        res = await check_url(row, session)
+        res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
     assert res == STATUS_BACKOFF
     # verify that we actually backed-off
     assert ("HEAD", URL(rurl)) not in rmock.requests
     # we wait for BACKOFF_PERIOD before crawling again, it should _not_ backoff
     async with ClientSession() as session:
-        res = await check_url(row, session, sleep=0.25)
+        res = await check_url(
+            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
+        )
     assert res != STATUS_BACKOFF
     assert ("HEAD", URL(rurl)) in rmock.requests
 
@@ -337,20 +345,24 @@ async def test_backoff_on_429_status_code(
 
     # we've messed up, we should backoff
     async with ClientSession() as session:
-        res = await check_url(row, session)
+        res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
     assert res == STATUS_BACKOFF
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # waiting for BACKOFF_PERIOD is not enough since we've messed up already
     async with ClientSession() as session:
-        res = await check_url(row, session, sleep=0.25)
+        res = await check_url(
+            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
+        )
     assert res == STATUS_BACKOFF
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # we wait until COOL_OFF_PERIOD (0.25+0.25) before crawling again,
     # it should _not_ backoff
     async with ClientSession() as session:
-        res = await check_url(row, session, sleep=0.25)
+        res = await check_url(
+            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
+        )
     assert res != STATUS_BACKOFF
     assert ("HEAD", URL(rurl)) in rmock.requests
 
@@ -434,7 +446,7 @@ async def test_process_resource(setup_catalog, mocker, fake_check):
 
     check = await fake_check()
     await process_resource(check["id"], False)
-    result = await get_check(check["id"])
+    result = await Check.get(check["id"])
 
     assert result["error"] is None
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()

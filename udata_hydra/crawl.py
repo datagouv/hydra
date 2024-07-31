@@ -11,12 +11,13 @@ from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
 from udata_hydra.analysis.resource import process_resource
+from udata_hydra.db.check import Check
+from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils import queue
-from udata_hydra.utils.db import insert_check
 from udata_hydra.utils.http import send
 
-results = defaultdict(int)
+results: defaultdict = defaultdict(int)
 
 STATUS_OK = "ok"
 STATUS_TIMEOUT = "timeout"
@@ -51,7 +52,7 @@ async def get_content_type_from_header(headers: dict) -> str:
     return content_type
 
 
-async def compute_check_has_changed(check_data, last_check) -> bool:
+async def compute_check_has_changed(check_data: dict, last_check: dict) -> bool:
     is_first_check = not last_check
     status_has_changed = last_check and check_data.get("status") != last_check.get("status")
     status_no_longer_available = (
@@ -95,28 +96,16 @@ async def compute_check_has_changed(check_data, last_check) -> bool:
             )
             or None,
         }
-        pool = await context.pool()
-        async with pool.acquire() as conn:
-            q = "SELECT dataset_id FROM CATALOG where resource_id = $1"
-            dataset = await conn.fetchrow(q, check_data["resource_id"])
+        res = await Resource.get(resource_id=check_data["resource_id"], column_name="dataset_id")
         queue.enqueue(
             send,
-            dataset_id=dataset["dataset_id"],
+            dataset_id=res["dataset_id"],
             resource_id=check_data["resource_id"],
             document=document,
             _priority="high",
         )
 
     return has_changed
-
-
-async def update_catalog_following_check(resource_id: int):
-    pool = await context.pool()
-    async with pool.acquire() as connection:
-        await connection.execute(
-            "UPDATE catalog SET priority = FALSE, status = NULL WHERE resource_id = $1",
-            resource_id,
-        )
 
 
 async def process_check_data(check_data: dict) -> Tuple[int, bool]:
@@ -135,13 +124,15 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
 
         await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
-    await update_catalog_following_check(check_data["resource_id"])
+    await Resource.update(
+        resource_id=check_data["resource_id"], data={"status": None, "priority": False}
+    )
 
     is_first_check = last_check is None
-    return await insert_check(check_data), is_first_check
+    return await Check.insert(check_data), is_first_check
 
 
-async def is_backoff(domain) -> Tuple[bool, str]:
+async def is_backoff(domain: str) -> Tuple[bool, str]:
     backoff = False, ""
     no_backoff = [f"'{d}'" for d in config.NO_BACKOFF_DOMAINS]
     no_backoff = f"({','.join(no_backoff)})"
@@ -232,7 +223,7 @@ def convert_headers(headers):
     return _headers
 
 
-def has_nice_head(resp):
+def has_nice_head(resp) -> bool:
     """Check if a HEAD response looks useful to us"""
     if not is_valid_status(resp.status):
         return False
@@ -241,20 +232,22 @@ def has_nice_head(resp):
     return True
 
 
-async def check_url(row, session, sleep=0, method="head"):
-    log.debug(f"check {row}, sleep {sleep}, method {method}")
+async def check_url(
+    url: str, resource_id: str, session, sleep: float = 0, method: str = "head"
+) -> str:
+    log.debug(f"check {url}, sleep {sleep}, method {method}")
 
     if sleep:
         await asyncio.sleep(sleep)
 
-    url_parsed = urlparse(row["url"])
+    url_parsed = urlparse(url)
     domain = url_parsed.netloc
     if not domain:
-        log.warning(f"[warning] not netloc in url, skipping {row['url']}")
+        log.warning(f"[warning] not netloc in url, skipping {url}")
         await process_check_data(
             {
-                "resource_id": row["resource_id"],
-                "url": row["url"],
+                "resource_id": resource_id,
+                "url": url,
                 "error": "Not netloc in url",
                 "timeout": False,
             }
@@ -265,23 +258,23 @@ async def check_url(row, session, sleep=0, method="head"):
     if should_backoff:
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
-        await update_catalog_following_check(row["resource_id"])
+        await Resource.update(resource_id=resource_id, data={"status": None, "priority": False})
         return STATUS_BACKOFF
 
     try:
         start = time.time()
         timeout = aiohttp.ClientTimeout(total=5)
         _method = getattr(session, method)
-        async with _method(row["url"], timeout=timeout, allow_redirects=True) as resp:
+        async with _method(url, timeout=timeout, allow_redirects=True) as resp:
             end = time.time()
             if method != "get" and not has_nice_head(resp):
-                return await check_url(row, session, method="get")
+                return await check_url(url, resource_id, session, method="get")
             resp.raise_for_status()
 
             check_id, is_first_check = await process_check_data(
                 {
-                    "resource_id": row["resource_id"],
-                    "url": row["url"],
+                    "resource_id": resource_id,
+                    "url": url,
                     "domain": domain,
                     "status": resp.status,
                     "headers": convert_headers(resp.headers),
@@ -296,8 +289,8 @@ async def check_url(row, session, sleep=0, method="head"):
     except asyncio.exceptions.TimeoutError:
         await process_check_data(
             {
-                "resource_id": row["resource_id"],
-                "url": row["url"],
+                "resource_id": resource_id,
+                "url": url,
                 "domain": domain,
                 "timeout": True,
             }
@@ -316,8 +309,8 @@ async def check_url(row, session, sleep=0, method="head"):
         error = getattr(e, "message", None) or str(e)
         await process_check_data(
             {
-                "resource_id": row["resource_id"],
-                "url": row["url"],
+                "resource_id": resource_id,
+                "url": url,
                 "domain": domain,
                 "timeout": False,
                 "error": fix_surrogates(error),
@@ -325,25 +318,25 @@ async def check_url(row, session, sleep=0, method="head"):
                 "status": getattr(e, "status", None),
             }
         )
-        log.warning(f"Crawling error for url {row['url']}", exc_info=e)
+        log.warning(f"Crawling error for url {url}", exc_info=e)
         return STATUS_ERROR
 
 
-async def crawl_urls(to_parse):
+async def crawl_urls(to_parse: list[str]) -> None:
     context.monitor().set_status("Crawling urls...")
-    tasks = []
+    tasks: list = []
     async with aiohttp.ClientSession(
         timeout=None, headers={"user-agent": config.USER_AGENT}
     ) as session:
         for row in to_parse:
-            tasks.append(check_url(row, session))
+            tasks.append(check_url(url=row["url"], resource_id=row["resource_id"], session=session))
         for task in asyncio.as_completed(tasks):
             result = await task
             results[result] += 1
             context.monitor().refresh(results)
 
 
-def get_excluded_clause():
+def get_excluded_clause() -> str:
     return " AND ".join(
         [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS]
         + [
@@ -379,7 +372,7 @@ async def select_rows_based_on_query(connection, q, *args):
     return to_check
 
 
-async def crawl_batch():
+async def crawl_batch() -> None:
     """Crawl a batch from the catalog"""
     context.monitor().set_status("Getting a batch from catalog...")
     pool = await context.pool()
@@ -435,7 +428,7 @@ async def crawl_batch():
     await asyncio.sleep(config.SLEEP_BETWEEN_BATCHES)
 
 
-async def crawl(iterations=-1):
+async def crawl(iterations: int = -1) -> None:
     """Launch crawl batches
 
     :iterations: for testing purposes (break infinite loop)
@@ -455,7 +448,7 @@ async def crawl(iterations=-1):
         await pool.close()
 
 
-def run():
+def run() -> None:
     """Main function
 
     :iterations: for testing purposes (break infinite loop)
