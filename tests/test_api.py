@@ -72,15 +72,8 @@ async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
         "dataset_id=61fd30cb29ea95c7bc0e1211&resource_id=f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
     ],
 )
-async def test_api_get_resource(db, client, query):
-    # Insert the test resource in the DB
-    await db.execute(
-        """
-        INSERT INTO catalog (dataset_id, resource_id, url, priority, deleted)
-        VALUES ('61fd30cb29ea95c7bc0e1211', 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec', 'http://dev.local/', True, False)
-        """
-    )
-
+async def test_api_get_resource(db, client, query, insert_fake_resource):
+    await insert_fake_resource(db)
     resp = await client.get(f"/api/resources/?{query}")
     assert resp.status == 200
     data = await resp.json()
