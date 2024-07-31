@@ -132,7 +132,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     return await Check.insert(check_data), is_first_check
 
 
-async def is_backoff(domain) -> Tuple[bool, str]:
+async def is_backoff(domain: str) -> Tuple[bool, str]:
     backoff = False, ""
     no_backoff = [f"'{d}'" for d in config.NO_BACKOFF_DOMAINS]
     no_backoff = f"({','.join(no_backoff)})"
@@ -223,7 +223,7 @@ def convert_headers(headers):
     return _headers
 
 
-def has_nice_head(resp):
+def has_nice_head(resp) -> bool:
     """Check if a HEAD response looks useful to us"""
     if not is_valid_status(resp.status):
         return False
@@ -232,7 +232,9 @@ def has_nice_head(resp):
     return True
 
 
-async def check_url(url, resource_id, session, sleep=0, method="head"):
+async def check_url(
+    url: str, resource_id: str, session, sleep: float = 0, method: str = "head"
+) -> str:
     log.debug(f"check {url}, sleep {sleep}, method {method}")
 
     if sleep:
@@ -320,7 +322,7 @@ async def check_url(url, resource_id, session, sleep=0, method="head"):
         return STATUS_ERROR
 
 
-async def crawl_urls(to_parse: list[str]):
+async def crawl_urls(to_parse: list[str]) -> None:
     context.monitor().set_status("Crawling urls...")
     tasks: list = []
     async with aiohttp.ClientSession(
@@ -334,7 +336,7 @@ async def crawl_urls(to_parse: list[str]):
             context.monitor().refresh(results)
 
 
-def get_excluded_clause():
+def get_excluded_clause() -> str:
     return " AND ".join(
         [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS]
         + [
@@ -370,7 +372,7 @@ async def select_rows_based_on_query(connection, q, *args):
     return to_check
 
 
-async def crawl_batch():
+async def crawl_batch() -> None:
     """Crawl a batch from the catalog"""
     context.monitor().set_status("Getting a batch from catalog...")
     pool = await context.pool()
@@ -426,7 +428,7 @@ async def crawl_batch():
     await asyncio.sleep(config.SLEEP_BETWEEN_BATCHES)
 
 
-async def crawl(iterations=-1):
+async def crawl(iterations: int = -1) -> None:
     """Launch crawl batches
 
     :iterations: for testing purposes (break infinite loop)
@@ -446,7 +448,7 @@ async def crawl(iterations=-1):
         await pool.close()
 
 
-def run():
+def run() -> None:
     """Main function
 
     :iterations: for testing purposes (break infinite loop)

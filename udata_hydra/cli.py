@@ -157,7 +157,7 @@ async def csv_sample(size=1000, download: bool = False, max_size: str = "100M"):
     :download: Download files or just list them
     :max_size: Maximum size for one file (from headers)
     """
-    max_size = parse_size(max_size)
+    max_size: int = parse_size(max_size)
     start_q = f"""
         SELECT catalog.resource_id, catalog.dataset_id, checks.url,
             checks.headers->>'content-type' as content_type,
