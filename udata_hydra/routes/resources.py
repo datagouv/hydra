@@ -5,8 +5,21 @@ from marshmallow import ValidationError
 
 from udata_hydra import config
 from udata_hydra.db.resource import Resource
-from udata_hydra.schemas import ResourceQuerySchema
-from udata_hydra.utils.minio import delete_resource_from_minio
+from udata_hydra.schemas import ResourceSchema
+from udata_hydra.utils import delete_resource_from_minio, get_request_params
+
+
+async def get_resource(request: web.Request) -> web.Response:
+    """Endpoint to get a resource from the DB
+    Respond with a 200 status code and a JSON body with the resource data
+    If resource is not found, respond with a 404 status code
+    """
+    [resource_id] = get_request_params(request, params_names=["resource_id"])
+    resource = await Resource.get(resource_id)
+    if not resource:
+        raise web.HTTPNotFound()
+
+    return web.json_response(ResourceSchema().dump(dict(resource)))
 
 
 async def create_resource(request: web.Request) -> web.Response:
@@ -17,7 +30,7 @@ async def create_resource(request: web.Request) -> web.Response:
     """
     try:
         payload = await request.json()
-        valid_payload: dict = ResourceQuerySchema().load(payload)
+        valid_payload: dict = ResourceSchema().load(payload)
     except ValidationError as err:
         raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
@@ -46,7 +59,7 @@ async def update_resource(request: web.Request) -> web.Response:
     """
     try:
         payload = await request.json()
-        valid_payload: dict = ResourceQuerySchema().load(payload)
+        valid_payload: dict = ResourceSchema().load(payload)
     except ValidationError as err:
         raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
@@ -65,7 +78,7 @@ async def update_resource(request: web.Request) -> web.Response:
 async def delete_resource(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
-        valid_payload: dict = ResourceQuerySchema().load(payload)
+        valid_payload: dict = ResourceSchema().load(payload)
     except ValidationError as err:
         raise web.HTTPBadRequest(text=json.dumps(err.messages))
 

@@ -19,7 +19,7 @@ pytestmark = pytest.mark.asyncio
         "resource_id=c4e3a9fb-4415-488e-ba57-d05269b27adf",
     ],
 )
-async def test_api_get_latest_check(setup_catalog, query, client, fake_check):
+async def test_api_get_latest_check(setup_catalog, client, query, fake_check):
     await fake_check(parsing_table=True)
     resp = await client.get(f"/api/checks/latest/?{query}")
     assert resp.status == 200
@@ -53,7 +53,7 @@ async def test_api_get_latest_check(setup_catalog, query, client, fake_check):
         "resource_id=c4e3a9fb-4415-488e-ba57-d05269b27adf",
     ],
 )
-async def test_api_get_all_checks(setup_catalog, query, client, fake_check):
+async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
     await fake_check(status=500, error="no-can-do")
     await fake_check()
     resp = await client.get(f"/api/checks/all/?{query}")
@@ -64,6 +64,28 @@ async def test_api_get_all_checks(setup_catalog, query, client, fake_check):
     assert first["status"] == 200
     assert second["status"] == 500
     assert second["error"] == "no-can-do"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "dataset_id=61fd30cb29ea95c7bc0e1211&resource_id=f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
+    ],
+)
+async def test_api_get_resource(db, client, query):
+    # Insert the test resource in the DB
+    await db.execute(
+        """
+        INSERT INTO catalog (dataset_id, resource_id, url, priority, deleted)
+        VALUES ('61fd30cb29ea95c7bc0e1211', 'f8fb4c7b-3fc6-4448-b34f-81a9991f18ec', 'http://dev.local/', True, False)
+        """
+    )
+
+    resp = await client.get(f"/api/resources/?{query}")
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["dataset_id"] == "61fd30cb29ea95c7bc0e1211"
+    assert data["resource_id"] == "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec"
 
 
 @pytest.mark.parametrize(
@@ -139,7 +161,7 @@ async def test_api_update_resource(client, route):
         {"url": "/api/resource/updated/", "method": "post"},  # legacy route
     ],
 )  # TODO: can be removed once we don't use legacy route anymore
-async def test_api_update_resource_url_since_load_catalog(setup_catalog, route, db, client):
+async def test_api_update_resource_url_since_load_catalog(setup_catalog, db, client, route):
     # We modify the url for this resource
     await db.execute(
         "UPDATE catalog SET url = 'https://example.com/resource-0' "
