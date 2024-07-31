@@ -34,11 +34,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.analysis.errors import ParseException
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
-from udata_hydra.utils import queue
-from udata_hydra.utils.file import download_resource
-from udata_hydra.utils.http import send
-from udata_hydra.utils.reader import Reader
-from udata_hydra.utils.timer import Timer
+from udata_hydra.utils import Reader, Timer, download_resource, queue, send
 
 log = logging.getLogger("udata-hydra")
 

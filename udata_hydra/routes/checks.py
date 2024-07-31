@@ -2,19 +2,12 @@ from aiohttp import web
 
 from udata_hydra.db.check import Check
 from udata_hydra.schemas import CheckSchema
-
-
-def _get_args(request, params=("url", "resource_id")) -> list:
-    """Get GET parameters from request"""
-    data = [request.query.get(param) for param in params]
-    if not any(data):
-        raise web.HTTPBadRequest()
-    return data
+from udata_hydra.utils import get_request_params
 
 
 async def get_latest_check(request: web.Request) -> web.Response:
     """Get the latest check for a given URL or resource_id"""
-    url, resource_id = _get_args(request)
+    url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
     data = await Check.get_latest(url, resource_id)
     if not data:
         raise web.HTTPNotFound()
@@ -24,7 +17,7 @@ async def get_latest_check(request: web.Request) -> web.Response:
 
 
 async def get_all_checks(request: web.Request) -> web.Response:
-    url, resource_id = _get_args(request)
+    url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
     data = await Check.get_all(url, resource_id)
     if not data:
         raise web.HTTPNotFound()
