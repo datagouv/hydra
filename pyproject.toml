@@ -83,5 +83,5 @@ dependencies = { file = ["requirements.txt"] }
 optional-dependencies.test = { file = ["requirements-dev.txt"] }
 
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
