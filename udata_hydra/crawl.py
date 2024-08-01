@@ -132,6 +132,9 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
 
 
 async def is_backoff(domain: str) -> Tuple[bool, str]:
+    """Check if we should not crawl on this domain
+    Returns a tuple with if it should backoff or not (boolean) and the reason why (string)
+    """
     backoff = False, ""
     no_backoff = [f"'{d}'" for d in config.NO_BACKOFF_DOMAINS]
     no_backoff = f"({','.join(no_backoff)})"
