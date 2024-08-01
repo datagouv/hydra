@@ -46,6 +46,7 @@
 - Refactor routes [#117](https://github.com/datagouv/hydra/pull/117)
 - Fix Ruff configuration [#117](https://github.com/datagouv/hydra/pull/117)
 - Add some API tests to improve coverage [#123](https://github.com/datagouv/hydra/pull/123)
+- Use Python 3.11 instead of 3.9 for performance improvements and future compatibility [#101](https://github.com/datagouv/hydra/pull/101)
 
 ## 1.0.1 (2023-01-04)
 
