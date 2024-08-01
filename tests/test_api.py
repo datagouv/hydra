@@ -63,7 +63,6 @@ async def test_api_get_latest_check(setup_catalog, client, query, fake_check, fa
         "parsing_finished_at": None,
         "parsing_started_at": None,
         "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest(),
-        "deleted": False,
     }
 
     # Test deleted resource

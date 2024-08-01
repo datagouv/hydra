@@ -1,6 +1,5 @@
 import json
 
-from aiohttp import web
 from marshmallow import Schema, fields
 
 
