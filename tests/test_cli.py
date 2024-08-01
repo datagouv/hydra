@@ -2,6 +2,8 @@ import nest_asyncio
 import pytest
 from minicli import run
 
+from tests.conftest import RESOURCE_ID
+
 pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
@@ -121,7 +123,7 @@ async def test_load_catalog_url_has_changed(setup_catalog, rmock, db, catalog_co
 
     # check that we still only have one entry for this resource in the catalog
     res = await db.fetch(
-        "SELECT * FROM catalog WHERE resource_id = $1", "c4e3a9fb-4415-488e-ba57-d05269b27adf"
+        f"SELECT * FROM catalog WHERE resource_id = $1", f"{RESOURCE_ID}"
     )
     assert len(res) == 1
     assert res[0]["url"] == "https://example.com/resource-0"

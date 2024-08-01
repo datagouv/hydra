@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import os
+import uuid
 from datetime import datetime
 
 import asyncpg
@@ -166,6 +167,11 @@ async def insert_fake_resource():
 
 
 @pytest_asyncio.fixture
+def fake_resource_id():
+    return uuid.uuid4
+
+
+@pytest_asyncio.fixture
 async def fake_check():
     async def _fake_check(
         status=200,
@@ -175,7 +181,7 @@ async def fake_check():
         created_at=None,
         headers={"x-do": "you"},
         checksum=None,
-        resource_id="c4e3a9fb-4415-488e-ba57-d05269b27adf",
+        resource_id=RESOURCE_ID,
         detected_last_modified_at=None,
         parsing_table=False,
     ):

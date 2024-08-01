@@ -30,7 +30,7 @@ class Check:
         async with pool.acquire() as connection:
             q = f"""
             SELECT catalog.id as catalog_id, checks.id as check_id,
-                catalog.status as catalog_status, checks.status as check_status, *
+                catalog.status as catalog_status, checks.status as check_status, catalog.deleted as deleted, *
             FROM checks, catalog
             WHERE checks.id = catalog.last_check
             AND catalog.{column} = $1
@@ -44,7 +44,7 @@ class Check:
         async with pool.acquire() as connection:
             q = f"""
             SELECT catalog.id as catalog_id, checks.id as check_id,
-                catalog.status as catalog_status, checks.status as check_status, *
+                catalog.status as catalog_status, checks.status as check_status, catalog.deleted as deleted, *
             FROM checks, catalog
             WHERE catalog.{column} = $1
             AND catalog.url = checks.url
@@ -71,3 +71,10 @@ class Check:
     async def update(cls, check_id: int, data: dict) -> int:
         """Update a check in DB with new data and return the check id in DB"""
         return await update_table_record(table_name="checks", record_id=check_id, data=data)
+
+    @classmethod
+    async def delete(cls, check_id: int) -> int:
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = f"""DELETE FROM checks WHERE id = $1"""
+            return await connection.fetch(q, check_id)

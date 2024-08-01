@@ -25,7 +25,7 @@ from udata_hydra.crawl import (
 )
 from udata_hydra.db.check import Check
 
-from .conftest import RESOURCE_ID as resource_id
+from .conftest import DATASET_ID, RESOURCE_ID
 
 # TODO: make file content configurable
 SIMPLE_CSV_CONTENT = """code_insee,number
@@ -47,13 +47,13 @@ async def mock_download_resource(url, headers, max_size_allowed):
 async def test_catalog(setup_catalog, db):
     res = await db.fetch(
         "SELECT * FROM catalog WHERE resource_id = $1",
-        "c4e3a9fb-4415-488e-ba57-d05269b27adf",
+        RESOURCE_ID,
     )
     # Only one resource because the other belonged to an archived dataset
     assert len(res) == 1
     resource = res[0]
     assert resource["url"] == "https://example.com/resource-1"
-    assert resource["dataset_id"] == "601ddcfc85a59c3a45c2435a"
+    assert resource["dataset_id"] == DATASET_ID
 
 
 async def test_catalog_deleted(setup_catalog, db, rmock):
@@ -108,7 +108,7 @@ async def test_catalog_deleted_with_new_url(
     run("load_catalog", url=catalog)
 
     # check catalog coherence, replacing the URL in the existing entry
-    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", resource_id)
+    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", RESOURCE_ID)
     assert len(res) == 1
     assert res[0]["deleted"] is False
     assert "resource-2" in res[0]["url"]
@@ -531,7 +531,7 @@ async def test_change_analysis_content_length_header(
     # different content-length than mock response
     await fake_check(headers={"content-length": "1"})
     # force check execution at next run
-    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
+    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", RESOURCE_ID)
     rmock.head("https://example.com/resource-1", headers={"content-length": "2"})
     rmock.get("https://example.com/resource-1")
     rmock.put(udata_url, repeat=True)
@@ -575,7 +575,7 @@ async def test_change_analysis_harvested(
 ):
     await fake_check(detected_last_modified_at=datetime.now() - timedelta(days=10))
     # force check execution at next run
-    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
+    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", RESOURCE_ID)
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.head("https://example.com/harvested", headers={"content-length": "2"}, repeat=True)
     rmock.put(udata_url, repeat=True)
@@ -808,7 +808,7 @@ async def test_recrawl_download_only_once(
 ):
     """On recrawl of a (CSV) file, if it hasn't change, downloads only once"""
     await fake_check(
-        resource_id=resource_id, headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"}
+        resource_id=RESOURCE_ID, headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"}
     )
     rurl = "https://example.com/resource-1"
     # mock for check, with same last-modified header
@@ -820,7 +820,7 @@ async def test_recrawl_download_only_once(
             "content-type": "application/csv",
         },
     )
-    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", resource_id)
+    await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", RESOURCE_ID)
     event_loop.run_until_complete(crawl(iterations=1))
 
     # HEAD should have been called
@@ -853,7 +853,7 @@ async def test_dont_crawl_urls_with_status_crawling(
     rurl = "https://example.com/resource-1"
     await db.execute(
         "UPDATE catalog SET priority = TRUE, status = 'crawling' WHERE resource_id = $1",
-        resource_id,
+        RESOURCE_ID,
     )
     event_loop.run_until_complete(crawl(iterations=1))
 
