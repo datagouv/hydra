@@ -76,5 +76,5 @@ class Check:
     async def delete(cls, check_id: int) -> int:
         pool = await context.pool()
         async with pool.acquire() as connection:
-            q = f"""DELETE FROM checks WHERE id = $1"""
+            q = """DELETE FROM checks WHERE id = $1"""
             return await connection.fetch(q, check_id)

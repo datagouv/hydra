@@ -338,6 +338,6 @@ Once this is done, code formatting and linting, as well as import sorting, will 
 
 If you cannot use pre-commit, it is necessary to format, lint, and sort imports with [Ruff](https://docs.astral.sh/ruff/) before committing:
 ```bash
-ruff check --fix --select I .
+ruff check --fix .
 ruff format .
 ```

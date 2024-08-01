@@ -122,9 +122,7 @@ async def test_load_catalog_url_has_changed(setup_catalog, rmock, db, catalog_co
     run("load_catalog", url=catalog)
 
     # check that we still only have one entry for this resource in the catalog
-    res = await db.fetch(
-        f"SELECT * FROM catalog WHERE resource_id = $1", f"{RESOURCE_ID}"
-    )
+    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", f"{RESOURCE_ID}")
     assert len(res) == 1
     assert res[0]["url"] == "https://example.com/resource-0"
     assert res[0]["deleted"] is False
