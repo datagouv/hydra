@@ -45,6 +45,7 @@
 - Add tests coverage feature [#122](https://github.com/datagouv/hydra/pull/122)
 - Refactor routes [#117](https://github.com/datagouv/hydra/pull/117)
 - Fix Ruff configuration [#117](https://github.com/datagouv/hydra/pull/117)
+- Add some API tests to improve coverage [#123](https://github.com/datagouv/hydra/pull/123)
 
 ## 1.0.1 (2023-01-04)
 
