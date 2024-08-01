@@ -9,6 +9,8 @@ from typing import Callable
 
 import pytest
 
+from tests.conftest import DATASET_ID, RESOURCE_ID
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -66,19 +68,14 @@ async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
     assert second["error"] == "no-can-do"
 
 
-@pytest.mark.parametrize(
-    "query",
-    [
-        "dataset_id=61fd30cb29ea95c7bc0e1211&resource_id=f8fb4c7b-3fc6-4448-b34f-81a9991f18ec",
-    ],
-)
-async def test_api_get_resource(db, client, query, insert_fake_resource):
+async def test_api_get_resource(db, client, insert_fake_resource):
     await insert_fake_resource(db)
+    query: str = f"dataset_id={DATASET_ID}&resource_id={RESOURCE_ID}"
     resp = await client.get(f"/api/resources/?{query}")
     assert resp.status == 200
     data = await resp.json()
-    assert data["dataset_id"] == "61fd30cb29ea95c7bc0e1211"
-    assert data["resource_id"] == "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec"
+    assert data["dataset_id"] == DATASET_ID
+    assert data["resource_id"] == RESOURCE_ID
 
 
 @pytest.mark.parametrize(
