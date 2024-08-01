@@ -47,6 +47,7 @@ mypy = "^1.11.0"
 nest_asyncio = "^1.5.5"
 pytest = "^7.1.1"
 pytest-asyncio = "^0.18.3"
+pytest-cov = "^5.0.0"
 pytest-mock = "^3.7.0"
 ruff = "^0.5.2"
 
@@ -66,20 +67,21 @@ module = [
 ]
 ignore_missing_imports = true
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "catalog_harvested: use catalog_harvested.csv as source",
+]
+addopts = "--cov=udata_hydra/ --cov-report term-missing"
+
 [tool.ruff]
-lint = { select = ["I"] } # also sort imports with an isort rule
+lint = { extend-select = ["I"] } # also sort imports with an isort rule
 line-length = 100
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.pytest.ini_options]
-asyncio_mode = "strict"
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "catalog_harvested: use catalog_harvested.csv as source",
-]
 
 [tool.poetry.scripts]
 udata-hydra = "udata_hydra.cli:run"

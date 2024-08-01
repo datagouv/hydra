@@ -5,6 +5,14 @@ from udata_hydra.schemas import CheckSchema
 from udata_hydra.utils import get_request_params
 
 
+def _get_args(request, params=("url", "resource_id")) -> list:
+    """Get GET parameters from request"""
+    data = [request.query.get(param) for param in params]
+    if not any(data):
+        raise web.HTTPBadRequest()
+    return data
+
+
 async def get_latest_check(request: web.Request) -> web.Response:
     """Get the latest check for a given URL or resource_id"""
     url, resource_id = get_request_params(request, params_names=["url", "resource_id"])

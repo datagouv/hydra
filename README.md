@@ -69,6 +69,11 @@ Then you can run the tests with `poetry run pytest`.
 
 If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
 
+### Tests coverage
+
+Pytest automatically uses the `coverage` package to generate a coverage report, which is displayed at the end of the test run in the terminal.
+The coverage is configured in the `pypoject.toml` file, in the `[tool.pytest.ini_options]` section.
+You can also override the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
 
 ## API
 
@@ -79,7 +84,32 @@ poetry install
 poetry run adev runserver udata_hydra/app.py
 ```
 
-### Get latest check
+### Routes/endpoints
+
+The API serves the following endpoints:
+
+*Related to checks:*
+- `GET` on `/api/checks/latest/` to get the latest check for a given URL or resource
+- `GET` on `/api/checks/all/` to get all checks for a given URL or resource
+
+*Related to resources:*
+- `POST` on `/api/resources/` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
+- `PUT` on `/api/resources/` to update a resource in the DB "catalog" table
+- `DELETE` on `/api/resources/` to delete a resource in the DB "catalog" table
+
+> :warning: **Warning: the following routes are deprecated and need be removed in the future:**
+> - `POST` on `/api/resource/created` -> use `POST` on `/api/resources/` instead
+> - `POST` on `/api/resource/updated` -> use `PUT` on `/api/resources/` instead
+> - `POST` on `/api/resource/deleted` -> use `DELET`E on `/api/resources/` instead
+
+*Related to some status and health check:*
+- `GET` on `/api/status/crawler/` to get the crawling status
+- `GET` on `/api/status/worker/` to get the worker status
+- `GET` on `/api/stats/` to get the crawling stats
+
+More details about some enpoints are provided below with examples, but not for all of them:
+
+#### Get latest check
 
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
@@ -116,7 +146,7 @@ $ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.sain
 }
 ```
 
-### Get all checks for an URL or resource
+#### Get all checks for an URL or resource
 
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
@@ -156,7 +186,7 @@ $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv
 ]
 ```
 
-### Get crawling status
+#### Get crawling status
 
 ```bash
 $ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
@@ -169,7 +199,7 @@ $ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 }
 ```
 
-### Get worker status
+#### Get worker status
 
 ```bash
 $ curl -s "http://localhost:8000/api/status/worker/" | json_pp
@@ -182,7 +212,7 @@ $ curl -s "http://localhost:8000/api/status/worker/" | json_pp
 }
 ```
 
-### Get crawling stats
+#### Get crawling stats
 
 ```bash
 $ curl -s "http://localhost:8000/api/stats/" | json_pp
