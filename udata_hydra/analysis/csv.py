@@ -35,9 +35,8 @@ from udata_hydra.analysis.errors import ParseException
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.utils import Reader, Timer, download_resource, queue, send
-from udata_hydra.utils.parquet import save_as_parquet
 from udata_hydra.utils.minio import MinIOClient
-
+from udata_hydra.utils.parquet import save_as_parquet
 
 log = logging.getLogger("udata-hydra")
 

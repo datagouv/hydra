@@ -1,5 +1,6 @@
 import logging
 import os
+
 from minio import Minio
 
 from udata_hydra import config

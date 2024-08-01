@@ -1,13 +1,14 @@
-import pytest
 from io import BytesIO
-import pyarrow.parquet as pq
 
-from udata_hydra.utils.parquet import save_as_parquet
+import pyarrow.parquet as pq
+import pytest
+
 from udata_hydra.analysis.csv import (
     RESERVED_COLS,
-    perform_csv_inspection,
     generate_records,
+    perform_csv_inspection,
 )
+from udata_hydra.utils.parquet import save_as_parquet
 
 pytestmark = pytest.mark.asyncio
 

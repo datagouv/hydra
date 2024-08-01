@@ -1,7 +1,7 @@
-import pyarrow as pa
-import pyarrow.parquet as pq
 from typing import Generator
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 PYTHON_TYPE_TO_PA = {
     "string": pa.string(),
