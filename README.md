@@ -69,6 +69,11 @@ Then you can run the tests with `poetry run pytest`.
 
 If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
 
+### Tests coverage
+
+Pytest automatically uses the `coverage` package to generate a coverage report, which is displayed at the end of the test run in the terminal.
+The coverage is configured in the `pypoject.toml` file, in the `[tool.pytest.ini_options]` section.
+You can also override the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
 
 ## API
 
