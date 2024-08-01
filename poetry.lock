@@ -1583,6 +1583,7 @@ files = [
     {file = "pyflakes-2.4.0.tar.gz", hash = "sha256:05a85c2872edf37a4ed30b0cce2f6093e1d0581f8c19d7393122da7e25b2b24c"},
 ]
 
+[[package]]
 name = "pygments"
 version = "2.18.0"
 description = "Pygments is a syntax highlighting package written in Python."
