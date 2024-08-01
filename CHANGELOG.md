@@ -39,7 +39,7 @@
 - Update documentation [#98](https://github.com/datagouv/hydra/pull/98) and [#106](https://github.com/datagouv/hydra/pull/106)
 - Add linter and formatter with `pyproject.toml` config, add lint and formatting step in CI, add pre-commit hook to lint and format, update docs and lint and format the code [#99](https://github.com/datagouv/hydra/pull/99)
 - Update `sentry-sdk` dependency, and update Sentry logic to be able to send environment, app version and profiling/performance info [#100](https://github.com/datagouv/hydra/pull/100)
-- Basic cleaning: use Python 3.11 in Sentry, remove Pandas in project dependencies, add type hints, fix wrong type hints, remove deprecated version field in docker compose files, updata .gitignore [#102] [https://github.com/datagouv/hydra/pull/102] and [#107](https://github.com/datagouv/hydra/pull/107)
+- Basic cleaning: use Python 3.11 in CI, remove Pandas in project dependencies, add type hints, fix wrong type hints, remove deprecated version field in docker compose files, update `.gitignore` [#102] [https://github.com/datagouv/hydra/pull/102] and [#107](https://github.com/datagouv/hydra/pull/107)
 - Add missing content-type for csv.gz [#103](https://github.com/datagouv/hydra/pull/103)
 - Remove deprecated `pytz` module [#109](https://github.com/datagouv/hydra/pull/109)
 - Refactor project structure to use DB classes for each DB table, with their factorized DB methods [#112](https://github.com/datagouv/hydra/pull/112) and [#55](https://github.com/datagouv/hydra/pull/55)
