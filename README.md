@@ -72,8 +72,8 @@ If you would like to see print statements as they are executed, you can pass the
 ### Tests coverage
 
 Pytest automatically uses the `coverage` package to generate a coverage report, which is displayed at the end of the test run in the terminal.
-The converage is configured in the `pypoject.toml` file, in the `[tool.pytest.ini_options]` section.
-You can also overrides the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
+The coverage is configured in the `pypoject.toml` file, in the `[tool.pytest.ini_options]` section.
+You can also override the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
 
 ## API
 
