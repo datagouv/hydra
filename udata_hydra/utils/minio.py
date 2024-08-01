@@ -32,9 +32,7 @@ class MinIOClient:
     ):
         if self.bucket is None:
             raise AttributeError("A bucket has to be specified.")
-        is_file = os.path.isfile(
-            os.path.join(file_path)
-        )
+        is_file = os.path.isfile(os.path.join(file_path))
         if is_file:
             dest_path = f"{config.MINIO_FOLDER}{file_path.split('/')[-1]}"
             self.client.fput_object(

@@ -198,10 +198,7 @@ def generate_records(file_path: str, inspection: dict, columns: dict) -> Iterato
     with Reader(file_path, inspection) as reader:
         for line in reader:
             if line:
-                yield [
-                    smart_cast(t, v, failsafe=True)
-                    for t, v in zip(columns.values(), line)
-                ]
+                yield [smart_cast(t, v, failsafe=True) for t, v in zip(columns.values(), line)]
 
 
 async def csv_to_parquet(file_path: str, inspection: dict, table_name: str) -> None:
@@ -265,7 +262,7 @@ async def csv_to_db(
             await db.copy_records_to_table(
                 table_name,
                 records=generate_records(file_path, inspection, columns),
-                columns=columns.keys()
+                columns=columns.keys(),
             )
         except Exception as e:  # I know what I'm doing, pinky swear
             raise ParseException("copy_records_to_table") from e

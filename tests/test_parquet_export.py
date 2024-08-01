@@ -13,12 +13,17 @@ from udata_hydra.utils.parquet import save_as_parquet
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.parametrize("file_and_count", (
-    ("catalog.csv", 2),
-    ("catalog.xls", 2),
-    ("catalog.xlsx", 2),
-))
-async def test_parquet_conversion(setup_catalog, rmock, db, fake_check, produce_mock, file_and_count):
+@pytest.mark.parametrize(
+    "file_and_count",
+    (
+        ("catalog.csv", 2),
+        ("catalog.xls", 2),
+        ("catalog.xlsx", 2),
+    ),
+)
+async def test_parquet_conversion(
+    setup_catalog, rmock, db, fake_check, produce_mock, file_and_count
+):
     filename, expected_count = file_and_count
     file_path = f"tests/data/{filename}"
     inspection = await perform_csv_inspection(file_path)

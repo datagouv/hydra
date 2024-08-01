@@ -22,17 +22,8 @@ def save_as_parquet(
 ) -> tuple[str, pa.Table]:
     # the "save_output" argument is only used in tests
     table = pa.Table.from_pylist(
-        [{
-            c: v
-            for c, v in zip(columns, values)
-        } for values in records],
-        schema=pa.schema([
-            pa.field(
-                c,
-                PYTHON_TYPE_TO_PA[columns[c]]
-            )
-            for c in columns
-        ])
+        [{c: v for c, v in zip(columns, values)} for values in records],
+        schema=pa.schema([pa.field(c, PYTHON_TYPE_TO_PA[columns[c]]) for c in columns]),
     )
     if save_output:
         pq.write_table(table, f"{output_name}.parquet")
