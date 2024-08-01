@@ -1,5 +1,5 @@
 """
-NB: we can't use pytest-aiohttp helpers beause
+NB: we can't use pytest-aiohttp helpers because
 it will interfere with the rest of our async code
 """
 
