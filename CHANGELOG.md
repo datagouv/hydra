@@ -43,6 +43,7 @@
 - Remove deprecated `pytz` module [#109](https://github.com/datagouv/hydra/pull/109)
 - Refactor project structure to use DB classes for each DB table, with their factorized DB methods [#112](https://github.com/datagouv/hydra/pull/112) and [#55](https://github.com/datagouv/hydra/pull/55)
 - Refactor routes [#117](https://github.com/datagouv/hydra/pull/117)
+- Fix Ruff configuration [#117](https://github.com/datagouv/hydra/pull/117)
 
 ## 1.0.1 (2023-01-04)
 
