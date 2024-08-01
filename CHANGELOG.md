@@ -35,6 +35,7 @@
 - Handle other file formats [#92](https://github.com/etalab/udata-hydra/pull/92)
 - Add a quiet option on load catalog [#95](https://github.com/datagouv/hydra/pull/95)
 - Select distinct parsing tables to delete [#96](https://github.com/datagouv/hydra/pull/96)
+- Enable parquet export [#97](https://github.com/datagouv/hydra/pull/97)
 
 ## 1.0.1 (2023-01-04)
 
