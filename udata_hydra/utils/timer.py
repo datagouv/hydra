@@ -14,9 +14,10 @@ class Timer:
     timer.stop()
     ```
     """
+
     steps = []
 
-    def __init__(self, name) -> None:
+    def __init__(self, name: str) -> None:
         self.name = name
         self.steps.append(time.perf_counter())
 

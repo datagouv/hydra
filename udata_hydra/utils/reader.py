@@ -1,7 +1,9 @@
 import csv as stdcsv
+from io import BytesIO
+from typing import Generator
+
 import openpyxl
 import xlrd
-from io import BytesIO
 
 
 def generate_dialect(inspection: dict) -> stdcsv.Dialect:
@@ -9,6 +11,7 @@ def generate_dialect(inspection: dict) -> stdcsv.Dialect:
         # TODO: it would be nice to have more info from csvdetective to feed the dialect
         # in the meantime we might want to sniff the file a bit
         delimiter = inspection["separator"]
+
     return CustomDialect()
 
 
@@ -40,8 +43,7 @@ class Reader:
         else:
             self.file = open(self.file_path, encoding=self.inspection["encoding"])
             self.reader = stdcsv.reader(
-                self._skip_rows(),
-                dialect=generate_dialect(self.inspection)
+                self._skip_rows(), dialect=generate_dialect(self.inspection)
             )
         return self
 
@@ -55,7 +57,7 @@ class Reader:
             next(self.file)
         return self.file
 
-    def _excel_reader(self):
+    def _excel_reader(self) -> Generator:
         _method = getattr(self.sheet, self.mapping[self.inspection["engine"]])
         for idx, row in enumerate(_method()):
             # skipping header

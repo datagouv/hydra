@@ -1,31 +1,31 @@
 import json
+from typing import Tuple
 
 
-async def detect_tabular_from_headers(check: str) -> bool:
+async def detect_tabular_from_headers(check: dict) -> Tuple[bool, str]:
     """
     Determine from content-type header if file looks like:
         - a csv
         - a csv.gz (1. is the file's content binary?, 2. does the URL contain "csv.gz"?)
         - a xls(x)
     """
-    headers = json.loads(check["headers"] or "{}")
+    headers: dict = json.loads(check["headers"] or "{}")
 
     if any(
-        headers.get("content-type", "").lower().startswith(ct) for ct in [
-            "application/csv", "text/plain", "text/csv"
-        ]
+        headers.get("content-type", "").lower().startswith(ct)
+        for ct in ["application/csv", "text/plain", "text/csv"]
     ):
         return True, "csv"
 
     if any(
-        headers.get("content-type", "").lower().startswith(ct) for ct in [
-            "application/octet-stream", "application/x-gzip"
-        ]
+        headers.get("content-type", "").lower().startswith(ct)
+        for ct in ["application/octet-stream", "application/x-gzip", "application/gzip"]
     ) and "csv.gz" in check.get("url", ""):
         return True, "csvgz"
 
     if any(
-        headers.get("content-type", "").lower().startswith(ct) for ct in [
+        headers.get("content-type", "").lower().startswith(ct)
+        for ct in [
             "application/vnd.ms-excel",
         ]
     ):
@@ -33,7 +33,8 @@ async def detect_tabular_from_headers(check: str) -> bool:
         return True, "xls"
 
     if any(
-        headers.get("content-type", "").lower().startswith(ct) for ct in [
+        headers.get("content-type", "").lower().startswith(ct)
+        for ct in [
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         ]
     ):

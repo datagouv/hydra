@@ -2,7 +2,7 @@ import hashlib
 import os
 import tempfile
 
-from udata_hydra.utils.file import compute_checksum_from_file
+from udata_hydra.utils import compute_checksum_from_file
 
 
 def test_compute_checksum_from_file():

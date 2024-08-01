@@ -4,11 +4,7 @@ version: 2.1
 parameters:
   python-version:
     type: string
-    # FIXME: 3.9.16 fails silently on circle while running poetry install (not reproduced via SSH)
-    # this is a probably a weird combo circle headless env + poetry 1.3 + python 3.9.16
-    # we cannot target prod version (3.9.2) because we need poetry 1.2
-    # we could use a custom image but probably not worth it, so pin to last working version:
-    default: "3.9.15"
+    default: "3.11.9"
   python-module:
     type: string
     default: "udata_hydra"
@@ -54,11 +50,12 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Lint code
-          command: poetry run flake8 << pipeline.parameters.python-module >>
-      - run:
-          name: Lint tests
-          command: poetry run flake8 tests/
+          name: Lint and format code and sort imports
+          # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
+          # ruff format --check . : check code formatting without fixing (to fix, remove --check)
+          command: |
+            poetry run ruff check --select I .
+            poetry run ruff format --check .
 
   tests:
     docker:

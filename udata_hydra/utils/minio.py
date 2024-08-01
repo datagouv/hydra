@@ -4,7 +4,6 @@ from minio import Minio
 
 from udata_hydra import config
 
-
 log = logging.getLogger("udata-hydra")
 
 

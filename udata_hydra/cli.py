@@ -1,30 +1,29 @@
 import csv
-import os
-
-from datetime import datetime, timezone
 import logging
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Union
 
 import aiohttp
 import asyncpg
-
 from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
 
 from udata_hydra import config
+from udata_hydra.analysis.csv import analyse_csv, delete_table
 from udata_hydra.crawl import check_url as crawl_check_url
+from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
-from udata_hydra.analysis.csv import analyse_csv, delete_table
-
 
 context = {}
 log = setup_logging()
 
 
-async def download_file(url, fd):
+async def download_file(url: str, fd):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             while True:
@@ -38,10 +37,8 @@ async def connection(db="main"):
     if db not in context["conn"]:
         dsn = config.DATABASE_URL if db == "main" else getattr(config, f"DATABASE_URL_{db.upper()}")
         context["conn"][db] = await asyncpg.connect(
-            dsn=dsn,
-            server_settings={
-                "search_path": config.DATABASE_SCHEMA
-            })
+            dsn=dsn, server_settings={"search_path": config.DATABASE_SCHEMA}
+        )
     return context["conn"][db]
 
 
@@ -75,10 +72,10 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
                 yield row
 
     try:
-        log.info(f"Downloading catalog from {url}...")
+        log.info(f"Downloading resources catalog from {url}...")
         with NamedTemporaryFile(dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False) as fd:
             await download_file(url, fd)
-        log.info("Upserting catalog in database...")
+        log.info("Upserting resources catalog in database...")
         # consider everything deleted, deleted will be updated when loading new catalog
         conn = await connection()
         await conn.execute("UPDATE catalog SET deleted = TRUE")
@@ -86,7 +83,6 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
             reader = csv.DictReader(fd, delimiter=";")
             rows = list(reader)
             for row in iter_with_progressbar_or_quiet(rows, quiet):
-
                 # Skip resources belonging to an archived dataset
                 if row.get("dataset.archived") != "False":
                     continue
@@ -108,9 +104,10 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
                     row["url"],
                     # force timezone info to UTC (catalog data should be in UTC)
                     datetime.fromisoformat(row["harvest.modified_at"]).replace(tzinfo=timezone.utc)
-                    if row["harvest.modified_at"] else None,
+                    if row["harvest.modified_at"]
+                    else None,
                 )
-        log.info("Catalog successfully upserted into DB.")
+        log.info("Resources catalog successfully upserted into DB.")
     except Exception as e:
         raise e
     finally:
@@ -119,16 +116,14 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
 
 
 @cli
-async def check_url(url, method="get"):
+async def check_url(url: str, method: str = "get"):
     """Quickly check an URL"""
     log.info(f"Checking url {url}")
     async with aiohttp.ClientSession(timeout=None) as session:
         timeout = aiohttp.ClientTimeout(total=5)
         _method = getattr(session, method)
         try:
-            async with _method(
-                url, timeout=timeout, allow_redirects=True
-            ) as resp:
+            async with _method(url, timeout=timeout, allow_redirects=True) as resp:
                 print("Status :", resp.status)
                 print("Headers:", resp.headers)
         except Exception as e:
@@ -136,33 +131,33 @@ async def check_url(url, method="get"):
 
 
 @cli
-async def check_resource(resource_id, method="get"):
+async def check_resource(resource_id, method: str = "get"):
     """Trigger a complete check for a given resource_id"""
-    q = "SELECT * FROM catalog WHERE resource_id = $1"
-    conn = await connection()
-    res = await conn.fetch(q, resource_id)
+    res = await Resource.get(resource_id)
     if not res:
         log.error("Resource not found in catalog")
         return
     async with aiohttp.ClientSession(timeout=None) as session:
-        await crawl_check_url(res[0], session, method=method)
+        await crawl_check_url(url=res[0], resource_id=None, session=session, method=method)
 
 
 @cli(name="analyse-csv")
-async def analyse_csv_cli(check_id: int = None, url: str = None, debug_insert=False):
+async def analyse_csv_cli(
+    check_id: Union[int, None] = None, url: Union[str, None] = None, debug_insert: bool = False
+):
     """Trigger a csv analysis from a check_id or an url"""
     await analyse_csv(check_id=check_id, url=url, debug_insert=debug_insert)
 
 
 @cli
-async def csv_sample(size=1000, download=False, max_size="100M"):
+async def csv_sample(size=1000, download: bool = False, max_size: str = "100M"):
     """Get a csv sample from latest checks
 
     :size: Size of the sample (how many files to query)
     :download: Download files or just list them
     :max_size: Maximum size for one file (from headers)
     """
-    max_size = parse_size(max_size)
+    max_size: int = parse_size(max_size)
     start_q = f"""
         SELECT catalog.resource_id, catalog.dataset_id, checks.url,
             checks.headers->>'content-type' as content_type,
@@ -225,7 +220,7 @@ async def csv_sample(size=1000, download=False, max_size="100M"):
 
 
 @cli
-async def drop_dbs(dbs=[]):
+async def drop_dbs(dbs: list = []):
     for db in dbs:
         conn = await connection(db)
         tables = await conn.fetch(f"""
@@ -237,7 +232,7 @@ async def drop_dbs(dbs=[]):
 
 
 @cli
-async def migrate(skip_errors=False, dbs=["main", "csv"]):
+async def migrate(skip_errors: bool = False, dbs: list[str] = ["main", "csv"]):
     """Migrate the database(s)"""
     for db in dbs:
         log.info(f"Migrating db {db}...")
@@ -246,7 +241,7 @@ async def migrate(skip_errors=False, dbs=["main", "csv"]):
 
 
 @cli
-async def purge_checks(limit=2):
+async def purge_checks(limit: int = 2):
     """Delete past checks for each resource_id, keeping only `limit` number of checks"""
     q = "SELECT resource_id FROM checks GROUP BY resource_id HAVING count(id) > $1"
     conn = await connection()
@@ -286,9 +281,7 @@ async def purge_csv_tables():
     for table in tables_to_delete:
         log.debug(f"Deleting table {table}")
         await delete_table(table)
-        await conn.execute(
-            "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-        )
+        await conn.execute("UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table)
     if len(tables_to_delete):
         log.info(f"Deleted {len(tables_to_delete)} table(s).")
     else:

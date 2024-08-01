@@ -1,23 +1,23 @@
-from enum import Enum
 import json
 import logging
 import os
-import pytz
-
-from datetime import datetime
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Tuple, Union
 
 import magic
-
 from dateparser import parse as date_parser
 
-from udata_hydra import context, config
-from udata_hydra.utils import queue
+from udata_hydra import config, context
 from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.utils.csv import detect_tabular_from_headers
-from udata_hydra.utils.db import update_check, get_check
-from udata_hydra.utils.file import compute_checksum_from_file, download_resource
-from udata_hydra.utils.http import send
+from udata_hydra.db.check import Check
+from udata_hydra.utils import (
+    compute_checksum_from_file,
+    detect_tabular_from_headers,
+    download_resource,
+    queue,
+    send,
+)
 
 
 class Change(Enum):
@@ -40,7 +40,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     Will call udata if first check or changes found, and update check with optionnal infos
     """
-    check = await get_check(check_id)
+    check: dict = await Check.get(check_id)
     if not check:
         log.error(f"Check not found by id {check_id}")
         return
@@ -60,8 +60,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     # could it be a CSV? If we get hints, we will analyse the file further depending on change status
     is_tabular, file_format = await detect_tabular_from_headers(check)
     max_size_allowed = (
-        None if str(resource_id) in exceptions
-        else float(config.MAX_FILESIZE_ALLOWED[file_format])
+        None if str(resource_id) in exceptions else float(config.MAX_FILESIZE_ALLOWED[file_format])
     )
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
@@ -79,21 +78,28 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             dl_analysis["analysis:checksum"] = compute_checksum_from_file(tmp_file.name)
             # Check if checksum has been modified if we don't have other hints
             if change_status == Change.NO_GUESS:
-                change_status,  change_payload = await detect_resource_change_from_checksum(
-                    resource_id, dl_analysis["analysis:checksum"])
+                (
+                    change_status,
+                    change_payload,
+                ) = await detect_resource_change_from_checksum(
+                    resource_id, dl_analysis["analysis:checksum"]
+                )
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
             if tmp_file and not is_tabular:
                 os.remove(tmp_file.name)
-            await update_check(check_id, {
-                "checksum": dl_analysis.get("analysis:checksum"),
-                "analysis_error": dl_analysis.get("analysis:error"),
-                "filesize": dl_analysis.get("analysis:content-length"),
-                "mime_type": dl_analysis.get("analysis:mime-type"),
-            })
+            await Check.update(
+                check_id,
+                {
+                    "checksum": dl_analysis.get("analysis:checksum"),
+                    "analysis_error": dl_analysis.get("analysis:error"),
+                    "filesize": dl_analysis.get("analysis:content-length"),
+                    "mime_type": dl_analysis.get("analysis:mime-type"),
+                },
+            )
 
     if change_status == Change.HAS_CHANGED:
-        await store_last_modified_date(change_payload or {}, resource_id, check_id)
+        await store_last_modified_date(change_payload or {}, check_id)
 
     analysis_results = {**dl_analysis, **(change_payload or {})}
     if change_status == Change.HAS_CHANGED or is_first_check:
@@ -108,22 +114,19 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         )
 
 
-async def store_last_modified_date(change_analysis, resource_id, check_id) -> None:
+async def store_last_modified_date(change_analysis: dict, check_id: int) -> None:
     """
     Store last modified date in checks because it may be useful for later comparison
     """
-    pool = await context.pool()
     last_modified = change_analysis.get("analysis:last-modified-at")
     if last_modified:
         last_modified = datetime.fromisoformat(last_modified)
-        async with pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE checks SET detected_last_modified_at = $1 WHERE id = $2",
-                last_modified, check_id
-            )
+        await Check.update(check_id, {"detected_last_modified_at": last_modified})
 
 
-async def detect_resource_change_from_checksum(resource_id, new_checksum) -> Tuple[Change, Union[dict, None]]:
+async def detect_resource_change_from_checksum(
+    resource_id, new_checksum
+) -> Tuple[Change, Union[dict, None]]:
     """
     Checks if resource checksum has changed over time
     Returns a tuple with a Change status and an optional payload:
@@ -144,13 +147,15 @@ async def detect_resource_change_from_checksum(resource_id, new_checksum) -> Tup
         data = await connection.fetchrow(q, resource_id)
         if data and data["checksum"] != new_checksum:
             return Change.HAS_CHANGED, {
-                "analysis:last-modified-at": datetime.now(pytz.UTC).isoformat(),
+                "analysis:last-modified-at": datetime.now(timezone.utc).isoformat(),
                 "analysis:last-modified-detection": "computed-checksum",
             }
     return Change.NO_GUESS, None
 
 
-async def detect_resource_change_from_last_modified_header(data: dict) -> Tuple[Change, Union[dict, None]]:
+async def detect_resource_change_from_last_modified_header(
+    data: dict,
+) -> Tuple[Change, Union[dict, None]]:
     # last modified header check
 
     if len(data) == 1 and data[0]["last_modified"]:
@@ -172,7 +177,9 @@ async def detect_resource_change_from_last_modified_header(data: dict) -> Tuple[
     return Change.HAS_NOT_CHANGED, None
 
 
-async def detect_resource_change_from_content_length_header(data: dict) -> Tuple[Change, Union[dict, None]]:
+async def detect_resource_change_from_content_length_header(
+    data: dict,
+) -> Tuple[Change, Union[dict, None]]:
     # content-length variation between current and last check
     if len(data) <= 1 or not data[0]["content_length"]:
         return Change.NO_GUESS, None
@@ -185,7 +192,9 @@ async def detect_resource_change_from_content_length_header(data: dict) -> Tuple
     return Change.HAS_NOT_CHANGED, None
 
 
-async def detect_resource_change_on_early_hints(resource_id: str) -> Tuple[Change, Union[dict, None]]:
+async def detect_resource_change_on_early_hints(
+    resource_id: str,
+) -> Tuple[Change, Union[dict, None]]:
     """
     Try to guess if a resource has been modified from harvest and headers in check data:
     - last-modified header value if it can be found and parsed
@@ -223,7 +232,10 @@ async def detect_resource_change_on_early_hints(resource_id: str) -> Tuple[Chang
         return change_status, change_payload
 
     # if not, let's see if we can infer a modifification date from last-modified headers
-    change_status, change_payload = await detect_resource_change_from_last_modified_header(data)
+    (
+        change_status,
+        change_payload,
+    ) = await detect_resource_change_from_last_modified_header(data)
     if change_status != Change.NO_GUESS:
         return change_status, change_payload
 
@@ -231,7 +243,9 @@ async def detect_resource_change_on_early_hints(resource_id: str) -> Tuple[Chang
     return await detect_resource_change_from_content_length_header(data)
 
 
-async def detect_resource_change_from_harvest(checks_data: dict, resource_id: str) -> Tuple[Change, Union[dict, None]]:
+async def detect_resource_change_from_harvest(
+    checks_data: dict, resource_id: str
+) -> Tuple[Change, Union[dict, None]]:
     """
     Checks if resource has a harvest.modified_at
     Returns a tuple with a Change status and an optional payload:

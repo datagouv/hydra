@@ -2,14 +2,25 @@ import json
 import logging
 
 import aiohttp
+from aiohttp import web
 
 from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
 
 
+def get_request_params(request, params_names: list[str]) -> list:
+    """Get GET parameters from request"""
+    data = [request.query.get(p) for p in params_names]
+    if not any(data):
+        raise web.HTTPBadRequest()
+    return data
+
+
 async def send(dataset_id: str, resource_id: str, document: dict) -> None:
-    log.debug(f"Sending payload to udata {dataset_id}/{resource_id}: {json.dumps(document, indent=4)}")
+    log.debug(
+        f"Sending payload to udata {dataset_id}/{resource_id}: {json.dumps(document, indent=4)}"
+    )
 
     if not config.WEBHOOK_ENABLED:
         log.debug("Webhook disabled, skipping send")
@@ -20,7 +31,10 @@ async def send(dataset_id: str, resource_id: str, document: dict) -> None:
         return
 
     uri = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
-    headers = {"content-type": "application/json", "X-API-KEY": config.UDATA_URI_API_KEY}
+    headers = {
+        "content-type": "application/json",
+        "X-API-KEY": config.UDATA_URI_API_KEY,
+    }
 
     async with aiohttp.ClientSession() as session:
         async with session.put(uri, json=document, headers=headers) as resp:

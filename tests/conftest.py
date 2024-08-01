@@ -1,23 +1,22 @@
 import asyncio
 import hashlib
 import os
-
+import uuid
 from datetime import datetime
 
 import asyncpg
 import nest_asyncio
 import pytest
 import pytest_asyncio
-
-from aioresponses import aioresponses
 from aiohttp.test_utils import TestClient, TestServer
+from aioresponses import aioresponses
 from minicli import run
 
+import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra import config
 from udata_hydra.app import app_factory
-import udata_hydra.cli  # noqa - this register the cli cmds
+from udata_hydra.db.check import Check
 from udata_hydra.logger import stop_sentry
-from udata_hydra.utils.db import insert_check, update_check
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
@@ -33,8 +32,10 @@ def dummy(return_value=None):
     A kind of MagicMock but pickle-able for workers
     You should use this when mocking an enqueued function
     """
+
     async def fn(*args, **kwargs):
         return return_value
+
     return fn
 
 
@@ -78,6 +79,7 @@ async def patch_enqueue(mocker, event_loop):
     This bypasses rq totally by executing the function in the same event loop
     This also has the advantage of bubbling up errors in queued functions
     """
+
     def _execute(fn, *args, **kwargs):
         kwargs.pop("_priority")
         result = fn(*args, **kwargs)
@@ -86,6 +88,7 @@ async def patch_enqueue(mocker, event_loop):
             coro_result = loop.run_until_complete(result)
             return coro_result
         return result
+
     mocker.patch("udata_hydra.utils.queue.enqueue", _execute)
 
 
@@ -129,12 +132,10 @@ def produce_mock(mocker):
 @pytest.fixture
 def analysis_mock(mocker):
     """Disable process_resource while crawling"""
-    mocker.patch("udata_hydra.crawl.process_resource", dummy({
-        "error": None,
-        "checksum": None,
-        "filesize": None,
-        "mime_type": None
-    }))
+    mocker.patch(
+        "udata_hydra.crawl.process_resource",
+        dummy({"error": None, "checksum": None, "filesize": None, "mime_type": None}),
+    )
 
 
 @pytest.fixture
@@ -152,6 +153,25 @@ async def db():
 
 
 @pytest_asyncio.fixture
+async def insert_fake_resource():
+    async def _insert_fake_resource(database):
+        await database.execute(
+            f"""
+            INSERT INTO catalog (dataset_id, resource_id, url, priority, deleted)
+            VALUES ('{DATASET_ID}', '{RESOURCE_ID}', 'http://dev.local/', True, False)
+            ON CONFLICT (resource_id) DO NOTHING;
+            """
+        )
+
+    return _insert_fake_resource
+
+
+@pytest_asyncio.fixture
+def fake_resource_id():
+    return uuid.uuid4
+
+
+@pytest_asyncio.fixture
 async def fake_check():
     async def _fake_check(
         status=200,
@@ -161,7 +181,7 @@ async def fake_check():
         created_at=None,
         headers={"x-do": "you"},
         checksum=None,
-        resource_id="c4e3a9fb-4415-488e-ba57-d05269b27adf",
+        resource_id=RESOURCE_ID,
         detected_last_modified_at=None,
         parsing_table=False,
     ):
@@ -177,12 +197,14 @@ async def fake_check():
             "error": error,
             "checksum": checksum,
             "detected_last_modified_at": detected_last_modified_at,
-            "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest() if parsing_table else None,
+            "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest()
+            if parsing_table
+            else None,
         }
-        id = await insert_check(data)
+        id = await Check.insert(data)
         data["id"] = id
         if created_at:
-            await update_check(id, {"created_at": created_at})
+            await Check.update(id, {"created_at": created_at})
             data["created_at"] = created_at
         return data
 
@@ -213,5 +235,5 @@ def udata_resource_payload():
             "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
             "created_at": datetime.now().isoformat(),
             "last_modified": datetime.now().isoformat(),
-        }
+        },
     }

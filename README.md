@@ -9,6 +9,17 @@ Since it's called _hydra_, it also has mythical powers embedded:
 - if the remote resource is a CSV, convert it to a PostgreSQL table, ready for APIfication
 - send crawl and analysis info to a udata instance
 
+## Architecture schema
+
+The architecture for the full workflow is the following:
+
+![Full workflow architecture](docs/archi-idd-IDD.drawio.png)
+
+
+The hydra crawler is one of the components of the architecture. It will check if resource is available, analyze the type of file if the resource has been modified, and analyze the CSV content. It will also convert CSV resources to database tables and send the data to a udata instance.
+
+![Crawler architecture](docs/hydra.drawio.png)
+
 ## CLI
 
 ### Create database structure
@@ -26,7 +37,7 @@ Install udata-hydra dependencies and cli.
 
 `poetry run udata-hydra-crawl`
 
-It will crawl (forever) the catalog according to config set in `config.py`.
+It will crawl (forever) the catalog according to config set in `udata_hydra/config.toml`, with a default config in `udata_hydra/config_default.toml`.
 
 `BATCH_SIZE` URLs are queued at each loop run.
 
@@ -50,20 +61,60 @@ Monitor worker status:
 
 Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
 
+## Tests
+
+To run the tests, you need to launch the database, the test database, and the Redis broker with `docker-compose -f docker-compose.yml -f docker-compose.test.yml up -f docker-compose.broker.yml up -d`.
+
+Then you can run the tests with `poetry run pytest`.
+
+If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
+
+### Tests coverage
+
+Pytest automatically uses the `coverage` package to generate a coverage report, which is displayed at the end of the test run in the terminal.
+The coverage is configured in the `pypoject.toml` file, in the `[tool.pytest.ini_options]` section.
+You can also override the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
+
 ## API
 
 ### Run
 
-```
+```bash
 poetry install
 poetry run adev runserver udata_hydra/app.py
 ```
 
-### Get latest check
+### Routes/endpoints
+
+The API serves the following endpoints:
+
+*Related to checks:*
+- `GET` on `/api/checks/latest/?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
+- `GET` on `/api/checks/all/?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
+
+*Related to resources:*
+- `GET` on `/api/resources/?resource_id={resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
+- `POST` on `/api/resources/` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
+- `PUT` on `/api/resources/` to update a resource in the DB "catalog" table
+- `DELETE` on `/api/resources/` to delete a resource in the DB "catalog" table
+
+> :warning: **Warning: the following routes are deprecated and need be removed in the future:**
+> - `POST` on `/api/resource/created` -> use `POST` on `/api/resources/` instead
+> - `POST` on `/api/resource/updated` -> use `PUT` on `/api/resources/` instead
+> - `POST` on `/api/resource/deleted` -> use `DELET`E on `/api/resources/` instead
+
+*Related to some status and health check:*
+- `GET` on `/api/status/crawler/` to get the crawling status
+- `GET` on `/api/status/worker/` to get the worker status
+- `GET` on `/api/stats/` to get the crawling stats
+
+More details about some enpoints are provided below with examples, but not for all of them:
+
+#### Get latest check
 
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.saintdenis.re/datasets/661e19974bcc48849bbff7c9637c5c28_1.csv" | json_pp
 {
    "status" : 200,
@@ -96,11 +147,11 @@ $ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.sain
 }
 ```
 
-### Get all checks for an URL or resource
+#### Get all checks for an URL or resource
 
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv.fr/IMG/xls/er864.xls" | json_pp
 [
    {
@@ -136,9 +187,9 @@ $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv
 ]
 ```
 
-### Get crawling status
+#### Get crawling status
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 {
    "fresh_checks_percentage" : 0.4,
@@ -149,9 +200,9 @@ $ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 }
 ```
 
-### Get worker status
+#### Get worker status
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/status/worker/" | json_pp
 {
    "queued" : {
@@ -162,9 +213,9 @@ $ curl -s "http://localhost:8000/api/status/worker/" | json_pp
 }
 ```
 
-### Get crawling stats
+#### Get crawling stats
 
-```
+```bash
 $ curl -s "http://localhost:8000/api/stats/" | json_pp
 {
    "status" : [
@@ -276,3 +327,17 @@ For example, to set the log level to `DEBUG` when initializing the database, use
 Refer to each section to learn how to launch them. The only differences from dev to prod are:
 - use `HYDRA_SETTINGS` env var to point to your custom `config.toml`
 - use `HYDRA_APP_SOCKET_PATH` to configure where aiohttp should listen to a [reverse proxy connection (eg nginx)](https://docs.aiohttp.org/en/stable/deployment.html#nginx-configuration) and use `udata-hydra-app` to launch the app server
+
+## Contributing
+
+Before contributing to the repository and making any PR, it is necessary to initialize the pre-commit hooks:
+```bash
+pre-commit install
+```
+Once this is done, code formatting and linting, as well as import sorting, will be automatically checked before each commit.
+
+If you cannot use pre-commit, it is necessary to format, lint, and sort imports with [Ruff](https://docs.astral.sh/ruff/) before committing:
+```bash
+ruff check --fix .
+ruff format .
+```

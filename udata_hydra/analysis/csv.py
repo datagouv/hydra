@@ -3,35 +3,38 @@ import hashlib
 import json
 import logging
 import os
-import pytz
 import sys
-
-from datetime import datetime
-from typing import Any, Iterator
+from datetime import datetime, timezone
+from typing import Any, Iterator, Union
 
 import sentry_sdk
-
-from csv_detective.explore_csv import routine as csv_detective_routine
 from csv_detective.detection import engine_to_file
+from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
 from sqlalchemy import (
-    MetaData, Table, Column,
-    BigInteger, String, Float, Boolean, Integer, JSON, Date, DateTime,
+    JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    Integer,
+    MetaData,
+    String,
+    Table,
 )
 from sqlalchemy.dialects.postgresql import asyncpg
 from sqlalchemy.schema import CreateTable
 from str2bool import str2bool
 from str2float import str2float
 
-from udata_hydra import context, config
+from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.errors import ParseException
-from udata_hydra.utils.db import get_check, compute_insert_query, update_check
-from udata_hydra.utils.file import download_resource
-from udata_hydra.utils.timer import Timer
-from udata_hydra.utils.http import send
-from udata_hydra.utils.reader import Reader
-from udata_hydra.utils import queue
+from udata_hydra.db import compute_insert_query
+from udata_hydra.db.check import Check
+from udata_hydra.utils import Reader, Timer, download_resource, queue, send
 from udata_hydra.utils.parquet import save_as_parquet
 from udata_hydra.utils.minio import MinIOClient
 
@@ -74,7 +77,7 @@ minio_client = MinIOClient()
 
 async def notify_udata(check_id: str, table_name: str) -> None:
     """Notify udata of the result of a parsing"""
-    check = await get_check(check_id)
+    check = await Check.get(check_id)
     resource_id = check["resource_id"]
     db = await context.pool()
     record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
@@ -85,10 +88,12 @@ async def notify_udata(check_id: str, table_name: str) -> None:
             "document": {
                 "analysis:parsing:error": check["parsing_error"],
                 "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
-                if check["parsing_started_at"] else None,
+                if check["parsing_started_at"]
+                else None,
                 "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
-                if check["parsing_finished_at"] else None,
-            }
+                if check["parsing_finished_at"]
+                else None,
+            },
         }
         if config.CSV_TO_PARQUET:
             payload["parquet_id"] = table_name
@@ -96,9 +101,9 @@ async def notify_udata(check_id: str, table_name: str) -> None:
 
 
 async def analyse_csv(
-    check_id: int = None,
-    url: str = None,
-    file_path: str = None,
+    check_id: Union[int, None] = None,
+    url: Union[str, None] = None,
+    file_path: Union[str, None] = None,
     debug_insert: bool = False,
 ) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
@@ -110,22 +115,26 @@ async def analyse_csv(
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
-    check = await get_check(check_id) if check_id is not None else {}
+    check = await Check.get(check_id) if check_id is not None else {}
     url = check.get("url") or url
     exception_file = str(check.get("resource_id", "")) in exceptions
 
     headers = json.loads(check.get("headers") or "{}")
-    tmp_file = open(file_path, "rb") if file_path else await download_resource(
-        url=url,
-        headers=headers,
-        max_size_allowed=None if exception_file else float(config.MAX_FILESIZE_ALLOWED["csv"]),
+    tmp_file = (
+        open(file_path, "rb")
+        if file_path
+        else await download_resource(
+            url=url,
+            headers=headers,
+            max_size_allowed=None if exception_file else int(config.MAX_FILESIZE_ALLOWED["csv"]),
+        )
     )
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     timer.mark("download-file")
 
     try:
         if check_id:
-            await update_check(check_id, {"parsing_started_at": datetime.now(pytz.UTC)})
+            await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
         csv_inspection = await perform_csv_inspection(tmp_file.name)
         timer.mark("csv-inspection")
         await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
@@ -133,10 +142,13 @@ async def analyse_csv(
         await csv_to_parquet(tmp_file.name, csv_inspection, table_name)
         timer.mark("csv-to-parquet")
         if check_id:
-            await update_check(check_id, {
-                "parsing_table": table_name,
-                "parsing_finished_at": datetime.now(pytz.UTC),
-            })
+            await Check.update(
+                check_id,
+                {
+                    "parsing_table": table_name,
+                    "parsing_finished_at": datetime.now(timezone.utc),
+                },
+            )
         await csv_to_db_index(table_name, csv_inspection, check)
     except ParseException as e:
         await handle_parse_exception(e, check_id, table_name)
@@ -148,7 +160,7 @@ async def analyse_csv(
         os.remove(tmp_file.name)
 
 
-def smart_cast(_type: str, value: Any, failsafe: bool = False) -> Any:
+def smart_cast(_type: str, value, failsafe: bool = False) -> Any:
     try:
         if value is None or value == "":
             return None
@@ -218,7 +230,9 @@ async def csv_to_parquet(file_path: str, inspection: dict, table_name: str) -> N
     minio_client.send_file(parquet_file)
 
 
-async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_insert: bool = False) -> None:
+async def csv_to_db(
+    file_path: str, inspection: dict, table_name: str, debug_insert: bool = False
+) -> None:
     """
     Convert a csv file to database table using inspection data. It should (re)create one table:
     - `table_name` with data from `file_path`
@@ -259,10 +273,10 @@ async def csv_to_db(file_path: str, inspection: dict, table_name: str, debug_ins
     # this inserts rows from iterator one by one, slow but useful for debugging
     else:
         bar = ProgressBar(total=inspection["total_lines"])
-        for r in bar.iter(generate_records(file_path, inspection, columns)):
+        for r in bar.iter(records):
             data = {k: v for k, v in zip(columns.keys(), r)}
             # NB: possible sql injection here, but should not be used in prod
-            q = compute_insert_query(data, table_name, returning="__id")
+            q = compute_insert_query(table_name=table_name, data=data, returning="__id")
             await db.execute(q, *data.values())
 
 
@@ -270,13 +284,21 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict) -> Non
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)"
-    await db.execute(q, table_name, json.dumps(inspection), check.get("resource_id"), check.get("url"))
+    await db.execute(
+        q,
+        table_name,
+        json.dumps(inspection),
+        check.get("resource_id"),
+        check.get("url"),
+    )
 
 
-async def perform_csv_inspection(file_path: str) -> dict:
+async def perform_csv_inspection(file_path: str) -> Union[dict, None]:
     """Launch csv-detective against given file"""
     try:
-        return csv_detective_routine(file_path, output_profile=True, num_rows=-1, save_results=False)
+        return csv_detective_routine(
+            file_path, output_profile=True, num_rows=-1, save_results=False
+        )
     except Exception as e:
         raise ParseException("csv_detective") from e
 
@@ -289,12 +311,12 @@ async def delete_table(table_name: str) -> None:
 
 async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -> None:
     """Specific ParsingError handling. Enriches sentry w/ context if available,
-       and store error if in a check context. Also cleanup :table_name: if needed."""
+    and store error if in a check context. Also cleanup :table_name: if needed."""
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if check_id:
         if config.SENTRY_DSN:
-            check = await get_check(check_id)
+            check = await Check.get(check_id)
             url = check["url"]
             with sentry_sdk.push_scope() as scope:
                 scope.set_extra("check_id", check_id)
@@ -304,7 +326,10 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
         # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
-        await update_check(check_id, {"parsing_error": err, "parsing_finished_at": datetime.now(pytz.UTC)})
+        await Check.update(
+            check_id,
+            {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
+        )
         log.error("Parsing error", exc_info=e)
     else:
         raise e
