@@ -15,6 +15,7 @@ routes: list = [
     web.get("/api/checks/latest/", get_latest_check),
     web.get("/api/checks/all/", get_all_checks),
     # Routes for resources
+    web.get("/api/resources/", get_resource),
     web.post("/api/resources/", create_resource),
     web.put("/api/resources/", update_resource),
     web.delete("/api/resources/", delete_resource),
