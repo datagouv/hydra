@@ -67,7 +67,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.ruff]
-lint = { select = ["I"] } # also sort imports with an isort rule
+lint = { extend-select = ["I"] } # also sort imports with an isort rule
 line-length = 100
 
 [build-system]
