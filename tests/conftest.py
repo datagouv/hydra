@@ -152,6 +152,20 @@ async def db():
 
 
 @pytest_asyncio.fixture
+async def insert_fake_resource():
+    async def _insert_fake_resource(database):
+        await database.execute(
+            f"""
+            INSERT INTO catalog (dataset_id, resource_id, url, priority, deleted)
+            VALUES ('{DATASET_ID}', '{RESOURCE_ID}', 'http://dev.local/', True, False)
+            ON CONFLICT (resource_id) DO NOTHING;
+            """
+        )
+
+    return _insert_fake_resource
+
+
+@pytest_asyncio.fixture
 async def fake_check():
     async def _fake_check(
         status=200,

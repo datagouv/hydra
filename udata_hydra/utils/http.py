@@ -2,10 +2,19 @@ import json
 import logging
 
 import aiohttp
+from aiohttp import web
 
 from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
+
+
+def get_request_params(request, params_names: list[str]) -> list:
+    """Get GET parameters from request"""
+    data = [request.query.get(p) for p in params_names]
+    if not any(data):
+        raise web.HTTPBadRequest()
+    return data
 
 
 async def send(dataset_id: str, resource_id: str, document: dict) -> None:

@@ -89,10 +89,11 @@ poetry run adev runserver udata_hydra/app.py
 The API serves the following endpoints:
 
 *Related to checks:*
-- `GET` on `/api/checks/latest/` to get the latest check for a given URL or resource
-- `GET` on `/api/checks/all/` to get all checks for a given URL or resource
+- `GET` on `/api/checks/latest/?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
+- `GET` on `/api/checks/all/?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
 
 *Related to resources:*
+- `GET` on `/api/resources/?resource_id={resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
 - `POST` on `/api/resources/` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
 - `PUT` on `/api/resources/` to update a resource in the DB "catalog" table
 - `DELETE` on `/api/resources/` to delete a resource in the DB "catalog" table

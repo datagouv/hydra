@@ -8,7 +8,7 @@ from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 from sentry_sdk.integrations.rq import RqIntegration
 
 from udata_hydra import config
-from udata_hydra.utils.app_version import get_app_version
+from udata_hydra.utils import get_app_version
 
 log = logging.getLogger("udata-hydra")
 context = {"inited": False}

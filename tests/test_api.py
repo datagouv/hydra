@@ -9,6 +9,8 @@ from typing import Callable
 
 import pytest
 
+from tests.conftest import DATASET_ID, RESOURCE_ID
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -19,7 +21,7 @@ pytestmark = pytest.mark.asyncio
         "resource_id=c4e3a9fb-4415-488e-ba57-d05269b27adf",
     ],
 )
-async def test_api_get_latest_check(setup_catalog, query, client, fake_check):
+async def test_api_get_latest_check(setup_catalog, client, query, fake_check):
     await fake_check(parsing_table=True)
     resp = await client.get(f"/api/checks/latest/?{query}")
     assert resp.status == 200
@@ -53,7 +55,7 @@ async def test_api_get_latest_check(setup_catalog, query, client, fake_check):
         "resource_id=c4e3a9fb-4415-488e-ba57-d05269b27adf",
     ],
 )
-async def test_api_get_all_checks(setup_catalog, query, client, fake_check):
+async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
     await fake_check(status=500, error="no-can-do")
     await fake_check()
     resp = await client.get(f"/api/checks/all/?{query}")
@@ -64,6 +66,16 @@ async def test_api_get_all_checks(setup_catalog, query, client, fake_check):
     assert first["status"] == 200
     assert second["status"] == 500
     assert second["error"] == "no-can-do"
+
+
+async def test_api_get_resource(db, client, insert_fake_resource):
+    await insert_fake_resource(db)
+    query: str = f"dataset_id={DATASET_ID}&resource_id={RESOURCE_ID}"
+    resp = await client.get(f"/api/resources/?{query}")
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["dataset_id"] == DATASET_ID
+    assert data["resource_id"] == RESOURCE_ID
 
 
 @pytest.mark.parametrize(
@@ -139,7 +151,7 @@ async def test_api_update_resource(client, route):
         {"url": "/api/resource/updated/", "method": "post"},  # legacy route
     ],
 )  # TODO: can be removed once we don't use legacy route anymore
-async def test_api_update_resource_url_since_load_catalog(setup_catalog, route, db, client):
+async def test_api_update_resource_url_since_load_catalog(setup_catalog, db, client, route):
     # We modify the url for this resource
     await db.execute(
         "UPDATE catalog SET url = 'https://example.com/resource-0' "

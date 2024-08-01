@@ -14,8 +14,7 @@ from udata_hydra.analysis.resource import process_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
-from udata_hydra.utils import queue
-from udata_hydra.utils.http import send
+from udata_hydra.utils import queue, send
 
 results: defaultdict = defaultdict(int)
 

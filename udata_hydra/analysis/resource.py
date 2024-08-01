@@ -11,10 +11,13 @@ from dateparser import parse as date_parser
 from udata_hydra import config, context
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.db.check import Check
-from udata_hydra.utils import queue
-from udata_hydra.utils.csv import detect_tabular_from_headers
-from udata_hydra.utils.file import compute_checksum_from_file, download_resource
-from udata_hydra.utils.http import send
+from udata_hydra.utils import (
+    compute_checksum_from_file,
+    detect_tabular_from_headers,
+    download_resource,
+    queue,
+    send,
+)
 
 
 class Change(Enum):
