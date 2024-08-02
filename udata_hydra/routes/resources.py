@@ -6,7 +6,7 @@ from marshmallow import ValidationError
 from udata_hydra import config
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import ResourceSchema
-from udata_hydra.utils import delete_resource_from_minio, get_request_params
+from udata_hydra.utils import get_request_params
 
 
 async def get_resource(request: web.Request) -> web.Response:
@@ -82,13 +82,10 @@ async def delete_resource(request: web.Request) -> web.Response:
     except ValidationError as err:
         raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
-    dataset_id = valid_payload["dataset_id"]
     resource_id = valid_payload["resource_id"]
 
     pool = request.app["pool"]
     async with pool.acquire() as connection:
-        if config.SAVE_TO_MINIO:
-            delete_resource_from_minio(dataset_id, resource_id)
         # Mark resource as deleted in catalog table
         q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
         await connection.execute(q)

@@ -204,7 +204,7 @@ def fix_surrogates(value):
     """FIX Unicode low surrogate must follow a high surrogate.
     eg in 'TREMI_2017-R\xe9sultats enqu\xeate bruts.csv'
     """
-    if type(value) is not str:
+    if not isinstance(value, str):
         value = str(value)
     return value.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
 

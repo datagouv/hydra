@@ -35,6 +35,7 @@
 - Handle other file formats [#92](https://github.com/etalab/udata-hydra/pull/92)
 - Add a quiet option on load catalog [#95](https://github.com/datagouv/hydra/pull/95)
 - Select distinct parsing tables to delete [#96](https://github.com/datagouv/hydra/pull/96)
+- Enable parquet export [#97](https://github.com/datagouv/hydra/pull/97)
 - Update documentation [#98](https://github.com/datagouv/hydra/pull/98) and [#106](https://github.com/datagouv/hydra/pull/106)
 - Add linter and formatter with `pyproject.toml` config, add lint and formatting step in CI, add pre-commit hook to lint and format, update docs and lint and format the code [#99](https://github.com/datagouv/hydra/pull/99)
 - Update `sentry-sdk` dependency, and update Sentry logic to be able to send environment, app version and profiling/performance info [#100](https://github.com/datagouv/hydra/pull/100)

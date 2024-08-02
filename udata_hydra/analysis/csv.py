@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Union
+from typing import Any, Iterator, Union
 
 import sentry_sdk
 from csv_detective.detection import engine_to_file
@@ -35,6 +35,8 @@ from udata_hydra.analysis.errors import ParseException
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.utils import Reader, Timer, download_resource, queue, send
+from udata_hydra.utils.minio import MinIOClient
+from udata_hydra.utils.parquet import save_as_parquet
 
 log = logging.getLogger("udata-hydra")
 
@@ -69,9 +71,10 @@ PYTHON_TYPE_TO_PY = {
 }
 
 RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
+minio_client = MinIOClient()
 
 
-async def notify_udata(check_id: int) -> None:
+async def notify_udata(check_id: str, table_name: str) -> None:
     """Notify udata of the result of a parsing"""
     check = await Check.get(check_id)
     resource_id = check["resource_id"]
@@ -91,6 +94,8 @@ async def notify_udata(check_id: int) -> None:
                 else None,
             },
         }
+        if config.CSV_TO_PARQUET:
+            payload["parquet_id"] = table_name
         queue.enqueue(send, _priority="high", **payload)
 
 
@@ -101,8 +106,8 @@ async def analyse_csv(
     debug_insert: bool = False,
 ) -> None:
     """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
-    if not config.CSV_ANALYSIS_ENABLED:
-        log.debug("CSV_ANALYSIS_ENABLED turned off, skipping.")
+    if not config.CSV_ANALYSIS:
+        log.debug("CSV_ANALYSIS turned off, skipping.")
         return
 
     exceptions = config.LARGE_RESOURCES_EXCEPTIONS
@@ -133,6 +138,8 @@ async def analyse_csv(
         timer.mark("csv-inspection")
         await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
         timer.mark("csv-to-db")
+        await csv_to_parquet(tmp_file.name, csv_inspection, table_name)
+        timer.mark("csv-to-parquet")
         if check_id:
             await Check.update(
                 check_id,
@@ -146,7 +153,7 @@ async def analyse_csv(
         await handle_parse_exception(e, check_id, table_name)
     finally:
         if check_id:
-            await notify_udata(check_id)
+            await notify_udata(check_id, table_name)
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
@@ -185,6 +192,40 @@ def compute_create_table_query(table_name: str, columns: list) -> str:
     return compiled.string.replace("%%", "%")
 
 
+def generate_records(file_path: str, inspection: dict, columns: dict) -> Iterator[list]:
+    # because we need the iterator twice, not possible to
+    # handle parquet and db through the same iteration
+    with Reader(file_path, inspection) as reader:
+        for line in reader:
+            if line:
+                yield [smart_cast(t, v, failsafe=True) for t, v in zip(columns.values(), line)]
+
+
+async def csv_to_parquet(file_path: str, inspection: dict, table_name: str) -> None:
+    """
+    Convert a csv file to parquet using inspection data.
+
+    :file_path: CSV file path to convert
+    :inspection: CSV detective report
+    :table_name: used to name the parquet file
+    """
+    if not config.CSV_TO_PARQUET:
+        log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
+        return
+    log.debug(
+        f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
+        f"to parquet for {table_name} and sending to Minio."
+    )
+    columns = {c: v["python_type"] for c, v in inspection["columns"].items()}
+    # save the file as parquet and store it on Minio instance
+    parquet_file, _ = save_as_parquet(
+        records=generate_records(file_path, inspection, columns),
+        columns=columns,
+        output_name=table_name,
+    )
+    minio_client.send_file(parquet_file)
+
+
 async def csv_to_db(
     file_path: str, inspection: dict, table_name: str, debug_insert: bool = False
 ) -> None:
@@ -197,42 +238,42 @@ async def csv_to_db(
     :table_name: used to create tables
     :debug_insert: insert record one by one instead of using postgresql COPY
     """
+    if not config.CSV_TO_DB:
+        log.debug("CSV_TO_DB turned off, skipping.")
+        return
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
         f"to db for {table_name}"
     )
-    columns = inspection["columns"]
     # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {
         f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
-        for c, v in columns.items()
+        for c, v in inspection["columns"].items()
     }
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
     await db.execute(q)
     q = compute_create_table_query(table_name, columns)
     await db.execute(q)
-    with Reader(file_path, inspection) as reader:
-        records = (
-            [smart_cast(t, v, failsafe=True) for t, v in zip(columns.values(), line)]
-            for line in reader
-            if line
-        )
-        # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
-        if not debug_insert:
-            # NB: also see copy_to_table for a file source
-            try:
-                await db.copy_records_to_table(table_name, records=records, columns=columns.keys())
-            except Exception as e:  # I know what I'm doing, pinky swear
-                raise ParseException("copy_records_to_table") from e
-        # this inserts rows from iterator one by one, slow but useful for debugging
-        else:
-            bar = ProgressBar(total=inspection["total_lines"])
-            for r in bar.iter(records):
-                data = {k: v for k, v in zip(columns.keys(), r)}
-                # NB: possible sql injection here, but should not be used in prod
-                q = compute_insert_query(table_name=table_name, data=data, returning="__id")
-                await db.execute(q, *data.values())
+    # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
+    if not debug_insert:
+        # NB: also see copy_to_table for a file source
+        try:
+            await db.copy_records_to_table(
+                table_name,
+                records=generate_records(file_path, inspection, columns),
+                columns=columns.keys(),
+            )
+        except Exception as e:  # I know what I'm doing, pinky swear
+            raise ParseException("copy_records_to_table") from e
+    # this inserts rows from iterator one by one, slow but useful for debugging
+    else:
+        bar = ProgressBar(total=inspection["total_lines"])
+        for r in bar.iter(generate_records(file_path, inspection, columns)):
+            data = {k: v for k, v in zip(columns.keys(), r)}
+            # NB: possible sql injection here, but should not be used in prod
+            q = compute_insert_query(table_name=table_name, data=data, returning="__id")
+            await db.execute(q, *data.values())
 
 
 async def csv_to_db_index(table_name: str, inspection: dict, check: dict) -> None:
