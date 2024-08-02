@@ -24,7 +24,9 @@ class Check:
         return check
 
     @classmethod
-    async def get_latest(cls, url: Union[str, None], resource_id: Union[str, None]) -> dict | None:
+    async def get_latest(
+        cls, url: Union[str, None], resource_id: Union[str, None]
+    ) -> Union[dict, None]:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -38,7 +40,9 @@ class Check:
             return await connection.fetchrow(q, url or resource_id)
 
     @classmethod
-    async def get_all(cls, url: Union[str, None], resource_id: Union[str, None]) -> dict | None:
+    async def get_all(
+        cls, url: Union[str, None], resource_id: Union[str, None]
+    ) -> Union[dict, None]:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
