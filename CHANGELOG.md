@@ -47,6 +47,7 @@
 - Refactor routes [#117](https://github.com/datagouv/hydra/pull/117)
 - Fix Ruff configuration [#117](https://github.com/datagouv/hydra/pull/117)
 - Add some API tests to improve coverage [#123](https://github.com/datagouv/hydra/pull/123)
+- Fix health check endpoint route which was wrongly removed, and add test for API health check endpoint to make sure this endpoint is working as expected [#128](https://github.com/datagouv/hydra/pull/128)
 
 ## 1.0.1 (2023-01-04)
 
