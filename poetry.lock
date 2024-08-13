@@ -723,13 +723,14 @@ tomli = {version = "*", optional = true, markers = "python_full_version <= \"3.1
 toml = ["tomli"]
 
 [[package]]
-name = "csv_detective"
-version = "0.7.2.dev0"
+name = "csv-detective"
+version = "0.7.2.dev800"
 description = "Detect CSV column content"
 optional = false
 python-versions = "*"
-files = []
-develop = false
+files = [
+    {file = "csv_detective-0.7.2.dev800-py3-none-any.whl", hash = "sha256:1d387ce3afe64c18c024d1133f8747973a69aae14b94ac5fffc8f8850eb55efb"},
+]
 
 [package.dependencies]
 boto3 = "1.34.0"
@@ -744,12 +745,6 @@ requests = "2.32.0"
 responses = "0.25.0"
 Unidecode = "1.3.6"
 xlrd = "2.0.1"
-
-[package.source]
-type = "git"
-url = "git@github.com:datagouv/csv-detective.git"
-reference = "master"
-resolved_reference = "dfa1b91ba13bdc3d20f177a355e613e68edff9a4"
 
 [[package]]
 name = "dateparser"
@@ -2530,4 +2525,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "ef18f0f1c1400cf400f6fd7c7183df48086e361a886cdf4b49f316ef2cb9256f"
+content-hash = "280a9a964eaf7fbdaf34b3f080850ee9d7c313ee8e4cca1665a9b5b8dddb53e8"
