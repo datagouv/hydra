@@ -18,10 +18,12 @@ from udata_hydra.utils import queue, send
 
 results: defaultdict = defaultdict(int)
 
-STATUS_OK = "ok"
-STATUS_TIMEOUT = "timeout"
-STATUS_ERROR = "error"
-STATUS_BACKOFF = "backoff"
+RESOURCES_STATUSES = {
+    "OK": "ok",
+    "TIMEOUT": "timeout",
+    "ERROR": "error",
+    "BACKOFF": "backoff",
+}
 
 log = setup_logging()
 
@@ -260,14 +262,14 @@ async def check_url(
             },
             priority=priority,
         )
-        return STATUS_ERROR
+        return RESOURCES_STATUSES["ERROR"]
 
     should_backoff, reason = await is_backoff(domain)
     if should_backoff:
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
         await Resource.update(resource_id=resource_id, data={"status": None, "priority": False})
-        return STATUS_BACKOFF
+        return RESOURCES_STATUSES["BACKOFF"]
 
     try:
         start = time.time()
@@ -298,7 +300,7 @@ async def check_url(
 
             queue.enqueue(process_resource, check_id, is_first_check, _priority=_priority)
 
-            return STATUS_OK
+            return RESOURCES_STATUSES["OK"]
     except asyncio.exceptions.TimeoutError:
         await process_check_data(
             check_data={
@@ -309,7 +311,7 @@ async def check_url(
             },
             priority=priority,
         )
-        return STATUS_TIMEOUT
+        return RESOURCES_STATUSES["TIMEOUT"]
     # TODO: debug AssertionError, should be caught in DB now
     # File "[...]aiohttp/connector.py", line 991, in _create_direct_connection
     # assert port is not None
@@ -334,7 +336,7 @@ async def check_url(
             priority=priority,
         )
         log.warning(f"Crawling error for url {url}", exc_info=e)
-        return STATUS_ERROR
+        return RESOURCES_STATUSES["ERROR"]
 
 
 async def crawl_urls(to_parse: list[str]) -> None:

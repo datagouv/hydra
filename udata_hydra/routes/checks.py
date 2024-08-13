@@ -5,7 +5,7 @@ from aiohttp import web
 from marshmallow import ValidationError
 
 from udata_hydra import config, context
-from udata_hydra.crawl import check_url
+from udata_hydra.crawl import RESOURCES_STATUSES, check_url
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import CheckSchema
@@ -60,11 +60,8 @@ async def create_check(request: web.Request) -> web.Response:
         )
         context.monitor().refresh(status)
 
-    if status == "ok":
-        return web.HTTPCreated()
-    elif status == "timeout":
-        return web.HTTPRequestTimeout()
-    elif status == "error":
-        return web.HTTPBadRequest()
-    elif status == "backoff":
-        return web.HTTPTooManyRequests()
+    if status == RESOURCES_STATUSES["OK"]:
+        return web.HTTPOk()
+    elif status == RESOURCES_STATUSES["TIMEOUT"]:
+        return web.HTTPGatewayTimeout()
+    return web.HTTPBadGateway(text=f"Error while checking the resource: {status}")

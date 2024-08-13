@@ -14,6 +14,7 @@ from aiohttp.client_exceptions import ClientError, ClientResponseError
 from yarl import URL
 
 from tests.conftest import DATASET_ID, RESOURCE_ID
+from udata_hydra.crawl import RESOURCES_STATUSES
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -135,12 +136,12 @@ async def test_api_create_check_wrongly(setup_catalog, client, fake_check, fake_
 async def test_api_create_check(
     setup_catalog, client, rmock, event_loop, db, resource, analysis_mock, udata_url
 ):
-    resource_id, status, timeout, exception = resource
+    resource_id, resource_status, resource_timeout, resource_exception = resource
     rurl = "https://example.com/resource-1"
     params = {
-        "status": status,
+        "status": resource_status,
         "headers": {"Content-LENGTH": "10", "X-Do": "you"},
-        "exception": exception,
+        "exception": resource_exception,
     }
     rmock.head(rurl, **params)
     # mock for head fallback
@@ -148,30 +149,32 @@ async def test_api_create_check(
     rmock.put(udata_url)
 
     # Call the API and test the responses cases
-    resp = await client.post("/api/checks/", json={"resource_id": resource_id})
-    if timeout:
-        assert resp.status == 408
+    api_response = await client.post("/api/checks/", json={"resource_id": resource_id})
+    if resource_timeout:
+        assert api_response.status == 504
     else:
-        if status == 200:
-            assert resp.status == 201
+        if resource_status == 200:
+            assert api_response.status == 200
         else:
-            assert resp.status == 400
+            assert api_response.status == 502
+            error_text: str = await api_response.text()
+            assert "Error while checking the resource:" in error_text
 
     # Test check results in DB
     res = await db.fetchrow("SELECT * FROM checks WHERE url = $1", rurl)
     assert res["url"] == rurl
-    assert res["status"] == status
-    if not exception:
+    assert res["status"] == resource_status
+    if not resource_exception:
         assert json.loads(res["headers"]) == {
             "x-do": "you",
             # added by aioresponses :shrug:
             "content-type": "application/json",
             "content-length": "10",
         }
-    assert res["timeout"] == timeout
-    if isinstance(exception, ClientError):
+    assert res["timeout"] == resource_timeout
+    if isinstance(resource_exception, ClientError):
         assert res["error"] == "client error"
-    elif status == 500:
+    elif resource_status == 500:
         assert res["error"] == "Internal Server Error"
     else:
         assert not res["error"]
@@ -180,8 +183,8 @@ async def test_api_create_check(
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("check:date")
     datetime.fromisoformat(webhook["check:date"])
-    if exception or status == 500:
-        if status == 429:
+    if resource_exception or resource_status == 500:
+        if resource_status == 429:
             # In the case of a 429 status code, the error is on the crawler side and we can't give an availability status.
             # We expect check:available to be None.
             assert webhook.get("check:available") is None
@@ -191,7 +194,7 @@ async def test_api_create_check(
         assert webhook.get("check:available")
         assert webhook.get("check:headers:content-type") == "application/json"
         assert webhook.get("check:headers:content-length") == 10
-    if timeout:
+    if resource_timeout:
         assert webhook.get("check:timeout")
     else:
         assert webhook.get("check:timeout") is False
