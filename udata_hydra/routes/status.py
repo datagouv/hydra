@@ -119,7 +119,7 @@ async def get_stats(request: web.Request) -> web.Response:
     )
 
 
-async def health(request: web.Request) -> web.Response:
+async def get_health(request: web.Request) -> web.Response:
     test_connection = await request.app["pool"].fetchrow("SELECT 1")
     assert next(test_connection.values()) == 1
     return web.HTTPOk()

@@ -7,7 +7,7 @@ from udata_hydra.routes.resources import (
     get_resource,
     update_resource,
 )
-from udata_hydra.routes.status import get_crawler_status, get_stats, get_worker_status
+from udata_hydra.routes.status import get_crawler_status, get_health, get_stats, get_worker_status
 
 # routes = web.RouteTableDef()
 routes: list = [
@@ -26,4 +26,5 @@ routes: list = [
     web.get("/api/status/crawler/", get_crawler_status),
     web.get("/api/status/worker/", get_worker_status),
     web.get("/api/stats/", get_stats),
+    web.get("/api/health/", get_health),
 ]
