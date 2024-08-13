@@ -63,9 +63,13 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 
 ## Tests
 
-To run the tests, you need to launch the database, the test database, and the Redis broker with `docker-compose -f docker-compose.yml -f docker-compose.test.yml up -f docker-compose.broker.yml up -d`.
+To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
 
 Then you can run the tests with `poetry run pytest`.
+
+To run a specific test file, you can pass the path to the file to pytest, like this: `poetry run pytest tests/test_app.py`.
+
+To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `poetry run pytest tests/test_app.py::test_get_latest_check`.
 
 If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
 
@@ -298,14 +302,14 @@ The payload should look something like:
 
 ## Development
 
-### docker-compose
+### docker compose
 
 Multiple docker-compose files are provided:
 - a minimal `docker-compose.yml` with two PostgreSQL containers (one for catalog and metadata, the other for converted CSV to database)
 - `docker-compose.broker.yml` adds a Redis broker
 - `docker-compose.test.yml` launches a test DB, needed to run tests
 
-NB: you can launch compose from multiple files like this: `docker-compose -f docker-compose.yml -f docker-compose.test.yml up`
+NB: you can launch compose from multiple files like this: `docker compose -f docker-compose.yml -f docker-compose.test.yml up`
 
 ### Logging & Debugging
 
