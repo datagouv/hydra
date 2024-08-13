@@ -103,14 +103,12 @@ async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
     ],
 )
 async def test_api_create_check_wrongly(setup_catalog, post_data, client, fake_check):
-    await fake_check(status=500, error="no-can-do")
     await fake_check()
     resp = await client.post("/api/checks/", json=post_data)
     assert resp.status == 400
 
 
 async def test_api_create_check(setup_catalog, client, fake_check):
-    await fake_check(status=500, error="no-can-do")
     await fake_check()
     post_data: dict = {"resource_id": RESOURCE_ID, "url": "https://example.com/resource-1"}
     resp = await client.post("/api/checks/", json=post_data)
