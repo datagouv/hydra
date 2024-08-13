@@ -94,18 +94,15 @@ async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
     assert second["error"] == "no-can-do"
 
 
-@pytest.mark.parametrize(
-    "post_data",
-    [
-        {"resource_id": RESOURCE_ID},
-        {"url": "https://example.com/resource-1"},
-        {"stupid_data": "stupid"},
-    ],
-)
-async def test_api_create_check_wrongly(setup_catalog, post_data, client, fake_check):
+async def test_api_create_check_wrongly(setup_catalog, client, fake_check, fake_resource_id):
     await fake_check()
+    post_data = {"stupid_data": "stupid"}
     resp = await client.post("/api/checks/", json=post_data)
     assert resp.status == 400
+
+    post_data = {"resource_id": str(fake_resource_id())}
+    resp = await client.post("/api/checks/", json=post_data)
+    assert resp.status == 404
 
 
 async def test_api_create_check(setup_catalog, client, fake_check):
