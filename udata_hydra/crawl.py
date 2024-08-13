@@ -107,7 +107,7 @@ async def compute_check_has_changed(check_data: dict, last_check: dict) -> bool:
     return has_changed
 
 
-async def process_check_data(check_data: dict) -> Tuple[int, bool]:
+async def process_check_data(check_data: dict, priority: bool = False) -> Tuple[int, bool]:
     """Preprocess a check before saving it"""
     check_data["resource_id"] = str(check_data["resource_id"])
 
@@ -124,7 +124,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
         await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
     await Resource.update(
-        resource_id=check_data["resource_id"], data={"status": None, "priority": False}
+        resource_id=check_data["resource_id"], data={"status": None, "priority": priority}
     )
 
     is_first_check = last_check is None
@@ -235,7 +235,12 @@ def has_nice_head(resp) -> bool:
 
 
 async def check_url(
-    url: str, resource_id: str, session, sleep: float = 0, method: str = "head"
+    url: str,
+    resource_id: str,
+    session,
+    sleep: float = 0,
+    method: str = "head",
+    priority: bool = False,
 ) -> str:
     log.debug(f"check {url}, sleep {sleep}, method {method}")
 
@@ -247,12 +252,13 @@ async def check_url(
     if not domain:
         log.warning(f"[warning] not netloc in url, skipping {url}")
         await process_check_data(
-            {
+            check_data={
                 "resource_id": resource_id,
                 "url": url,
                 "error": "Not netloc in url",
                 "timeout": False,
-            }
+            },
+            priority=priority,
         )
         return STATUS_ERROR
 
@@ -274,7 +280,7 @@ async def check_url(
             resp.raise_for_status()
 
             check_id, is_first_check = await process_check_data(
-                {
+                check_data={
                     "resource_id": resource_id,
                     "url": url,
                     "domain": domain,
@@ -282,20 +288,26 @@ async def check_url(
                     "headers": convert_headers(resp.headers),
                     "timeout": False,
                     "response_time": end - start,
-                }
+                },
+                priority=priority,
             )
 
-            queue.enqueue(process_resource, check_id, is_first_check, _priority="low")
+            _priority = "low"
+            if priority:
+                _priority = "default"
+
+            queue.enqueue(process_resource, check_id, is_first_check, _priority=_priority)
 
             return STATUS_OK
     except asyncio.exceptions.TimeoutError:
         await process_check_data(
-            {
+            check_data={
                 "resource_id": resource_id,
                 "url": url,
                 "domain": domain,
                 "timeout": True,
-            }
+            },
+            priority=priority,
         )
         return STATUS_TIMEOUT
     # TODO: debug AssertionError, should be caught in DB now
@@ -318,7 +330,8 @@ async def check_url(
                 "error": fix_surrogates(error),
                 "headers": convert_headers(getattr(e, "headers", {})),
                 "status": getattr(e, "status", None),
-            }
+            },
+            priority=priority,
         )
         log.warning(f"Crawling error for url {url}", exc_info=e)
         return STATUS_ERROR
