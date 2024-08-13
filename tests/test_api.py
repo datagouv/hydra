@@ -4,10 +4,14 @@ it will interfere with the rest of our async code
 """
 
 import hashlib
+import json
 from datetime import datetime
 from typing import Callable
 
 import pytest
+from aiohttp import RequestInfo
+from aiohttp.client_exceptions import ClientError, ClientResponseError
+from yarl import URL
 
 from tests.conftest import DATASET_ID, RESOURCE_ID
 from udata_hydra.db.resource import Resource
@@ -105,12 +109,86 @@ async def test_api_create_check_wrongly(setup_catalog, client, fake_check, fake_
     assert resp.status == 404
 
 
-async def test_api_create_check(setup_catalog, client, fake_check):
-    await fake_check()
+@pytest.mark.parametrize(
+    "resource",
+    [
+        # status, timeout, exception
+        (200, False, None),
+        (500, False, None),
+        (None, False, ClientError("client error")),
+        (None, False, AssertionError),
+        (None, False, UnicodeError),
+        (None, True, TimeoutError),
+        (
+            429,
+            False,
+            ClientResponseError(
+                RequestInfo(url="", method="", headers={}),
+                history=(),
+                message="client error",
+                status=429,
+            ),
+        ),
+    ],
+)
+async def test_api_create_check(
+    setup_catalog, client, rmock, event_loop, db, resource, analysis_mock, udata_url
+):
+    status, timeout, exception = resource
+    rurl = "https://example.com/resource-1"
+    params = {
+        "status": status,
+        "headers": {"Content-LENGTH": "10", "X-Do": "you"},
+        "exception": exception,
+    }
+    rmock.head(rurl, **params)
+    # mock for head fallback
+    rmock.get(rurl, **params)
+    rmock.put(udata_url)
+
+    # Call the API
     post_data: dict = {"resource_id": RESOURCE_ID, "url": "https://example.com/resource-1"}
     resp = await client.post("/api/checks/", json=post_data)
     assert resp.status == 201
-    # TODO: check what was created in DB?
+
+    # Test check results in DB
+    res = await db.fetchrow("SELECT * FROM checks WHERE url = $1", rurl)
+    assert res["url"] == rurl
+    assert res["status"] == status
+    if not exception:
+        assert json.loads(res["headers"]) == {
+            "x-do": "you",
+            # added by aioresponses :shrug:
+            "content-type": "application/json",
+            "content-length": "10",
+        }
+    assert res["timeout"] == timeout
+    if isinstance(exception, ClientError):
+        assert res["error"] == "client error"
+    elif status == 500:
+        assert res["error"] == "Internal Server Error"
+    else:
+        assert not res["error"]
+
+    # Test webhook results from mock
+    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    assert webhook.get("check:date")
+    datetime.fromisoformat(webhook["check:date"])
+    if exception or status == 500:
+        if status == 429:
+            # In the case of a 429 status code, the error is on the crawler side and we can't give an availability status.
+            # We expect check:available to be None.
+            assert webhook.get("check:available") is None
+        else:
+            assert webhook.get("check:available") is False
+    else:
+        assert webhook.get("check:available")
+        assert webhook.get("check:headers:content-type") == "application/json"
+        assert webhook.get("check:headers:content-length") == 10
+    if timeout:
+        assert webhook.get("check:timeout")
+    else:
+        assert webhook.get("check:timeout") is False
 
 
 async def test_api_get_resource(setup_catalog, client):
