@@ -55,7 +55,16 @@ async def create_check(request: web.Request) -> web.Response:
     async with aiohttp.ClientSession(
         timeout=None, headers={"user-agent": config.USER_AGENT}
     ) as session:
-        result = await check_url(url=url, resource_id=resource_id, session=session, priority=True)
-        context.monitor().refresh(result)
+        status: str = await check_url(
+            url=url, resource_id=resource_id, session=session, priority=True
+        )
+        context.monitor().refresh(status)
 
-    return web.HTTPCreated()  # TODO: do we want to return the check id here?
+    if status == "ok":
+        return web.HTTPCreated()
+    elif status == "timeout":
+        return web.HTTPRequestTimeout()
+    elif status == "error":
+        return web.HTTPBadRequest()
+    elif status == "backoff":
+        return web.HTTPTooManyRequests()

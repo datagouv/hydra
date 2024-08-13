@@ -112,14 +112,15 @@ async def test_api_create_check_wrongly(setup_catalog, client, fake_check, fake_
 @pytest.mark.parametrize(
     "resource",
     [
-        # status, timeout, exception
-        (200, False, None),
-        (500, False, None),
-        (None, False, ClientError("client error")),
-        (None, False, AssertionError),
-        (None, False, UnicodeError),
-        (None, True, TimeoutError),
+        # resource_id, status, timeout, exception
+        (RESOURCE_ID, 200, False, None),
+        (RESOURCE_ID, 500, False, None),
+        (RESOURCE_ID, None, False, ClientError("client error")),
+        (RESOURCE_ID, None, False, AssertionError),
+        (RESOURCE_ID, None, False, UnicodeError),
+        (RESOURCE_ID, None, True, TimeoutError),
         (
+            RESOURCE_ID,
             429,
             False,
             ClientResponseError(
@@ -134,7 +135,7 @@ async def test_api_create_check_wrongly(setup_catalog, client, fake_check, fake_
 async def test_api_create_check(
     setup_catalog, client, rmock, event_loop, db, resource, analysis_mock, udata_url
 ):
-    status, timeout, exception = resource
+    resource_id, status, timeout, exception = resource
     rurl = "https://example.com/resource-1"
     params = {
         "status": status,
@@ -146,10 +147,15 @@ async def test_api_create_check(
     rmock.get(rurl, **params)
     rmock.put(udata_url)
 
-    # Call the API
-    post_data: dict = {"resource_id": RESOURCE_ID, "url": "https://example.com/resource-1"}
-    resp = await client.post("/api/checks/", json=post_data)
-    assert resp.status == 201
+    # Call the API and test the responses cases
+    resp = await client.post("/api/checks/", json={"resource_id": resource_id})
+    if timeout:
+        assert resp.status == 408
+    else:
+        if status == 200:
+            assert resp.status == 201
+        else:
+            assert resp.status == 400
 
     # Test check results in DB
     res = await db.fetchrow("SELECT * FROM checks WHERE url = $1", rurl)
