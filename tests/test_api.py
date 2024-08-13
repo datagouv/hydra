@@ -255,7 +255,7 @@ async def test_api_delete_resource(client, route):
     assert data == {"message": "deleted"}
 
 
-async def test_api_status_crawler(setup_catalog, client, fake_check):
+async def test_api_get_crawler_status(setup_catalog, client, fake_check):
     resp = await client.get("/api/status/crawler/")
     assert resp.status == 200
     data = await resp.json()
@@ -280,7 +280,7 @@ async def test_api_status_crawler(setup_catalog, client, fake_check):
     }
 
 
-async def test_api_stats(setup_catalog, client, fake_check):
+async def test_api_get_stats(setup_catalog, client, fake_check):
     resp = await client.get("/api/stats/")
     assert resp.status == 200
     data = await resp.json()
@@ -308,3 +308,8 @@ async def test_api_stats(setup_catalog, client, fake_check):
         ],
         "status_codes": [{"code": 500, "count": 1, "percentage": 100.0}],
     }
+
+
+async def test_api_get_health(client) -> None:
+    resp = await client.get("/api/health/")
+    assert resp.status == 200
