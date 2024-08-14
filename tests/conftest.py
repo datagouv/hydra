@@ -154,7 +154,7 @@ async def db():
 
 @pytest_asyncio.fixture
 async def insert_fake_resource():
-    async def _insert_fake_resource(database):
+    async def _insert_fake_resource(database) -> None:
         await database.execute(
             f"""
             INSERT INTO catalog (dataset_id, resource_id, url, priority, deleted)
@@ -184,7 +184,7 @@ async def fake_check():
         resource_id=RESOURCE_ID,
         detected_last_modified_at=None,
         parsing_table=False,
-    ):
+    ) -> dict:
         url = f"https://example.com/resource-{resource}"
         data = {
             "url": url,

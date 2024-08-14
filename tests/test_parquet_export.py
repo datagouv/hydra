@@ -26,7 +26,7 @@ async def test_parquet_conversion(
 ):
     filename, expected_count = file_and_count
     file_path = f"tests/data/{filename}"
-    inspection = await perform_csv_inspection(file_path)
+    inspection: dict = await perform_csv_inspection(file_path)
     columns = inspection["columns"]
     columns = {
         f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
