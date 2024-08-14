@@ -1,4 +1,5 @@
 import os
+from typing import Union
 
 from aiohttp import web
 from aiohttp_tokenauth import token_auth_middleware
@@ -15,15 +16,14 @@ async def app_factory() -> web.Application:
         if "pool" in app:
             await app["pool"].close()
 
-    async def user_loader(token: str):
+    async def user_loader(token: str) -> Union[dict, None]:
         """Checks that app token is valid
         Callback that will get the token from "Authorization" header.
         Args:
             token (str): A token from "Authorization" http header.
 
         Returns:
-            Dict or something else. If the callback returns None then
-            the aiohttp.web.HTTPForbidden will be raised.
+            Dict but could be something else. If the callback returns None then the aiohttp.web.HTTPForbidden will be raised.
         """
         if token == config.API_TOKEN:
             return {"username": "admin"}
