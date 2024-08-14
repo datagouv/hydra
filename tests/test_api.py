@@ -10,7 +10,6 @@ from typing import Callable
 import pytest
 
 from tests.conftest import DATASET_ID, RESOURCE_ID
-from udata_hydra import config
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
