@@ -104,6 +104,17 @@ async def test_api_get_resource(db, client, insert_fake_resource):
     assert data["resource_id"] == RESOURCE_ID
 
 
+async def test_api_get_resource_status(db, client, insert_fake_resource):
+    fake_status: str = "TO_ANALYZE"
+    await insert_fake_resource(db, status=fake_status)
+    resp = await client.get(f"/api/resources/{RESOURCE_ID}/status")
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["resource_id"] == RESOURCE_ID
+    assert data["status"] == fake_status
+    assert data["status_verbose"] == Resource.STATUSES[fake_status]
+
+
 @pytest.mark.parametrize(
     "route",
     [
