@@ -10,6 +10,7 @@ from typing import Callable
 import pytest
 
 from tests.conftest import DATASET_ID, RESOURCE_ID
+from udata_hydra import config
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -111,23 +112,40 @@ async def test_api_get_resource(db, client, insert_fake_resource):
         {"url": "/api/resource/created/", "method": "post"},  # legacy route
     ],
 )  # TODO: can be removed once we don't use legacy route anymore
-async def test_api_create_resource(client, route, udata_resource_payload):
-    client_http_method: Callable = getattr(
-        client, route["method"]
-    )  # TODO: can be removed once we don't use legacy route anymore
+async def test_api_create_resource(
+    client, route, api_headers, api_headers_wrong_token, udata_resource_payload
+):
+    # TODO: can be removed once we don't use legacy route anymore
+    client_http_method: Callable = getattr(client, route["method"])
 
-    # Test invalid POST data
+    # Test API call with no token
+    resp = await client_http_method(path=route["url"], headers=None, json=udata_resource_payload)
+    assert resp.status == 401
+
+    # Test API call with invalid token
+    resp = await client_http_method(
+        path=route["url"], headers=api_headers_wrong_token, json=udata_resource_payload
+    )
+    assert resp.status == 403
+
+    # Test API call with invalid POST data
     stupid_post_data: dict = {"stupid": "stupid"}
-    resp = await client_http_method(route["url"], json=stupid_post_data)
+    resp = await client_http_method(path=route["url"], headers=api_headers, json=stupid_post_data)
     assert resp.status == 400
 
-    resp = await client_http_method(route["url"], json=udata_resource_payload)
+    # Test API call success
+    resp = await client_http_method(
+        path=route["url"], headers=api_headers, json=udata_resource_payload
+    )
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == {"message": "created"}
 
+    # Test API call with missing document body
     udata_resource_payload["document"] = None
-    resp = await client_http_method(route["url"], json=udata_resource_payload)
+    resp = await client_http_method(
+        path=route["url"], headers=api_headers, json=udata_resource_payload
+    )
     assert resp.status == 400
     text = await resp.text()
     assert text == "Missing document body"
@@ -140,14 +158,13 @@ async def test_api_create_resource(client, route, udata_resource_payload):
         {"url": "/api/resource/updated/", "method": "post"},  # legacy route
     ],
 )  # TODO: can be removed once we don't use legacy route anymore
-async def test_api_update_resource(client, route):
-    client_http_method: Callable = getattr(
-        client, route["method"]
-    )  # TODO: can be removed once we don't use legacy route anymore
+async def test_api_update_resource(client, route, api_headers, api_headers_wrong_token):
+    # TODO: can be removed once we don't use legacy route anymore:
+    client_http_method: Callable = getattr(client, route["method"])
 
     # Test invalid PUT data
     stupid_post_data: dict = {"stupid": "stupid"}
-    resp = await client_http_method(route["url"], json=stupid_post_data)
+    resp = await client_http_method(path=route["url"], headers=api_headers, json=stupid_post_data)
     assert resp.status == 400
 
     payload = {
@@ -169,13 +186,25 @@ async def test_api_update_resource(client, route):
         },
     }
 
-    resp = await client_http_method(route["url"], json=payload)
+    # Test API call with no token
+    resp = await client_http_method(path=route["url"], headers=None, json=payload)
+    assert resp.status == 401
+
+    # Test API call with invalid token
+    resp = await client_http_method(
+        path=route["url"], headers=api_headers_wrong_token, json=payload
+    )
+    assert resp.status == 403
+
+    # Test API call success
+    resp = await client_http_method(path=route["url"], headers=api_headers, json=payload)
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == {"message": "updated"}
 
+    # Test API call with missing document body
     payload["document"] = None
-    resp = await client_http_method(route["url"], json=payload)
+    resp = await client_http_method(path=route["url"], headers=api_headers, json=payload)
     assert resp.status == 400
     text = await resp.text()
     assert text == "Missing document body"
@@ -188,7 +217,9 @@ async def test_api_update_resource(client, route):
         {"url": "/api/resource/updated/", "method": "post"},  # legacy route
     ],
 )  # TODO: can be removed once we don't use legacy route anymore
-async def test_api_update_resource_url_since_load_catalog(setup_catalog, db, client, route):
+async def test_api_update_resource_url_since_load_catalog(
+    setup_catalog, db, client, route, api_headers
+):
     # We modify the url for this resource
     await db.execute(
         "UPDATE catalog SET url = 'https://example.com/resource-0' "
@@ -216,10 +247,12 @@ async def test_api_update_resource_url_since_load_catalog(setup_catalog, db, cli
     }
     # It does not create any duplicated resource.
     # The existing entry get updated accordingly.
-    client_http_method: Callable = getattr(
-        client, route["method"]
-    )  # TODO: can be removed once we don't use legacy route anymore
-    resp = await client_http_method(route["url"], json=payload)
+
+    # TODO: can be removed once we don't use legacy route anymore:
+    client_http_method: Callable = getattr(client, route["method"])
+
+    # Test API call success
+    resp = await client_http_method(path=route["url"], headers=api_headers, json=payload)
     assert resp.status == 200
 
     res = await db.fetch(f"SELECT * FROM catalog WHERE resource_id = '{RESOURCE_ID}'")
@@ -234,14 +267,13 @@ async def test_api_update_resource_url_since_load_catalog(setup_catalog, db, cli
         {"url": "/api/resource/deleted/", "method": "post"},  # legacy route
     ],
 )  # TODO: can be removed once we don't use legacy route anymore
-async def test_api_delete_resource(client, route):
-    client_http_method: Callable = getattr(
-        client, route["method"]
-    )  # TODO: can be removed once we don't use legacy route anymore
+async def test_api_delete_resource(client, route, api_headers, api_headers_wrong_token):
+    # TODO: can be removed once we don't use legacy route anymore
+    client_http_method: Callable = getattr(client, route["method"])
 
     # Test invalid DELETE data
     stupid_delete_data: dict = {"stupid": "stupid"}
-    resp = await client_http_method(route["url"], json=stupid_delete_data)
+    resp = await client_http_method(path=route["url"], headers=api_headers, json=stupid_delete_data)
     assert resp.status == 400
 
     payload = {
@@ -249,7 +281,19 @@ async def test_api_delete_resource(client, route):
         "dataset_id": DATASET_ID,
         "document": None,
     }
-    resp = await client_http_method(route["url"], json=payload)
+
+    # Test API call with no token
+    resp = await client_http_method(path=route["url"], headers=None, json=payload)
+    assert resp.status == 401
+
+    # Test API call with invalid token
+    resp = await client_http_method(
+        path=route["url"], headers=api_headers_wrong_token, json=payload
+    )
+    assert resp.status == 403
+
+    # Test API call success
+    resp = await client_http_method(path=route["url"], headers=api_headers, json=payload)
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == {"message": "deleted"}
