@@ -43,7 +43,7 @@ async def test_api_get_latest_check(setup_catalog, client, query, fake_check, fa
     # Test existing resource
     resp = await client.get(f"/api/checks/latest/?{query}")
     assert resp.status == 200
-    data = await resp.json()
+    data: dict = await resp.json()
     assert data.pop("created_at")
     assert data.pop("id")
     url = "https://example.com/resource-1"
@@ -86,7 +86,7 @@ async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
     await fake_check()
     resp = await client.get(f"/api/checks/all/?{query}")
     assert resp.status == 200
-    data = await resp.json()
+    data: list = await resp.json()
     assert len(data) == 2
     first, second = data
     assert first["status"] == 200
@@ -99,7 +99,7 @@ async def test_api_get_resource(db, client, insert_fake_resource):
     query: str = f"dataset_id={DATASET_ID}&resource_id={RESOURCE_ID}"
     resp = await client.get(f"/api/resources/?{query}")
     assert resp.status == 200
-    data = await resp.json()
+    data: dict = await resp.json()
     assert data["dataset_id"] == DATASET_ID
     assert data["resource_id"] == RESOURCE_ID
 
@@ -123,7 +123,7 @@ async def test_api_create_resource(client, route, udata_resource_payload):
 
     resp = await client_http_method(route["url"], json=udata_resource_payload)
     assert resp.status == 200
-    data = await resp.json()
+    data: dict = await resp.json()
     assert data == {"message": "created"}
 
     udata_resource_payload["document"] = None
@@ -171,7 +171,7 @@ async def test_api_update_resource(client, route):
 
     resp = await client_http_method(route["url"], json=payload)
     assert resp.status == 200
-    data = await resp.json()
+    data: dict = await resp.json()
     assert data == {"message": "updated"}
 
     payload["document"] = None
@@ -251,14 +251,14 @@ async def test_api_delete_resource(client, route):
     }
     resp = await client_http_method(route["url"], json=payload)
     assert resp.status == 200
-    data = await resp.json()
+    data: dict = await resp.json()
     assert data == {"message": "deleted"}
 
 
 async def test_api_get_crawler_status(setup_catalog, client, fake_check):
     resp = await client.get("/api/status/crawler/")
     assert resp.status == 200
-    data = await resp.json()
+    data: dict = await resp.json()
     assert data == {
         "total": 1,
         "pending_checks": 1,
@@ -270,7 +270,7 @@ async def test_api_get_crawler_status(setup_catalog, client, fake_check):
     await fake_check()
     resp = await client.get("/api/status/crawler/")
     assert resp.status == 200
-    data = await resp.json()
+    data: dict = await resp.json()
     assert data == {
         "total": 1,
         "pending_checks": 0,
@@ -283,7 +283,7 @@ async def test_api_get_crawler_status(setup_catalog, client, fake_check):
 async def test_api_get_stats(setup_catalog, client, fake_check):
     resp = await client.get("/api/stats/")
     assert resp.status == 200
-    data = await resp.json()
+    data: dict = await resp.json()
     assert data == {
         "status": [
             {"label": "error", "count": 0, "percentage": 0},
@@ -299,7 +299,7 @@ async def test_api_get_stats(setup_catalog, client, fake_check):
     await fake_check(status=500, error="error")
     resp = await client.get("/api/stats/")
     assert resp.status == 200
-    data = await resp.json()
+    data: dict = await resp.json()
     assert data == {
         "status": [
             {"label": "error", "count": 1, "percentage": 100.0},

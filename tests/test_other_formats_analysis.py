@@ -17,10 +17,10 @@ pytestmark = pytest.mark.asyncio
     ),
 )
 async def test_formats_analysis(setup_catalog, rmock, db, fake_check, produce_mock, file_and_count):
-    check = await fake_check()
+    check: dict = await fake_check()
     filename, expected_count = file_and_count
-    url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    url: str = check["url"]
+    table_name: str = hashlib.md5(url.encode("utf-8")).hexdigest()
     with open(f"tests/data/{filename}", "rb") as f:
         data = f.read()
     rmock.get(url, status=200, body=data)
@@ -30,7 +30,7 @@ async def test_formats_analysis(setup_catalog, rmock, db, fake_check, produce_mo
     profile = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    profile = json.loads(profile["csv_detective"])
+    profile: dict = json.loads(profile["csv_detective"])
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == expected_count

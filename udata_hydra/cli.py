@@ -33,13 +33,17 @@ async def download_file(url: str, fd):
                 fd.write(chunk)
 
 
-async def connection(db="main"):
-    if db not in context["conn"]:
-        dsn = config.DATABASE_URL if db == "main" else getattr(config, f"DATABASE_URL_{db.upper()}")
-        context["conn"][db] = await asyncpg.connect(
+async def connection(db_name: str = "main"):
+    if db_name not in context["conn"]:
+        dsn = (
+            config.DATABASE_URL
+            if db_name == "main"
+            else getattr(config, f"DATABASE_URL_{db_name.upper()}")
+        )
+        context["conn"][db_name] = await asyncpg.connect(
             dsn=dsn, server_settings={"search_path": config.DATABASE_SCHEMA}
         )
-    return context["conn"][db]
+    return context["conn"][db_name]
 
 
 @cli
