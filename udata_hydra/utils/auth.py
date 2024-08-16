@@ -19,9 +19,9 @@ def token_auth_middleware(
     exclude_routes: Tuple = tuple(),
     exclude_methods: Tuple = tuple(),
 ) -> Coroutine:
-    """Checks a auth token and adds a user from user_loader in request.
+    """Checks a auth token and adds a user in request.
 
-    Aiohttp token auth middleware, that checks the "Authorization" http header for token and, if the token in the requet headers is valid, then middleware adds the user to request with key that contain the "request_property" variable, else it will raise an HTTPForbiddenexception.
+    Token auth middleware that checks the "Authorization" http header for token and, if the token in the requet headers is valid, then middleware adds the user to request with key that contain the "request_property" variable, else it will raise an HTTPForbiddenexception.
 
     Args:
         request_property (str, optional): Key for save in request object.
