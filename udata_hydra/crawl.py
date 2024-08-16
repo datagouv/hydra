@@ -102,7 +102,7 @@ async def compute_check_has_changed(check_data: dict, last_check: dict) -> bool:
             resource_id=check_data["resource_id"],
             document=document,
             _priority="high",
-        )
+        )  # Send the document to udata
 
     return has_changed
 
@@ -121,11 +121,10 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
         """
         last_check = await connection.fetchrow(q)
 
+        # If it has changed, send it to udata
         await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
-    await Resource.update(
-        resource_id=check_data["resource_id"], data={"status": None, "priority": False}
-    )
+    await Resource.update(resource_id=check_data["resource_id"], data={"priority": False})
 
     is_first_check = last_check is None
     return await Check.insert(check_data), is_first_check
@@ -246,6 +245,7 @@ async def check_url(
     domain = url_parsed.netloc
     if not domain:
         log.warning(f"[warning] not netloc in url, skipping {url}")
+        # Process the check data. If it has changed, it will be sent to udata
         await process_check_data(
             {
                 "resource_id": resource_id,
@@ -260,7 +260,9 @@ async def check_url(
     if should_backoff:
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
-        await Resource.update(resource_id=resource_id, data={"status": None, "priority": False})
+        await Resource.update(
+            resource_id=resource_id, data={"priority": False}
+        )  # Don't update the resource status
         return STATUS_BACKOFF
 
     try:
@@ -273,6 +275,7 @@ async def check_url(
                 return await check_url(url, resource_id, session, method="get")
             resp.raise_for_status()
 
+            # Process the check data. If it has changed, it will be sent to udata
             check_id, is_first_check = await process_check_data(
                 {
                     "resource_id": resource_id,
@@ -285,10 +288,12 @@ async def check_url(
                 }
             )
 
+            # Analyze the resource
             queue.enqueue(process_resource, check_id, is_first_check, _priority="low")
 
             return STATUS_OK
     except asyncio.exceptions.TimeoutError:
+        # Process the check data. If it has changed, it will be sent to udata
         await process_check_data(
             {
                 "resource_id": resource_id,
@@ -309,6 +314,7 @@ async def check_url(
         UnicodeError,
     ) as e:
         error = getattr(e, "message", None) or str(e)
+        # Process the check data. If it has changed, it will be sent to udata
         await process_check_data(
             {
                 "resource_id": resource_id,
