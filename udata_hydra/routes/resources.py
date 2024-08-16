@@ -3,10 +3,8 @@ import json
 from aiohttp import web
 from marshmallow import ValidationError
 
-from udata_hydra import config
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import ResourceSchema
-from udata_hydra.utils import get_request_params
 
 
 async def get_resource(request: web.Request) -> web.Response:
@@ -14,8 +12,13 @@ async def get_resource(request: web.Request) -> web.Response:
     Respond with a 200 status code and a JSON body with the resource data
     If resource is not found, respond with a 404 status code
     """
-    [resource_id] = get_request_params(request, params_names=["resource_id"])
-    resource = await Resource.get(resource_id)
+
+    try:
+        resource_id: str = request.match_info["resource_id"]
+    except Exception as e:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
+
+    resource: dict = await Resource.get(resource_id)
     if not resource:
         raise web.HTTPNotFound()
 
@@ -87,7 +90,6 @@ async def delete_resource(request: web.Request) -> web.Response:
     pool = request.app["pool"]
     async with pool.acquire() as connection:
         # Mark resource as deleted in catalog table
-        q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
-        await connection.execute(q)
+        await Resource.delete(resource_id)
 
     return web.json_response({"message": "deleted"})

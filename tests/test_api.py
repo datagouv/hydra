@@ -96,8 +96,7 @@ async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
 
 async def test_api_get_resource(db, client, insert_fake_resource):
     await insert_fake_resource(db)
-    query: str = f"dataset_id={DATASET_ID}&resource_id={RESOURCE_ID}"
-    resp = await client.get(f"/api/resources/?{query}")
+    resp = await client.get(f"/api/resources/{RESOURCE_ID}/")
     assert resp.status == 200
     data = await resp.json()
     assert data["dataset_id"] == DATASET_ID

@@ -72,3 +72,14 @@ class Resource:
                             url = '{url}',
                             priority = '{priority}';"""
             await connection.execute(q)
+
+    @classmethod
+    async def delete(
+        cls,
+        resource_id: str,
+    ) -> None:
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            # Mark resource as deleted in catalog table
+            q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
+            await connection.execute(q)
