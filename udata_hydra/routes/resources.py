@@ -22,7 +22,8 @@ async def get_resource(request: web.Request) -> web.Response:
 
 
 async def get_resource_status(request: web.Request) -> web.Response:
-    """Endpoint to get the current status of a resource from the DB
+    """Endpoint to get the current status of a resource from the DB.
+    It is the same as get_resource but only returns the status of the resource, saving bandwith and processing time.
     Respond with a 200 status code and a JSON body with the resource status
     If resource is not found, respond with a 404 status code
     """
