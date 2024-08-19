@@ -37,7 +37,7 @@ async def create_resource(request: web.Request) -> web.Response:
     except ValidationError as err:
         raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
-    resource = valid_payload["document"]
+    resource: dict = valid_payload["document"]
     if not resource:
         raise web.HTTPBadRequest(text="Missing document body")
 
@@ -60,17 +60,18 @@ async def update_resource(request: web.Request) -> web.Response:
     Respond with a 200 status code and a JSON body with a message key set to "updated"
     If error, respond with a 400 status code
     """
+
     try:
         payload = await request.json()
         valid_payload: dict = ResourceSchema().load(payload)
     except ValidationError as err:
         raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
-    resource = valid_payload["document"]
+    resource: dict = valid_payload["document"]
     if not resource:
         raise web.HTTPBadRequest(text="Missing document body")
 
-    dataset_id = valid_payload["dataset_id"]
+    dataset_id: str = valid_payload["dataset_id"]
     resource_id = valid_payload["resource_id"]
 
     await Resource.update_or_insert(dataset_id, resource_id, resource["url"])
@@ -80,16 +81,14 @@ async def update_resource(request: web.Request) -> web.Response:
 
 async def delete_resource(request: web.Request) -> web.Response:
     try:
-        payload = await request.json()
-        valid_payload: dict = ResourceSchema().load(payload)
-    except ValidationError as err:
-        raise web.HTTPBadRequest(text=json.dumps(err.messages))
-
-    resource_id = valid_payload["resource_id"]
+        resource_id: str = request.match_info["resource_id"]
+    except Exception as e:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
     pool = request.app["pool"]
     async with pool.acquire() as connection:
         # Mark resource as deleted in catalog table
-        await Resource.delete(resource_id)
+        q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
+        await connection.execute(q)
 
     return web.json_response({"message": "deleted"})

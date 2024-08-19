@@ -135,7 +135,7 @@ async def test_api_create_resource(client, route, udata_resource_payload):
 @pytest.mark.parametrize(
     "route",
     [
-        {"url": "/api/resources/", "method": "put"},
+        {"url": f"/api/resources/{RESOURCE_ID}/", "method": "put"},
         {"url": "/api/resource/updated/", "method": "post"},  # legacy route
     ],
 )  # TODO: can be removed once we don't use legacy route anymore
@@ -183,7 +183,7 @@ async def test_api_update_resource(client, route):
 @pytest.mark.parametrize(
     "route",
     [
-        {"url": "/api/resources/", "method": "put"},
+        {"url": f"/api/resources/{RESOURCE_ID}/", "method": "put"},
         {"url": "/api/resource/updated/", "method": "post"},  # legacy route
     ],
 )  # TODO: can be removed once we don't use legacy route anymore
@@ -226,29 +226,8 @@ async def test_api_update_resource_url_since_load_catalog(setup_catalog, db, cli
     res[0]["url"] == "https://example.com/resource-1"
 
 
-@pytest.mark.parametrize(
-    "route",
-    [
-        {"url": "/api/resources/", "method": "delete"},
-        {"url": "/api/resource/deleted/", "method": "post"},  # legacy route
-    ],
-)  # TODO: can be removed once we don't use legacy route anymore
-async def test_api_delete_resource(client, route):
-    client_http_method: Callable = getattr(
-        client, route["method"]
-    )  # TODO: can be removed once we don't use legacy route anymore
-
-    # Test invalid DELETE data
-    stupid_delete_data: dict = {"stupid": "stupid"}
-    resp = await client_http_method(route["url"], json=stupid_delete_data)
-    assert resp.status == 400
-
-    payload = {
-        "resource_id": RESOURCE_ID,
-        "dataset_id": DATASET_ID,
-        "document": None,
-    }
-    resp = await client_http_method(route["url"], json=payload)
+async def test_api_delete_resource(client):
+    resp = await client.delete(f"/api/resources/{RESOURCE_ID}/")
     assert resp.status == 200
     data = await resp.json()
     assert data == {"message": "deleted"}

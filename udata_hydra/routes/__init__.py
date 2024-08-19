@@ -17,10 +17,8 @@ routes: list = [
     # Routes for resources
     web.get("/api/resources/{resource_id}/", get_resource),
     web.post("/api/resources/", create_resource),
-    web.put("/api/resources/", update_resource),  # TODO: should include the resource_id in the URL
-    web.delete(
-        "/api/resources/", delete_resource
-    ),  # TODO: should include the resource_id in the URL
+    web.put("/api/resources/{resource_id}/", update_resource),
+    web.delete("/api/resources/{resource_id}/", delete_resource),
     web.post("/api/resource/created/", create_resource),  # TODO: legacy, to remove
     web.post("/api/resource/updated/", update_resource),  # TODO: legacy, to remove
     web.post("/api/resource/deleted/", delete_resource),  # TODO: legacy, to remove
