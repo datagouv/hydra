@@ -33,12 +33,12 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     """
     Perform analysis on the resource designated by check_id
     - change analysis
-    - size (optionnal)
-    - mime_type (optionnal)
-    - checksum (optionnal)
+    - size (optional)
+    - mime_type (optional)
+    - checksum (optional)
     - launch csv_analysis if looks like a CSV response
 
-    Will call udata if first check or changes found, and update check with optionnal infos
+    Will call udata if first check or changes found, and update check with optional infos
     """
     check: dict = await Check.get(check_id)
     if not check:
@@ -104,7 +104,9 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     analysis_results = {**dl_analysis, **(change_payload or {})}
     if change_status == Change.HAS_CHANGED or is_first_check:
         if is_tabular and tmp_file:
+            # Analyse CSV and create a table in the CSV database
             queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="default")
+        # Send analysis result to udata
         queue.enqueue(
             send,
             dataset_id=dataset_id,
