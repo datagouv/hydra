@@ -105,7 +105,7 @@ async def test_api_get_resource(db, client, insert_fake_resource):
 
 
 async def test_api_get_resource_status(db, client, insert_fake_resource):
-    fake_status: str = "TO_ANALYZE"
+    fake_status: str = "TO_ANALYSE"
     await insert_fake_resource(db, status=fake_status)
     resp = await client.get(f"/api/resources/{RESOURCE_ID}/status")
     assert resp.status == 200

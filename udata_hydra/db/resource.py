@@ -6,7 +6,7 @@ class Resource:
 
     STATUSES = {
         "TO_CHECK": "to be checked",
-        "TO_ANALYZE": "to be analyzed by CSV detective",
+        "TO_ANALYSE": "to be analysed by CSV detective",
         "TO_INSERT": "to be inserted in DB",
         "CHECKED": "check finished",
     }

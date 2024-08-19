@@ -16,7 +16,7 @@ The architecture for the full workflow is the following:
 ![Full workflow architecture](docs/archi-idd-IDD.drawio.png)
 
 
-The hydra crawler is one of the components of the architecture. It will check if resource is available, analyze the type of file if the resource has been modified, and analyze the CSV content. It will also convert CSV resources to database tables and send the data to a udata instance.
+The hydra crawler is one of the components of the architecture. It will check if resource is available, analyse the type of file if the resource has been modified, and analyse the CSV content. It will also convert CSV resources to database tables and send the data to a udata instance.
 
 ![Crawler architecture](docs/hydra.drawio.png)
 
@@ -281,7 +281,7 @@ UDATA_URI_API_KEY = "example.api.key"
 SENTRY_DSN = "https://{my-sentry-dsn}"
 ```
 
-The webhook integration sends HTTP messages to `udata` when resources are analyzed or checked to fill resources extras.
+The webhook integration sends HTTP messages to `udata` when resources are analysed or checked to fill resources extras.
 
 Regarding analysis, there is a phase called "change detection". It will try to guess if a resource has been modified based on different criterions:
 - harvest modified date in catalog
