@@ -74,7 +74,7 @@ RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 minio_client = MinIOClient()
 
 
-async def notify_udata(check_id: str, table_name: str) -> None:
+async def notify_udata(check_id: int, table_name: str) -> None:
     """Notify udata of the result of a parsing"""
     check = await Check.get(check_id)
     resource_id = check["resource_id"]
