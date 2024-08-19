@@ -34,6 +34,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.analysis.errors import ParseException
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource import Resource
 from udata_hydra.utils import Reader, Timer, download_resource, queue, send
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
@@ -114,8 +115,9 @@ async def analyse_csv(
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
-    check = await Check.get(check_id) if check_id is not None else {}
-    url = check.get("url") or url
+    check: dict = await Check.get(check_id) if check_id is not None else {}
+    url: str = check.get("url") or url
+    resource_id: str = check.get("resource_id")
     exception_file = str(check.get("resource_id", "")) in exceptions
 
     headers = json.loads(check.get("headers") or "{}")
@@ -130,6 +132,9 @@ async def analyse_csv(
     )
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     timer.mark("download-file")
+
+    # Update resource status to TO_ANALYZE
+    await Resource.update(resource_id, {"status": "TO_ANALYZE"})
 
     try:
         if check_id:
@@ -151,6 +156,9 @@ async def analyse_csv(
         await csv_to_db_index(table_name, csv_inspection, check)
     except ParseException as e:
         await handle_parse_exception(e, check_id, table_name)
+    else:
+        # Update resource status to CHECKED
+        await Resource.update(resource_id, {"status": "CHECKED"})
     finally:
         if check_id:
             await notify_udata(check_id, table_name)
