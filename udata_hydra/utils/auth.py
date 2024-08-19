@@ -6,7 +6,7 @@ from aiohttp import web
 from udata_hydra import config
 
 
-def _is_exclude(request, exclude: Tuple) -> bool:
+def _is_exclude(request, exclude: Tuple[str]) -> bool:
     for pattern in exclude:
         if re.fullmatch(pattern, request.path):
             return True
@@ -16,8 +16,8 @@ def _is_exclude(request, exclude: Tuple) -> bool:
 def token_auth_middleware(
     request_property: str = "user",
     auth_scheme: str = "Bearer",
-    exclude_routes: Tuple = tuple(),
-    exclude_methods: Tuple = tuple(),
+    exclude_routes: Tuple[str] = tuple(),
+    exclude_methods: Tuple[str] = tuple(),
 ) -> Coroutine:
     """Checks a auth token and adds a user in request.
 
@@ -34,7 +34,6 @@ def token_auth_middleware(
             excluded. Defaults to empty tuple.
 
     Raises:
-        TypeError: If user_loader isn't callable object.
         web.HTTPUnauthorized: If "Authorization" token is missing.
         web.HTTPForbidden: Wrong token, schema or header.
 
