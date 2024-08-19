@@ -54,6 +54,7 @@ async def test_catalog(setup_catalog, db):
     resource = res[0]
     assert resource["url"] == "https://example.com/resource-1"
     assert resource["dataset_id"] == DATASET_ID
+    assert resource["status"] == "TO_CHECK"
 
 
 async def test_catalog_deleted(setup_catalog, db, rmock):
