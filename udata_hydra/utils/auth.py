@@ -65,7 +65,7 @@ def token_auth_middleware(
         if token == config.API_TOKEN:
             request[request_property] = {"username": "admin"}
         else:
-            raise web.HTTPForbidden(reason="Token doesn't exist")
+            raise web.HTTPForbidden(reason="Invalid authentication token")
 
         return await handler(request)
 
