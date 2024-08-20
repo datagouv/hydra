@@ -285,6 +285,7 @@ async def check_url(
                 }
             )
 
+            # Analyse the resource
             queue.enqueue(process_resource, check_id, is_first_check, _priority="low")
 
             return STATUS_OK
