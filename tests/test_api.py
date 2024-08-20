@@ -105,15 +105,17 @@ async def test_api_get_resource(db, client, insert_fake_resource):
     assert data["status"] == "TO_CHECK"
 
 
-@pytest.mark.parametrize("resource_status", list(Resource.STATUSES.items()))
-async def test_api_get_resource_status(db, client, insert_fake_resource, resource_status):
-    await insert_fake_resource(db, status=resource_status[0])
+@pytest.mark.parametrize("resource_status,resource_status_verbose", list(Resource.STATUSES.items()))
+async def test_api_get_resource_status(
+    db, client, insert_fake_resource, resource_status, resource_status_verbose
+):
+    await insert_fake_resource(db, status=resource_status)
     resp = await client.get(f"/api/resources/{RESOURCE_ID}/status")
     assert resp.status == 200
     data = await resp.json()
     assert data["resource_id"] == RESOURCE_ID
-    assert data["status"] == resource_status[0]
-    assert data["status_verbose"] == resource_status[1]
+    assert data["status"] == resource_status
+    assert data["status_verbose"] == resource_status_verbose
 
 
 @pytest.mark.parametrize(
