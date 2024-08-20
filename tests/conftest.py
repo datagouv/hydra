@@ -44,6 +44,16 @@ def is_harvested(request):
     return "catalog_harvested" in [m.name for m in request.node.iter_markers()]
 
 
+@pytest.fixture
+def api_headers() -> dict:
+    return {"Authorization": f"Bearer {config.API_TOKEN}"}
+
+
+@pytest.fixture
+def api_headers_wrong_token() -> dict:
+    return {"Authorization": "Bearer stupid-token"}
+
+
 # this really really really should run first (or "prod" db will get erased)
 @pytest.fixture(autouse=True, scope="session")
 def setup():

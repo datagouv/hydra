@@ -3,7 +3,6 @@ import json
 from aiohttp import web
 from marshmallow import ValidationError
 
-from udata_hydra import config
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import ResourceSchema
 from udata_hydra.utils import get_request_params

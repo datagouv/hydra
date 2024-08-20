@@ -746,10 +746,13 @@ async def test_crawl_triggered_by_udata_entrypoint_clean_catalog(
     analysis_mock,
     clean_db,
     produce_mock,
+    api_headers,
 ):
     rurl = udata_resource_payload["document"]["url"]
     rmock.head(rurl, headers={"content-length": "1"})
-    res = await client.post("/api/resource/created/", json=udata_resource_payload)
+    res = await client.post(
+        path="/api/resource/created/", headers=api_headers, json=udata_resource_payload
+    )
     assert res.status == 200
     res = await db.fetch("SELECT * FROM catalog")
     assert len(res) == 1
@@ -768,10 +771,13 @@ async def test_crawl_triggered_by_udata_entrypoint_existing_catalog(
     rmock,
     analysis_mock,
     produce_mock,
+    api_headers,
 ):
     rurl = udata_resource_payload["document"]["url"]
     rmock.head(rurl, headers={"content-length": "1"})
-    res = await client.post("/api/resource/created/", json=udata_resource_payload)
+    res = await client.post(
+        path="/api/resource/created/", headers=api_headers, json=udata_resource_payload
+    )
     assert res.status == 200
     res = await db.fetch("SELECT * FROM catalog")
     assert len(res) == 2
