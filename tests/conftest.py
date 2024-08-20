@@ -44,6 +44,16 @@ def is_harvested(request):
     return "catalog_harvested" in [m.name for m in request.node.iter_markers()]
 
 
+@pytest.fixture
+def api_headers() -> dict:
+    return {"Authorization": f"Bearer {config.API_TOKEN}"}
+
+
+@pytest.fixture
+def api_headers_wrong_token() -> dict:
+    return {"Authorization": "Bearer stupid-token"}
+
+
 # this really really really should run first (or "prod" db will get erased)
 @pytest.fixture(autouse=True, scope="session")
 def setup():
@@ -154,7 +164,7 @@ async def db():
 
 @pytest_asyncio.fixture
 async def insert_fake_resource():
-    async def _insert_fake_resource(database):
+    async def _insert_fake_resource(database) -> None:
         await database.execute(
             f"""
             INSERT INTO catalog (dataset_id, resource_id, url, priority, deleted)
@@ -184,7 +194,7 @@ async def fake_check():
         resource_id=RESOURCE_ID,
         detected_last_modified_at=None,
         parsing_table=False,
-    ):
+    ) -> dict:
         url = f"https://example.com/resource-{resource}"
         data = {
             "url": url,
