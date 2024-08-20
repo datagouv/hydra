@@ -134,7 +134,16 @@ async def test_api_create_check_wrongly(setup_catalog, client, fake_check, fake_
     ],
 )
 async def test_api_create_check(
-    setup_catalog, client, rmock, event_loop, db, resource, analysis_mock, udata_url
+    setup_catalog,
+    client,
+    rmock,
+    event_loop,
+    db,
+    resource,
+    analysis_mock,
+    udata_url,
+    api_headers,
+    api_headers_wrong_token,
 ):
     resource_id, resource_status, resource_timeout, resource_exception = resource
     rurl = "https://example.com/resource-1"
@@ -148,8 +157,20 @@ async def test_api_create_check(
     rmock.get(rurl, **params)
     rmock.put(udata_url)
 
-    # Call the API and test the responses cases
-    api_response = await client.post("/api/checks/", json={"resource_id": resource_id})
+    # Test API call with no token
+    resp = await client.post("/api/checks/", json={"resource_id": resource_id})
+    assert resp.status == 401
+
+    # Test API call with invalid token
+    resp = await client.post(
+        "/api/checks/", headers=api_headers_wrong_token, json={"resource_id": resource_id}
+    )
+    assert resp.status == 403
+
+    # Test the API responses cases
+    api_response = await client.post(
+        "/api/checks/", headers=api_headers, json={"resource_id": resource_id}
+    )
     if resource_timeout:
         assert api_response.status == 504
     else:
