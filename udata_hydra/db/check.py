@@ -12,7 +12,7 @@ class Check:
     """Represents a check in the "checks" DB table"""
 
     @classmethod
-    async def get(cls, check_id: int) -> dict:
+    async def get(cls, check_id: int) -> Optional[dict]:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
@@ -20,11 +20,12 @@ class Check:
                 ON catalog.last_check = checks.id
                 WHERE checks.id = $1;
             """
-            check = await connection.fetchrow(q, check_id)
-        return check
+            return await connection.fetchrow(q, check_id)
 
     @classmethod
-    async def get_latest(cls, url: Optional[str], resource_id: Optional[str]) -> Optional[dict]:
+    async def get_latest(
+        cls, url: Optional[str] = None, resource_id: Optional[str] = None
+    ) -> Optional[dict]:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -38,7 +39,9 @@ class Check:
             return await connection.fetchrow(q, url or resource_id)
 
     @classmethod
-    async def get_all(cls, url: Optional[str], resource_id: Optional[str]) -> Optional[list]:
+    async def get_all(
+        cls, url: Optional[str] = None, resource_id: Optional[str] = None
+    ) -> Optional[list]:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
