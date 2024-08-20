@@ -296,7 +296,7 @@ async def check_url(
 
             _priority = "low"
             if priority:
-                _priority = "default"
+                _priority = "high"
 
             queue.enqueue(process_resource, check_id, is_first_check, _priority=_priority)
 
