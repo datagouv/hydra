@@ -289,7 +289,7 @@ async def test_error_reporting_csv_detective(
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
-    assert resource["status"] == "TO_ANALYSE"
+    assert resource["status"] == "ANALYSE_ERROR"
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -310,7 +310,7 @@ async def test_error_reporting_parsing(
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
-    assert resource["status"] == "TO_ANALYSE"
+    assert resource["status"] == "ANALYSE_ERROR"
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
