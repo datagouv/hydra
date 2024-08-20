@@ -259,7 +259,7 @@ async def check_url(
                 "url": url,
                 "error": "Not netloc in url",
                 "timeout": False,
-            },
+            }
         )
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
 
@@ -304,7 +304,7 @@ async def check_url(
                 "url": url,
                 "domain": domain,
                 "timeout": True,
-            },
+            }
         )
         return RESOURCE_RESPONSE_STATUSES["TIMEOUT"]
     # TODO: debug AssertionError, should be caught in DB now
@@ -327,7 +327,7 @@ async def check_url(
                 "error": fix_surrogates(error),
                 "headers": convert_headers(getattr(e, "headers", {})),
                 "status": getattr(e, "status", None),
-            },
+            }
         )
         log.warning(f"Crawling error for url {url}", exc_info=e)
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
