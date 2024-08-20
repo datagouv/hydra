@@ -177,15 +177,12 @@ async def test_api_create_check(
     api_response = await client.post(
         "/api/checks/", headers=api_headers, json={"resource_id": resource_id}
     )
-    if resource_timeout:
-        assert api_response.status == 504
-    else:
-        if resource_status == 200:
-            assert api_response.status == 200
-        else:
-            assert api_response.status == 502
-            error_text: str = await api_response.text()
-            assert "Error while checking the resource:" in error_text
+    assert api_response.status == 200
+    data: dict = await api_response.json()
+    assert data["resource_id"] == resource_id
+    assert data["url"] == rurl
+    assert data["status"] == resource_status
+    assert data["timeout"] == resource_timeout
 
     # Test check results in DB
     res = await db.fetchrow("SELECT * FROM checks WHERE url = $1", rurl)
