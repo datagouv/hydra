@@ -109,7 +109,7 @@ async def compute_check_has_changed(check_data: dict, last_check: dict) -> bool:
     return has_changed
 
 
-async def process_check_data(check_data: dict, priority: bool = False) -> Tuple[int, bool]:
+async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     """Preprocess a check before saving it"""
     check_data["resource_id"] = str(check_data["resource_id"])
 
@@ -126,7 +126,7 @@ async def process_check_data(check_data: dict, priority: bool = False) -> Tuple[
         await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
     await Resource.update(
-        resource_id=check_data["resource_id"], data={"status": None, "priority": priority}
+        resource_id=check_data["resource_id"], data={"status": None, "priority": False}
     )
 
     is_first_check = last_check is None
@@ -242,7 +242,7 @@ async def check_url(
     session,
     sleep: float = 0,
     method: str = "head",
-    priority: bool = False,
+    worker_priority: str = "default",
 ) -> str:
     log.debug(f"check {url}, sleep {sleep}, method {method}")
 
@@ -254,13 +254,12 @@ async def check_url(
     if not domain:
         log.warning(f"[warning] not netloc in url, skipping {url}")
         await process_check_data(
-            check_data={
+            {
                 "resource_id": resource_id,
                 "url": url,
                 "error": "Not netloc in url",
                 "timeout": False,
             },
-            priority=priority,
         )
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
 
@@ -278,11 +277,13 @@ async def check_url(
         async with _method(url, timeout=timeout, allow_redirects=True) as resp:
             end = time.time()
             if method != "get" and not has_nice_head(resp):
-                return await check_url(url, resource_id, session, method="get")
+                return await check_url(
+                    url, resource_id, session, method="get", worker_priority=worker_priority
+                )
             resp.raise_for_status()
 
             check_id, is_first_check = await process_check_data(
-                check_data={
+                {
                     "resource_id": resource_id,
                     "url": url,
                     "domain": domain,
@@ -291,25 +292,19 @@ async def check_url(
                     "timeout": False,
                     "response_time": end - start,
                 },
-                priority=priority,
             )
 
-            _priority = "low"
-            if priority:
-                _priority = "high"
-
-            queue.enqueue(process_resource, check_id, is_first_check, _priority=_priority)
+            queue.enqueue(process_resource, check_id, is_first_check, _priority=worker_priority)
 
             return RESOURCE_RESPONSE_STATUSES["OK"]
     except asyncio.exceptions.TimeoutError:
         await process_check_data(
-            check_data={
+            {
                 "resource_id": resource_id,
                 "url": url,
                 "domain": domain,
                 "timeout": True,
             },
-            priority=priority,
         )
         return RESOURCE_RESPONSE_STATUSES["TIMEOUT"]
     # TODO: debug AssertionError, should be caught in DB now
@@ -333,7 +328,6 @@ async def check_url(
                 "headers": convert_headers(getattr(e, "headers", {})),
                 "status": getattr(e, "status", None),
             },
-            priority=priority,
         )
         log.warning(f"Crawling error for url {url}", exc_info=e)
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
@@ -346,7 +340,14 @@ async def crawl_urls(to_parse: list[str]) -> None:
         timeout=None, headers={"user-agent": config.USER_AGENT}
     ) as session:
         for row in to_parse:
-            tasks.append(check_url(url=row["url"], resource_id=row["resource_id"], session=session))
+            tasks.append(
+                check_url(
+                    url=row["url"],
+                    resource_id=row["resource_id"],
+                    session=session,
+                    worker_priority="low",
+                )
+            )
         for task in asyncio.as_completed(tasks):
             result = await task
             results[result] += 1

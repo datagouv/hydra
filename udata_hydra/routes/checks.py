@@ -57,7 +57,7 @@ async def create_check(request: web.Request) -> web.Response:
         timeout=None, headers={"user-agent": config.USER_AGENT}
     ) as session:
         status: str = await check_url(
-            url=url, resource_id=resource_id, session=session, priority=True
+            url=url, resource_id=resource_id, session=session, worker_priority="high"
         )
         context.monitor().refresh(status)
 
