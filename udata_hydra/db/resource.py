@@ -6,7 +6,10 @@ class Resource:
 
     STATUSES = {
         "TO_CHECK": "to be checked",
+        "TO_CHECK_BACKOFF": "backoff period for this domain, will be checked later",
+        "CHECK_ERROR": "error during check",
         "TO_ANALYSE": "to be analysed by CSV detective",
+        "ANALYSE_ERROR": "error during CSV detective analysis",
         "TO_INSERT": "to be inserted in DB",
         "CHECKED": "check finished",
     }

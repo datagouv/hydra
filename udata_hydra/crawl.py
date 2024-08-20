@@ -261,8 +261,8 @@ async def check_url(
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
         await Resource.update(
-            resource_id=resource_id, data={"priority": False}
-        )  # Don't update the resource status
+            resource_id=resource_id, data={"status": "TO_CHECK_BACKOFF", "priority": False}
+        )
         return STATUS_BACKOFF
 
     try:
@@ -302,6 +302,7 @@ async def check_url(
                 "timeout": True,
             }
         )
+        await Resource.update(resource_id=resource_id, data={"status": "CHECK_ERROR"})
         return STATUS_TIMEOUT
     # TODO: debug AssertionError, should be caught in DB now
     # File "[...]aiohttp/connector.py", line 991, in _create_direct_connection
@@ -327,6 +328,7 @@ async def check_url(
             }
         )
         log.warning(f"Crawling error for url {url}", exc_info=e)
+        await Resource.update(resource_id=resource_id, data={"status": "CHECK_ERROR"})
         return STATUS_ERROR
 
 

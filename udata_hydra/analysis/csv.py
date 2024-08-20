@@ -155,6 +155,8 @@ async def analyse_csv(
             )
         await csv_to_db_index(table_name, csv_inspection, check)
     except ParseException as e:
+        # Update resource status to ANALYSE_ERROR
+        await Resource.update(resource_id, {"status": "ANALYSE_ERROR"})
         await handle_parse_exception(e, check_id, table_name)
     else:
         # Update resource status to CHECKED
