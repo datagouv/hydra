@@ -1,12 +1,12 @@
 import logging
-from typing import Union
+from typing import Optional
 
 import toml
 
 log = logging.getLogger("udata-hydra")
 
 
-def get_app_version() -> Union[str, None]:
+def get_app_version() -> Optional[str]:
     """Get the app version from pyproject.toml"""
     try:
         pyproject: dict = toml.load("pyproject.toml")

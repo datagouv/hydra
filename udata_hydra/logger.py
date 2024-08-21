@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Union
+from typing import Optional
 
 import coloredlogs
 import sentry_sdk
@@ -18,7 +18,7 @@ def setup_logging() -> logging.Logger:
     if context.get("inited"):
         return log
     release = "hydra@unknown"
-    app_version: Union[str, None] = get_app_version()
+    app_version: Optional[str] = get_app_version()
     if app_version:
         release = f"hydra@{app_version}"
     if config.SENTRY_DSN:
