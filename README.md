@@ -20,6 +20,12 @@ The hydra crawler is one of the components of the architecture. It will check if
 
 ![Crawler architecture](docs/hydra.drawio.png)
 
+## Dependencies
+
+This project uses `libmagic`, which needs to be installed on your system, eg:
+
+`brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on linux.
+
 ## CLI
 
 ### Create database structure
