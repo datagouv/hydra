@@ -48,7 +48,7 @@
 - Fix Ruff configuration [#117](https://github.com/datagouv/hydra/pull/117)
 - Add some API tests to improve coverage [#123](https://github.com/datagouv/hydra/pull/123)
 - Fix health check endpoint route which was wrongly removed, and add test for API health check endpoint to make sure this endpoint is working as expected [#128](https://github.com/datagouv/hydra/pull/128)
-- Add basic authentication via admin token using a new auth logic for all POST/PUT/DELETE endpoints [#130](https://github.com/datagouv/hydra/pull/130)
+- Add basic authentication via API key using a bearer token auth for all POST/PUT/DELETE endpoints [#130](https://github.com/datagouv/hydra/pull/130)
 
 ## 1.0.1 (2023-01-04)
 
