@@ -1,21 +1,25 @@
+import logging
 import os
 from pathlib import Path
 
 import toml
 
+log = logging.getLogger("udata-hydra")
+
 
 class Configurator:
     """Loads a dict of config from TOML file(s) and behaves like an object, ie config.VALUE"""
 
-    configuration = None
+    configuration: dict = {}
 
     def __init__(self):
         if not self.configuration:
             self.configure()
+            self.load_pyproject_info()
 
     def configure(self) -> None:
         # load default settings
-        configuration = toml.load(Path(__file__).parent / "config_default.toml")
+        configuration: dict = toml.load(Path(__file__).parent / "config_default.toml")
 
         # override with local settings
         local_settings = os.environ.get("HYDRA_SETTINGS", Path.cwd() / "config.toml")
@@ -24,6 +28,15 @@ class Configurator:
 
         self.configuration = configuration
         self.check()
+
+    def load_pyproject_info(self) -> None:
+        """Get more info about the app from pyproject.toml"""
+        try:
+            project_info: dict = toml.load("pyproject.toml")["project"]
+        except Exception as e:
+            log.error(f"Error while getting pyproject.toml info: {str(e)}")
+        self.configuration["APP_NAME"] = project_info.get("name")
+        self.configuration["APP_VERSION"] = project_info.get("version")
 
     def override(self, **kwargs) -> None:
         self.configuration.update(kwargs)

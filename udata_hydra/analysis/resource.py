@@ -3,7 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Tuple, Union
+from typing import Optional, Tuple
 
 import magic
 from dateparser import parse as date_parser
@@ -128,7 +128,7 @@ async def store_last_modified_date(change_analysis: dict, check_id: int) -> None
 
 async def detect_resource_change_from_checksum(
     resource_id, new_checksum
-) -> Tuple[Change, Union[dict, None]]:
+) -> Tuple[Change, Optional[dict]]:
     """
     Checks if resource checksum has changed over time
     Returns a tuple with a Change status and an optional payload:
@@ -157,7 +157,7 @@ async def detect_resource_change_from_checksum(
 
 async def detect_resource_change_from_last_modified_header(
     data: dict,
-) -> Tuple[Change, Union[dict, None]]:
+) -> Tuple[Change, Optional[dict]]:
     # last modified header check
 
     if len(data) == 1 and data[0]["last_modified"]:
@@ -181,7 +181,7 @@ async def detect_resource_change_from_last_modified_header(
 
 async def detect_resource_change_from_content_length_header(
     data: dict,
-) -> Tuple[Change, Union[dict, None]]:
+) -> Tuple[Change, Optional[dict]]:
     # content-length variation between current and last check
     if len(data) <= 1 or not data[0]["content_length"]:
         return Change.NO_GUESS, None
@@ -196,7 +196,7 @@ async def detect_resource_change_from_content_length_header(
 
 async def detect_resource_change_on_early_hints(
     resource_id: str,
-) -> Tuple[Change, Union[dict, None]]:
+) -> Tuple[Change, Optional[dict]]:
     """
     Try to guess if a resource has been modified from harvest and headers in check data:
     - last-modified header value if it can be found and parsed
@@ -247,7 +247,7 @@ async def detect_resource_change_on_early_hints(
 
 async def detect_resource_change_from_harvest(
     checks_data: dict, resource_id: str
-) -> Tuple[Change, Union[dict, None]]:
+) -> Tuple[Change, Optional[dict]]:
     """
     Checks if resource has a harvest.modified_at
     Returns a tuple with a Change status and an optional payload:

@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional
 
 from udata_hydra import context
 from udata_hydra.db import (
@@ -12,7 +12,7 @@ class Check:
     """Represents a check in the "checks" DB table"""
 
     @classmethod
-    async def get(cls, check_id: int) -> dict:
+    async def get(cls, check_id: int) -> Optional[dict]:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
@@ -20,13 +20,12 @@ class Check:
                 ON catalog.last_check = checks.id
                 WHERE checks.id = $1;
             """
-            check = await connection.fetchrow(q, check_id)
-        return check
+            return await connection.fetchrow(q, check_id)
 
     @classmethod
     async def get_latest(
-        cls, url: Union[str, None], resource_id: Union[str, None]
-    ) -> Union[dict, None]:
+        cls, url: Optional[str] = None, resource_id: Optional[str] = None
+    ) -> Optional[dict]:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -41,8 +40,8 @@ class Check:
 
     @classmethod
     async def get_all(
-        cls, url: Union[str, None], resource_id: Union[str, None]
-    ) -> Union[list, None]:
+        cls, url: Optional[str] = None, resource_id: Optional[str] = None
+    ) -> Optional[list]:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:

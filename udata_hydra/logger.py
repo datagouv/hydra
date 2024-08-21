@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Union
+from typing import Optional
 
 import coloredlogs
 import sentry_sdk
@@ -8,7 +8,6 @@ from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 from sentry_sdk.integrations.rq import RqIntegration
 
 from udata_hydra import config
-from udata_hydra.utils import get_app_version
 
 log = logging.getLogger("udata-hydra")
 context = {"inited": False}
@@ -17,10 +16,6 @@ context = {"inited": False}
 def setup_logging() -> logging.Logger:
     if context.get("inited"):
         return log
-    release = "hydra@unknown"
-    app_version: Union[str, None] = get_app_version()
-    if app_version:
-        release = f"hydra@{app_version}"
     if config.SENTRY_DSN:
         sentry_sdk.init(
             dsn=config.SENTRY_DSN,
@@ -28,7 +23,7 @@ def setup_logging() -> logging.Logger:
                 AioHttpIntegration(),
                 RqIntegration(),
             ],
-            release=release,
+            release=f"{config.APP_NAME}@{config.APP_VERSION}",
             environment=os.getenv("HYDRA_ENV", "unknown"),
             # Set traces_sample_rate to 1.0 to capture 100%
             # of transactions for performance monitoring.

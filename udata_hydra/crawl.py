@@ -3,7 +3,7 @@ import json
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Tuple, Union
+from typing import Optional, Tuple
 from urllib.parse import urlparse
 
 import aiohttp
@@ -26,7 +26,7 @@ STATUS_BACKOFF = "backoff"
 log = setup_logging()
 
 
-def is_valid_status(status: str) -> Union[bool, None]:
+def is_valid_status(status: str) -> Optional[bool]:
     if not status:
         return False
     status_nb = int(status)
@@ -52,7 +52,7 @@ async def get_content_type_from_header(headers: dict) -> str:
 
 
 async def compute_check_has_changed(check_data: dict, last_check: dict) -> bool:
-    is_first_check = not last_check
+    is_first_check: bool = last_check is None
     status_has_changed = last_check and check_data.get("status") != last_check.get("status")
     status_no_longer_available = (
         last_check

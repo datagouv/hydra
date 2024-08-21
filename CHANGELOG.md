@@ -48,6 +48,8 @@
 - Fix Ruff configuration [#117](https://github.com/datagouv/hydra/pull/117)
 - Add some API tests to improve coverage [#123](https://github.com/datagouv/hydra/pull/123)
 - Fix health check endpoint route which was wrongly removed, and add test for API health check endpoint to make sure this endpoint is working as expected [#128](https://github.com/datagouv/hydra/pull/128)
+- Add basic authentication via API key using a bearer token auth for all POST/PUT/DELETE endpoints [#130](https://github.com/datagouv/hydra/pull/130)
+- Simplify getting Sentry info by loading pyproject.toml info in config [#138](https://github.com/datagouv/hydra/pull/138)
 - Update resource statuses in DB when crawling and analysing, and add resource status route[#119](https://github.com/datagouv/hydra/pull/119)
 
 ## 1.0.1 (2023-01-04)
