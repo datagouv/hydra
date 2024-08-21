@@ -46,7 +46,7 @@ def is_harvested(request):
 
 @pytest.fixture
 def api_headers() -> dict:
-    return {"Authorization": f"Bearer {config.API_TOKEN}"}
+    return {"Authorization": f"Bearer {config.API_KEY}"}
 
 
 @pytest.fixture
