@@ -62,8 +62,8 @@ def token_auth_middleware(
                 reason="Invalid token scheme",
             )
 
-        if token == config.API_TOKEN:
-            request[request_property] = {"username": "admin"}
+        if token == config.API_KEY:
+            request[request_property] = {"username": "udata"}
         else:
             raise web.HTTPForbidden(reason="Invalid authentication token")
 

@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Union
+from typing import Optional
 
 import aiohttp
 import asyncpg
@@ -47,7 +47,9 @@ async def connection(db_name: str = "main"):
 
 
 @cli
-async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
+async def load_catalog(
+    url: Optional[str] = None, drop_meta: bool = False, drop_all: bool = False, quiet: bool = False
+):
     """Load the catalog into DB from CSV file
 
     :url: URL of the catalog to fetch, by default defined in config
@@ -135,7 +137,7 @@ async def check_url(url: str, method: str = "get"):
 
 
 @cli
-async def check_resource(resource_id, method: str = "get"):
+async def check_resource(resource_id: str, method: str = "get"):
     """Trigger a complete check for a given resource_id"""
     res = await Resource.get(resource_id)
     if not res:
@@ -149,14 +151,14 @@ async def check_resource(resource_id, method: str = "get"):
 
 @cli(name="analyse-csv")
 async def analyse_csv_cli(
-    check_id: Union[int, None] = None, url: Union[str, None] = None, debug_insert: bool = False
+    check_id: Optional[int] = None, url: Optional[str] = None, debug_insert: bool = False
 ):
     """Trigger a csv analysis from a check_id or an url"""
     await analyse_csv(check_id=check_id, url=url, debug_insert=debug_insert)
 
 
 @cli
-async def csv_sample(size=1000, download: bool = False, max_size: str = "100M"):
+async def csv_sample(size: int = 1000, download: bool = False, max_size: str = "100M"):
     """Get a csv sample from latest checks
 
     :size: Size of the sample (how many files to query)

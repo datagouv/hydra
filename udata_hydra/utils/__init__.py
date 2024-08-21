@@ -1,4 +1,3 @@
-from .app_version import get_app_version
 from .auth import token_auth_middleware
 from .csv import detect_tabular_from_headers
 from .file import compute_checksum_from_file, download_resource, read_csv_gz

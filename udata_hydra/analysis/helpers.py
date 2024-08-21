@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Union
+from typing import Optional
 
 from dateparser import parse as date_parser
 from dateutil.parser import ParserError
@@ -11,7 +11,7 @@ def to_json(value: str) -> str:
     return value
 
 
-def _parse_dt(value: str) -> Union[datetime, None]:
+def _parse_dt(value: str) -> Optional[datetime]:
     """For performance reasons, we try first with dateutil and fallback on dateparser"""
     try:
         return dateutil_parser(value)
@@ -19,10 +19,10 @@ def _parse_dt(value: str) -> Union[datetime, None]:
         return date_parser(value)
 
 
-def to_date(value: str) -> Union[date, None]:
+def to_date(value: str) -> Optional[date]:
     parsed = _parse_dt(value)
     return parsed.date() if parsed else None
 
 
-def to_datetime(value: str) -> Union[datetime, None]:
+def to_datetime(value: str) -> Optional[datetime]:
     return _parse_dt(value)
