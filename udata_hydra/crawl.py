@@ -52,7 +52,7 @@ async def get_content_type_from_header(headers: dict) -> str:
 
 
 async def compute_check_has_changed(check_data: dict, last_check: dict) -> bool:
-    is_first_check = not last_check
+    is_first_check: bool = last_check is None
     status_has_changed = last_check and check_data.get("status") != last_check.get("status")
     status_no_longer_available = (
         last_check
