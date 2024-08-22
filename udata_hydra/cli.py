@@ -99,7 +99,7 @@ async def load_catalog(
                         dataset_id, resource_id, url, harvest_modified_at,
                         deleted, priority, status
                     )
-                    VALUES ($1, $2, $3, $4, FALSE, FALSE, 'TO_CHECK')
+                    VALUES ($1, $2, $3, $4, FALSE, FALSE, NULL)
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,

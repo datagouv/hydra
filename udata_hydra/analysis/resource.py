@@ -11,6 +11,7 @@ from dateparser import parse as date_parser
 from udata_hydra import config, context
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource import Resource
 from udata_hydra.utils import (
     compute_checksum_from_file,
     detect_tabular_from_headers,
@@ -53,6 +54,9 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     headers = json.loads(check["headers"] or "{}")
 
     log.debug(f"Analysis for resource {resource_id} in dataset {dataset_id}")
+
+    # Update resource status to PROCESSING_RESOURCE
+    await Resource.update(resource_id, data={"status": "PROCESSING_RESOURCE"})
 
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
     change_status, change_payload = await detect_resource_change_on_early_hints(resource_id)
@@ -101,11 +105,18 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     if change_status == Change.HAS_CHANGED:
         await store_last_modified_date(change_payload or {}, check_id)
 
+    # Update resource status to PROCESSED_RESOURCE
+    await Resource.update(resource_id, data={"status": "PROCESSED_RESOURCE"})
+
     analysis_results = {**dl_analysis, **(change_payload or {})}
+
     if change_status == Change.HAS_CHANGED or is_first_check:
         if is_tabular and tmp_file:
+            # Change status to TO_ANALYSE_CSV
+            await Resource.update(resource_id, data={"status": "TO_ANALYSE_CSV"})
             # Analyse CSV and create a table in the CSV database
             queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="default")
+
         # Send analysis result to udata
         queue.enqueue(
             send,

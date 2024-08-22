@@ -1,3 +1,5 @@
+from typing import Optional
+
 from udata_hydra import context
 
 
@@ -5,13 +7,16 @@ class Resource:
     """Represents a resource in the "catalog" DB table"""
 
     STATUSES = {
-        "TO_CHECK": "to be checked",
-        "TO_CHECK_BACKOFF": "backoff period for this domain, will be checked later",
-        "CHECK_ERROR": "error during check",
-        "TO_ANALYSE": "to be analysed by CSV detective",
-        "ANALYSE_ERROR": "error during CSV detective analysis",
-        "TO_INSERT": "to be inserted in DB",
-        "CHECKED": "check finished",
+        "BACKOFF": "backoff period for this domain, will be checked later",
+        "CRAWLING": "resource URL currently being crawled",
+        "CRAWLED": "resource URL crawl finished",
+        "TO_PROCESS_RESOURCE": "to be processed for change analysis",
+        "PROCESSING_RESOURCE": "currently being processed for change analysis",
+        "PROCESSED_RESOURCE": "change analysis finished",
+        "TO_ANALYSE_CSV": "to be analysed by CSV detective",
+        "ANALYSING_CSV": "currently being analysed by CSV detective",
+        "INSERTING_IN_DB": "currently being inserted in DB",
+        "CONVERTING_TO_PARQUET": "currently being converted to Parquet",
     }
 
     @classmethod
@@ -28,9 +33,12 @@ class Resource:
         dataset_id: str,
         resource_id: str,
         url: str,
-        status: str = "TO_CHECK",
+        status: Optional[str] = None,
         priority: bool = True,
     ) -> None:
+        if status and status not in cls.STATUSES.keys():
+            raise ValueError(f"Invalid status: {status}")
+
         pool = await context.pool()
         async with pool.acquire() as connection:
             # Insert new resource in catalog table and mark as high priority for crawling
@@ -66,10 +74,10 @@ class Resource:
         dataset_id: str,
         resource_id: str,
         url: str,
-        status: str = "TO_CHECK",
+        status: Optional[str] = None,
         priority: bool = True,  # Make resource high priority by default for crawling
     ) -> None:
-        if status not in cls.STATUSES.keys():
+        if status and status not in cls.STATUSES.keys():
             raise ValueError(f"Invalid status: {status}")
 
         pool = await context.pool()
@@ -78,7 +86,7 @@ class Resource:
             if await Resource.get(resource_id):
                 q = """
                         UPDATE catalog
-                        SET url = $3, status = $4, priority = $5
+                        SET dataset_id = $1, url = $3, status = $4, priority = $5
                         WHERE resource_id = $2;"""
             else:
                 q = """

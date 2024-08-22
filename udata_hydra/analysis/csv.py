@@ -115,8 +115,8 @@ async def analyse_csv(
     check: dict = await Check.get(check_id) if check_id is not None else {}
     resource_id: str = check.get("resource_id")
 
-    # Update resource status to TO_ANALYSE
-    await Resource.update(resource_id, {"status": "TO_ANALYSE"})
+    # Update resource status to ANALYSING_CSV
+    await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
 
     exceptions = config.LARGE_RESOURCES_EXCEPTIONS
 
@@ -143,10 +143,24 @@ async def analyse_csv(
             await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
         csv_inspection = await perform_csv_inspection(tmp_file.name)
         timer.mark("csv-inspection")
-        await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
+
+        await csv_to_db(
+            file_path=tmp_file.name,
+            inspection=csv_inspection,
+            table_name=table_name,
+            resource_id=resource_id,
+            debug_insert=debug_insert,
+        )
         timer.mark("csv-to-db")
-        await csv_to_parquet(tmp_file.name, csv_inspection, table_name)
+
+        await csv_to_parquet(
+            file_path=tmp_file.name,
+            inspection=csv_inspection,
+            table_name=table_name,
+            resource_id=resource_id,
+        )
         timer.mark("csv-to-parquet")
+
         if check_id:
             await Check.update(
                 check_id,
@@ -156,19 +170,18 @@ async def analyse_csv(
                 },
             )
         await csv_to_db_index(table_name, csv_inspection, check)
+
     except ParseException as e:
-        # Update resource status to ANALYSE_ERROR
-        await Resource.update(resource_id, {"status": "ANALYSE_ERROR"})
         await handle_parse_exception(e, check_id, table_name)
-    else:
-        # Update resource status to CHECKED
-        await Resource.update(resource_id, {"status": "CHECKED"})
     finally:
         if check_id:
             await notify_udata(check_id, table_name)
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
+
+        # Reset resource status to None
+        await Resource.update(resource_id, {"status": None})
 
 
 def smart_cast(_type: str, value, failsafe: bool = False) -> Any:
@@ -213,7 +226,12 @@ def generate_records(file_path: str, inspection: dict, columns: dict) -> Iterato
                 yield [smart_cast(t, v, failsafe=True) for t, v in zip(columns.values(), line)]
 
 
-async def csv_to_parquet(file_path: str, inspection: dict, table_name: str) -> None:
+async def csv_to_parquet(
+    file_path: str,
+    inspection: dict,
+    table_name: str,
+    resource_id: Optional[str] = None,
+) -> None:
     """
     Convert a csv file to parquet using inspection data.
 
@@ -224,10 +242,16 @@ async def csv_to_parquet(file_path: str, inspection: dict, table_name: str) -> N
     if not config.CSV_TO_PARQUET:
         log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
         return
+
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
         f"to parquet for {table_name} and sending to Minio."
     )
+
+    if resource_id:
+        # Update resource status to CONVERTING_TO_PARQUET
+        await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
+
     columns = {c: v["python_type"] for c, v in inspection["columns"].items()}
     # save the file as parquet and store it on Minio instance
     parquet_file, _ = save_as_parquet(
@@ -239,7 +263,11 @@ async def csv_to_parquet(file_path: str, inspection: dict, table_name: str) -> N
 
 
 async def csv_to_db(
-    file_path: str, inspection: dict, table_name: str, debug_insert: bool = False
+    file_path: str,
+    inspection: dict,
+    table_name: str,
+    resource_id: Optional[str] = None,
+    debug_insert: bool = False,
 ) -> None:
     """
     Convert a csv file to database table using inspection data. It should (re)create one table:
@@ -253,10 +281,16 @@ async def csv_to_db(
     if not config.CSV_TO_DB:
         log.debug("CSV_TO_DB turned off, skipping.")
         return
+
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
         f"to db for {table_name}"
     )
+
+    if resource_id:
+        # Update resource status to INSERTING_IN_DB
+        await Resource.update(resource_id, {"status": "INSERTING_IN_DB"})
+
     # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {
         f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]

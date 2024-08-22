@@ -231,7 +231,7 @@ async def test_api_get_resource(setup_catalog, client):
     data: dict = await resp.json()
     assert data["dataset_id"] == DATASET_ID
     assert data["resource_id"] == RESOURCE_ID
-    assert data["status"] == "TO_CHECK"
+    assert data["status"] is None
 
 
 @pytest.mark.parametrize("resource_status,resource_status_verbose", list(Resource.STATUSES.items()))

@@ -27,14 +27,14 @@ async def test_analyse_csv_on_catalog(
 
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_ID)
-    assert resource["status"] == "TO_CHECK"
+    assert resource["status"] is None
 
     # Analyse the CSV
     await analyse_csv(check_id=check["id"])
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
-    assert resource["status"] == "CHECKED"
+    assert resource["status"] is None
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table_name
@@ -66,14 +66,14 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
 
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_ID)
-    assert resource["status"] == "TO_CHECK"
+    assert resource["status"] is None
 
     # Analyse the CSV
     await analyse_csv(check_id=check["id"])
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
-    assert resource["status"] == "CHECKED"
+    assert resource["status"] is None
 
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
@@ -105,14 +105,14 @@ async def test_exception_analysis(setup_catalog, rmock, db, fake_check, produce_
 
     # Check resource status before analysis
     resource = await Resource.get(config.LARGE_RESOURCES_EXCEPTIONS[0])
-    assert resource["status"] == "TO_CHECK"
+    assert resource["status"] is None
 
     # Analyse the CSV
     await analyse_csv(check_id=check["id"])
 
     # Check resource status after analysis
     resource = await Resource.get(config.LARGE_RESOURCES_EXCEPTIONS[0])
-    assert resource["status"] == "CHECKED"
+    assert resource["status"] is None
 
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
@@ -289,7 +289,7 @@ async def test_error_reporting_csv_detective(
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
-    assert resource["status"] == "ANALYSE_ERROR"
+    assert resource["status"] is None
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -310,7 +310,7 @@ async def test_error_reporting_parsing(
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
-    assert resource["status"] == "ANALYSE_ERROR"
+    assert resource["status"] is None
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -342,7 +342,7 @@ async def test_analyse_csv_send_udata_webhook(
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
-    assert resource["status"] == "CHECKED"
+    assert resource["status"] is None
 
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("analysis:parsing:started_at")

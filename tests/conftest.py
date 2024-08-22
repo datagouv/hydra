@@ -166,7 +166,7 @@ async def db():
 
 @pytest_asyncio.fixture
 async def insert_fake_resource():
-    async def _insert_fake_resource(database, status: str = "TO_CHECK"):
+    async def _insert_fake_resource(database, status: Optional[str] = None):
         await Resource.insert(
             dataset_id=DATASET_ID,
             resource_id=RESOURCE_ID,
