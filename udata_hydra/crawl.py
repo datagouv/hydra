@@ -18,10 +18,12 @@ from udata_hydra.utils import queue, send
 
 results: defaultdict = defaultdict(int)
 
-STATUS_OK = "ok"
-STATUS_TIMEOUT = "timeout"
-STATUS_ERROR = "error"
-STATUS_BACKOFF = "backoff"
+RESOURCE_RESPONSE_STATUSES = {
+    "OK": "ok",
+    "TIMEOUT": "timeout",
+    "ERROR": "error",
+    "BACKOFF": "backoff",
+}
 
 log = setup_logging()
 
@@ -235,7 +237,12 @@ def has_nice_head(resp) -> bool:
 
 
 async def check_url(
-    url: str, resource_id: str, session, sleep: float = 0, method: str = "head"
+    url: str,
+    resource_id: str,
+    session,
+    sleep: float = 0,
+    method: str = "head",
+    worker_priority: str = "default",
 ) -> str:
     log.debug(f"check {url}, sleep {sleep}, method {method}")
 
@@ -254,14 +261,14 @@ async def check_url(
                 "timeout": False,
             }
         )
-        return STATUS_ERROR
+        return RESOURCE_RESPONSE_STATUSES["ERROR"]
 
     should_backoff, reason = await is_backoff(domain)
     if should_backoff:
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
         await Resource.update(resource_id=resource_id, data={"status": None, "priority": False})
-        return STATUS_BACKOFF
+        return RESOURCE_RESPONSE_STATUSES["BACKOFF"]
 
     try:
         start = time.time()
@@ -270,7 +277,9 @@ async def check_url(
         async with _method(url, timeout=timeout, allow_redirects=True) as resp:
             end = time.time()
             if method != "get" and not has_nice_head(resp):
-                return await check_url(url, resource_id, session, method="get")
+                return await check_url(
+                    url, resource_id, session, method="get", worker_priority=worker_priority
+                )
             resp.raise_for_status()
 
             check_id, is_first_check = await process_check_data(
@@ -282,13 +291,12 @@ async def check_url(
                     "headers": convert_headers(resp.headers),
                     "timeout": False,
                     "response_time": end - start,
-                }
+                },
             )
 
-            # Analyse the resource
-            queue.enqueue(process_resource, check_id, is_first_check, _priority="low")
+            queue.enqueue(process_resource, check_id, is_first_check, _priority=worker_priority)
 
-            return STATUS_OK
+            return RESOURCE_RESPONSE_STATUSES["OK"]
     except asyncio.exceptions.TimeoutError:
         await process_check_data(
             {
@@ -298,7 +306,7 @@ async def check_url(
                 "timeout": True,
             }
         )
-        return STATUS_TIMEOUT
+        return RESOURCE_RESPONSE_STATUSES["TIMEOUT"]
     # TODO: debug AssertionError, should be caught in DB now
     # File "[...]aiohttp/connector.py", line 991, in _create_direct_connection
     # assert port is not None
@@ -322,7 +330,7 @@ async def check_url(
             }
         )
         log.warning(f"Crawling error for url {url}", exc_info=e)
-        return STATUS_ERROR
+        return RESOURCE_RESPONSE_STATUSES["ERROR"]
 
 
 async def crawl_urls(to_parse: list[str]) -> None:
@@ -332,7 +340,14 @@ async def crawl_urls(to_parse: list[str]) -> None:
         timeout=None, headers={"user-agent": config.USER_AGENT}
     ) as session:
         for row in to_parse:
-            tasks.append(check_url(url=row["url"], resource_id=row["resource_id"], session=session))
+            tasks.append(
+                check_url(
+                    url=row["url"],
+                    resource_id=row["resource_id"],
+                    session=session,
+                    worker_priority="low",
+                )
+            )
         for task in asyncio.as_completed(tasks):
             result = await task
             results[result] += 1
