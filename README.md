@@ -100,7 +100,6 @@ PUBLISH_ON_RESOURCE_EVENTS = True
 RESOURCES_ANALYSER_URI = "http://localhost:8000"
 # The API key that hydra needs
 RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
-
 ```
 
 ### Run
