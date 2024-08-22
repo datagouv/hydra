@@ -139,13 +139,17 @@ async def crawl_url(url: str, method: str = "get"):
 @cli
 async def check_resource(resource_id: str, method: str = "get"):
     """Trigger a complete check for a given resource_id"""
-    res = await Resource.get(resource_id)
-    if not res:
+    resource: dict = await Resource.get(resource_id)
+    if not resource:
         log.error("Resource not found in catalog")
         return
     async with aiohttp.ClientSession(timeout=None) as session:
         await crawl_check_resource(
-            url=res[0], resource_id=None, session=session, method=method, worker_priority="high"
+            url=resource["url"],
+            resource_id=resource_id,
+            session=session,
+            method=method,
+            worker_priority="high",
         )
 
 
