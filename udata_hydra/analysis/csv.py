@@ -106,18 +106,23 @@ async def analyse_csv(
     file_path: Optional[str] = None,
     debug_insert: bool = False,
 ) -> None:
-    """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
+    """Launch csv analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS:
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
+
+    # Get check and resource_id
+    check: dict = await Check.get(check_id) if check_id is not None else {}
+    resource_id: str = check.get("resource_id")
+
+    # Update resource status to TO_ANALYSE
+    await Resource.update(resource_id, {"status": "TO_ANALYSE"})
 
     exceptions = config.LARGE_RESOURCES_EXCEPTIONS
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
-    check: dict = await Check.get(check_id) if check_id is not None else {}
     url: str = check.get("url") or url
-    resource_id: str = check.get("resource_id")
     exception_file = str(check.get("resource_id", "")) in exceptions
 
     headers = json.loads(check.get("headers") or "{}")
@@ -132,9 +137,6 @@ async def analyse_csv(
     )
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     timer.mark("download-file")
-
-    # Update resource status to TO_ANALYSE
-    await Resource.update(resource_id, {"status": "TO_ANALYSE"})
 
     try:
         if check_id:
