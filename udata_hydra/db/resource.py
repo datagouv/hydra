@@ -34,16 +34,16 @@ class Resource:
         pool = await context.pool()
         async with pool.acquire() as connection:
             # Insert new resource in catalog table and mark as high priority for crawling
-            q = f"""
+            q = """
                     INSERT INTO catalog (dataset_id, resource_id, url, deleted, status, priority)
-                    VALUES ('{dataset_id}', '{resource_id}', '{url}', FALSE, '{status}', '{priority}')
+                    VALUES ($1, $2, $3, FALSE, $4, $5)
                     ON CONFLICT (resource_id) DO UPDATE SET
-                        dataset_id = '{dataset_id}',
-                        url = '{url}',
+                        dataset_id = $1,
+                        url = $3,
                         deleted = FALSE,
-                        status = '{status}',
-                        priority = '{priority}';"""
-            await connection.execute(q)
+                        status = $4,
+                        priority = $5;"""
+            await connection.execute(q, dataset_id, resource_id, url, status, priority)
 
     @classmethod
     async def update(cls, resource_id: str, data: dict) -> str:
@@ -76,18 +76,18 @@ class Resource:
         async with pool.acquire() as connection:
             # Check if resource is in catalog then insert or update into table
             if await Resource.get(resource_id):
-                q = f"""
+                q = """
                         UPDATE catalog
-                        SET url = '{url}', status = '{status}', priority = '{priority}'
-                        WHERE resource_id = '{resource_id}';"""
+                        SET url = $3, status = $4, priority = $5
+                        WHERE resource_id = $2;"""
             else:
-                q = f"""
+                q = """
                         INSERT INTO catalog (dataset_id, resource_id, url, deleted, status, priority)
-                        VALUES ('{dataset_id}', '{resource_id}', '{url}', FALSE, '{status}', '{priority}')
+                        VALUES ($1, $2, $3, FALSE, $4, $5)
                         ON CONFLICT (resource_id) DO UPDATE SET
-                            dataset_id = '{dataset_id}',
-                            url = '{url}',
+                            dataset_id = $1,
+                            url = $3,
                             deleted = FALSE,
-                            status = '{status}',
-                            priority = '{priority}';"""
-            await connection.execute(q)
+                            status = $4,
+                            priority = $5;"""
+            await connection.execute(q, dataset_id, resource_id, url, status, priority)
