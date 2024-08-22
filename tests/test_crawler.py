@@ -18,7 +18,7 @@ from yarl import URL
 from udata_hydra import config
 from udata_hydra.analysis.resource import process_resource
 from udata_hydra.crawl import (
-    STATUS_BACKOFF,
+    RESOURCE_RESPONSE_STATUSES,
     check_url,
     crawl,
     get_content_type_from_header,
@@ -177,8 +177,8 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mo
     datetime.fromisoformat(webhook["check:date"])
     if exception or status == 500:
         if status == 429:
-            # In the case of a 429 status code, the error is on the crawler side and we can't give an
-            # availability status. We expect check:available to be None.
+            # In the case of a 429 status code, the error is on the crawler side and we can't give an availability status.
+            # We expect check:available to be None.
             assert webhook.get("check:available") is None
         else:
             assert webhook.get("check:available") is False
@@ -256,7 +256,7 @@ async def test_backoff_rate_limiting_lifted(
     row = await db.fetchrow("SELECT * FROM catalog")
     async with ClientSession() as session:
         res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
-    assert res == STATUS_BACKOFF
+    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # we wait for BACKOFF_PERIOD before crawling again, it should _not_ backoff
@@ -264,7 +264,7 @@ async def test_backoff_rate_limiting_lifted(
         res = await check_url(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
-    assert res != STATUS_BACKOFF
+    assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
@@ -288,7 +288,7 @@ async def test_backoff_rate_limiting_cooled_off(
     row = await db.fetchrow("SELECT * FROM catalog")
     async with ClientSession() as session:
         res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
-    assert res == STATUS_BACKOFF
+    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # waiting for BACKOFF_PERIOD is not enough since we've messed up already
@@ -296,7 +296,7 @@ async def test_backoff_rate_limiting_cooled_off(
         res = await check_url(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
-    assert res == STATUS_BACKOFF
+    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # we wait until COOL_OFF_PERIOD (0.25+0.25) before crawling again,
@@ -305,7 +305,7 @@ async def test_backoff_rate_limiting_cooled_off(
         res = await check_url(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
-    assert res != STATUS_BACKOFF
+    assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
@@ -320,7 +320,7 @@ async def test_backoff_nb_req_lifted(
     row = await db.fetchrow("SELECT * FROM catalog")
     async with ClientSession() as session:
         res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
-    assert res == STATUS_BACKOFF
+    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     # verify that we actually backed-off
     assert ("HEAD", URL(rurl)) not in rmock.requests
     # we wait for BACKOFF_PERIOD before crawling again, it should _not_ backoff
@@ -328,7 +328,7 @@ async def test_backoff_nb_req_lifted(
         res = await check_url(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
-    assert res != STATUS_BACKOFF
+    assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
@@ -347,7 +347,7 @@ async def test_backoff_on_429_status_code(
     # we've messed up, we should backoff
     async with ClientSession() as session:
         res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
-    assert res == STATUS_BACKOFF
+    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # waiting for BACKOFF_PERIOD is not enough since we've messed up already
@@ -355,7 +355,7 @@ async def test_backoff_on_429_status_code(
         res = await check_url(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
-    assert res == STATUS_BACKOFF
+    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # we wait until COOL_OFF_PERIOD (0.25+0.25) before crawling again,
@@ -364,7 +364,7 @@ async def test_backoff_on_429_status_code(
         res = await check_url(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
-    assert res != STATUS_BACKOFF
+    assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 

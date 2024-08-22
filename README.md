@@ -87,6 +87,22 @@ You can also override the coverage report configuration when running the tests b
 
 ## API
 
+The API will need a Bearer token for each request on protected endpoints (any endpoint that isn't a `GET`).
+The token is configured in the `config.toml` file as `API_KEY`, and has a default value set in the `udata_hydra/config_default.toml` file.
+
+If you're using hydra as an external service to receive resource events from [udata](https://github.com/opendatateam/udata), then udata needs to also configure this
+API key in its `udata.cfg` file:
+
+```
+# Wether udata should publish the resource events
+PUBLISH_ON_RESOURCE_EVENTS = True
+# Where to publish the events
+RESOURCES_ANALYSER_URI = "http://localhost:8000"
+# The API key that hydra needs
+RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
+
+```
+
 ### Run
 
 ```bash

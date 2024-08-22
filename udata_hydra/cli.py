@@ -144,7 +144,9 @@ async def check_resource(resource_id: str, method: str = "get"):
         log.error("Resource not found in catalog")
         return
     async with aiohttp.ClientSession(timeout=None) as session:
-        await crawl_check_url(url=res[0], resource_id=None, session=session, method=method)
+        await crawl_check_url(
+            url=res[0], resource_id=None, session=session, method=method, worker_priority="high"
+        )
 
 
 @cli(name="analyse-csv")
