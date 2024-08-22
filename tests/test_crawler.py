@@ -20,7 +20,7 @@ from udata_hydra.analysis.resource import process_resource
 from udata_hydra.crawl import (
     RESOURCE_RESPONSE_STATUSES,
     check_catalog,
-    check_url,
+    check_resource,
     get_content_type_from_header,
 )
 from udata_hydra.db.check import Check
@@ -255,13 +255,13 @@ async def test_backoff_rate_limiting_lifted(
     # We should backoff
     row = await db.fetchrow("SELECT * FROM catalog")
     async with ClientSession() as session:
-        res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
+        res = await check_resource(url=row["url"], resource_id=row["resource_id"], session=session)
     assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # we wait for BACKOFF_PERIOD before crawling again, it should _not_ backoff
     async with ClientSession() as session:
-        res = await check_url(
+        res = await check_resource(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
     assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
@@ -287,13 +287,13 @@ async def test_backoff_rate_limiting_cooled_off(
     # We should backoff
     row = await db.fetchrow("SELECT * FROM catalog")
     async with ClientSession() as session:
-        res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
+        res = await check_resource(url=row["url"], resource_id=row["resource_id"], session=session)
     assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # waiting for BACKOFF_PERIOD is not enough since we've messed up already
     async with ClientSession() as session:
-        res = await check_url(
+        res = await check_resource(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
     assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
@@ -302,7 +302,7 @@ async def test_backoff_rate_limiting_cooled_off(
     # we wait until COOL_OFF_PERIOD (0.25+0.25) before crawling again,
     # it should _not_ backoff
     async with ClientSession() as session:
-        res = await check_url(
+        res = await check_resource(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
     assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
@@ -319,13 +319,13 @@ async def test_backoff_nb_req_lifted(
     rmock.head(rurl, status=200)
     row = await db.fetchrow("SELECT * FROM catalog")
     async with ClientSession() as session:
-        res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
+        res = await check_resource(url=row["url"], resource_id=row["resource_id"], session=session)
     assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     # verify that we actually backed-off
     assert ("HEAD", URL(rurl)) not in rmock.requests
     # we wait for BACKOFF_PERIOD before crawling again, it should _not_ backoff
     async with ClientSession() as session:
-        res = await check_url(
+        res = await check_resource(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
     assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
@@ -346,13 +346,13 @@ async def test_backoff_on_429_status_code(
 
     # we've messed up, we should backoff
     async with ClientSession() as session:
-        res = await check_url(url=row["url"], resource_id=row["resource_id"], session=session)
+        res = await check_resource(url=row["url"], resource_id=row["resource_id"], session=session)
     assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
     # waiting for BACKOFF_PERIOD is not enough since we've messed up already
     async with ClientSession() as session:
-        res = await check_url(
+        res = await check_resource(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
     assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
@@ -361,7 +361,7 @@ async def test_backoff_on_429_status_code(
     # we wait until COOL_OFF_PERIOD (0.25+0.25) before crawling again,
     # it should _not_ backoff
     async with ClientSession() as session:
-        res = await check_url(
+        res = await check_resource(
             url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
         )
     assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
@@ -738,7 +738,7 @@ async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, p
     event_loop.run_until_complete(check_catalog(iterations=1))
 
 
-async def test_crawl_triggered_by_udata_entrypoint_clean_catalog(
+async def test_check_triggered_by_udata_entrypoint_clean_catalog(
     client,
     udata_resource_payload,
     event_loop,
@@ -763,7 +763,7 @@ async def test_crawl_triggered_by_udata_entrypoint_clean_catalog(
     assert len(res) == 1
 
 
-async def test_crawl_triggered_by_udata_entrypoint_existing_catalog(
+async def test_check_triggered_by_udata_entrypoint_existing_catalog(
     setup_catalog,
     client,
     udata_resource_payload,
@@ -788,7 +788,7 @@ async def test_crawl_triggered_by_udata_entrypoint_existing_catalog(
     assert len(res) == 2
 
 
-async def test_crawl_triggers_csv_analysis(rmock, event_loop, db, produce_mock, setup_catalog):
+async def test_check_triggers_csv_analysis(rmock, event_loop, db, produce_mock, setup_catalog):
     """Crawl a CSV file, analyse and apify it, downloads only once"""
     rurl = "https://example.com/resource-1"
     # mock for check
@@ -810,10 +810,10 @@ async def test_crawl_triggers_csv_analysis(rmock, event_loop, db, produce_mock, 
     assert len(res) == 2
 
 
-async def test_recrawl_download_only_once(
+async def test_recheck_download_only_once(
     rmock, fake_check, event_loop, db, produce_mock, setup_catalog
 ):
-    """On recrawl of a (CSV) file, if it hasn't change, downloads only once"""
+    """On reccheck of a (CSV) file, if it hasn't change, downloads only once"""
     await fake_check(
         resource_id=RESOURCE_ID, headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"}
     )

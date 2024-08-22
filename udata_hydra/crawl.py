@@ -241,7 +241,7 @@ def has_nice_head(resp) -> bool:
     return True
 
 
-async def check_url(
+async def check_resource(
     url: str,
     resource_id: str,
     session,
@@ -290,7 +290,7 @@ async def check_url(
         async with _method(url, timeout=timeout, allow_redirects=True) as resp:
             end = time.time()
             if method != "get" and not has_nice_head(resp):
-                return await check_url(
+                return await check_resource(
                     url, resource_id, session, method="get", worker_priority=worker_priority
                 )
             resp.raise_for_status()
@@ -366,7 +366,7 @@ async def check_url(
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
 
 
-async def check_urls(to_parse: list[str]) -> None:
+async def check_resources(to_parse: list[str]) -> None:
     context.monitor().set_status("Checking urls...")
     tasks: list = []
     async with aiohttp.ClientSession(
@@ -374,7 +374,7 @@ async def check_urls(to_parse: list[str]) -> None:
     ) as session:
         for row in to_parse:
             tasks.append(
-                check_url(
+                check_resource(
                     url=row["url"],
                     resource_id=row["resource_id"],
                     session=session,
@@ -473,7 +473,7 @@ async def check_batch() -> None:
             to_check += await select_rows_based_on_query(connection, q, since)
 
     if len(to_check):
-        await check_urls(to_check)
+        await check_resources(to_check)
     else:
         context.monitor().set_status("Nothing to crawl for now.")
     await asyncio.sleep(config.SLEEP_BETWEEN_BATCHES)

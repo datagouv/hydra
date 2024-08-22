@@ -14,7 +14,7 @@ from progressist import ProgressBar
 
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, delete_table
-from udata_hydra.crawl import check_url as crawl_check_url
+from udata_hydra.crawl import check_resource as crawl_check_resource
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
@@ -122,8 +122,8 @@ async def load_catalog(
 
 
 @cli
-async def check_url(url: str, method: str = "get"):
-    """Quickly check an URL"""
+async def crawl_url(url: str, method: str = "get"):
+    """Quickly crawl an URL"""
     log.info(f"Checking url {url}")
     async with aiohttp.ClientSession(timeout=None) as session:
         timeout = aiohttp.ClientTimeout(total=5)
@@ -144,7 +144,7 @@ async def check_resource(resource_id: str, method: str = "get"):
         log.error("Resource not found in catalog")
         return
     async with aiohttp.ClientSession(timeout=None) as session:
-        await crawl_check_url(
+        await crawl_check_resource(
             url=res[0], resource_id=None, session=session, method=method, worker_priority="high"
         )
 
