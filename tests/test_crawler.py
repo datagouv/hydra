@@ -24,6 +24,7 @@ from udata_hydra.crawl import (
     get_content_type_from_header,
 )
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource import Resource
 
 from .conftest import DATASET_ID, RESOURCE_ID
 
@@ -853,19 +854,34 @@ async def test_content_type_from_header(content_type):
     )
 
 
-async def test_dont_check_urls_with_status_crawling(
-    rmock, event_loop, db, produce_mock, setup_catalog
+@pytest.mark.parametrize("resource_status", list(Resource.STATUSES.keys()) + [None])
+async def test_dont_check_resources_with_status(
+    rmock, event_loop, db, produce_mock, setup_catalog, resource_status
 ):
-    """Don't check urls that have a status state pending"""
+    await Resource.update(resource_id=RESOURCE_ID, data={"status": resource_status})
     rurl = "https://example.com/resource-1"
-    await db.execute(
-        "UPDATE catalog SET priority = TRUE, status = 'crawling' WHERE resource_id = $1",
-        RESOURCE_ID,
-    )
     event_loop.run_until_complete(check_catalog(iterations=1))
 
-    # HEAD shouldn't have been called
-    assert ("HEAD", URL(rurl)) not in rmock.requests
+    if resource_status == "BACKOFF" or resource_status is None:
+        # HEAD should have been called
+        assert ("HEAD", URL(rurl)) in rmock.requests
 
-    # GET shouldn't have been called
-    assert ("GET", URL(rurl)) not in rmock.requests
+        # Status should have been reset to None
+        resource: dict = await db.fetchrow(
+            "SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID
+        )
+        assert resource["status"] is None
+
+    else:
+        # Don't check urls that have a status state pending
+
+        # HEAD shouldn't have been called
+        assert ("HEAD", URL(rurl)) not in rmock.requests
+        # GET shouldn't have been called
+        assert ("GET", URL(rurl)) not in rmock.requests
+
+        # Status should have stayed the same
+        resource: dict = await db.fetchrow(
+            "SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID
+        )
+        assert resource["status"] == resource_status
