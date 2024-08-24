@@ -33,12 +33,12 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     """
     Perform analysis on the resource designated by check_id
     - change analysis
-    - size (optionnal)
-    - mime_type (optionnal)
-    - checksum (optionnal)
+    - size (optional)
+    - mime_type (optional)
+    - checksum (optional)
     - launch csv_analysis if looks like a CSV response
 
-    Will call udata if first check or changes found, and update check with optionnal infos
+    Will call udata if first check or changes found, and update check with optional infos
     """
     check: dict = await Check.get(check_id)
     if not check:
