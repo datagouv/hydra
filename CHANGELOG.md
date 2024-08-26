@@ -51,6 +51,7 @@
 - Add basic authentication via API key using a bearer token auth for all POST/PUT/DELETE endpoints [#130](https://github.com/datagouv/hydra/pull/130)
 - Simplify getting Sentry info by loading pyproject.toml info in config [#138](https://github.com/datagouv/hydra/pull/138)
 - Add a `POST` `/api/checks/` route for force crawling [#118](https://github.com/datagouv/hydra/pull/118)
+- Update `csv-detective` to 0.7.2.dev824 which doesn't include yanked version of `requests` anymore [#142](https://github.com/datagouv/hydra/pull/142)
 
 ## 1.0.1 (2023-01-04)
 
