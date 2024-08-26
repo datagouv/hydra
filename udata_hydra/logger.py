@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Optional
 
 import coloredlogs
 import sentry_sdk
