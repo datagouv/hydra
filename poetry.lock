@@ -739,12 +739,12 @@ toml = ["tomli"]
 
 [[package]]
 name = "csv-detective"
-version = "0.7.2.dev824"
+version = "0.7.2"
 description = "Detect CSV column content"
 optional = false
 python-versions = "*"
 files = [
-    {file = "csv_detective-0.7.2.dev824-py3-none-any.whl", hash = "sha256:61793ba47719b0ab2a0ebcd9b94e969a3ce1ca24e28c1a161cc64291a3459dbb"},
+    {file = "csv_detective-0.7.2-py3-none-any.whl", hash = "sha256:5d8165a7eae2759da8c92c8df82080d91e638b707d757ac0cfff2bc9ca05cb42"},
 ]
 
 [package.dependencies]
@@ -2631,4 +2631,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "397fccecb0b438df6c03d285b72b99205a079412c5c8004dac976cdc7ddd4c93"
+content-hash = "7cb6ee6577660bb86a707d50b7614e9ac673919e470950dfc235ad51b9dfdd8c"
