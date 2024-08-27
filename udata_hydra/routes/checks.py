@@ -6,7 +6,7 @@ from aiohttp import web
 from marshmallow import ValidationError
 
 from udata_hydra import config, context
-from udata_hydra.crawl import RESOURCE_RESPONSE_STATUSES, check_url
+from udata_hydra.crawl import check_url
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import CheckSchema
