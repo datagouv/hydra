@@ -1,26 +1,30 @@
+import datetime
 import json
+from typing import Optional
 
-from marshmallow import Schema, fields
+from pydantic import UUID1, BaseModel, Field, field_validator
 
 
-class CheckSchema(Schema):
-    check_id = fields.Integer(data_key="id")
-    catalog_id = fields.Integer()
-    url = fields.Str()
-    domain = fields.Str()
-    created_at = fields.DateTime()
-    check_status = fields.Integer(data_key="status")
-    headers = fields.Function(lambda obj: json.loads(obj["headers"]) if obj["headers"] else {})
-    timeout = fields.Boolean()
-    response_time = fields.Float()
-    error = fields.Str()
-    dataset_id = fields.Str()
-    resource_id = fields.UUID()
-    deleted = fields.Boolean()
-    parsing_started_at = fields.DateTime()
-    parsing_finished_at = fields.DateTime()
-    parsing_error = fields.Str()
-    parsing_table = fields.Str()
+class CheckSchema(BaseModel):
+    check_id: int = Field(alias="id")
+    catalog_id: Optional[int] = None
+    url: Optional[str] = None
+    domain: Optional[str] = None
+    created_at: Optional[datetime.datetime]
+    check_status: int = Field(alias="status")
+    headers: dict
+    timeout: Optional[bool] = None
+    response_time: Optional[float]
+    error: Optional[str] = None
+    dataset_id: Optional[str] = None
+    resource_id: Optional[UUID1] = None
+    deleted: Optional[bool] = None
+    parsing_started_at: Optional[datetime.datetime] = None
+    parsing_finished_at: Optional[datetime.datetime] = None
+    parsing_error: Optional[str] = None
+    parsing_table: Optional[str] = None
 
-    def create(self, data):
-        return self.load(data)
+    @field_validator("headers", mode="before")
+    @classmethod
+    def transform(cls, obj: dict) -> dict:
+        return json.loads(obj["headers"]) if obj["headers"] else {}

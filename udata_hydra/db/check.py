@@ -20,7 +20,10 @@ class Check:
                 ON catalog.last_check = checks.id
                 WHERE checks.id = $1;
             """
-            return await connection.fetchrow(q, check_id)
+            record = await connection.fetchrow(q, check_id)
+            if record:
+                return dict(record)
+            return None
 
     @classmethod
     async def get_latest(
@@ -36,7 +39,10 @@ class Check:
             WHERE checks.id = catalog.last_check
             AND catalog.{column} = $1
             """
-            return await connection.fetchrow(q, url or resource_id)
+            record = await connection.fetchrow(q, url or resource_id)
+            if record:
+                return dict(record)
+            return None
 
     @classmethod
     async def get_all(

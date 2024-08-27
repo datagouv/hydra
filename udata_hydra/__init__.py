@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 import toml
+import tomllib
 
 log = logging.getLogger("udata-hydra")
 
@@ -24,7 +25,8 @@ class Configurator:
         # override with local settings
         local_settings = os.environ.get("HYDRA_SETTINGS", Path.cwd() / "config.toml")
         if Path(local_settings).exists():
-            configuration.update(toml.load(local_settings))
+            with open(Path(local_settings), "rb") as f:
+                configuration.update(tomllib.load(f))
 
         self.configuration = configuration
         self.check()

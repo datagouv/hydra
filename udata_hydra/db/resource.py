@@ -1,3 +1,5 @@
+from typing import Optional
+
 from udata_hydra import context
 
 
@@ -5,12 +7,14 @@ class Resource:
     """Represents a resource in the "catalog" DB table"""
 
     @classmethod
-    async def get(cls, resource_id: str, column_name: str = "*") -> dict:
+    async def get(cls, resource_id: str, column_name: str = "*") -> Optional[dict]:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = f"""SELECT {column_name} FROM catalog WHERE resource_id = '{resource_id}';"""
-            resource = await connection.fetchrow(q)
-        return resource
+            record = await connection.fetchrow(q)
+            if record:
+                return dict(record)
+            return None
 
     @classmethod
     async def insert(
