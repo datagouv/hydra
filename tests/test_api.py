@@ -14,7 +14,6 @@ from aiohttp.client_exceptions import ClientError, ClientResponseError
 from yarl import URL
 
 from tests.conftest import DATASET_ID, RESOURCE_ID
-from udata_hydra.crawl import RESOURCE_RESPONSE_STATUSES
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
