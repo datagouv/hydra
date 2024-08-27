@@ -7,6 +7,26 @@ class ResourceException:
     Resources that are too large to be processed normally but that we want to have anyway"""
 
     @classmethod
+    async def get_all(cls) -> list[dict]:
+        """
+        Get all resource_exceptions from the DB table
+        """
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = "SELECT * FROM resources_exceptions;"
+            return await connection.fetch(q)
+
+    @classmethod
+    async def get_all_ids(cls) -> list[dict]:
+        """
+        Get all resource_ids from resource_exceptions DB table
+        """
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = "SELECT resource_id FROM resources_exceptions;"
+            return await connection.fetch(q)
+
+    @classmethod
     async def insert(cls, resource_id: str, indexes: list[str]) -> dict:
         """
         Insert a new resource_exception in the DB

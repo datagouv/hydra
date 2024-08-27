@@ -34,6 +34,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.analysis.errors import ParseException
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import Reader, Timer, download_resource, queue, send
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
@@ -110,7 +111,7 @@ async def analyse_csv(
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
 
-    exceptions = config.LARGE_RESOURCES_EXCEPTIONS
+    exceptions: list[str] = [r["resource_id"] for r in await ResourceException.get_all_ids()]
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))

@@ -11,6 +11,7 @@ from dateparser import parse as date_parser
 from udata_hydra import config, context
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
     compute_checksum_from_file,
     detect_tabular_from_headers,
@@ -45,7 +46,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         log.error(f"Check not found by id {check_id}")
         return
 
-    exceptions = config.LARGE_RESOURCES_EXCEPTIONS
+    exceptions: list[str] = [r["resource_id"] for r in await ResourceException.get_all_ids()]
 
     resource_id = check["resource_id"]
     dataset_id = check["dataset_id"]
