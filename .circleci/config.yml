@@ -105,10 +105,11 @@ jobs:
                 # This is a tagged release, version has been handled upstream
                 python3 -m build
             else
-                # Relies on a dev version like "1.2.1.dev" by default
+                # Relies on a dev version like "2.0.0.dev" by default
                 VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
                 DEV_VERSION="${VERSION}.dev${CIRCLE_BUILD_NUM}"
-                sed -i '' "s/version = '${VERSION}'/version = '${DEV_VERSION}'/" pyproject.toml
+                # Use sed to replace the version in pyproject.toml
+                sed -i "s/version = \"${VERSION}\"/version = \"${DEV_VERSION}\"/" pyproject.toml
                 python3 -m build
             fi
       - store_artifacts:
