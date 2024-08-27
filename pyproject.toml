@@ -1,6 +1,6 @@
 [project]
 name = "udata-hydra"
-version = "2.0.0.dev"
+version = "2.0.0"
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = [{ name = "Opendata Team", email = "opendatateam@data.gouv.fr" }]
 dependencies = [
@@ -71,11 +71,9 @@ markers = [
 addopts = "--cov=udata_hydra/ --cov-report term-missing"
 
 [tool.ruff]
-lint = { extend-select = [
-    "I",
-], ignore = [
-    "F401",
-] } # ["I"] is to also sort imports with an isort rule # TODO: remove ignore F401 later
+lint = { extend-select = ["I"], ignore = ["F401"] }
+# ["I"] is to also sort imports with an isort rule
+# TODO: remove ignore F401 later
 line-length = 100
 
 [tool.setuptools.dynamic]
