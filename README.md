@@ -29,7 +29,7 @@ This project uses `libmagic`, which needs to be installed on your system, eg:
 
 ### Python
 
-This project uses Python 3.9.
+This project uses Python >=3.9.
 
 Project dependencies are listed in `pyproject.toml`, while dependencies are locked in `requirements.txt` (for production only deps) and in `requirements-dev.txt` files.
 
