@@ -7,6 +7,7 @@ from udata_hydra.routes.resources import (
     get_resource,
     update_resource,
 )
+from udata_hydra.routes.resources_exceptions import create_resource_exception
 from udata_hydra.routes.status import get_crawler_status, get_health, get_stats, get_worker_status
 
 # routes = web.RouteTableDef()
@@ -23,6 +24,8 @@ routes: list = [
     web.post("/api/resource/created/", create_resource),  # TODO: legacy, to remove
     web.post("/api/resource/updated/", update_resource),  # TODO: legacy, to remove
     web.post("/api/resource/deleted/", delete_resource),  # TODO: legacy, to remove
+    # Route for resources exceptions
+    web.post("/api/resources-exceptions/", create_resource_exception),
     # Routes for statuses
     web.get("/api/status/crawler/", get_crawler_status),
     web.get("/api/status/worker/", get_worker_status),
