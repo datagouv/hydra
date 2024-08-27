@@ -53,12 +53,12 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Lint code, format code and sort imports
+          name: Check code linting, code formatting and imports sorting
           command: |
             source .venv/bin/activate
-            # Check linting and imports sorting (to fix, add --fix)
+            # Check linting and imports sorting
             ruff check
-            # Check code formatting (to fix, add --check)
+            # Check code formatting
             ruff format --check
 
   tests:
