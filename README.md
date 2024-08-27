@@ -38,14 +38,14 @@ To install the exact same environment locally including the dev dependencies, us
 ...or `pip-sync requirements-dev.txt` with [pip-tools](https://pip-tools.readthedocs.io/en/stable/).
 
 To update the lock files, you can use any modern Python package manager (except Poetry) like [pip-tools](https://pip-tools.readthedocs.io/en/stable/), [PDM](https://pdm.fming.dev/) or [uv](https://uv.readthedocs.io/en/latest/), while defining `requirement.txt` and `requirement-dev.txt` as the output lock files.
-With [pip-tools](https://pip-tools.readthedocs.io/en/stable/), the command are `pip-compile` for requirements.txt, and `pip-compile --extra dev -o requirements-dev.txt` for requirements-dev.txt.
+With [pip-tools](https://pip-tools.readthedocs.io/en/stable/), the commands are `pip-compile` for requirements.txt, and `pip-compile --extra dev -o requirements-dev.txt` for requirements-dev.txt.
 
 ## CLI
 
 ### Create database structure
 
 Create a Python 3.9 virtual environment and activate it:
-`python3 -m venv .venv && source .venv/bin/activate`
+`python3.9 -m venv .venv && source .venv/bin/activate`
 
 Install udata-hydra dependencies and cli:
 `pip install -r requirements-dev.txt`
