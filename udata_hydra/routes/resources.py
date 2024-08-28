@@ -1,4 +1,5 @@
 import json
+from typing import Optional
 
 from aiohttp import web
 from marshmallow import ValidationError
@@ -36,7 +37,7 @@ async def get_resource_status(request: web.Request) -> web.Response:
     if not resource:
         raise web.HTTPNotFound()
 
-    status: str = resource["status"]
+    status: Optional[str] = resource["status"]
     status_verbose: str = Resource.STATUSES[status]
 
     return web.json_response(

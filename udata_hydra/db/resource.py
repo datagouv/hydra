@@ -7,6 +7,7 @@ class Resource:
     """Represents a resource in the "catalog" DB table"""
 
     STATUSES = {
+        None: "no status, waiting",
         "BACKOFF": "backoff period for this domain, will be checked later",
         "CRAWLING": "resource URL currently being crawled",
         "CRAWLED": "resource URL crawl finished",
