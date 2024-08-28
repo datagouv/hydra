@@ -13,7 +13,6 @@ class Resource:
         "CRAWLED": "resource URL crawl finished",
         "TO_PROCESS_RESOURCE": "to be processed for change analysis",
         "PROCESSING_RESOURCE": "currently being processed for change analysis",
-        "PROCESSED_RESOURCE": "change analysis finished",
         "TO_ANALYSE_CSV": "to be analysed by CSV detective",
         "ANALYSING_CSV": "currently being analysed by CSV detective",
         "INSERTING_IN_DB": "currently being inserted in DB",
