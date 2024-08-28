@@ -9,7 +9,7 @@ class Resource:
     STATUSES = {
         None: "no status, waiting",
         "BACKOFF": "backoff period for this domain, will be checked later",
-        "CRAWLING": "resource URL currently being crawled",
+        "CRAWLING_URL": "resource URL currently being crawled",
         "TO_PROCESS_RESOURCE": "to be processed for change analysis",
         "PROCESSING_RESOURCE": "currently being processed for change analysis",
         "TO_ANALYSE_CSV": "to be analysed by CSV detective",
