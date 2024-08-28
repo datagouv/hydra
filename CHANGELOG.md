@@ -56,7 +56,7 @@
 - Simplify `save_as_parquet` method, and fix type not compatible with Python 3.9; remove unused import [#156](https://github.com/datagouv/hydra/pull/156)
 - Fix and simplify project metadata loading [#157](https://github.com/datagouv/hydra/pull/157)
 - Use Python 3.11 instead of 3.9 for performance improvements and future compatibility [#101](https://github.com/datagouv/hydra/pull/101)
-- Convert to a package-manager-agnostic project instead of a Poetry project [#145](https://github.com/datagouv/hydra/pull/145)
+- Convert to a package-manager-agnostic project instead of a Poetry project [#143](https://github.com/datagouv/hydra/pull/143)
 
 ## 1.0.1 (2023-01-04)
 
