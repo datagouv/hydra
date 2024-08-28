@@ -105,9 +105,6 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
     if change_status == Change.HAS_CHANGED:
         await store_last_modified_date(change_payload or {}, check_id)
 
-    # Update resource status to PROCESSED_RESOURCE
-    await Resource.update(resource_id, data={"status": "PROCESSED_RESOURCE"})
-
     analysis_results = {**dl_analysis, **(change_payload or {})}
 
     if change_status == Change.HAS_CHANGED or is_first_check:
@@ -117,6 +114,9 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             # Analyse CSV and create a table in the CSV database
             queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="default")
 
+        else:
+            await Resource.update(resource_id, data={"status": None})
+
         # Send analysis result to udata
         queue.enqueue(
             send,
@@ -125,6 +125,9 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
             document=analysis_results,
             _priority="high",
         )
+
+    else:
+        await Resource.update(resource_id, data={"status": None})
 
 
 async def store_last_modified_date(change_analysis: dict, check_id: int) -> None:
