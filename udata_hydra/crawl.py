@@ -310,9 +310,6 @@ async def check_resource(
 
             queue.enqueue(process_resource, check_id, is_first_check, _priority=worker_priority)
 
-            # Reset resource status to None so that it's not forbidden to be checked again
-            await Resource.update(resource_id=resource_id, data={"status": None})
-
             return RESOURCE_RESPONSE_STATUSES["OK"]
 
     except asyncio.exceptions.TimeoutError:
