@@ -44,23 +44,15 @@ With [pip-tools](https://pip-tools.readthedocs.io/en/stable/), the commands are 
 
 ### Create database structure
 
-Create a Python 3.9 virtual environment and activate it:
-`python3.9 -m venv .venv && source .venv/bin/activate`
-
-Install udata-hydra dependencies and cli:
-`pip install -r requirements-dev.txt`
-...or with `pip-sync` from [pip-tools](https://pip-tools.readthedocs.io/en/stable/):
-`pip-sync requirements-dev.txt`
-
-`python3 udata-hydra migrate`
+`python udata-hydra migrate`
 
 ### Load (UPSERT) latest catalog version from data.gouv.fr
 
-`python3 udata-hydra load-catalog`
+`python udata-hydra load-catalog`
 
 ## Crawler
 
-`python3 udata_hydra.crawl:run`
+`python udata_hydra.crawl:run`
 
 It will crawl (forever) the catalog according to config set in `udata_hydra/config.toml`, with a default config in `udata_hydra/config_default.toml`.
 
@@ -76,11 +68,11 @@ If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
 A job queuing system is used to process long-running tasks. Launch the worker with the following command:
 
-`python3 rq worker -c udata_hydra.worker`
+`python rq worker -c udata_hydra.worker`
 
 Monitor worker status:
 
-`python3 rq info -c udata_hydra.worker --interval 1`
+`python rq info -c udata_hydra.worker --interval 1`
 
 ## CSV conversion to database
 
@@ -124,9 +116,7 @@ RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
 ### Run
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install .
-python3 adev runserver udata_hydra/app.py
+python adev runserver udata_hydra/app.py
 ```
 
 ### Routes/endpoints
