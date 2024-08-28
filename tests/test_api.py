@@ -15,6 +15,7 @@ from yarl import URL
 
 from tests.conftest import DATASET_ID, RESOURCE_ID
 from udata_hydra.db.resource import Resource
+from udata_hydra.utils import is_valid_uri
 
 pytestmark = pytest.mark.asyncio
 
@@ -238,12 +239,15 @@ async def test_api_get_resource_status(
     db, client, insert_fake_resource, resource_status, resource_status_verbose
 ):
     await insert_fake_resource(db, status=resource_status)
+    # await fake_check()
     resp = await client.get(f"/api/resources/{RESOURCE_ID}/status")
     assert resp.status == 200
     data = await resp.json()
     assert data["resource_id"] == RESOURCE_ID
     assert data["status"] == resource_status
     assert data["status_verbose"] == resource_status_verbose
+    assert is_valid_uri(data["latest_check_url"])
+    assert data["latest_check_url"].endswith(f"/api/checks/latest/?resource_id={RESOURCE_ID}")
 
 
 @pytest.mark.parametrize(

@@ -13,7 +13,7 @@ from udata_hydra.routes.status import get_crawler_status, get_health, get_stats,
 # routes = web.RouteTableDef()
 routes: list = [
     # Routes for checks
-    web.get("/api/checks/latest/", get_latest_check),
+    web.get("/api/checks/latest/", get_latest_check, name="get-latest-check"),
     web.get("/api/checks/all/", get_all_checks),
     web.post("/api/checks/", create_check),
     # Routes for resources

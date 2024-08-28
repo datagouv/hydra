@@ -4,6 +4,7 @@ from typing import Optional
 from aiohttp import web
 from marshmallow import ValidationError
 
+from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import ResourceSchema
 from udata_hydra.utils import get_request_params
@@ -40,8 +41,15 @@ async def get_resource_status(request: web.Request) -> web.Response:
     status: Optional[str] = resource["status"]
     status_verbose: str = Resource.STATUSES[status]
 
+    latest_check_url: str = f"{request.scheme}://{request.host}{str(request.app.router["get-latest-check"].url_for())}?resource_id={resource_id}"
+
     return web.json_response(
-        {"resource_id": resource_id, "status": status, "status_verbose": status_verbose}
+        {
+            "resource_id": resource_id,
+            "status": status,
+            "status_verbose": status_verbose,
+            "latest_check_url": latest_check_url,
+        }
     )
 
 
