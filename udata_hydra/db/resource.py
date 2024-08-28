@@ -10,7 +10,6 @@ class Resource:
         None: "no status, waiting",
         "BACKOFF": "backoff period for this domain, will be checked later",
         "CRAWLING": "resource URL currently being crawled",
-        "CRAWLED": "resource URL crawl finished",
         "TO_PROCESS_RESOURCE": "to be processed for change analysis",
         "PROCESSING_RESOURCE": "currently being processed for change analysis",
         "TO_ANALYSE_CSV": "to be analysed by CSV detective",

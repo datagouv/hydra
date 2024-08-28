@@ -260,9 +260,6 @@ async def check_resource(
     url_parsed = urlparse(url)
     domain = url_parsed.netloc
 
-    # Update resource status to CRAWLED
-    await Resource.update(resource_id, data={"status": "CRAWLED"})
-
     if not domain:
         log.warning(f"[warning] not netloc in url, skipping {url}")
         # Process the check data. If it has changed, it will be sent to udata
