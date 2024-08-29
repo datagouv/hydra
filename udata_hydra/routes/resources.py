@@ -41,14 +41,14 @@ async def get_resource_status(request: web.Request) -> web.Response:
     status: Optional[str] = resource["status"]
     status_verbose: str = Resource.STATUSES[status]
 
-    latest_check_url: str = f"{request.scheme}://{request.host}{str(request.app.router["get-latest-check"].url_for())}?resource_id={resource_id}"
+    latest_check_endpoint = str(request.app.router["get-latest-check"].url_for())
 
     return web.json_response(
         {
             "resource_id": resource_id,
             "status": status,
             "status_verbose": status_verbose,
-            "latest_check_url": latest_check_url,
+            "latest_check_url": f"{request.scheme}://{request.host}{latest_check_endpoint}?resource_id={resource_id}",
         }
     )
 
