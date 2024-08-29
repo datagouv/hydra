@@ -90,16 +90,10 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Install build dependencies, not including dev ones
-          command: |
-            pip install --upgrade pip
-            python3 -m venv .venv_build && source .venv_build/bin/activate
-            pip install -r requirements.txt
-            pip install build
-      - run:
           name: Build a distributable package
           command: |
-            source .venv_build/bin/activate
+            source .venv/bin/activate
+            pip install build
             # Build a wheel release
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
