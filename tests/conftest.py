@@ -3,6 +3,7 @@ import hashlib
 import os
 import uuid
 from datetime import datetime
+from typing import Optional
 
 import asyncpg
 import nest_asyncio
@@ -16,6 +17,7 @@ import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra import config
 from udata_hydra.app import app_factory
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource import Resource
 from udata_hydra.logger import stop_sentry
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
@@ -164,13 +166,13 @@ async def db():
 
 @pytest_asyncio.fixture
 async def insert_fake_resource():
-    async def _insert_fake_resource(database) -> None:
-        await database.execute(
-            f"""
-            INSERT INTO catalog (dataset_id, resource_id, url, priority, deleted)
-            VALUES ('{DATASET_ID}', '{RESOURCE_ID}', 'http://dev.local/', True, False)
-            ON CONFLICT (resource_id) DO NOTHING;
-            """
+    async def _insert_fake_resource(database, status: Optional[str] = None):
+        await Resource.insert(
+            dataset_id=DATASET_ID,
+            resource_id=RESOURCE_ID,
+            url="http://dev.local/",
+            status=status,
+            priority=True,
         )
 
     return _insert_fake_resource

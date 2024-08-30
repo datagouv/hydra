@@ -1,5 +1,6 @@
 import json
 import logging
+from urllib.parse import urlparse
 
 import aiohttp
 from aiohttp import web
@@ -7,6 +8,14 @@ from aiohttp import web
 from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
+
+
+def is_valid_uri(uri: str) -> bool:
+    try:
+        result = urlparse(uri)
+        return all([result.scheme, result.netloc])
+    except AttributeError:
+        return False
 
 
 def get_request_params(request, params_names: list[str]) -> list:

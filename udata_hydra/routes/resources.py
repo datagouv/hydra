@@ -1,8 +1,10 @@
 import json
+from typing import Optional
 
 from aiohttp import web
 from marshmallow import ValidationError
 
+from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import ResourceSchema
 from udata_hydra.utils import get_request_params
@@ -19,6 +21,36 @@ async def get_resource(request: web.Request) -> web.Response:
         raise web.HTTPNotFound()
 
     return web.json_response(ResourceSchema().dump(dict(resource)))
+
+
+async def get_resource_status(request: web.Request) -> web.Response:
+    """Endpoint to get the current status of a resource from the DB.
+    It is the same as get_resource but only returns the status of the resource, saving bandwith and processing time.
+    Respond with a 200 status code and a JSON body with the resource status
+    If resource is not found, respond with a 404 status code
+    """
+    try:
+        resource_id: str = request.match_info["resource_id"]
+    except Exception as e:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
+
+    resource = await Resource.get(resource_id=resource_id, column_name="status")
+    if not resource:
+        raise web.HTTPNotFound()
+
+    status: Optional[str] = resource["status"]
+    status_verbose: str = Resource.STATUSES[status]
+
+    latest_check_endpoint = str(request.app.router["get-latest-check"].url_for())
+
+    return web.json_response(
+        {
+            "resource_id": resource_id,
+            "status": status,
+            "status_verbose": status_verbose,
+            "latest_check_url": f"{request.scheme}://{request.host}{latest_check_endpoint}?resource_id={resource_id}",
+        }
+    )
 
 
 async def create_resource(request: web.Request) -> web.Response:
