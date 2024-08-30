@@ -251,8 +251,8 @@ async def check_resource(
 ) -> str:
     log.debug(f"check {url}, sleep {sleep}, method {method}")
 
-    # Update resource status to CRAWLING
-    await Resource.update(resource_id, data={"status": "CRAWLING"})
+    # Update resource status to CRAWLING_URL
+    await Resource.update(resource_id, data={"status": "CRAWLING_URL"})
 
     if sleep:
         await asyncio.sleep(sleep)
