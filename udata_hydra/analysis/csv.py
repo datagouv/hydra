@@ -120,11 +120,10 @@ async def analyse_csv(
     # Update resource status to ANALYSING_CSV
     await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
 
-    exceptions: list[Record] = await ResourceException.get_all()
-    exception: Optional[Record] = next(
-        (e for e in exceptions if e["resource_id"] == resource_id), None
-    )
-    table_indexes: Optional[dict[str, str]] = exception["table_indexes"] if exception else None
+    # Check if the resource is in the exceptions table
+    # If it is, get the table_indexes to use them later
+    exception: Optional[Record] = await ResourceException.get_by_resource_id(resource_id)
+    table_indexes = exception["table_indexes"] if exception else None
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
