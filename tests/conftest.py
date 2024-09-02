@@ -143,9 +143,9 @@ def produce_mock(mocker):
 
 @pytest.fixture
 def analysis_mock(mocker):
-    """Disable process_resource while crawling"""
+    """Disable analyse_resource while crawling"""
     mocker.patch(
-        "udata_hydra.crawl.check_resource.process_resource",
+        "udata_hydra.crawl.check_resource.analyse_resource",
         dummy({"error": None, "checksum": None, "filesize": None, "mime_type": None}),
     )
 

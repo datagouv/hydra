@@ -3,11 +3,12 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
+import asyncpg
 from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
 from udata_hydra.crawl.check_resource import check_resource
-from udata_hydra.crawl.utils_db import get_excluded_clause, select_rows_based_on_query
+from udata_hydra.crawl.select_resources_to_check import select_resources_to_check
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils import queue  # noqa
 
@@ -18,7 +19,8 @@ log = setup_logging()
 
 
 async def check_resources(to_parse: list[str]) -> None:
-    context.monitor().set_status("Checking urls...")
+    """Check a batch of resources"""
+    context.monitor().set_status("Checking resources...")
     tasks: list = []
     async with aiohttp.ClientSession(
         timeout=None, headers={"user-agent": config.USER_AGENT}
@@ -38,62 +40,6 @@ async def check_resources(to_parse: list[str]) -> None:
             context.monitor().refresh(results)
 
 
-async def check_batch() -> None:
-    """Check a batch of resources from the catalog"""
-    context.monitor().set_status("Getting a batch from catalog...")
-    pool = await context.pool()
-    async with pool.acquire() as connection:
-        excluded = get_excluded_clause()
-        # first urls that are prioritised
-        q = f"""
-            SELECT * FROM (
-                SELECT catalog.url, dataset_id, resource_id
-                FROM catalog
-                WHERE {excluded}
-                AND priority = True
-            ) s
-            ORDER BY random() LIMIT {config.BATCH_SIZE}
-        """
-        to_check = await select_rows_based_on_query(connection, q)
-        # then urls without checks
-        if len(to_check) < config.BATCH_SIZE:
-            q = f"""
-                SELECT * FROM (
-                    SELECT catalog.url, dataset_id, resource_id
-                    FROM catalog
-                    WHERE catalog.last_check IS NULL
-                    AND {excluded}
-                    AND priority = False
-                ) s
-                ORDER BY random() LIMIT {config.BATCH_SIZE}
-            """
-            to_check += await select_rows_based_on_query(connection, q)
-        # if not enough for our batch size, handle outdated checks
-        if len(to_check) < config.BATCH_SIZE:
-            since = parse_timespan(config.SINCE)  # in seconds
-            since = datetime.now(timezone.utc) - timedelta(seconds=since)
-            limit = config.BATCH_SIZE - len(to_check)
-            q = f"""
-            SELECT * FROM (
-                SELECT catalog.url, dataset_id, catalog.resource_id
-                FROM catalog, checks
-                WHERE catalog.last_check IS NOT NULL
-                AND {excluded}
-                AND catalog.last_check = checks.id
-                AND checks.created_at <= $1
-                AND catalog.priority = False
-            ) s
-            ORDER BY random() LIMIT {limit}
-            """
-            to_check += await select_rows_based_on_query(connection, q, since)
-
-    if len(to_check):
-        await check_resources(to_check)
-    else:
-        context.monitor().set_status("Nothing to crawl for now.")
-    await asyncio.sleep(config.SLEEP_BETWEEN_BATCHES)
-
-
 async def check_catalog(iterations: int = -1) -> None:
     """Launch check batches
 
@@ -106,9 +52,19 @@ async def check_catalog(iterations: int = -1) -> None:
             BACKOFF_NB_REQ=config.BACKOFF_NB_REQ,
             BACKOFF_PERIOD=config.BACKOFF_PERIOD,
         )
+
         while iterations != 0:
-            await check_batch()
+            to_check = await select_resources_to_check()
+
+            if to_check and len(to_check):
+                await check_resources(to_check)
+
+            else:
+                context.monitor().set_status("No resources to check for now.")
+
+            await asyncio.sleep(config.SLEEP_BETWEEN_BATCHES)
             iterations -= 1
+
     finally:
         pool = await context.pool()
         await pool.close()

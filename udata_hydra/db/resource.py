@@ -1,6 +1,8 @@
 from typing import Optional
 
-from udata_hydra import context
+import asyncpg
+
+from udata_hydra import config, context
 
 
 class Resource:
@@ -10,21 +12,20 @@ class Resource:
         None: "no status, waiting",
         "BACKOFF": "backoff period for this domain, will be checked later",
         "CRAWLING_URL": "resource URL currently being crawled",
-        "TO_PROCESS_RESOURCE": "to be processed for change analysis",
-        "PROCESSING_RESOURCE": "currently being processed for change analysis",
-        "TO_ANALYSE_CSV": "to be analysed by CSV detective",
-        "ANALYSING_CSV": "currently being analysed by CSV detective",
+        "TO_ANALYSE_RESOURCE": "resource to be processed for change, type and size analysis",
+        "ANALYSING_RESOURCE": "currently being processed for change, type and size analysis",
+        "TO_ANALYSE_CSV": "resource content to be analysed by CSV detective",
+        "ANALYSING_CSV": "resource content currently being analysed by CSV detective",
         "INSERTING_IN_DB": "currently being inserted in DB",
         "CONVERTING_TO_PARQUET": "currently being converted to Parquet",
     }
 
     @classmethod
-    async def get(cls, resource_id: str, column_name: str = "*") -> dict:
+    async def get(cls, resource_id: str, column_name: str = "*") -> asyncpg.Record:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = f"""SELECT {column_name} FROM catalog WHERE resource_id = '{resource_id}';"""
-            resource = await connection.fetchrow(q)
-        return resource
+            return await connection.fetchrow(q)
 
     @classmethod
     async def insert(
@@ -98,3 +99,18 @@ class Resource:
                             status = $4,
                             priority = $5;"""
             await connection.execute(q, dataset_id, resource_id, url, status, priority)
+
+    @staticmethod
+    def get_excluded_clause() -> str:
+        """Return the WHERE clause to get only resources from the check which:
+        - have a URL in the excluded URLs patterns
+        - are not deleted
+        - are not currently being crawled or analysed (i.e. resources with no status, or status 'BACKOFF')
+        """
+        return " AND ".join(
+            [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS]
+            + [
+                "catalog.deleted = False",
+                "(catalog.status IS NULL OR catalog.status = 'BACKOFF')",
+            ]
+        )

@@ -4,9 +4,9 @@ from urllib.parse import urlparse
 
 import aiohttp
 
-from udata_hydra.analysis.resource import process_resource
+from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.process_check_data import process_check_data
-from udata_hydra.crawl.utils_http import (
+from udata_hydra.crawl.utils import (
     convert_headers,
     fix_surrogates,
     has_nice_head,
@@ -93,8 +93,8 @@ async def check_resource(
             # Update resource status to TO_PROCESS_RESOURCE
             await Resource.update(resource_id, data={"status": "TO_PROCESS_RESOURCE"})
 
-            # Enqueue the resource for processing
-            queue.enqueue(process_resource, check_id, is_first_check, _priority=worker_priority)
+            # Enqueue the resource for analysis
+            queue.enqueue(analyse_resource, check_id, is_first_check, _priority=worker_priority)
 
             return RESOURCE_RESPONSE_STATUSES["OK"]
 

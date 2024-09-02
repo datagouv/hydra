@@ -16,7 +16,7 @@ from minicli import run
 from yarl import URL
 
 from udata_hydra import config
-from udata_hydra.analysis.resource import process_resource
+from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import check_catalog
 from udata_hydra.crawl.check_resource import (
     RESOURCE_RESPONSE_STATUSES,
@@ -441,13 +441,13 @@ async def test_no_switch_head_to_get(setup_catalog, event_loop, rmock, produce_m
     assert ("GET", URL(rurl)) not in rmock.requests
 
 
-async def test_process_resource(setup_catalog, mocker, fake_check):
+async def test_analyse_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     # disable webhook, tested in following test
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
     check = await fake_check()
-    await process_resource(check["id"], False)
+    await analyse_resource(check["id"], False)
     result = await Check.get_by_id(check["id"])
 
     assert result["error"] is None
@@ -456,12 +456,12 @@ async def test_process_resource(setup_catalog, mocker, fake_check):
     assert result["mime_type"] == "text/plain"
 
 
-async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_check, udata_url):
+async def test_analyse_resource_send_udata(setup_catalog, mocker, rmock, fake_check, udata_url):
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
 
     check = await fake_check()
-    await process_resource(check["id"], True)
+    await analyse_resource(check["id"], True)
 
     req = rmock.requests[("PUT", URL(udata_url))]
     assert len(req) == 1
@@ -470,7 +470,7 @@ async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
     assert document["analysis:mime-type"] == "text/plain"
 
 
-async def test_process_resource_send_udata_no_change(
+async def test_analyse_resource_send_udata_no_change(
     setup_catalog, mocker, rmock, fake_check, udata_url
 ):
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
@@ -479,13 +479,13 @@ async def test_process_resource_send_udata_no_change(
     # previous check with same checksum
     await fake_check(checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest())
     check = await fake_check()
-    await process_resource(check["id"], False)
+    await analyse_resource(check["id"], False)
 
     # udata has not been called
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
-async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db, udata_url):
+async def test_analyse_resource_from_crawl(setup_catalog, rmock, event_loop, db, udata_url):
     """ "
     Looks a lot like an E2E test:
     - process catalog

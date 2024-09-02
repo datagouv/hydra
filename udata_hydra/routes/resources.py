@@ -16,7 +16,7 @@ async def get_resource(request: web.Request) -> web.Response:
     If resource is not found, respond with a 404 status code
     """
     [resource_id] = get_request_params(request, params_names=["resource_id"])
-    resource: dict = await Resource.get(resource_id)
+    resource = await Resource.get(resource_id)
     if not resource:
         raise web.HTTPNotFound()
 

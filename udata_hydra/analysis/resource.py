@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Tuple
 
+import asyncpg
 import magic
 from dateparser import parse as date_parser
 
@@ -30,9 +31,9 @@ class Change(Enum):
 log = logging.getLogger("udata-hydra")
 
 
-async def process_resource(check_id: int, is_first_check: bool) -> None:
+async def analyse_resource(check_id: int, is_first_check: bool) -> None:
     """
-    Perform analysis on the resource designated by check_id
+    Perform analysis on the resource designated by check_id:
     - change analysis
     - size (optional)
     - mime_type (optional)
@@ -41,7 +42,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     Will call udata if first check or changes found, and update check with optional infos
     """
-    check: dict = await Check.get_by_id(check_id, with_deleted=True)
+    check: Optional[asyncpg.Record] = await Check.get_by_id(check_id, with_deleted=True)
     if not check:
         log.error(f"Check not found by id {check_id}")
         return
