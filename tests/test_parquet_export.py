@@ -37,7 +37,7 @@ async def test_parquet_conversion(
     _, table = save_as_parquet(
         records=generate_records(file_path, inspection, columns),
         columns=columns,
-        output_name=None,
+        output_filename=None,
     )
     assert len(table) == expected_count
     fake_file = BytesIO()
