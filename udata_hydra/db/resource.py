@@ -21,11 +21,12 @@ class Resource:
     }
 
     @classmethod
-    async def get(cls, resource_id: str, column_name: str = "*") -> asyncpg.Record:
+    async def get(cls, resource_id: str, column_name: str = "*") -> Optional[asyncpg.Record]:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = f"""SELECT {column_name} FROM catalog WHERE resource_id = '{resource_id}';"""
             return await connection.fetchrow(q)
+        return None
 
     @classmethod
     async def insert(

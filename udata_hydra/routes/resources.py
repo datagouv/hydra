@@ -2,6 +2,7 @@ import json
 from typing import Optional
 
 from aiohttp import web
+from asyncpg import Record
 from marshmallow import ValidationError
 
 from udata_hydra.db.check import Check
@@ -16,7 +17,7 @@ async def get_resource(request: web.Request) -> web.Response:
     If resource is not found, respond with a 404 status code
     """
     [resource_id] = get_request_params(request, params_names=["resource_id"])
-    resource = await Resource.get(resource_id)
+    resource: Optional[Record] = await Resource.get(resource_id)
     if not resource:
         raise web.HTTPNotFound()
 
@@ -34,7 +35,7 @@ async def get_resource_status(request: web.Request) -> web.Response:
     except Exception as e:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
-    resource = await Resource.get(resource_id=resource_id, column_name="status")
+    resource: Optional[Record] = await Resource.get(resource_id=resource_id, column_name="status")
     if not resource:
         raise web.HTTPNotFound()
 

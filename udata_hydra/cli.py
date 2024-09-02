@@ -139,7 +139,7 @@ async def crawl_url(url: str, method: str = "get"):
 @cli
 async def check_resource(resource_id: str, method: str = "get"):
     """Trigger a complete check for a given resource_id"""
-    resource: dict = await Resource.get(resource_id)
+    resource: Optional[asyncpg.Record] = await Resource.get(resource_id)
     if not resource:
         log.error("Resource not found in catalog")
         return
