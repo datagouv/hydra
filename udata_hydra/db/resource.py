@@ -1,5 +1,3 @@
-from typing import Optional
-
 from udata_hydra import context
 
 
@@ -32,7 +30,7 @@ class Resource:
         dataset_id: str,
         resource_id: str,
         url: str,
-        status: Optional[str] = None,
+        status: str | None = None,
         priority: bool = True,
     ) -> None:
         if status and status not in cls.STATUSES.keys():
@@ -73,7 +71,7 @@ class Resource:
         dataset_id: str,
         resource_id: str,
         url: str,
-        status: Optional[str] = None,
+        status: str | None = None,
         priority: bool = True,  # Make resource high priority by default for crawling
     ) -> None:
         if status and status not in cls.STATUSES.keys():

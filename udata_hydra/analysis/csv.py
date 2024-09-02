@@ -230,7 +230,7 @@ async def csv_to_parquet(
     file_path: str,
     inspection: dict,
     table_name: str,
-    resource_id: Optional[str] = None,
+    resource_id: str | None = None,
 ) -> None:
     """
     Convert a csv file to parquet using inspection data.
@@ -266,7 +266,7 @@ async def csv_to_db(
     file_path: str,
     inspection: dict,
     table_name: str,
-    resource_id: Optional[str] = None,
+    resource_id: str | None = None,
     debug_insert: bool = False,
 ) -> None:
     """
