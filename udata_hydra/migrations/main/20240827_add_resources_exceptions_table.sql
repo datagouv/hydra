@@ -4,7 +4,7 @@
 CREATE TABLE resources_exceptions (
     id SERIAL PRIMARY KEY,
     resource_id UUID UNIQUE NOT NULL REFERENCES catalog(resource_id) ON DELETE CASCADE,
-    indexes JSONB DEFAULT '[]'::JSONB,
+    table_indexes JSONB DEFAULT '{}'::JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

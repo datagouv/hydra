@@ -29,7 +29,7 @@ class ResourceException:
             return await connection.fetch(q)
 
     @classmethod
-    async def insert(cls, resource_id: str, indexes: list[str]) -> Record:
+    async def insert(cls, resource_id: str, table_indexes: dict[str, str]) -> Record:
         """
         Insert a new resource_exception in the resource_exceptions DB table
         """
@@ -42,8 +42,8 @@ class ResourceException:
 
         async with pool.acquire() as connection:
             q = f"""
-                INSERT INTO resources_exceptions (resource_id, indexes)
-                VALUES ('{resource_id}', '{indexes}')
+                INSERT INTO resources_exceptions (resource_id, table_indexes)
+                VALUES ('{resource_id}', '{table_indexes}')
                 RETURNING *;
             """
             return await connection.fetchrow(q)

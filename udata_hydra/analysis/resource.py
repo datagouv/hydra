@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Optional, Tuple
 
 import magic
+from asyncpg import Record
 from dateparser import parse as date_parser
 
 from udata_hydra import config, context
@@ -47,7 +48,9 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
         log.error(f"Check not found by id {check_id}")
         return
 
-    exceptions: list[str] = [r["resource_id"] for r in await ResourceException.get_all_ids()]
+    is_exception: bool = str(check["resource_id"]) in [
+        str(e["resource_id"]) for e in await ResourceException.get_all()
+    ]
 
     resource_id = check["resource_id"]
     dataset_id = check["dataset_id"]
@@ -64,9 +67,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     # could it be a CSV? If we get hints, we will analyse the file further depending on change status
     is_tabular, file_format = await detect_tabular_from_headers(check)
-    max_size_allowed = (
-        None if str(resource_id) in exceptions else float(config.MAX_FILESIZE_ALLOWED[file_format])
-    )
+    max_size_allowed = None if is_exception else float(config.MAX_FILESIZE_ALLOWED[file_format])
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}

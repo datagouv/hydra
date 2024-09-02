@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterator, Optional
 
 import sentry_sdk
+from asyncpg import Record
 from csv_detective.detection import engine_to_file
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
@@ -119,12 +120,15 @@ async def analyse_csv(
     # Update resource status to ANALYSING_CSV
     await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
 
-    exceptions: list[str] = [r["resource_id"] for r in await ResourceException.get_all_ids()]
+    exceptions: list[Record] = await ResourceException.get_all()
+    exception: Optional[Record] = next(
+        (e for e in exceptions if e["resource_id"] == resource_id), None
+    )
+    table_indexes: Optional[dict[str, str]] = exception["table_indexes"] if exception else None
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
     url: str = check.get("url") or url
-    exception_file = str(check.get("resource_id", "")) in exceptions
 
     headers = json.loads(check.get("headers") or "{}")
     tmp_file = (
@@ -133,7 +137,7 @@ async def analyse_csv(
         else await download_resource(
             url=url,
             headers=headers,
-            max_size_allowed=None if exception_file else int(config.MAX_FILESIZE_ALLOWED["csv"]),
+            max_size_allowed=None if exception else int(config.MAX_FILESIZE_ALLOWED["csv"]),
         )
     )
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
@@ -149,6 +153,7 @@ async def analyse_csv(
             file_path=tmp_file.name,
             inspection=csv_inspection,
             table_name=table_name,
+            table_indexes=table_indexes,
             resource_id=resource_id,
             debug_insert=debug_insert,
         )
@@ -205,12 +210,17 @@ def smart_cast(_type: str, value, failsafe: bool = False) -> Any:
         return None
 
 
-def compute_create_table_query(table_name: str, columns: list) -> str:
+def compute_create_table_query(
+    table_name: str, columns: dict, indexes: Optional[dict[str, str]]
+) -> str:
     """Use sqlalchemy to build a CREATE TABLE statement that should not be vulnerable to injections"""
     metadata = MetaData()
     table = Table(table_name, metadata, Column("__id", Integer, primary_key=True))
     for col_name, col_type in columns.items():
         table.append_column(Column(col_name, PYTHON_TYPE_TO_PG.get(col_type, String)))
+    if indexes:
+        for col_name, index_type in indexes.items():
+            table.append_constraint(Column(col_name, PYTHON_TYPE_TO_PG.get(index_type, String)))
     compiled = CreateTable(table).compile(dialect=asyncpg.dialect())
     # compiled query will want to write "%% mon pourcent" VARCHAR but will fail when querying "% mon pourcent"
     # also, "% mon pourcent" works well in pg as a column
@@ -267,6 +277,7 @@ async def csv_to_db(
     file_path: str,
     inspection: dict,
     table_name: str,
+    table_indexes: Optional[dict[str, str]] = None,
     resource_id: Optional[str] = None,
     debug_insert: bool = False,
 ) -> None:
@@ -300,7 +311,7 @@ async def csv_to_db(
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
     await db.execute(q)
-    q = compute_create_table_query(table_name, columns)
+    q = compute_create_table_query(table_name=table_name, columns=columns, indexes=table_indexes)
     await db.execute(q)
     # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
     if not debug_insert:

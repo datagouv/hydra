@@ -156,7 +156,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
             "header": list(columns.keys()),
             "columns": columns,
         }
-        await csv_to_db(fp.name, inspection, "test_table")
+        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
     cols = ["__id", "int", "float", "string", "bool"]
@@ -201,7 +201,7 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
             "columns": columns,
         }
         # Insert the data
-        await csv_to_db(fp.name, inspection, "test_table")
+        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
     cols = ["__id", "json", "date", "datetime"]
@@ -228,7 +228,7 @@ async def test_basic_sql_injection(db, clean_db):
             "columns": columns,
         }
         # Insert the data
-        await csv_to_db(fp.name, inspection, "test_table")
+        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res[injection] == "test"
 
@@ -250,7 +250,7 @@ async def test_percentage_column(db, clean_db):
             "columns": columns,
         }
         # Insert the data
-        await csv_to_db(fp.name, inspection, "test_table")
+        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["% mon pourcent"] == "test"
 
@@ -272,7 +272,7 @@ async def test_reserved_column_name(db, clean_db):
             "columns": columns,
         }
         # Insert the data
-        await csv_to_db(fp.name, inspection, "test_table")
+        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["xmin__hydra_renamed"] == "test"
 

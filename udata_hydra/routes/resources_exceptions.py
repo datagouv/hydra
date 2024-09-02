@@ -16,16 +16,20 @@ async def create_resource_exception(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
         resource_id: str = payload["resource_id"]
-        indexes: list[str] = payload[
-            "indexes"
-        ]  # TODO: should be a list of objects, so that it has an column name and can maybe have a SQL index type
+        table_indexes: dict[str, str] = payload["table_indexes"]
+        # format should be like this:
+        #    {
+        #       "column_name": "index_type",
+        #       "column_name": "index_type"
+        #       ...
+        #    },
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps(err))
 
     try:
         resource_exception: Record = await ResourceException.insert(
             resource_id=resource_id,
-            indexes=indexes,
+            table_indexes=table_indexes,
         )
     except ValueError as err:
         raise web.HTTPBadRequest(text=f"Resource exception could not be created: {err}")
