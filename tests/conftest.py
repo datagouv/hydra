@@ -136,7 +136,7 @@ def setup_catalog(catalog_content, rmock):
 
 @pytest.fixture
 def produce_mock(mocker):
-    mocker.patch("udata_hydra.crawl.send", dummy())
+    mocker.patch("udata_hydra.crawl.process_check_data.send", dummy())
     mocker.patch("udata_hydra.analysis.resource.send", dummy())
     mocker.patch("udata_hydra.analysis.csv.send", dummy())
 
@@ -145,7 +145,7 @@ def produce_mock(mocker):
 def analysis_mock(mocker):
     """Disable process_resource while crawling"""
     mocker.patch(
-        "udata_hydra.crawl.process_resource",
+        "udata_hydra.crawl.check_resource.process_resource",
         dummy({"error": None, "checksum": None, "filesize": None, "mime_type": None}),
     )
 

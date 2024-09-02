@@ -12,15 +12,32 @@ class Check:
     """Represents a check in the "checks" DB table"""
 
     @classmethod
-    async def get(cls, check_id: int) -> Optional[dict]:
+    async def get_by_id(cls, check_id: int, with_deleted: bool = False) -> Optional[dict]:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
                 SELECT * FROM catalog JOIN checks
                 ON catalog.last_check = checks.id
-                WHERE checks.id = $1;
+                WHERE checks.id = $1
             """
+            if not with_deleted:
+                q += " AND catalog.deleted = FALSE"
             return await connection.fetchrow(q, check_id)
+
+    @classmethod
+    async def get_by_resource_id(
+        cls, resource_id: str, with_deleted: bool = False
+    ) -> Optional[dict]:
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = """
+                SELECT * FROM catalog JOIN checks
+                ON catalog.last_check = checks.id
+                WHERE catalog.resource_id = $1
+            """
+            if not with_deleted:
+                q += " AND catalog.deleted = FALSE"
+            return await connection.fetchrow(q, resource_id)
 
     @classmethod
     async def get_latest(

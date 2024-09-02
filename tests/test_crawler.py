@@ -17,12 +17,12 @@ from yarl import URL
 
 from udata_hydra import config
 from udata_hydra.analysis.resource import process_resource
-from udata_hydra.crawl import (
+from udata_hydra.crawl import check_catalog
+from udata_hydra.crawl.check_resource import (
     RESOURCE_RESPONSE_STATUSES,
-    check_catalog,
     check_resource,
-    get_content_type_from_header,
 )
+from udata_hydra.crawl.process_check_data import get_content_type_from_header
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 
@@ -448,7 +448,7 @@ async def test_process_resource(setup_catalog, mocker, fake_check):
 
     check = await fake_check()
     await process_resource(check["id"], False)
-    result = await Check.get(check["id"])
+    result = await Check.get_by_id(check["id"])
 
     assert result["error"] is None
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()

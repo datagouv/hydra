@@ -41,7 +41,7 @@ async def process_resource(check_id: int, is_first_check: bool) -> None:
 
     Will call udata if first check or changes found, and update check with optional infos
     """
-    check: dict = await Check.get(check_id)
+    check: dict = await Check.get_by_id(check_id, with_deleted=True)
     if not check:
         log.error(f"Check not found by id {check_id}")
         return

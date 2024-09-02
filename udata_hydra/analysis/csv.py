@@ -77,7 +77,7 @@ minio_client = MinIOClient()
 
 async def notify_udata(check_id: int, table_name: str) -> None:
     """Notify udata of the result of a parsing"""
-    check = await Check.get(check_id)
+    check = await Check.get_by_id(check_id, with_deleted=True)
     resource_id = check["resource_id"]
     db = await context.pool()
     record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
@@ -112,7 +112,7 @@ async def analyse_csv(
         return
 
     # Get check and resource_id
-    check: dict = await Check.get(check_id) if check_id is not None else {}
+    check: dict = await Check.get_by_id(check_id, with_deleted=True) if check_id is not None else {}
     resource_id: str = check.get("resource_id")
 
     # Update resource status to ANALYSING_CSV
@@ -358,7 +358,7 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if check_id:
         if config.SENTRY_DSN:
-            check = await Check.get(check_id)
+            check = await Check.get_by_id(check_id, with_deleted=True)
             url = check["url"]
             with sentry_sdk.push_scope() as scope:
                 scope.set_extra("check_id", check_id)
