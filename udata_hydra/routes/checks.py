@@ -6,7 +6,7 @@ from aiohttp import web
 from marshmallow import ValidationError
 
 from udata_hydra import config, context
-from udata_hydra.crawl import check_url
+from udata_hydra.crawl import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import CheckSchema
@@ -56,7 +56,7 @@ async def create_check(request: web.Request) -> web.Response:
     async with aiohttp.ClientSession(
         timeout=None, headers={"user-agent": config.USER_AGENT}
     ) as session:
-        status: str = await check_url(
+        status: str = await check_resource(
             url=url, resource_id=resource_id, session=session, worker_priority="high"
         )
         context.monitor().refresh(status)

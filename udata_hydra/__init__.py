@@ -31,12 +31,13 @@ class Configurator:
 
     def load_pyproject_info(self) -> None:
         """Get more info about the app from pyproject.toml"""
+        project_info: dict = {}
         try:
-            project_info: dict = toml.load("pyproject.toml")["project"]
+            project_info = toml.load("pyproject.toml")["project"]
         except Exception as e:
             log.error(f"Error while getting pyproject.toml info: {str(e)}")
-        self.configuration["APP_NAME"] = project_info.get("name")
-        self.configuration["APP_VERSION"] = project_info.get("version")
+        self.configuration["APP_NAME"] = project_info.get("name", "udata-hydra")
+        self.configuration["APP_VERSION"] = project_info.get("version", "unknown")
 
     def override(self, **kwargs) -> None:
         self.configuration.update(kwargs)

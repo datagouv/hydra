@@ -104,7 +104,7 @@ async def compute_check_has_changed(check_data: dict, last_check: dict) -> bool:
             resource_id=check_data["resource_id"],
             document=document,
             _priority="high",
-        )
+        )  # Send the document to udata
 
     return has_changed
 
@@ -123,13 +123,18 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
         """
         last_check = await connection.fetchrow(q)
 
+        # If it has changed, send it to udata
         await compute_check_has_changed(check_data, dict(last_check) if last_check else None)
 
+    # Update catalog following check:
+    # Reset resource status so that it's not forbidden to be checked again.
+    # Reset priority so that it's not prioritised anymore.
     await Resource.update(
         resource_id=check_data["resource_id"], data={"status": None, "priority": False}
     )
 
     is_first_check = last_check is None
+
     return await Check.insert(check_data), is_first_check
 
 
@@ -236,7 +241,7 @@ def has_nice_head(resp) -> bool:
     return True
 
 
-async def check_url(
+async def check_resource(
     url: str,
     resource_id: str,
     session,
@@ -246,13 +251,18 @@ async def check_url(
 ) -> str:
     log.debug(f"check {url}, sleep {sleep}, method {method}")
 
+    # Update resource status to CRAWLING_URL
+    await Resource.update(resource_id, data={"status": "CRAWLING_URL"})
+
     if sleep:
         await asyncio.sleep(sleep)
 
     url_parsed = urlparse(url)
     domain = url_parsed.netloc
+
     if not domain:
         log.warning(f"[warning] not netloc in url, skipping {url}")
+        # Process the check data. If it has changed, it will be sent to udata
         await process_check_data(
             {
                 "resource_id": resource_id,
@@ -267,7 +277,7 @@ async def check_url(
     if should_backoff:
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
-        await Resource.update(resource_id=resource_id, data={"status": None, "priority": False})
+        await Resource.update(resource_id, data={"status": "BACKOFF", "priority": False})
         return RESOURCE_RESPONSE_STATUSES["BACKOFF"]
 
     try:
@@ -277,11 +287,12 @@ async def check_url(
         async with _method(url, timeout=timeout, allow_redirects=True) as resp:
             end = time.time()
             if method != "get" and not has_nice_head(resp):
-                return await check_url(
+                return await check_resource(
                     url, resource_id, session, method="get", worker_priority=worker_priority
                 )
             resp.raise_for_status()
 
+            # Process the check data. If it has changed, it will be sent to udata
             check_id, is_first_check = await process_check_data(
                 {
                     "resource_id": resource_id,
@@ -294,10 +305,15 @@ async def check_url(
                 },
             )
 
+            # Update resource status to TO_PROCESS_RESOURCE
+            await Resource.update(resource_id, data={"status": "TO_PROCESS_RESOURCE"})
+
             queue.enqueue(process_resource, check_id, is_first_check, _priority=worker_priority)
 
             return RESOURCE_RESPONSE_STATUSES["OK"]
+
     except asyncio.exceptions.TimeoutError:
+        # Process the check data. If it has changed, it will be sent to udata
         await process_check_data(
             {
                 "resource_id": resource_id,
@@ -306,7 +322,12 @@ async def check_url(
                 "timeout": True,
             }
         )
+
+        # Reset resource status so that it's not forbidden to be checked again
+        await Resource.update(resource_id=resource_id, data={"status": None})
+
         return RESOURCE_RESPONSE_STATUSES["TIMEOUT"]
+
     # TODO: debug AssertionError, should be caught in DB now
     # File "[...]aiohttp/connector.py", line 991, in _create_direct_connection
     # assert port is not None
@@ -318,6 +339,7 @@ async def check_url(
         UnicodeError,
     ) as e:
         error = getattr(e, "message", None) or str(e)
+        # Process the check data. If it has changed, it will be sent to udata
         await process_check_data(
             {
                 "resource_id": resource_id,
@@ -329,19 +351,24 @@ async def check_url(
                 "status": getattr(e, "status", None),
             }
         )
+
         log.warning(f"Crawling error for url {url}", exc_info=e)
+
+        # Reset resource status so that it's not forbidden to be checked again
+        await Resource.update(resource_id=resource_id, data={"status": None})
+
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
 
 
-async def crawl_urls(to_parse: list[str]) -> None:
-    context.monitor().set_status("Crawling urls...")
+async def check_resources(to_parse: list[str]) -> None:
+    context.monitor().set_status("Checking urls...")
     tasks: list = []
     async with aiohttp.ClientSession(
         timeout=None, headers={"user-agent": config.USER_AGENT}
     ) as session:
         for row in to_parse:
             tasks.append(
-                check_url(
+                check_resource(
                     url=row["url"],
                     resource_id=row["resource_id"],
                     session=session,
@@ -355,11 +382,17 @@ async def crawl_urls(to_parse: list[str]) -> None:
 
 
 def get_excluded_clause() -> str:
+    """Return the WHERE clause to get only resources from the check which:
+    - have a URL in the excluded URLs patterns
+    - are not deleted
+    - are not currently being crawled or analysed (i.e. resources with no status, or status 'BACKOFF')
+    """
+
     return " AND ".join(
         [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS]
         + [
             "catalog.deleted = False",
-            "(catalog.status != 'crawling' OR catalog.status IS NULL)",
+            "(catalog.status IS NULL OR catalog.status = 'BACKOFF')",
         ]
     )
 
@@ -368,30 +401,24 @@ async def select_rows_based_on_query(connection, q, *args):
     """
     A transaction wrapper around a select query q pass as param with *args.
     It first creates a temporary table based on this query,
-    then updates the status values from the rows selected,
-    fetches the selected rows and drops the temporary table.
-    It finally returns the selected (and updated) rows.
+    then fetches the selected rows and drops the temporary table.
+    It finally returns the selected rows.
     """
-    temporary_table = "crawl_urls"
-    create_temp_select_table_query = f"""
-        CREATE TEMPORARY TABLE {temporary_table} AS
-            {q} FOR UPDATE;
-    """
-    update_select_catalog_query = f"""
-        UPDATE catalog SET status = 'crawling' WHERE resource_id in (select resource_id from {temporary_table});
-    """
+    temporary_table = "check_urls"
+    create_temp_select_table_query = (
+        f"""CREATE TEMPORARY TABLE {temporary_table} AS {q} FOR UPDATE;"""
+    )
     async with connection.transaction():
         await connection.execute("BEGIN;")
         await connection.execute(create_temp_select_table_query, *args)
-        await connection.execute(update_select_catalog_query)
         to_check = await connection.fetch(f"SELECT * FROM {temporary_table};")
         await connection.execute("COMMIT;")
     await connection.execute(f"DROP TABLE {temporary_table};")
     return to_check
 
 
-async def crawl_batch() -> None:
-    """Crawl a batch from the catalog"""
+async def check_batch() -> None:
+    """Check a batch of resources from the catalog"""
     context.monitor().set_status("Getting a batch from catalog...")
     pool = await context.pool()
     async with pool.acquire() as connection:
@@ -440,14 +467,14 @@ async def crawl_batch() -> None:
             to_check += await select_rows_based_on_query(connection, q, since)
 
     if len(to_check):
-        await crawl_urls(to_check)
+        await check_resources(to_check)
     else:
         context.monitor().set_status("Nothing to crawl for now.")
     await asyncio.sleep(config.SLEEP_BETWEEN_BATCHES)
 
 
-async def crawl(iterations: int = -1) -> None:
-    """Launch crawl batches
+async def check_catalog(iterations: int = -1) -> None:
+    """Launch check batches
 
     :iterations: for testing purposes (break infinite loop)
     """
@@ -459,7 +486,7 @@ async def crawl(iterations: int = -1) -> None:
             BACKOFF_PERIOD=config.BACKOFF_PERIOD,
         )
         while iterations != 0:
-            await crawl_batch()
+            await check_batch()
             iterations -= 1
     finally:
         pool = await context.pool()
@@ -472,7 +499,7 @@ def run() -> None:
     :iterations: for testing purposes (break infinite loop)
     """
     try:
-        asyncio.get_event_loop().run_until_complete(crawl())
+        asyncio.get_event_loop().run_until_complete(check_catalog())
     except KeyboardInterrupt:
         pass
     finally:
