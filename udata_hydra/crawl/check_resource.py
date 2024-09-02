@@ -5,13 +5,13 @@ from urllib.parse import urlparse
 import aiohttp
 
 from udata_hydra.analysis.resource import analyse_resource
-from udata_hydra.crawl.process_check_data import process_check_data
-from udata_hydra.crawl.utils import (
+from udata_hydra.crawl.helpers import (
     convert_headers,
     fix_surrogates,
     has_nice_head,
     is_domain_backoff,
 )
+from udata_hydra.crawl.process_check_data import process_check_data
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils import queue

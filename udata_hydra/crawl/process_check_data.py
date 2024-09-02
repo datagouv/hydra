@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 
 from asyncpg import Record
 
-from udata_hydra.crawl.utils import get_content_type_from_header, is_valid_status
+from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_status
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import queue, send
