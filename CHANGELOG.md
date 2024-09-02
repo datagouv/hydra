@@ -53,6 +53,7 @@
 - Add a `POST` `/api/checks/` route for force crawling [#118](https://github.com/datagouv/hydra/pull/118)
 - Update `csv-detective` to 0.7.2 which doesn't include yanked version of `requests` anymore [#142](https://github.com/datagouv/hydra/pull/142) and [#144](https://github.com/datagouv/hydra/pull/144)
 - Update resource statuses in DB when crawling and analysing, and add resource status route [#119](https://github.com/datagouv/hydra/pull/119)
+- Refactor and split code from `crawl.py` into separate files using refactored `db.Resource` class methods and static methods [#135](https://github.com/datagouv/hydra/pull/135)
 
 ## 1.0.1 (2023-01-04)
 
