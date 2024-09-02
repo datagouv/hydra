@@ -1,3 +1,5 @@
+from asyncpg import Record
+
 from udata_hydra import context
 from udata_hydra.db.resource import Resource
 
@@ -7,9 +9,9 @@ class ResourceException:
     Resources that are too large to be processed normally but that we want to have anyway"""
 
     @classmethod
-    async def get_all(cls) -> list[dict]:
+    async def get_all(cls) -> list[Record]:
         """
-        Get all resource_exceptions from the DB table
+        Get all resource_exceptions from the resource_exceptions DB table
         """
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -17,7 +19,7 @@ class ResourceException:
             return await connection.fetch(q)
 
     @classmethod
-    async def get_all_ids(cls) -> list[dict]:
+    async def get_all_ids(cls) -> list[Record]:
         """
         Get all resource_ids from resource_exceptions DB table
         """
@@ -27,9 +29,9 @@ class ResourceException:
             return await connection.fetch(q)
 
     @classmethod
-    async def insert(cls, resource_id: str, indexes: list[str]) -> dict:
+    async def insert(cls, resource_id: str, indexes: list[str]) -> Record:
         """
-        Insert a new resource_exception in the DB
+        Insert a new resource_exception in the resource_exceptions DB table
         """
         pool = await context.pool()
 
