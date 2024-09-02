@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 
-import asyncpg
+from asyncpg import Record
 
 from udata_hydra.crawl.utils import get_content_type_from_header, is_valid_status
 from udata_hydra.db.check import Check
@@ -16,7 +16,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
 
     check_data["resource_id"] = str(check_data["resource_id"])
 
-    last_check: Optional[asyncpg.Record] = await Check.get_by_resource_id(check_data["resource_id"])
+    last_check: Optional[Record] = await Check.get_by_resource_id(check_data["resource_id"])
 
     has_changed: bool = await has_check_changed(check_data, last_check)
     if has_changed:

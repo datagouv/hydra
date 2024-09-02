@@ -1,6 +1,6 @@
 from typing import Optional
 
-import asyncpg
+from asyncpg import Record
 
 from udata_hydra import context
 from udata_hydra.db import (
@@ -14,7 +14,7 @@ class Check:
     """Represents a check in the "checks" DB table"""
 
     @classmethod
-    async def get_by_id(cls, check_id: int, with_deleted: bool = False) -> Optional[asyncpg.Record]:
+    async def get_by_id(cls, check_id: int, with_deleted: bool = False) -> Optional[Record]:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
@@ -29,7 +29,7 @@ class Check:
     @classmethod
     async def get_by_resource_id(
         cls, resource_id: str, with_deleted: bool = False
-    ) -> Optional[asyncpg.Record]:
+    ) -> Optional[Record]:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
@@ -44,7 +44,7 @@ class Check:
     @classmethod
     async def get_latest(
         cls, url: Optional[str] = None, resource_id: Optional[str] = None
-    ) -> Optional[asyncpg.Record]:
+    ) -> Optional[Record]:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:

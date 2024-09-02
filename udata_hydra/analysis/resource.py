@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Tuple
 
-import asyncpg
 import magic
+from asyncpg import Record
 from dateparser import parse as date_parser
 
 from udata_hydra import config, context
@@ -42,7 +42,7 @@ async def analyse_resource(check_id: int, is_first_check: bool) -> None:
 
     Will call udata if first check or changes found, and update check with optional infos
     """
-    check: Optional[asyncpg.Record] = await Check.get_by_id(check_id, with_deleted=True)
+    check: Optional[Record] = await Check.get_by_id(check_id, with_deleted=True)
     if not check:
         log.error(f"Check not found by id {check_id}")
         return
