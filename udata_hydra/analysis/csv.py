@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterator, Optional
 
 import sentry_sdk
+from asyncpg import Record
 from csv_detective.detection import engine_to_file
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
@@ -77,7 +78,7 @@ minio_client = MinIOClient()
 
 async def notify_udata(check_id: int, table_name: str) -> None:
     """Notify udata of the result of a parsing"""
-    check: Optional[asyncpg.Record] = await Check.get_by_id(check_id, with_deleted=True)
+    check: Optional[Record] = await Check.get_by_id(check_id, with_deleted=True)
     resource_id = check["resource_id"]
     db = await context.pool()
     record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
@@ -112,7 +113,7 @@ async def analyse_csv(
         return
 
     # Get check and resource_id
-    check: Optional[asyncpg.Record] = (
+    check: Optional[Record] = (
         await Check.get_by_id(check_id, with_deleted=True) if check_id is not None else {}
     )
     resource_id: str = check.get("resource_id")
@@ -360,7 +361,7 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if check_id:
         if config.SENTRY_DSN:
-            check: Optional[asyncpg.Record] = await Check.get_by_id(check_id, with_deleted=True)
+            check: Optional[Record] = await Check.get_by_id(check_id, with_deleted=True)
             url = check["url"]
             with sentry_sdk.push_scope() as scope:
                 scope.set_extra("check_id", check_id)

@@ -4,8 +4,10 @@ import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from unittest.mock import MagicMock
 
+import asyncpg
 import nest_asyncio
 import pytest
 from aiohttp import ClientSession, RequestInfo
@@ -448,7 +450,7 @@ async def test_analyse_resource(setup_catalog, mocker, fake_check):
 
     check = await fake_check()
     await analyse_resource(check["id"], False)
-    result = await Check.get_by_id(check["id"])
+    result: Optional[asyncpg.Record] = await Check.get_by_id(check["id"])
 
     assert result["error"] is None
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
