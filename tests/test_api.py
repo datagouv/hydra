@@ -240,7 +240,7 @@ async def test_api_get_resource_status(
 ):
     await insert_fake_resource(db, status=resource_status)
     # await fake_check()
-    resp = await client.get(f"/api/resources/{RESOURCE_ID}/status")
+    resp = await client.get(f"/api/resources/{RESOURCE_ID}/status/")
     assert resp.status == 200
     data = await resp.json()
     assert data["resource_id"] == RESOURCE_ID
