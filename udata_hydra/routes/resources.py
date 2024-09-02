@@ -5,7 +5,6 @@ from aiohttp import web
 from asyncpg import Record
 from marshmallow import ValidationError
 
-from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import ResourceSchema
 from udata_hydra.utils import get_request_params
