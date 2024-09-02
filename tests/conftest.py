@@ -213,10 +213,10 @@ async def fake_check():
             if parsing_table
             else None,
         }
-        id = await Check.insert(data)
-        data["id"] = id
+        check = await Check.insert(data)
+        data["id"] = check["id"]
         if created_at:
-            await Check.update(id, {"created_at": created_at})
+            await Check.update(check["id"], {"created_at": created_at})
             data["created_at"] = created_at
         return data
 

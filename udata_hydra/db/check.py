@@ -75,7 +75,7 @@ class Check:
             return await connection.fetch(q, url or resource_id)
 
     @classmethod
-    async def insert(cls, data: dict) -> int:
+    async def insert(cls, data: dict) -> Record:
         """
         Insert a new check in DB and return the check id in DB
         This use the info from the last check of the same resource
@@ -87,7 +87,7 @@ class Check:
             last_check = await connection.fetchrow(q1, *data.values())
             q2 = """UPDATE catalog SET last_check = $1 WHERE resource_id = $2"""
             await connection.execute(q2, last_check["id"], data["resource_id"])
-        return last_check["id"]
+            return last_check
 
     @classmethod
     async def update(cls, check_id: int, data: dict) -> int:

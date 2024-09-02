@@ -10,9 +10,9 @@ from udata_hydra.db.resource import Resource
 from udata_hydra.utils import queue, send
 
 
-async def process_check_data(check_data: dict) -> Tuple[int, bool]:
+async def process_check_data(check_data: dict) -> Tuple[Record, bool]:
     """Preprocess a check before saving it
-    Return the check id and a boolean indicating if it's the first check for this resource"""
+    Return the check and a boolean indicating if it's the first check for this resource"""
 
     check_data["resource_id"] = str(check_data["resource_id"])
 

@@ -26,7 +26,6 @@ class Resource:
         async with pool.acquire() as connection:
             q = f"""SELECT {column_name} FROM catalog WHERE resource_id = '{resource_id}';"""
             return await connection.fetchrow(q)
-        return None
 
     @classmethod
     async def insert(
@@ -55,19 +54,20 @@ class Resource:
             await connection.execute(q, dataset_id, resource_id, url, status, priority)
 
     @classmethod
-    async def update(cls, resource_id: str, data: dict) -> str:
-        """Update a resource in DB with new data and return the updated resource id in DB"""
+    async def update(cls, resource_id: str, data: dict) -> Record:
+        """Update a resource in DB with new data and return the updated resource in DB"""
         columns = data.keys()
         # $1, $2...
         placeholders = [f"${x + 1}" for x in range(len(data.values()))]
         set_clause = ",".join([f"{c} = {v}" for c, v in zip(columns, placeholders)])
-        q = f"""
-                UPDATE catalog
-                SET {set_clause}
-                WHERE resource_id = ${len(placeholders) + 1};"""
         pool = await context.pool()
-        await pool.execute(q, *data.values(), resource_id)
-        return resource_id
+        async with pool.acquire() as connection:
+            q = f"""
+                    UPDATE catalog
+                    SET {set_clause}
+                    WHERE resource_id = ${len(placeholders) + 1};"""
+            pool = await context.pool()
+            return await connection.execute(q, *data.values(), resource_id)
 
     @classmethod
     async def update_or_insert(

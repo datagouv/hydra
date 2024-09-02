@@ -78,7 +78,7 @@ async def check_resource(
             resp.raise_for_status()
 
             # Process the check data. If it has changed, it will be sent to udata
-            check_id, is_first_check = await process_check_data(
+            check, is_first_check = await process_check_data(
                 {
                     "resource_id": resource_id,
                     "url": url,
@@ -94,7 +94,7 @@ async def check_resource(
             await Resource.update(resource_id, data={"status": "TO_PROCESS_RESOURCE"})
 
             # Enqueue the resource for analysis
-            queue.enqueue(analyse_resource, check_id, is_first_check, _priority=worker_priority)
+            queue.enqueue(analyse_resource, check["id"], is_first_check, _priority=worker_priority)
 
             return RESOURCE_RESPONSE_STATUSES["OK"]
 
