@@ -123,7 +123,7 @@ async def analyse_csv(
     # Check if the resource is in the exceptions table
     # If it is, get the table_indexes to use them later
     exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
-    table_indexes: dict | None = exception["table_indexes"] if exception else None
+    table_indexes: dict | None = json.loads(exception["table_indexes"]) if exception else None
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
