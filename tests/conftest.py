@@ -17,6 +17,7 @@ from udata_hydra import config
 from udata_hydra.app import app_factory
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.logger import stop_sentry
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
@@ -131,6 +132,11 @@ def setup_catalog(catalog_content, rmock):
     run("drop_dbs", dbs=["main"])
     run("migrate")
     run("load_catalog", url=catalog)
+
+
+@pytest.fixture
+async def setup_resources_exceptions():
+    await ResourceException.insert(resource_id="c4e3a9fb-4415-488e-ba57-d05269b27adf")
 
 
 @pytest.fixture

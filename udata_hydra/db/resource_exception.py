@@ -19,7 +19,7 @@ class ResourceException:
             return await connection.fetchrow(q, resource_id)
 
     @classmethod
-    async def insert(cls, resource_id: str, table_indexes: dict[str, str]) -> Record:
+    async def insert(cls, resource_id: str, table_indexes: dict[str, str] | None = {}) -> Record:
         """
         Insert a new resource_exception in the resource_exceptions DB table
         """

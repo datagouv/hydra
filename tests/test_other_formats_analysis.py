@@ -16,7 +16,9 @@ pytestmark = pytest.mark.asyncio
         ("catalog.xlsx", 2),
     ),
 )
-async def test_formats_analysis(setup_catalog, rmock, db, fake_check, produce_mock, file_and_count):
+async def test_formats_analysis(
+    setup_catalog, setup_resources_exceptions, rmock, db, fake_check, produce_mock, file_and_count
+):
     check: dict = await fake_check()
     filename, expected_count = file_and_count
     url: str = check["url"]
