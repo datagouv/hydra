@@ -1,5 +1,4 @@
 import json
-from typing import Optional
 
 from aiohttp import web
 from marshmallow import ValidationError
@@ -37,7 +36,7 @@ async def get_resource_status(request: web.Request) -> web.Response:
     if not resource:
         raise web.HTTPNotFound()
 
-    status: Optional[str] = resource["status"]
+    status: str | None = resource["status"]
     status_verbose: str = Resource.STATUSES[status]
 
     latest_check_endpoint = str(request.app.router["get-latest-check"].url_for())

@@ -3,7 +3,6 @@ import hashlib
 import os
 import uuid
 from datetime import datetime
-from typing import Optional
 
 import asyncpg
 import nest_asyncio
@@ -166,7 +165,7 @@ async def db():
 
 @pytest_asyncio.fixture
 async def insert_fake_resource():
-    async def _insert_fake_resource(database, status: Optional[str] = None):
+    async def _insert_fake_resource(database, status: str | None = None):
         await Resource.insert(
             dataset_id=DATASET_ID,
             resource_id=RESOURCE_ID,

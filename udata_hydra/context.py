@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 from unittest.mock import MagicMock
 
 import asyncpg
@@ -36,7 +35,7 @@ async def pool(db: str = "main") -> asyncpg.pool.Pool:
     return context["databases"][db]
 
 
-def queue(name: str = "default") -> Optional[Queue]:
+def queue(name: str = "default") -> Queue | None:
     if not context["queues"].get(name):
         # we dont need a queue while testing, make sure we're not using a real Redis connection
         if config.TESTING:
