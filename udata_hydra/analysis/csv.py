@@ -26,7 +26,7 @@ from sqlalchemy import (
     Table,
 )
 from sqlalchemy.dialects.postgresql import asyncpg
-from sqlalchemy.schema import CreateTable
+from sqlalchemy.schema import CreateTable, Index
 from str2bool import str2bool
 from str2float import str2float
 
@@ -213,14 +213,30 @@ def compute_create_table_query(
     table_name: str, columns: dict, indexes: dict[str, str] | None = None
 ) -> str:
     """Use sqlalchemy to build a CREATE TABLE statement that should not be vulnerable to injections"""
+
     metadata = MetaData()
     table = Table(table_name, metadata, Column("__id", Integer, primary_key=True))
+
     for col_name, col_type in columns.items():
         table.append_column(Column(col_name, PYTHON_TYPE_TO_PG.get(col_type, String)))
+
     if indexes:
         for col_name, index_type in indexes.items():
-            table.append_constraint(Column(col_name, PYTHON_TYPE_TO_PG.get(index_type, String)))
+            if index_type == "unique":
+                # Create a unique index on the column
+                table.append_constraint()
+            elif index_type == "index":
+                # Create an index on the column
+                table.append_constraint(
+                    Index(f"{table_name}_{col_name}_idx", table.columns[col_name])
+                )
+            else:
+                log.error(
+                    f"Index type {index_type} is unknown or not suported yet! Index wasn't created."
+                )
+
     compiled = CreateTable(table).compile(dialect=asyncpg.dialect())
+
     # compiled query will want to write "%% mon pourcent" VARCHAR but will fail when querying "% mon pourcent"
     # also, "% mon pourcent" works well in pg as a column
     # TODO: dirty hack, maybe find an alternative
