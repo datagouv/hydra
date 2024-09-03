@@ -11,7 +11,7 @@ class ResourceException:
     @classmethod
     async def get_by_resource_id(cls, resource_id: str) -> Record | None:
         """
-        Get all resource_exceptions from the resource_exceptions DB table
+        Get a resource_exceptions from the resource_exceptions DB table by its resource_id
         """
         pool = await context.pool()
         async with pool.acquire() as connection:
