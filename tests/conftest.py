@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 import os
 import uuid
 from datetime import datetime
@@ -22,10 +23,13 @@ from udata_hydra.logger import stop_sentry
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
+RESOURCE_ID_EXCEPTION = "d4e3a9fb-4415-488e-ba57-d05269b27adf"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 pytestmark = pytest.mark.asyncio
 
 nest_asyncio.apply()
+
+log = logging.getLogger("udata-hydra")
 
 
 def dummy(return_value=None):
@@ -135,8 +139,11 @@ def setup_catalog(catalog_content, rmock):
 
 
 @pytest.fixture
-async def setup_resources_exceptions():
-    await ResourceException.insert(resource_id="c4e3a9fb-4415-488e-ba57-d05269b27adf")
+async def setup_resources_exceptions(setup_catalog):
+    await Resource.insert(
+        dataset_id=DATASET_ID, resource_id=RESOURCE_ID_EXCEPTION, url="http://example.com/"
+    )
+    await ResourceException.insert(resource_id=RESOURCE_ID_EXCEPTION)
 
 
 @pytest.fixture
