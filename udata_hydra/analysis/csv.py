@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator
 
 import sentry_sdk
 from asyncpg import Record
@@ -103,9 +103,9 @@ async def notify_udata(check_id: int, table_name: str) -> None:
 
 
 async def analyse_csv(
-    check_id: Optional[int] = None,
-    url: Optional[str] = None,
-    file_path: Optional[str] = None,
+    check_id: int | None = None,
+    url: str | None = None,
+    file_path: str | None = None,
     debug_insert: bool = False,
 ) -> None:
     """Launch csv analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
@@ -122,8 +122,8 @@ async def analyse_csv(
 
     # Check if the resource is in the exceptions table
     # If it is, get the table_indexes to use them later
-    exception: Optional[Record] = await ResourceException.get_by_resource_id(resource_id)
-    table_indexes: Optional[dict] = exception["table_indexes"] if exception else None
+    exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
+    table_indexes: dict | None = exception["table_indexes"] if exception else None
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
@@ -210,7 +210,7 @@ def smart_cast(_type: str, value, failsafe: bool = False) -> Any:
 
 
 def compute_create_table_query(
-    table_name: str, columns: dict, indexes: Optional[dict[str, str]]
+    table_name: str, columns: dict, indexes: dict[str, str] | None = None
 ) -> str:
     """Use sqlalchemy to build a CREATE TABLE statement that should not be vulnerable to injections"""
     metadata = MetaData()
@@ -240,7 +240,7 @@ async def csv_to_parquet(
     file_path: str,
     inspection: dict,
     table_name: str,
-    resource_id: Optional[str] = None,
+    resource_id: str | None = None,
 ) -> None:
     """
     Convert a csv file to parquet using inspection data.
@@ -276,8 +276,8 @@ async def csv_to_db(
     file_path: str,
     inspection: dict,
     table_name: str,
-    table_indexes: Optional[dict[str, str]] = None,
-    resource_id: Optional[str] = None,
+    table_indexes: dict[str, str] | None = None,
+    resource_id: str | None = None,
     debug_insert: bool = False,
 ) -> None:
     """
@@ -346,7 +346,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict) -> Non
     )
 
 
-async def perform_csv_inspection(file_path: str) -> Optional[dict]:
+async def perform_csv_inspection(file_path: str) -> dict | None:
     """Launch csv-detective against given file"""
     try:
         return csv_detective_routine(

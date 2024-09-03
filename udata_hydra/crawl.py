@@ -3,7 +3,6 @@ import json
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
 from urllib.parse import urlparse
 
 import aiohttp
@@ -28,7 +27,7 @@ RESOURCE_RESPONSE_STATUSES = {
 log = setup_logging()
 
 
-def is_valid_status(status: str) -> Optional[bool]:
+def is_valid_status(status: str) -> bool | None:
     if not status:
         return False
     status_nb = int(status)
@@ -109,7 +108,7 @@ async def compute_check_has_changed(check_data: dict, last_check: dict) -> bool:
     return has_changed
 
 
-async def process_check_data(check_data: dict) -> Tuple[int, bool]:
+async def process_check_data(check_data: dict) -> tuple[int, bool]:
     """Preprocess a check before saving it"""
     check_data["resource_id"] = str(check_data["resource_id"])
 
@@ -138,7 +137,7 @@ async def process_check_data(check_data: dict) -> Tuple[int, bool]:
     return await Check.insert(check_data), is_first_check
 
 
-async def is_backoff(domain: str) -> Tuple[bool, str]:
+async def is_backoff(domain: str) -> tuple[bool, str]:
     """Check if we should not crawl on this domain
     Returns a tuple with if it should backoff or not (boolean) and the reason why (string)
     """

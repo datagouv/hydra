@@ -1,5 +1,3 @@
-from typing import Optional
-
 from asyncpg import Record
 
 from udata_hydra import context
@@ -11,7 +9,7 @@ class ResourceException:
     Resources that are too large to be processed normally but that we want to have anyway"""
 
     @classmethod
-    async def get_by_resource_id(cls, resource_id: str) -> Optional[Record]:
+    async def get_by_resource_id(cls, resource_id: str) -> Record | None:
         """
         Get all resource_exceptions from the resource_exceptions DB table
         """
