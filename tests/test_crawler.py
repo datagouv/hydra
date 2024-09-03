@@ -441,7 +441,7 @@ async def test_no_switch_head_to_get(setup_catalog, event_loop, rmock, produce_m
     assert ("GET", URL(rurl)) not in rmock.requests
 
 
-async def test_process_resource(setup_catalog, setup_resources_exceptions, mocker, fake_check):
+async def test_process_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     # disable webhook, tested in following test
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
@@ -456,9 +456,7 @@ async def test_process_resource(setup_catalog, setup_resources_exceptions, mocke
     assert result["mime_type"] == "text/plain"
 
 
-async def test_process_resource_send_udata(
-    setup_catalog, setup_resources_exceptions, mocker, rmock, fake_check, udata_url
-):
+async def test_process_resource_send_udata(setup_catalog, mocker, rmock, fake_check, udata_url):
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
 
@@ -488,7 +486,7 @@ async def test_process_resource_send_udata_no_change(
 
 
 async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db, udata_url):
-    """ "
+    """
     Looks a lot like an E2E test:
     - process catalog
     - check resource
