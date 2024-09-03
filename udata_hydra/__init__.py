@@ -1,3 +1,4 @@
+import importlib.metadata
 import logging
 import os
 from pathlib import Path
@@ -15,7 +16,6 @@ class Configurator:
     def __init__(self):
         if not self.configuration:
             self.configure()
-            self.load_pyproject_info()
 
     def configure(self) -> None:
         # load default settings
@@ -29,15 +29,9 @@ class Configurator:
         self.configuration = configuration
         self.check()
 
-    def load_pyproject_info(self) -> None:
-        """Get more info about the app from pyproject.toml"""
-        project_info: dict = {}
-        try:
-            project_info = toml.load("pyproject.toml")["project"]
-        except Exception as e:
-            log.error(f"Error while getting pyproject.toml info: {str(e)}")
-        self.configuration["APP_NAME"] = project_info.get("name", "udata-hydra")
-        self.configuration["APP_VERSION"] = project_info.get("version", "unknown")
+        # add project metadata to config
+        self.configuration["APP_NAME"] = "udata-hydra"
+        self.configuration["APP_VERSION"] = importlib.metadata.version("udata-hydra")
 
     def override(self, **kwargs) -> None:
         self.configuration.update(kwargs)
