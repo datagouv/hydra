@@ -77,7 +77,7 @@ class Check:
     @classmethod
     async def insert(cls, data: dict) -> Record:
         """
-        Insert a new check in DB and return the check id in DB
+        Insert a new check in DB and return the check record in DB
         This use the info from the last check of the same resource
         """
         data = convert_dict_values_to_json(data)
