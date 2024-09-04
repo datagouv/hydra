@@ -450,7 +450,7 @@ async def test_analyse_resource(setup_catalog, mocker, fake_check):
 
     check = await fake_check()
     await analyse_resource(check["id"], False)
-    result: Optional[Record] = await Check.get_by_id(check["id"])
+    result: Record | None = await Check.get_by_id(check["id"])
 
     assert result["error"] is None
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()

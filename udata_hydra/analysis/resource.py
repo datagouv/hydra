@@ -3,7 +3,6 @@ import logging
 import os
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional, Tuple
 
 import magic
 from asyncpg import Record
@@ -42,7 +41,7 @@ async def analyse_resource(check_id: int, is_first_check: bool) -> None:
 
     Will call udata if first check or changes found, and update check with optional infos
     """
-    check: Optional[Record] = await Check.get_by_id(check_id, with_deleted=True)
+    check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
     if not check:
         log.error(f"Check not found by id {check_id}")
         return
@@ -143,7 +142,7 @@ async def store_last_modified_date(change_analysis: dict, check_id: int) -> None
 
 async def detect_resource_change_from_checksum(
     resource_id, new_checksum
-) -> Tuple[Change, Optional[dict]]:
+) -> tuple[Change, dict | None]:
     """
     Checks if resource checksum has changed over time
     Returns a tuple with a Change status and an optional payload:
@@ -172,7 +171,7 @@ async def detect_resource_change_from_checksum(
 
 async def detect_resource_change_from_last_modified_header(
     data: dict,
-) -> Tuple[Change, Optional[dict]]:
+) -> tuple[Change, dict | None]:
     # last modified header check
 
     if len(data) == 1 and data[0]["last_modified"]:
@@ -196,7 +195,7 @@ async def detect_resource_change_from_last_modified_header(
 
 async def detect_resource_change_from_content_length_header(
     data: dict,
-) -> Tuple[Change, Optional[dict]]:
+) -> tuple[Change, dict | None]:
     # content-length variation between current and last check
     if len(data) <= 1 or not data[0]["content_length"]:
         return Change.NO_GUESS, None
@@ -211,7 +210,7 @@ async def detect_resource_change_from_content_length_header(
 
 async def detect_resource_change_on_early_hints(
     resource_id: str,
-) -> Tuple[Change, Optional[dict]]:
+) -> tuple[Change, dict | None]:
     """
     Try to guess if a resource has been modified from harvest and headers in check data:
     - last-modified header value if it can be found and parsed
@@ -262,7 +261,7 @@ async def detect_resource_change_on_early_hints(
 
 async def detect_resource_change_from_harvest(
     checks_data: dict, resource_id: str
-) -> Tuple[Change, Optional[dict]]:
+) -> tuple[Change, dict | None]:
     """
     Checks if resource has a harvest.modified_at
     Returns a tuple with a Change status and an optional payload:

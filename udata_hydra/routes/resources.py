@@ -1,5 +1,4 @@
 import json
-from typing import Optional
 
 from aiohttp import web
 from asyncpg import Record
@@ -16,7 +15,7 @@ async def get_resource(request: web.Request) -> web.Response:
     If resource is not found, respond with a 404 status code
     """
     [resource_id] = get_request_params(request, params_names=["resource_id"])
-    resource: Optional[Record] = await Resource.get(resource_id)
+    resource: Record | None = await Resource.get(resource_id)
     if not resource:
         raise web.HTTPNotFound()
 
@@ -34,11 +33,11 @@ async def get_resource_status(request: web.Request) -> web.Response:
     except Exception as e:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
-    resource: Optional[Record] = await Resource.get(resource_id=resource_id, column_name="status")
+    resource: Record | None = await Resource.get(resource_id=resource_id, column_name="status")
     if not resource:
         raise web.HTTPNotFound()
 
-    status: Optional[str] = resource["status"]
+    status: str | None = resource["status"]
     status_verbose: str = Resource.STATUSES[status]
 
     latest_check_endpoint = str(request.app.router["get-latest-check"].url_for())

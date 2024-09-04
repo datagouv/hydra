@@ -1,5 +1,3 @@
-from typing import Optional
-
 from asyncpg import Record
 
 from udata_hydra import config, context
@@ -21,7 +19,7 @@ class Resource:
     }
 
     @classmethod
-    async def get(cls, resource_id: str, column_name: str = "*") -> Optional[Record]:
+    async def get(cls, resource_id: str, column_name: str = "*") -> Record | None:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = f"""SELECT {column_name} FROM catalog WHERE resource_id = '{resource_id}';"""
@@ -33,7 +31,7 @@ class Resource:
         dataset_id: str,
         resource_id: str,
         url: str,
-        status: Optional[str] = None,
+        status: str | None = None,
         priority: bool = True,
     ) -> None:
         if status and status not in cls.STATUSES.keys():
@@ -75,7 +73,7 @@ class Resource:
         dataset_id: str,
         resource_id: str,
         url: str,
-        status: Optional[str] = None,
+        status: str | None = None,
         priority: bool = True,  # Make resource high priority by default for crawling
     ) -> None:
         if status and status not in cls.STATUSES.keys():

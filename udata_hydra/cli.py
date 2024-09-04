@@ -4,7 +4,6 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Optional
 
 import aiohttp
 import asyncpg
@@ -14,7 +13,7 @@ from progressist import ProgressBar
 
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, delete_table
-from udata_hydra.crawl import check_resources as crawl_check_resource
+from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
@@ -48,7 +47,7 @@ async def connection(db_name: str = "main"):
 
 @cli
 async def load_catalog(
-    url: Optional[str] = None, drop_meta: bool = False, drop_all: bool = False, quiet: bool = False
+    url: str | None = None, drop_meta: bool = False, drop_all: bool = False, quiet: bool = False
 ):
     """Load the catalog into DB from CSV file
 
@@ -139,7 +138,7 @@ async def crawl_url(url: str, method: str = "get"):
 @cli
 async def check_resource(resource_id: str, method: str = "get"):
     """Trigger a complete check for a given resource_id"""
-    resource: Optional[asyncpg.Record] = await Resource.get(resource_id)
+    resource: asyncpg.Record | None = await Resource.get(resource_id)
     if not resource:
         log.error("Resource not found in catalog")
         return
@@ -155,7 +154,7 @@ async def check_resource(resource_id: str, method: str = "get"):
 
 @cli(name="analyse-csv")
 async def analyse_csv_cli(
-    check_id: Optional[int] = None, url: Optional[str] = None, debug_insert: bool = False
+    check_id: int | None = None, url: str | None = None, debug_insert: bool = False
 ):
     """Trigger a csv analysis from a check_id or an url"""
     await analyse_csv(check_id=check_id, url=url, debug_insert=debug_insert)

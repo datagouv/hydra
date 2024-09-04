@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator
 
 import sentry_sdk
 from asyncpg import Record
@@ -78,7 +78,7 @@ minio_client = MinIOClient()
 
 async def notify_udata(check_id: int, table_name: str) -> None:
     """Notify udata of the result of a parsing"""
-    check: Optional[Record] = await Check.get_by_id(check_id, with_deleted=True)
+    check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
     resource_id = check["resource_id"]
     db = await context.pool()
     record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
@@ -102,9 +102,9 @@ async def notify_udata(check_id: int, table_name: str) -> None:
 
 
 async def analyse_csv(
-    check_id: Optional[int] = None,
-    url: Optional[str] = None,
-    file_path: Optional[str] = None,
+    check_id: int | None = None,
+    url: str | None = None,
+    file_path: str | None = None,
     debug_insert: bool = False,
 ) -> None:
     """Launch csv analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
@@ -113,7 +113,7 @@ async def analyse_csv(
         return
 
     # Get check and resource_id
-    check: Optional[Record] = (
+    check: Record | None = (
         await Check.get_by_id(check_id, with_deleted=True) if check_id is not None else {}
     )
     resource_id: str = check.get("resource_id")
@@ -233,7 +233,7 @@ async def csv_to_parquet(
     file_path: str,
     inspection: dict,
     table_name: str,
-    resource_id: Optional[str] = None,
+    resource_id: str | None = None,
 ) -> None:
     """
     Convert a csv file to parquet using inspection data.
@@ -269,7 +269,7 @@ async def csv_to_db(
     file_path: str,
     inspection: dict,
     table_name: str,
-    resource_id: Optional[str] = None,
+    resource_id: str | None = None,
     debug_insert: bool = False,
 ) -> None:
     """
@@ -338,7 +338,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict) -> Non
     )
 
 
-async def perform_csv_inspection(file_path: str) -> Optional[dict]:
+async def perform_csv_inspection(file_path: str) -> dict | None:
     """Launch csv-detective against given file"""
     try:
         return csv_detective_routine(
@@ -361,7 +361,7 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if check_id:
         if config.SENTRY_DSN:
-            check: Optional[Record] = await Check.get_by_id(check_id, with_deleted=True)
+            check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
             url = check["url"]
             with sentry_sdk.push_scope() as scope:
                 scope.set_extra("check_id", check_id)

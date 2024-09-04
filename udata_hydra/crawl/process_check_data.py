@@ -16,7 +16,7 @@ async def process_check_data(check_data: dict) -> Tuple[Record, bool]:
 
     check_data["resource_id"] = str(check_data["resource_id"])
 
-    last_check: Optional[Record] = await Check.get_by_resource_id(check_data["resource_id"])
+    last_check: Record | None = await Check.get_by_resource_id(check_data["resource_id"])
 
     has_changed: bool = await has_check_changed(check_data, last_check)
     if has_changed:

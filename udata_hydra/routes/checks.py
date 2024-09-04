@@ -1,5 +1,4 @@
 import json
-from typing import Optional
 
 import aiohttp
 from aiohttp import web
@@ -17,7 +16,7 @@ from udata_hydra.utils import get_request_params
 async def get_latest_check(request: web.Request) -> web.Response:
     """Get the latest check for a given URL or resource_id"""
     url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
-    data: Optional[Record] = await Check.get_latest(url, resource_id)
+    data: Record | None = await Check.get_latest(url, resource_id)
     if not data:
         raise web.HTTPNotFound()
     if data["deleted"]:
@@ -27,7 +26,7 @@ async def get_latest_check(request: web.Request) -> web.Response:
 
 async def get_all_checks(request: web.Request) -> web.Response:
     url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
-    data: Optional[list] = await Check.get_all(url, resource_id)
+    data: list | None = await Check.get_all(url, resource_id)
     if not data:
         raise web.HTTPNotFound()
     return web.json_response([CheckSchema().dump(dict(r)) for r in data])
@@ -47,7 +46,7 @@ async def create_check(request: web.Request) -> web.Response:
 
     # Get URL from resource_id
     try:
-        resource: Optional[Record] = await Resource.get(resource_id, "url")
+        resource: Record | None = await Resource.get(resource_id, "url")
         url: str = resource["url"]
     except Exception:
         raise web.HTTPNotFound(text=f"Couldn't find URL for resource {resource_id}")
@@ -62,7 +61,7 @@ async def create_check(request: web.Request) -> web.Response:
         )
         context.monitor().refresh(status)
 
-    check: Optional[Record] = await Check.get_latest(url, resource_id)
+    check: Record | None = await Check.get_latest(url, resource_id)
     if not check:
         raise web.HTTPBadRequest(text=f"Check not created, status: {status}")
 
