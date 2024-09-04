@@ -145,7 +145,7 @@ def produce_mock(mocker):
 def analysis_mock(mocker):
     """Disable analyse_resource while crawling"""
     mocker.patch(
-        "udata_hydra.crawl.check_resource.analyse_resource",
+        "udata_hydra.crawl.check_resources.analyse_resource",
         dummy({"error": None, "checksum": None, "filesize": None, "mime_type": None}),
     )
 

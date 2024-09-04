@@ -14,7 +14,7 @@ from progressist import ProgressBar
 
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, delete_table
-from udata_hydra.crawl import check_resource as crawl_check_resource
+from udata_hydra.crawl import check_resources as crawl_check_resource
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator

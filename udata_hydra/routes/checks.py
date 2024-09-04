@@ -7,7 +7,7 @@ from asyncpg import Record
 from marshmallow import ValidationError
 
 from udata_hydra import config, context
-from udata_hydra.crawl import check_resource
+from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import CheckSchema
