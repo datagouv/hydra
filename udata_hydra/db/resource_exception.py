@@ -11,7 +11,7 @@ class ResourceException:
     @classmethod
     async def get_by_resource_id(cls, resource_id: str) -> Record | None:
         """
-        Get a resource_exceptions from the resource_exceptions DB table by its resource_id
+        Get a resource_exception by its resource_id
         """
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -21,7 +21,9 @@ class ResourceException:
     @classmethod
     async def insert(cls, resource_id: str, table_indexes: dict[str, str] | None = {}) -> Record:
         """
-        Insert a new resource_exception in the resource_exceptions DB table
+        Insert a new resource_exception
+        table_indexes is a JSON object of column names and index types
+        e.g. {"siren": "unique", "code_postal": "index"}
         """
         pool = await context.pool()
 
