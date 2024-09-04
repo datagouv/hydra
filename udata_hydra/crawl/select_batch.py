@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta, timezone
 
-import asyncpg
+from asyncpg import Record
 from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
 from udata_hydra.db.resource import Resource
 
 
-async def select_rows_based_on_query(connection, q: str, *args) -> list[asyncpg.Record]:
+async def select_rows_based_on_query(connection, q: str, *args) -> list[Record]:
     """
     A transaction wrapper around a select query q pass as param with *args.
     It first creates a temporary table based on this query,
@@ -27,8 +27,8 @@ async def select_rows_based_on_query(connection, q: str, *args) -> list[asyncpg.
     return to_check
 
 
-async def select_resources_to_check() -> list[asyncpg.Record]:
-    """Select resources to check from the catalog
+async def select_batch_resources_to_check() -> list[Record]:
+    """Select a batch of resources to check from the catalog
     - It first selects resources with priority=True
     - ...then resources without checks
     - and if the total number of selected resources is still less than the batch size, it will also add resources with outdated checks in the batch.
@@ -49,7 +49,7 @@ async def select_resources_to_check() -> list[asyncpg.Record]:
             ) s
             ORDER BY random() LIMIT {config.BATCH_SIZE}
         """
-        to_check: list[asyncpg.Record] = await select_rows_based_on_query(connection, q)
+        to_check: list[Record] = await select_rows_based_on_query(connection, q)
 
         # then urls without checks
         if len(to_check) < config.BATCH_SIZE:

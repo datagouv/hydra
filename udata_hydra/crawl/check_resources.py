@@ -1,9 +1,13 @@
 import asyncio
+import logging
 import time
+from collections import defaultdict
 from urllib.parse import urlparse
 
 import aiohttp
+from asyncpg import Record
 
+from udata_hydra import config, context
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.helpers import (
     convert_headers,
@@ -13,7 +17,6 @@ from udata_hydra.crawl.helpers import (
 )
 from udata_hydra.crawl.process_check_data import process_check_data
 from udata_hydra.db.resource import Resource
-from udata_hydra.logger import setup_logging
 from udata_hydra.utils import queue
 
 RESOURCE_RESPONSE_STATUSES = {
@@ -23,7 +26,32 @@ RESOURCE_RESPONSE_STATUSES = {
     "BACKOFF": "backoff",
 }
 
-log = setup_logging()
+log = logging.getLogger("udata-hydra")
+
+
+results: defaultdict = defaultdict(int)
+
+
+async def check_batch_resources(to_parse: list[Record]) -> None:
+    """Check a batch of resources"""
+    context.monitor().set_status("Checking resources...")
+    tasks: list = []
+    async with aiohttp.ClientSession(
+        timeout=None, headers={"user-agent": config.USER_AGENT}
+    ) as session:
+        for row in to_parse:
+            tasks.append(
+                check_resource(
+                    url=row["url"],
+                    resource_id=row["resource_id"],
+                    session=session,
+                    worker_priority="low",
+                )
+            )
+        for task in asyncio.as_completed(tasks):
+            result = await task
+            results[result] += 1
+            context.monitor().refresh(results)
 
 
 async def check_resource(
