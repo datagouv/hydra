@@ -4,7 +4,6 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Union
 
 import aiohttp
 import asyncpg
@@ -14,7 +13,7 @@ from progressist import ProgressBar
 
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, delete_table
-from udata_hydra.crawl import check_url as crawl_check_url
+from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
@@ -33,17 +32,23 @@ async def download_file(url: str, fd):
                 fd.write(chunk)
 
 
-async def connection(db="main"):
-    if db not in context["conn"]:
-        dsn = config.DATABASE_URL if db == "main" else getattr(config, f"DATABASE_URL_{db.upper()}")
-        context["conn"][db] = await asyncpg.connect(
+async def connection(db_name: str = "main"):
+    if db_name not in context["conn"]:
+        dsn = (
+            config.DATABASE_URL
+            if db_name == "main"
+            else getattr(config, f"DATABASE_URL_{db_name.upper()}")
+        )
+        context["conn"][db_name] = await asyncpg.connect(
             dsn=dsn, server_settings={"search_path": config.DATABASE_SCHEMA}
         )
-    return context["conn"][db]
+    return context["conn"][db_name]
 
 
 @cli
-async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
+async def load_catalog(
+    url: str | None = None, drop_meta: bool = False, drop_all: bool = False, quiet: bool = False
+):
     """Load the catalog into DB from CSV file
 
     :url: URL of the catalog to fetch, by default defined in config
@@ -91,9 +96,9 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
                     """
                     INSERT INTO catalog (
                         dataset_id, resource_id, url, harvest_modified_at,
-                        deleted, priority
+                        deleted, priority, status
                     )
-                    VALUES ($1, $2, $3, $4, FALSE, FALSE)
+                    VALUES ($1, $2, $3, $4, FALSE, FALSE, NULL)
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,
@@ -116,8 +121,8 @@ async def load_catalog(url=None, drop_meta=False, drop_all=False, quiet=False):
 
 
 @cli
-async def check_url(url: str, method: str = "get"):
-    """Quickly check an URL"""
+async def crawl_url(url: str, method: str = "get"):
+    """Quickly crawl an URL"""
     log.info(f"Checking url {url}")
     async with aiohttp.ClientSession(timeout=None) as session:
         timeout = aiohttp.ClientTimeout(total=5)
@@ -131,26 +136,32 @@ async def check_url(url: str, method: str = "get"):
 
 
 @cli
-async def check_resource(resource_id, method: str = "get"):
+async def check_resource(resource_id: str, method: str = "get"):
     """Trigger a complete check for a given resource_id"""
-    res = await Resource.get(resource_id)
-    if not res:
+    resource: asyncpg.Record | None = await Resource.get(resource_id)
+    if not resource:
         log.error("Resource not found in catalog")
         return
     async with aiohttp.ClientSession(timeout=None) as session:
-        await crawl_check_url(url=res[0], resource_id=None, session=session, method=method)
+        await crawl_check_resource(
+            url=resource["url"],
+            resource_id=resource_id,
+            session=session,
+            method=method,
+            worker_priority="high",
+        )
 
 
 @cli(name="analyse-csv")
 async def analyse_csv_cli(
-    check_id: Union[int, None] = None, url: Union[str, None] = None, debug_insert: bool = False
+    check_id: int | None = None, url: str | None = None, debug_insert: bool = False
 ):
     """Trigger a csv analysis from a check_id or an url"""
     await analyse_csv(check_id=check_id, url=url, debug_insert=debug_insert)
 
 
 @cli
-async def csv_sample(size=1000, download: bool = False, max_size: str = "100M"):
+async def csv_sample(size: int = 1000, download: bool = False, max_size: str = "100M"):
     """Get a csv sample from latest checks
 
     :size: Size of the sample (how many files to query)
@@ -228,7 +239,7 @@ async def drop_dbs(dbs: list = []):
             WHERE schemaname = '{config.DATABASE_SCHEMA}';
         """)
         for table in tables:
-            await conn.execute(f'DROP TABLE "{table["tablename"]}"')
+            await conn.execute(f'DROP TABLE "{table["tablename"]}" CASCADE')
 
 
 @cli

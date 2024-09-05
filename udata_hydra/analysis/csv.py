@@ -5,9 +5,10 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Iterator, Union
+from typing import Any, Iterator
 
 import sentry_sdk
+from asyncpg import Record
 from csv_detective.detection import engine_to_file
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
@@ -34,6 +35,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.analysis.errors import ParseException
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource import Resource
 from udata_hydra.utils import Reader, Timer, download_resource, queue, send
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
@@ -74,9 +76,9 @@ RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 minio_client = MinIOClient()
 
 
-async def notify_udata(check_id: str, table_name: str) -> None:
+async def notify_udata(check_id: int, table_name: str) -> None:
     """Notify udata of the result of a parsing"""
-    check = await Check.get(check_id)
+    check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
     resource_id = check["resource_id"]
     db = await context.pool()
     record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
@@ -100,22 +102,30 @@ async def notify_udata(check_id: str, table_name: str) -> None:
 
 
 async def analyse_csv(
-    check_id: Union[int, None] = None,
-    url: Union[str, None] = None,
-    file_path: Union[str, None] = None,
+    check_id: int | None = None,
+    url: str | None = None,
+    file_path: str | None = None,
     debug_insert: bool = False,
 ) -> None:
-    """Launch csv analysis from a check or an URL (debug), using previsously downloaded file at file_path if any"""
+    """Launch csv analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS:
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
+
+    # Get check and resource_id
+    check: Record | None = (
+        await Check.get_by_id(check_id, with_deleted=True) if check_id is not None else {}
+    )
+    resource_id: str = check.get("resource_id")
+
+    # Update resource status to ANALYSING_CSV
+    await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
 
     exceptions = config.LARGE_RESOURCES_EXCEPTIONS
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
-    check = await Check.get(check_id) if check_id is not None else {}
-    url = check.get("url") or url
+    url: str = check.get("url") or url
     exception_file = str(check.get("resource_id", "")) in exceptions
 
     headers = json.loads(check.get("headers") or "{}")
@@ -136,10 +146,24 @@ async def analyse_csv(
             await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
         csv_inspection = await perform_csv_inspection(tmp_file.name)
         timer.mark("csv-inspection")
-        await csv_to_db(tmp_file.name, csv_inspection, table_name, debug_insert=debug_insert)
+
+        await csv_to_db(
+            file_path=tmp_file.name,
+            inspection=csv_inspection,
+            table_name=table_name,
+            resource_id=resource_id,
+            debug_insert=debug_insert,
+        )
         timer.mark("csv-to-db")
-        await csv_to_parquet(tmp_file.name, csv_inspection, table_name)
+
+        await csv_to_parquet(
+            file_path=tmp_file.name,
+            inspection=csv_inspection,
+            table_name=table_name,
+            resource_id=resource_id,
+        )
         timer.mark("csv-to-parquet")
+
         if check_id:
             await Check.update(
                 check_id,
@@ -149,6 +173,7 @@ async def analyse_csv(
                 },
             )
         await csv_to_db_index(table_name, csv_inspection, check)
+
     except ParseException as e:
         await handle_parse_exception(e, check_id, table_name)
     finally:
@@ -157,6 +182,9 @@ async def analyse_csv(
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
+
+        # Reset resource status to None
+        await Resource.update(resource_id, {"status": None})
 
 
 def smart_cast(_type: str, value, failsafe: bool = False) -> Any:
@@ -201,7 +229,12 @@ def generate_records(file_path: str, inspection: dict, columns: dict) -> Iterato
                 yield [smart_cast(t, v, failsafe=True) for t, v in zip(columns.values(), line)]
 
 
-async def csv_to_parquet(file_path: str, inspection: dict, table_name: str) -> None:
+async def csv_to_parquet(
+    file_path: str,
+    inspection: dict,
+    table_name: str,
+    resource_id: str | None = None,
+) -> None:
     """
     Convert a csv file to parquet using inspection data.
 
@@ -212,10 +245,16 @@ async def csv_to_parquet(file_path: str, inspection: dict, table_name: str) -> N
     if not config.CSV_TO_PARQUET:
         log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
         return
+
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
         f"to parquet for {table_name} and sending to Minio."
     )
+
+    if resource_id:
+        # Update resource status to CONVERTING_TO_PARQUET
+        await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
+
     columns = {c: v["python_type"] for c, v in inspection["columns"].items()}
     # save the file as parquet and store it on Minio instance
     parquet_file, _ = save_as_parquet(
@@ -227,7 +266,11 @@ async def csv_to_parquet(file_path: str, inspection: dict, table_name: str) -> N
 
 
 async def csv_to_db(
-    file_path: str, inspection: dict, table_name: str, debug_insert: bool = False
+    file_path: str,
+    inspection: dict,
+    table_name: str,
+    resource_id: str | None = None,
+    debug_insert: bool = False,
 ) -> None:
     """
     Convert a csv file to database table using inspection data. It should (re)create one table:
@@ -241,10 +284,16 @@ async def csv_to_db(
     if not config.CSV_TO_DB:
         log.debug("CSV_TO_DB turned off, skipping.")
         return
+
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
         f"to db for {table_name}"
     )
+
+    if resource_id:
+        # Update resource status to INSERTING_IN_DB
+        await Resource.update(resource_id, {"status": "INSERTING_IN_DB"})
+
     # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {
         f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
@@ -289,7 +338,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: dict) -> Non
     )
 
 
-async def perform_csv_inspection(file_path: str) -> Union[dict, None]:
+async def perform_csv_inspection(file_path: str) -> dict | None:
     """Launch csv-detective against given file"""
     try:
         return csv_detective_routine(
@@ -312,7 +361,7 @@ async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if check_id:
         if config.SENTRY_DSN:
-            check = await Check.get(check_id)
+            check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
             url = check["url"]
             with sentry_sdk.push_scope() as scope:
                 scope.set_extra("check_id", check_id)

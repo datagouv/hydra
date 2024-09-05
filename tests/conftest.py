@@ -16,6 +16,7 @@ import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra import config
 from udata_hydra.app import app_factory
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource import Resource
 from udata_hydra.logger import stop_sentry
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
@@ -42,6 +43,16 @@ def dummy(return_value=None):
 @pytest.fixture
 def is_harvested(request):
     return "catalog_harvested" in [m.name for m in request.node.iter_markers()]
+
+
+@pytest.fixture
+def api_headers() -> dict:
+    return {"Authorization": f"Bearer {config.API_KEY}"}
+
+
+@pytest.fixture
+def api_headers_wrong_token() -> dict:
+    return {"Authorization": "Bearer stupid-token"}
 
 
 # this really really really should run first (or "prod" db will get erased)
@@ -124,16 +135,16 @@ def setup_catalog(catalog_content, rmock):
 
 @pytest.fixture
 def produce_mock(mocker):
-    mocker.patch("udata_hydra.crawl.send", dummy())
+    mocker.patch("udata_hydra.crawl.process_check_data.send", dummy())
     mocker.patch("udata_hydra.analysis.resource.send", dummy())
     mocker.patch("udata_hydra.analysis.csv.send", dummy())
 
 
 @pytest.fixture
 def analysis_mock(mocker):
-    """Disable process_resource while crawling"""
+    """Disable analyse_resource while crawling"""
     mocker.patch(
-        "udata_hydra.crawl.process_resource",
+        "udata_hydra.crawl.check_resources.analyse_resource",
         dummy({"error": None, "checksum": None, "filesize": None, "mime_type": None}),
     )
 
@@ -154,13 +165,13 @@ async def db():
 
 @pytest_asyncio.fixture
 async def insert_fake_resource():
-    async def _insert_fake_resource(database):
-        await database.execute(
-            f"""
-            INSERT INTO catalog (dataset_id, resource_id, url, priority, deleted)
-            VALUES ('{DATASET_ID}', '{RESOURCE_ID}', 'http://dev.local/', True, False)
-            ON CONFLICT (resource_id) DO NOTHING;
-            """
+    async def _insert_fake_resource(database, status: str | None = None):
+        await Resource.insert(
+            dataset_id=DATASET_ID,
+            resource_id=RESOURCE_ID,
+            url="http://dev.local/",
+            status=status,
+            priority=True,
         )
 
     return _insert_fake_resource
@@ -184,7 +195,7 @@ async def fake_check():
         resource_id=RESOURCE_ID,
         detected_last_modified_at=None,
         parsing_table=False,
-    ):
+    ) -> dict:
         url = f"https://example.com/resource-{resource}"
         data = {
             "url": url,
@@ -201,10 +212,10 @@ async def fake_check():
             if parsing_table
             else None,
         }
-        id = await Check.insert(data)
-        data["id"] = id
+        check = await Check.insert(data)
+        data["id"] = check["id"]
         if created_at:
-            await Check.update(id, {"created_at": created_at})
+            await Check.update(check["id"], {"created_at": created_at})
             data["created_at"] = created_at
         return data
 

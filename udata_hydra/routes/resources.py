@@ -1,6 +1,7 @@
 import json
 
 from aiohttp import web
+from asyncpg import Record
 from marshmallow import ValidationError
 
 from udata_hydra.db.resource import Resource
@@ -18,11 +19,41 @@ async def get_resource(request: web.Request) -> web.Response:
     except Exception as e:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
-    resource: dict = await Resource.get(resource_id)
+    resource: Record | None = await Resource.get(resource_id)
     if not resource:
         raise web.HTTPNotFound()
 
     return web.json_response(ResourceSchema().dump(dict(resource)))
+
+
+async def get_resource_status(request: web.Request) -> web.Response:
+    """Endpoint to get the current status of a resource from the DB.
+    It is the same as get_resource but only returns the status of the resource, saving bandwith and processing time.
+    Respond with a 200 status code and a JSON body with the resource status
+    If resource is not found, respond with a 404 status code
+    """
+    try:
+        resource_id: str = request.match_info["resource_id"]
+    except Exception as e:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
+
+    resource: Record | None = await Resource.get(resource_id=resource_id, column_name="status")
+    if not resource:
+        raise web.HTTPNotFound()
+
+    status: str | None = resource["status"]
+    status_verbose: str = Resource.STATUSES[status]
+
+    latest_check_endpoint = str(request.app.router["get-latest-check"].url_for())
+
+    return web.json_response(
+        {
+            "resource_id": resource_id,
+            "status": status,
+            "status_verbose": status_verbose,
+            "latest_check_url": f"{request.scheme}://{request.host}{latest_check_endpoint}?resource_id={resource_id}",
+        }
+    )
 
 
 async def create_resource(request: web.Request) -> web.Response:
@@ -37,8 +68,8 @@ async def create_resource(request: web.Request) -> web.Response:
     except ValidationError as err:
         raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
-    resource: dict = valid_payload["document"]
-    if not resource:
+    document: dict | None = valid_payload["document"]
+    if not document:
         raise web.HTTPBadRequest(text="Missing document body")
 
     dataset_id = valid_payload["dataset_id"]
@@ -47,11 +78,11 @@ async def create_resource(request: web.Request) -> web.Response:
     await Resource.insert(
         dataset_id=dataset_id,
         resource_id=resource_id,
-        url=resource["url"],
+        url=document["url"],
         priority=True,
     )
 
-    return web.json_response({"message": "created"})
+    return web.HTTPCreated(text=ResourceSchema().dumps(dict(document)))
 
 
 async def update_resource(request: web.Request) -> web.Response:
@@ -67,16 +98,16 @@ async def update_resource(request: web.Request) -> web.Response:
     except ValidationError as err:
         raise web.HTTPBadRequest(text=json.dumps(err.messages))
 
-    resource: dict = valid_payload["document"]
-    if not resource:
+    document: dict | None = valid_payload["document"]
+    if not document:
         raise web.HTTPBadRequest(text="Missing document body")
 
     dataset_id: str = valid_payload["dataset_id"]
-    resource_id = valid_payload["resource_id"]  # TODO: get resource_id from URL
+    resource_id: str = valid_payload["resource_id"]
 
-    await Resource.update_or_insert(dataset_id, resource_id, resource["url"])
+    await Resource.update_or_insert(dataset_id, resource_id, document["url"])
 
-    return web.json_response({"message": "updated"})
+    return web.HTTPOk(text=ResourceSchema().dumps(dict(document)))
 
 
 async def delete_resource(request: web.Request) -> web.Response:
@@ -88,4 +119,4 @@ async def delete_resource(request: web.Request) -> web.Response:
     # Mark resource as deleted in catalog table
     await Resource.delete(resource_id)
 
-    return web.json_response({"message": "deleted"})
+    return web.HTTPOk()

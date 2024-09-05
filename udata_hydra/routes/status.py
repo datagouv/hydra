@@ -4,7 +4,7 @@ from aiohttp import web
 from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
-from udata_hydra.crawl import get_excluded_clause
+from udata_hydra.db.resource import Resource
 from udata_hydra.worker import QUEUES
 
 
@@ -14,7 +14,7 @@ async def get_crawler_status(request: web.Request) -> web.Response:
             SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END) AS count_left,
             SUM(CASE WHEN last_check IS NOT NULL THEN 1 ELSE 0 END) AS count_checked
         FROM catalog
-        WHERE {get_excluded_clause()}
+        WHERE {Resource.get_excluded_clause()}
         AND catalog.deleted = False
     """
     stats_catalog = await request.app["pool"].fetchrow(q)
@@ -26,7 +26,7 @@ async def get_crawler_status(request: web.Request) -> web.Response:
             SUM(CASE WHEN checks.created_at <= $1 THEN 1 ELSE 0 END) AS count_outdated
             --, SUM(CASE WHEN checks.created_at > $1 THEN 1 ELSE 0 END) AS count_fresh
         FROM catalog, checks
-        WHERE {get_excluded_clause()}
+        WHERE {Resource.get_excluded_clause()}
         AND catalog.last_check = checks.id
         AND catalog.deleted = False
     """
@@ -59,7 +59,7 @@ async def get_stats(request: web.Request) -> web.Response:
     q = f"""
         SELECT count(*) AS count_checked
         FROM catalog
-        WHERE {get_excluded_clause()}
+        WHERE {Resource.get_excluded_clause()}
         AND last_check IS NOT NULL
         AND catalog.deleted = False
     """
@@ -71,7 +71,7 @@ async def get_stats(request: web.Request) -> web.Response:
             SUM(CASE WHEN error IS NOT NULL THEN 1 ELSE 0 END) AS count_error,
             SUM(CASE WHEN timeout = True THEN 1 ELSE 0 END) AS count_timeout
         FROM catalog, checks
-        WHERE {get_excluded_clause()}
+        WHERE {Resource.get_excluded_clause()}
         AND catalog.last_check = checks.id
         AND catalog.deleted = False
     """
@@ -86,7 +86,7 @@ async def get_stats(request: web.Request) -> web.Response:
         SELECT checks.status, count(*) as count FROM checks, catalog
         WHERE catalog.last_check = checks.id
         AND checks.status IS NOT NULL
-        AND {get_excluded_clause()}
+        AND {Resource.get_excluded_clause()}
         AND last_check IS NOT NULL
         AND catalog.deleted = False
         GROUP BY checks.status

@@ -1,4 +1,4 @@
-from typing import Union
+from asyncpg import Record
 
 from udata_hydra import context
 from udata_hydra.db import (
@@ -12,21 +12,37 @@ class Check:
     """Represents a check in the "checks" DB table"""
 
     @classmethod
-    async def get(cls, check_id: int) -> dict:
+    async def get_by_id(cls, check_id: int, with_deleted: bool = False) -> Record | None:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
                 SELECT * FROM catalog JOIN checks
                 ON catalog.last_check = checks.id
-                WHERE checks.id = $1;
+                WHERE checks.id = $1
             """
-            check = await connection.fetchrow(q, check_id)
-        return check
+            if not with_deleted:
+                q += " AND catalog.deleted = FALSE"
+            return await connection.fetchrow(q, check_id)
+
+    @classmethod
+    async def get_by_resource_id(
+        cls, resource_id: str, with_deleted: bool = False
+    ) -> Record | None:
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = """
+                SELECT * FROM catalog JOIN checks
+                ON catalog.last_check = checks.id
+                WHERE catalog.resource_id = $1
+            """
+            if not with_deleted:
+                q += " AND catalog.deleted = FALSE"
+            return await connection.fetchrow(q, resource_id)
 
     @classmethod
     async def get_latest(
-        cls, url: Union[str, None], resource_id: Union[str, None]
-    ) -> Union[dict, None]:
+        cls, url: str | None = None, resource_id: str | None = None
+    ) -> Record | None:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -40,9 +56,7 @@ class Check:
             return await connection.fetchrow(q, url or resource_id)
 
     @classmethod
-    async def get_all(
-        cls, url: Union[str, None], resource_id: Union[str, None]
-    ) -> Union[dict, None]:
+    async def get_all(cls, url: str | None = None, resource_id: str | None = None) -> list | None:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -57,19 +71,19 @@ class Check:
             return await connection.fetch(q, url or resource_id)
 
     @classmethod
-    async def insert(cls, data: dict) -> int:
+    async def insert(cls, data: dict) -> Record:
         """
-        Insert a new check in DB and return the check id in DB
+        Insert a new check in DB and return the check record in DB
         This use the info from the last check of the same resource
         """
         data = convert_dict_values_to_json(data)
-        q = compute_insert_query(table_name="checks", data=data)
+        q1: str = compute_insert_query(table_name="checks", data=data)
         pool = await context.pool()
         async with pool.acquire() as connection:
-            last_check = await connection.fetchrow(q, *data.values())
-            q = """UPDATE catalog SET last_check = $1 WHERE resource_id = $2"""
-            await connection.execute(q, last_check["id"], data["resource_id"])
-        return last_check["id"]
+            last_check = await connection.fetchrow(q1, *data.values())
+            q2 = """UPDATE catalog SET last_check = $1 WHERE resource_id = $2"""
+            await connection.execute(q2, last_check["id"], data["resource_id"])
+            return last_check
 
     @classmethod
     async def update(cls, check_id: int, data: dict) -> int:

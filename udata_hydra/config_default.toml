@@ -12,6 +12,8 @@ TESTING = false
 MAX_POOL_SIZE = 50
 USER_AGENT = "udata-hydra/1.0"
 
+API_KEY = "hydra_api_key_to_change"
+
 # -- crawler settings -- #
 
 CATALOG_URL = "https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d"
@@ -30,8 +32,8 @@ NO_BACKOFF_DOMAINS = [
 ]
 # max number of _completed_ requests per domain per period
 BACKOFF_NB_REQ = 180
-BACKOFF_PERIOD = 360  # in seconds
-COOL_OFF_PERIOD = 86400  # 1 day to cool off when we've messed up
+BACKOFF_PERIOD = 360    # in seconds
+COOL_OFF_PERIOD = 86400 # 1 day to cool off when we've messed up
 # ids of the resources that are too large to be processed normally
 # but that we want to have anyway
 LARGE_RESOURCES_EXCEPTIONS = [
@@ -50,9 +52,9 @@ SLEEP_BETWEEN_BATCHES = 60
 # max download filesize in bytes (100 MB)
 MAX_FILESIZE_ALLOWED.csv = 104857600
 MAX_FILESIZE_ALLOWED.csvgz = 104857600
-MAX_FILESIZE_ALLOWED.xls = 52428800 # /2
-MAX_FILESIZE_ALLOWED.xlsx = 13107200 # /8
-MAX_FILESIZE_ALLOWED.ods = 10485760 # /10
+MAX_FILESIZE_ALLOWED.xls = 52428800    # /2
+MAX_FILESIZE_ALLOWED.xlsx = 13107200   # /8
+MAX_FILESIZE_ALLOWED.ods = 10485760    # /10
 
 
 CSV_ANALYSIS = true

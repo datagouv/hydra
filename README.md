@@ -16,9 +16,15 @@ The architecture for the full workflow is the following:
 ![Full workflow architecture](docs/archi-idd-IDD.drawio.png)
 
 
-The hydra crawler is one of the components of the architecture. It will check if resource is available, analyze the type of file if the resource has been modified, and analyze the CSV content. It will also convert CSV resources to database tables and send the data to a udata instance.
+The hydra crawler is one of the components of the architecture. It will check if resource is available, analyse the type of file if the resource has been modified, and analyse the CSV content. It will also convert CSV resources to database tables and send the data to a udata instance.
 
 ![Crawler architecture](docs/hydra.drawio.png)
+
+## Dependencies
+
+This project uses `libmagic`, which needs to be installed on your system, eg:
+
+`brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on linux.
 
 ## CLI
 
@@ -80,6 +86,21 @@ The coverage is configured in the `pypoject.toml` file, in the `[tool.pytest.ini
 You can also override the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
 
 ## API
+
+The API will need a Bearer token for each request on protected endpoints (any endpoint that isn't a `GET`).
+The token is configured in the `config.toml` file as `API_KEY`, and has a default value set in the `udata_hydra/config_default.toml` file.
+
+If you're using hydra as an external service to receive resource events from [udata](https://github.com/opendatateam/udata), then udata needs to also configure this
+API key in its `udata.cfg` file:
+
+```
+# Wether udata should publish the resource events
+PUBLISH_ON_RESOURCE_EVENTS = True
+# Where to publish the events
+RESOURCES_ANALYSER_URI = "http://localhost:8000"
+# The API key that hydra needs
+RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
+```
 
 ### Run
 
@@ -281,7 +302,7 @@ UDATA_URI_API_KEY = "example.api.key"
 SENTRY_DSN = "https://{my-sentry-dsn}"
 ```
 
-The webhook integration sends HTTP messages to `udata` when resources are analyzed or checked to fill resources extras.
+The webhook integration sends HTTP messages to `udata` when resources are analysed or checked to fill resources extras.
 
 Regarding analysis, there is a phase called "change detection". It will try to guess if a resource has been modified based on different criterions:
 - harvest modified date in catalog
