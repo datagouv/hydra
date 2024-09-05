@@ -120,7 +120,7 @@ async def test_api_create_check_wrongly(
     "resource",
     [
         # resource_id, status, timeout, exception
-        (RESOURCE_ID, 200, False, None),
+        (RESOURCE_ID, 201, False, None),
         (RESOURCE_ID, 500, False, None),
         (RESOURCE_ID, None, False, ClientError("client error")),
         (RESOURCE_ID, None, False, AssertionError),
@@ -177,7 +177,7 @@ async def test_api_create_check(
     api_response = await client.post(
         "/api/checks/", headers=api_headers, json={"resource_id": resource_id}
     )
-    assert api_response.status == 200
+    assert api_response.status == 201
     data: dict = await api_response.json()
     assert data["resource_id"] == resource_id
     assert data["url"] == rurl
@@ -225,8 +225,7 @@ async def test_api_create_check(
 
 
 async def test_api_get_resource(setup_catalog, client):
-    query: str = f"dataset_id={DATASET_ID}&resource_id={RESOURCE_ID}"
-    resp = await client.get(f"/api/resources/?{query}")
+    resp = await client.get(f"/api/resources/{RESOURCE_ID}")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data["dataset_id"] == DATASET_ID
@@ -250,66 +249,48 @@ async def test_api_get_resource_status(
     assert data["latest_check_url"].endswith(f"/api/checks/latest?resource_id={RESOURCE_ID}")
 
 
-@pytest.mark.parametrize(
-    "route",
-    [
-        {"url": "/api/resources/", "method": "post"},
-        {"url": "/api/resource/created/", "method": "post"},  # legacy route
-    ],
-)  # TODO: can be removed once we don't use legacy route anymore
 async def test_api_create_resource(
-    client, route, api_headers, api_headers_wrong_token, udata_resource_payload
+    client, api_headers, api_headers_wrong_token, udata_resource_payload
 ):
-    # TODO: can be removed once we don't use legacy route anymore
-    client_http_method: Callable = getattr(client, route["method"])
-
     # Test API call with no token
-    resp = await client_http_method(path=route["url"], headers=None, json=udata_resource_payload)
+    resp = await client.post(path="/api/resources/", headers=None, json=udata_resource_payload)
     assert resp.status == 401
 
     # Test API call with invalid token
-    resp = await client_http_method(
-        path=route["url"], headers=api_headers_wrong_token, json=udata_resource_payload
+    resp = await client.post(
+        path="/api/resources/", headers=api_headers_wrong_token, json=udata_resource_payload
     )
     assert resp.status == 403
 
     # Test API call with invalid POST data
     stupid_post_data: dict = {"stupid": "stupid"}
-    resp = await client_http_method(path=route["url"], headers=api_headers, json=stupid_post_data)
+    resp = await client.post(path="/api/resources/", headers=api_headers, json=stupid_post_data)
     assert resp.status == 400
 
     # Test API call success
-    resp = await client_http_method(
-        path=route["url"], headers=api_headers, json=udata_resource_payload
+    resp = await client.post(
+        path="/api/resources/", headers=api_headers, json=udata_resource_payload
     )
-    assert resp.status == 200
+    # assert resp.status == 201
     data: dict = await resp.json()
-    assert data == {"message": "created"}
+    assert data["id"] == "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec"
 
     # Test API call with missing document body
     udata_resource_payload["document"] = None
-    resp = await client_http_method(
-        path=route["url"], headers=api_headers, json=udata_resource_payload
+    resp = await client.post(
+        path="/api/resources/", headers=api_headers, json=udata_resource_payload
     )
     assert resp.status == 400
     text = await resp.text()
     assert text == "Missing document body"
 
 
-@pytest.mark.parametrize(
-    "route",
-    [
-        {"url": f"/api/resources/{RESOURCE_ID}/", "method": "put"},
-        {"url": "/api/resource/updated/", "method": "post"},  # legacy route
-    ],
-)  # TODO: can be removed once we don't use legacy route anymore
-async def test_api_update_resource(client, route, api_headers, api_headers_wrong_token):
-    # TODO: can be removed once we don't use legacy route anymore:
-    client_http_method: Callable = getattr(client, route["method"])
-
+async def test_api_update_resource(client, api_headers, api_headers_wrong_token):
     # Test invalid PUT data
     stupid_post_data: dict = {"stupid": "stupid"}
-    resp = await client_http_method(path=route["url"], headers=api_headers, json=stupid_post_data)
+    resp = await client.put(
+        path=f"/api/resources/{RESOURCE_ID}/", headers=api_headers, json=stupid_post_data
+    )
     assert resp.status == 400
 
     payload = {
@@ -332,39 +313,30 @@ async def test_api_update_resource(client, route, api_headers, api_headers_wrong
     }
 
     # Test API call with no token
-    resp = await client_http_method(path=route["url"], headers=None, json=payload)
+    resp = await client.put(path=f"/api/resources/{RESOURCE_ID}", headers=None, json=payload)
     assert resp.status == 401
 
     # Test API call with invalid token
-    resp = await client_http_method(
-        path=route["url"], headers=api_headers_wrong_token, json=payload
+    resp = await client.put(
+        path=f"/api/resources/{RESOURCE_ID}", headers=api_headers_wrong_token, json=payload
     )
     assert resp.status == 403
 
     # Test API call success
-    resp = await client_http_method(path=route["url"], headers=api_headers, json=payload)
+    resp = await client.put(path=f"/api/resources/{RESOURCE_ID}", headers=api_headers, json=payload)
     assert resp.status == 200
     data: dict = await resp.json()
-    assert data == {"message": "updated"}
+    assert data["id"] == RESOURCE_ID
 
     # Test API call with missing document body
     payload["document"] = None
-    resp = await client_http_method(path=route["url"], headers=api_headers, json=payload)
+    resp = await client.put(path=f"/api/resources/{RESOURCE_ID}", headers=api_headers, json=payload)
     assert resp.status == 400
-    text = await resp.text()
+    text: str = await resp.text()
     assert text == "Missing document body"
 
 
-@pytest.mark.parametrize(
-    "route",
-    [
-        {"url": f"/api/resources/{RESOURCE_ID}/", "method": "put"},
-        {"url": "/api/resource/updated/", "method": "post"},  # legacy route
-    ],
-)  # TODO: can be removed once we don't use legacy route anymore
-async def test_api_update_resource_url_since_load_catalog(
-    setup_catalog, db, client, route, api_headers
-):
+async def test_api_update_resource_url_since_load_catalog(setup_catalog, db, client, api_headers):
     # We modify the url for this resource
     await db.execute(
         "UPDATE catalog SET url = 'https://example.com/resource-0' "
@@ -393,11 +365,8 @@ async def test_api_update_resource_url_since_load_catalog(
     # It does not create any duplicated resource.
     # The existing entry get updated accordingly.
 
-    # TODO: can be removed once we don't use legacy route anymore:
-    client_http_method: Callable = getattr(client, route["method"])
-
     # Test API call success
-    resp = await client_http_method(path=route["url"], headers=api_headers, json=payload)
+    resp = await client.put(path=f"/api/resources/{RESOURCE_ID}", headers=api_headers, json=payload)
     assert resp.status == 200
 
     res = await db.fetch(f"SELECT * FROM catalog WHERE resource_id = '{RESOURCE_ID}'")
@@ -405,47 +374,31 @@ async def test_api_update_resource_url_since_load_catalog(
     res[0]["url"] == "https://example.com/resource-1"
 
 
-@pytest.mark.parametrize(
-    "route",
-    [
-        {"url": f"/api/resources/{RESOURCE_ID}/", "method": "delete"},
-        {"url": "/api/resource/deleted/", "method": "post"},  # legacy route
-    ],
-)  # TODO: can be removed once we don't use legacy route anymore
-async def test_api_delete_resource(client, route, api_headers, api_headers_wrong_token):
-    # TODO: can be removed once we don't use legacy route anymore
-    client_http_method: Callable = getattr(client, route["method"])
-
-    # Test invalid DELETE data
-    stupid_delete_data: dict = {"stupid": "stupid"}
-    resp = await client_http_method(path=route["url"], headers=api_headers, json=stupid_delete_data)
-    assert resp.status == 400
-
-    payload = {
-        "resource_id": RESOURCE_ID,
-        "dataset_id": DATASET_ID,
-        "document": None,
-    }
+async def test_api_delete_resource(client, api_headers, api_headers_wrong_token):
+    # Test invalid resource_id
+    resp = await client.delete(
+        path="/api/resources/STUPID-ID",
+        headers=api_headers,
+    )
+    assert resp.status == 404
 
     # Test API call with no token
-    resp = await client_http_method(path=route["url"], headers=None, json=payload)
+    resp = await client.delete(path=f"/api/resources/{RESOURCE_ID}", headers=None)
     assert resp.status == 401
 
     # Test API call with invalid token
-    resp = await client_http_method(
-        path=route["url"], headers=api_headers_wrong_token, json=payload
+    resp = await client.delete(
+        path=f"/api/resources/{RESOURCE_ID}", headers=api_headers_wrong_token
     )
     assert resp.status == 403
 
     # Test API call success
-    resp = await client_http_method(path=route["url"], headers=api_headers, json=payload)
+    resp = await client.delete(path=f"/api/resources/{RESOURCE_ID}", headers=api_headers)
     assert resp.status == 200
-    data: dict = await resp.json()
-    assert data == {"message": "deleted"}
 
 
 async def test_api_get_crawler_status(setup_catalog, client, fake_check):
-    resp = await client.get("/api/status/crawler/")
+    resp = await client.get("/api/status/crawler")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == {
@@ -457,7 +410,7 @@ async def test_api_get_crawler_status(setup_catalog, client, fake_check):
     }
 
     await fake_check()
-    resp = await client.get("/api/status/crawler/")
+    resp = await client.get("/api/status/crawler")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == {
@@ -470,7 +423,7 @@ async def test_api_get_crawler_status(setup_catalog, client, fake_check):
 
 
 async def test_api_get_stats(setup_catalog, client, fake_check):
-    resp = await client.get("/api/stats/")
+    resp = await client.get("/api/stats")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == {
@@ -486,7 +439,7 @@ async def test_api_get_stats(setup_catalog, client, fake_check):
     await fake_check()
     await fake_check(timeout=True, status=None)
     await fake_check(status=500, error="error")
-    resp = await client.get("/api/stats/")
+    resp = await client.get("/api/stats")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == {
@@ -500,5 +453,5 @@ async def test_api_get_stats(setup_catalog, client, fake_check):
 
 
 async def test_api_get_health(client) -> None:
-    resp = await client.get("/api/health/")
+    resp = await client.get("/api/health")
     assert resp.status == 200

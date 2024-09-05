@@ -1,2 +1,2 @@
 from .check import CheckSchema
-from .resource import ResourceSchema
+from .resource import ResourceDocumentSchema, ResourceSchema

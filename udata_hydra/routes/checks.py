@@ -67,4 +67,4 @@ async def create_check(request: web.Request) -> web.Response:
     if not check:
         raise web.HTTPBadRequest(text=f"Check not created, status: {status}")
 
-    return web.HTTPCreated(text=CheckSchema().dumps(dict(check)))
+    return web.json_response(CheckSchema().dump(dict(check)), status=201)

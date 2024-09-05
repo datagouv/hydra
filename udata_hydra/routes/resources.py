@@ -5,7 +5,7 @@ from asyncpg import Record
 from marshmallow import ValidationError
 
 from udata_hydra.db.resource import Resource
-from udata_hydra.schemas import ResourceSchema
+from udata_hydra.schemas import ResourceDocumentSchema, ResourceSchema
 
 
 async def get_resource(request: web.Request) -> web.Response:
@@ -82,7 +82,7 @@ async def create_resource(request: web.Request) -> web.Response:
         priority=True,
     )
 
-    return web.HTTPCreated(text=ResourceSchema().dumps(dict(document)))
+    return web.json_response(ResourceDocumentSchema().dump(dict(document)), status=201)
 
 
 async def update_resource(request: web.Request) -> web.Response:
@@ -107,7 +107,7 @@ async def update_resource(request: web.Request) -> web.Response:
 
     await Resource.update_or_insert(dataset_id, resource_id, document["url"])
 
-    return web.HTTPOk(text=ResourceSchema().dumps(dict(document)))
+    return web.json_response(ResourceDocumentSchema().dump(document), status=200)
 
 
 async def delete_resource(request: web.Request) -> web.Response:
@@ -115,6 +115,10 @@ async def delete_resource(request: web.Request) -> web.Response:
         resource_id: str = request.match_info["resource_id"]
     except Exception as e:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
+
+    resource: Record | None = await Resource.get(resource_id)
+    if not resource:
+        raise web.HTTPNotFound()
 
     # Mark resource as deleted in catalog table
     await Resource.delete(resource_id)
