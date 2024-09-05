@@ -32,21 +32,21 @@ async def test_api_get_latest_check(setup_catalog, client, query, fake_check, fa
 
     # Test invalid query
     stupid_query: str = "stupid=stupid"
-    resp = await client.get(f"/api/checks/latest/?{stupid_query}")
+    resp = await client.get(f"/api/checks/latest?{stupid_query}")
     assert resp.status == 400
 
     # Test not existing resource url
     not_existing_url_query: str = "url=https://example.com/not-existing-resource"
-    resp = await client.get(f"/api/checks/latest/?{not_existing_url_query}")
+    resp = await client.get(f"/api/checks/latest?{not_existing_url_query}")
     assert resp.status == 404
 
     # Test not existing resource_id
     not_existing_resource_id_query: str = f"resource_id={fake_resource_id()}"
-    resp = await client.get(f"/api/checks/latest/?{not_existing_resource_id_query}")
+    resp = await client.get(f"/api/checks/latest?{not_existing_resource_id_query}")
     assert resp.status == 404
 
     # Test existing resource
-    resp = await client.get(f"/api/checks/latest/?{query}")
+    resp = await client.get(f"/api/checks/latest?{query}")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data.pop("created_at")
@@ -72,7 +72,7 @@ async def test_api_get_latest_check(setup_catalog, client, query, fake_check, fa
 
     # Test deleted resource
     await Resource.update(resource_id=RESOURCE_ID, data={"deleted": True})
-    resp = await client.get(f"/api/checks/latest/?{query}")
+    resp = await client.get(f"/api/checks/latest?{query}")
     assert resp.status == 410
 
 
@@ -89,7 +89,7 @@ async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
 
     await fake_check(status=500, error="no-can-do")
     await fake_check()
-    resp = await client.get(f"/api/checks/all/?{query}")
+    resp = await client.get(f"/api/checks/all?{query}")
     assert resp.status == 200
     data: list = await resp.json()
     assert len(data) == 2

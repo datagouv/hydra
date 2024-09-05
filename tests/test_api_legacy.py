@@ -22,7 +22,7 @@ pytestmark = pytest.mark.asyncio
 
 async def test_api_get_resource_legacy(setup_catalog, client):
     query: str = f"dataset_id={DATASET_ID}&resource_id={RESOURCE_ID}"
-    resp = await client.get(f"/api/resources/?{query}")
+    resp = await client.get(f"/api/resources?{query}")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data["dataset_id"] == DATASET_ID
