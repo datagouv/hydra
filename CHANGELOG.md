@@ -56,6 +56,7 @@
 - Simplify `save_as_parquet` method, and fix type not compatible with Python 3.9; remove unused import [#156](https://github.com/datagouv/hydra/pull/156)
 - Fix and simplify project metadata loading [#157](https://github.com/datagouv/hydra/pull/157)
 - Use Python 3.11 instead of 3.9 for performance improvements and future compatibility [#101](https://github.com/datagouv/hydra/pull/101)
+- Refactor and split code from `crawl.py` into separate files using refactored `db.Resource` class methods and static methods [#135](https://github.com/datagouv/hydra/pull/135)
 
 ## 1.0.1 (2023-01-04)
 
