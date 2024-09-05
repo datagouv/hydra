@@ -375,9 +375,10 @@ async def test_api_update_resource_url_since_load_catalog(setup_catalog, db, cli
 
 
 async def test_api_delete_resource(client, api_headers, api_headers_wrong_token):
+    NOT_EXISTING_RESOURCE_ID = "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec"
     # Test invalid resource_id
     resp = await client.delete(
-        path="/api/resources/STUPID-ID",
+        path=f"/api/resources/{NOT_EXISTING_RESOURCE_ID}",
         headers=api_headers,
     )
     assert resp.status == 404

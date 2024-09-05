@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from aiohttp import web
 from asyncpg import Record
@@ -15,7 +16,7 @@ async def get_resource(request: web.Request) -> web.Response:
     """
 
     try:
-        resource_id: str = request.match_info["resource_id"]
+        resource_id = str(uuid.UUID(request.match_info["resource_id"]))
     except Exception as e:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
@@ -33,7 +34,7 @@ async def get_resource_status(request: web.Request) -> web.Response:
     If resource is not found, respond with a 404 status code
     """
     try:
-        resource_id: str = request.match_info["resource_id"]
+        resource_id = str(uuid.UUID(request.match_info["resource_id"]))
     except Exception as e:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
@@ -112,15 +113,15 @@ async def update_resource(request: web.Request) -> web.Response:
 
 async def delete_resource(request: web.Request) -> web.Response:
     try:
-        resource_id: str = request.match_info["resource_id"]
+        resource_id = str(uuid.UUID(request.match_info["resource_id"]))
     except Exception as e:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
-    resource: Record | None = await Resource.get(resource_id)
+    resource: Record | None = await Resource.get(resource_id=resource_id)
     if not resource:
         raise web.HTTPNotFound()
 
     # Mark resource as deleted in catalog table
-    await Resource.delete(resource_id)
+    await Resource.delete(resource_id=resource_id)
 
     return web.HTTPOk()
