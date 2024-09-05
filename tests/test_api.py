@@ -13,7 +13,7 @@ from aiohttp import RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
 from yarl import URL
 
-from tests.conftest import DATASET_ID, RESOURCE_ID
+from tests.conftest import DATASET_ID, NOT_EXISTING_RESOURCE_ID, RESOURCE_ID
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import is_valid_uri
 
@@ -84,7 +84,7 @@ async def test_api_get_latest_check(setup_catalog, client, query, fake_check, fa
     ],
 )
 async def test_api_get_all_checks(setup_catalog, client, query, fake_check):
-    resp = await client.get(f"/api/checks/all/?{query}")
+    resp = await client.get(f"/api/checks/all?{query}")
     assert resp.status == 404
 
     await fake_check(status=500, error="no-can-do")
@@ -225,6 +225,15 @@ async def test_api_create_check(
 
 
 async def test_api_get_resource(setup_catalog, client):
+    # Test invalid resource_id
+    resp = await client.get(path="/api/resources/STUPID-ID")
+    assert resp.status == 400
+
+    # Test non existing resource_id
+    resp = await client.get(path=f"/api/resources/{NOT_EXISTING_RESOURCE_ID}")
+    assert resp.status == 404
+
+    # Test existing resource
     resp = await client.get(f"/api/resources/{RESOURCE_ID}")
     assert resp.status == 200
     data: dict = await resp.json()
@@ -237,9 +246,19 @@ async def test_api_get_resource(setup_catalog, client):
 async def test_api_get_resource_status(
     db, client, insert_fake_resource, resource_status, resource_status_verbose
 ):
+    # Create resource with specific status
     await insert_fake_resource(db, status=resource_status)
-    # await fake_check()
-    resp = await client.get(f"/api/resources/{RESOURCE_ID}/status/")
+
+    # Test invalid resource_id
+    resp = await client.get(path="/api/resources/STUPID-ID/status")
+    assert resp.status == 400
+
+    # Test non existing resource_id
+    resp = await client.get(path=f"/api/resources/{NOT_EXISTING_RESOURCE_ID}")
+    assert resp.status == 404
+
+    # Test existing resource
+    resp = await client.get(f"/api/resources/{RESOURCE_ID}/status")
     assert resp.status == 200
     data = await resp.json()
     assert data["resource_id"] == RESOURCE_ID
@@ -375,8 +394,11 @@ async def test_api_update_resource_url_since_load_catalog(setup_catalog, db, cli
 
 
 async def test_api_delete_resource(client, api_headers, api_headers_wrong_token):
-    NOT_EXISTING_RESOURCE_ID = "f8fb4c7b-3fc6-4448-b34f-81a9991f18ec"
     # Test invalid resource_id
+    resp = await client.delete(path="/api/resources/STUPID-ID", headers=api_headers)
+    assert resp.status == 400
+
+    # Test non existing resource_id
     resp = await client.delete(
         path=f"/api/resources/{NOT_EXISTING_RESOURCE_ID}",
         headers=api_headers,
