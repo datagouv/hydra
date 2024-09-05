@@ -247,7 +247,7 @@ async def test_api_get_resource_status(
     assert data["status"] == resource_status
     assert data["status_verbose"] == resource_status_verbose
     assert is_valid_uri(data["latest_check_url"])
-    assert data["latest_check_url"].endswith(f"/api/checks/latest/?resource_id={RESOURCE_ID}")
+    assert data["latest_check_url"].endswith(f"/api/checks/latest?resource_id={RESOURCE_ID}")
 
 
 @pytest.mark.parametrize(
