@@ -99,6 +99,17 @@ class Resource:
                             priority = $5;"""
             await connection.execute(q, dataset_id, resource_id, url, status, priority)
 
+    @classmethod
+    async def delete(
+        cls,
+        resource_id: str,
+    ) -> None:
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            # Mark resource as deleted in catalog table
+            q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
+            await connection.execute(q)
+
     @staticmethod
     def get_excluded_clause() -> str:
         """Return the WHERE clause to get only resources from the check which:

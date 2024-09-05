@@ -114,10 +114,7 @@ async def delete_resource(request: web.Request) -> web.Response:
 
     resource_id: str = valid_payload["resource_id"]
 
-    pool = request.app["pool"]
-    async with pool.acquire() as connection:
-        # Mark resource as deleted in catalog table
-        q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
-        await connection.execute(q)
+    # Mark resource as deleted in catalog table
+    await Resource.delete(resource_id)
 
     return web.json_response({"message": "deleted"})

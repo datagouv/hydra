@@ -58,6 +58,7 @@
 - Use Python 3.11 instead of 3.9 for performance improvements and future compatibility [#101](https://github.com/datagouv/hydra/pull/101)
 - Refactor and split code from `crawl.py` into separate files using refactored `db.Resource` class methods and static methods [#135](https://github.com/datagouv/hydra/pull/135)
 - Allow routes with or without trailing slashes [#158](https://github.com/datagouv/hydra/pull/158)
+- Delete resource as a CRUD method [#161](https://github.com/datagouv/hydra/pull/161)
 
 ## 1.0.1 (2023-01-04)
 
