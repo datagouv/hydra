@@ -17,14 +17,14 @@ def generate_routes(
     routes_params: list[tuple[Callable, str, Callable, str | None]],
 ) -> list[web.RouteDef]:
     """
-    Generate an aiohttp routes list of web.RouteDef objects from the given route parameters, with each of them having a variant with a trailing slash and one without.
+    Generate an aiohttp routes list of web.RouteDef objects from the given route parameters, with each of them having a variant with a trailing slash and one without, since aiohttp does not handle optional trailing slashes easily.
     Args:
-        routes_params (list[tuple[Callable[..., web.RouteDef], str, Callable[..., web.StreamResponse], str | None]]):
+        routes_params:
             A list of tuples, where each tuple contains:
                 - method: The HTTP method (e.g., web.get, web.post).
                 - path: The route path as a string.
                 - handler: The handler function for the route.
-                - name: An optional name for the route.
+                - name: An optional name for the route which can later be used by request.app.router to get the route.
     """
     routes: list[web.RouteDef] = []
     for method, path, handler, name in routes_params:
