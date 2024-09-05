@@ -239,7 +239,7 @@ async def drop_dbs(dbs: list = []):
             WHERE schemaname = '{config.DATABASE_SCHEMA}';
         """)
         for table in tables:
-            await conn.execute(f'DROP TABLE "{table["tablename"]}"')
+            await conn.execute(f'DROP TABLE "{table["tablename"]}" CASCADE')
 
 
 @cli
