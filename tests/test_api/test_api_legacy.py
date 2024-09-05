@@ -3,24 +3,16 @@ NB: we can't use pytest-aiohttp helpers because
 it will interfere with the rest of our async code
 """
 
-import hashlib
-import json
 from datetime import datetime
-from typing import Callable
 
 import pytest
-from aiohttp import RequestInfo
-from aiohttp.client_exceptions import ClientError, ClientResponseError
-from yarl import URL
 
-from tests.conftest import DATASET_ID, RESOURCE_ID
-from udata_hydra.db.resource import Resource
-from udata_hydra.utils import is_valid_uri
+from tests.conftest import DATASET_ID, RESOURCE_ID, RESOURCE_URL
 
 pytestmark = pytest.mark.asyncio
 
 
-async def test_api_get_resource_legacy(setup_catalog, client):
+async def test_get_resource_legacy(setup_catalog, client):
     query: str = f"dataset_id={DATASET_ID}&resource_id={RESOURCE_ID}"
     resp = await client.get(f"/api/resources?{query}")
     assert resp.status == 200
@@ -30,7 +22,7 @@ async def test_api_get_resource_legacy(setup_catalog, client):
     assert data["status"] is None
 
 
-async def test_api_create_resource_legacy(
+async def test_create_resource_legacy(
     client, api_headers, api_headers_wrong_token, udata_resource_payload
 ):
     # Test API call with no token
@@ -70,7 +62,7 @@ async def test_api_create_resource_legacy(
     assert text == "Missing document body"
 
 
-async def test_api_update_resource_legacy(client, api_headers, api_headers_wrong_token):
+async def test_update_resource_legacy(client, api_headers, api_headers_wrong_token):
     # Test invalid PUT data
     stupid_post_data: dict = {"stupid": "stupid"}
     resp = await client.post(
@@ -83,7 +75,7 @@ async def test_api_update_resource_legacy(client, api_headers, api_headers_wrong
         "dataset_id": DATASET_ID,
         "document": {
             "id": RESOURCE_ID,
-            "url": "http://dev.local/",
+            "url": RESOURCE_URL,
             "title": "random title",
             "description": "random description",
             "filetype": "file",
@@ -121,7 +113,7 @@ async def test_api_update_resource_legacy(client, api_headers, api_headers_wrong
     assert text == "Missing document body"
 
 
-async def test_api_update_resource_url_since_load_catalog_legacy(
+async def test_update_resource_url_since_load_catalog_legacy(
     setup_catalog, db, client, api_headers
 ):
     # We modify the url for this resource
@@ -136,7 +128,7 @@ async def test_api_update_resource_url_since_load_catalog_legacy(
         "dataset_id": DATASET_ID,
         "document": {
             "id": RESOURCE_ID,
-            "url": "https://example.com/resource-1",
+            "url": RESOURCE_URL,
             "title": "random title",
             "description": "random description",
             "filetype": "file",
@@ -158,10 +150,10 @@ async def test_api_update_resource_url_since_load_catalog_legacy(
 
     res = await db.fetch(f"SELECT * FROM catalog WHERE resource_id = '{RESOURCE_ID}'")
     assert len(res) == 1
-    res[0]["url"] == "https://example.com/resource-1"
+    res[0]["url"] == RESOURCE_URL
 
 
-async def test_api_delete_resource_legacy(client, api_headers, api_headers_wrong_token):
+async def test_delete_resource_legacy(client, api_headers, api_headers_wrong_token):
     # Test invalid DELETE data
     stupid_delete_data: dict = {"stupid": "stupid"}
     resp = await client.post(
