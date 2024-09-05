@@ -4,7 +4,6 @@ import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 from unittest.mock import MagicMock
 
 import nest_asyncio
