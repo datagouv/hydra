@@ -359,7 +359,7 @@ async def test_api_update_resource_url_since_load_catalog(setup_catalog, db, cli
     # We modify the url for this resource
     await db.execute(
         "UPDATE catalog SET url = 'https://example.com/resource-0' "
-        "WHERE resource_id = 'c4e3a9fb-4415-488e-ba57-d05269b27adf'"
+        f"WHERE resource_id = '{RESOURCE_ID}'"
     )
 
     # We're sending an update signal on the (dataset_id,resource_id) with the previous url.
