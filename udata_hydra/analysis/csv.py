@@ -238,19 +238,18 @@ def compute_create_table_query(
                 # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
 
     compiled_query = CreateTable(table).compile(dialect=asyncpg.dialect())
-    query = compiled_query.string
+    query: str = compiled_query.string
 
     # Add the index creation queries to the main query
     for index in table.indexes:
         log.debug(f'Creating {index_type} on column "{col_name}"')
         query_idx = CreateIndex(index).compile(dialect=asyncpg.dialect())
-        query = query + ";" + query_idx.string
+        query: str = query + ";" + query_idx.string
 
     # compiled query will want to write "%% mon pourcent" VARCHAR but will fail when querying "% mon pourcent"
     # also, "% mon pourcent" works well in pg as a column
     # TODO: dirty hack, maybe find an alternative
     query = query.replace("%%", "%")
-    log.debug(query)
     return query
 
 
@@ -337,8 +336,11 @@ async def csv_to_db(
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
     await db.execute(q)
+
+    # Create table
     q = compute_create_table_query(table_name=table_name, columns=columns, indexes=table_indexes)
     await db.execute(q)
+
     # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
     if not debug_insert:
         # NB: also see copy_to_table for a file source

@@ -23,7 +23,8 @@ from udata_hydra.logger import stop_sentry
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
-RESOURCE_ID_EXCEPTION = "d4e3a9fb-4415-488e-ba57-d05269b27adf"
+RESOURCE_EXCEPTION_ID = "d4e3a9fb-4415-488e-ba57-d05269b27adf"
+RESOURCE_EXCEPTION_TABLE_INDEXES = {"Nom": "index", "N° de certificat": "index"}
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 pytestmark = pytest.mark.asyncio
 
@@ -145,11 +146,11 @@ async def setup_catalog_with_resource_exception(setup_catalog):
     ['__id', 'Nom', 'Prenom', 'Societe', 'Adresse', 'CP', 'Ville', 'Tel1', 'Tel2', 'email', 'Organisme', 'Org Cofrac', 'Type de certificat', 'N° de certificat', 'Date début validité', 'Date fin validité']
     """
     await Resource.insert(
-        dataset_id=DATASET_ID, resource_id=RESOURCE_ID_EXCEPTION, url="http://example.com/"
+        dataset_id=DATASET_ID, resource_id=RESOURCE_EXCEPTION_ID, url="http://example.com/"
     )
     await ResourceException.insert(
-        resource_id=RESOURCE_ID_EXCEPTION,
-        table_indexes={"Nom": "index", "N° de certificat": "index"},
+        resource_id=RESOURCE_EXCEPTION_ID,
+        table_indexes=RESOURCE_EXCEPTION_TABLE_INDEXES,
     )
 
 
