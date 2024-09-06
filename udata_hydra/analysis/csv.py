@@ -12,6 +12,7 @@ from asyncpg import Record
 from csv_detective.detection import engine_to_file
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
+from slugify import slugify
 from sqlalchemy import (
     JSON,
     BigInteger,
@@ -26,7 +27,7 @@ from sqlalchemy import (
     Table,
 )
 from sqlalchemy.dialects.postgresql import asyncpg
-from sqlalchemy.schema import CreateTable, Index
+from sqlalchemy.schema import CreateIndex, CreateTable, Index
 from str2bool import str2bool
 from str2float import str2float
 
@@ -229,29 +230,28 @@ def compute_create_table_query(
                     f'Index type "{index_type}" is unknown or not supported yet! Index for colum {col_name} was not created.'
                 )
                 continue
-            else:
-                log.debug(f'Creating index "{index_type}" on column "{col_name}"')
-                if index_type == "index":
-                    # Create an index on the column
-                    table.append_constraint(
-                        Index(f"{table_name}_{col_name}_idx", table.columns[col_name])
-                    )
-                elif index_type == "index_unique":
-                    # Create a unique index on the column
-                    table.append_constraint(
-                        Index(f"{table_name}_{col_name}_idx", table.columns[col_name])
-                    )
-                    table.columns[col_name].unique = True
-                elif index_type == "primary":
-                    # Create a primary key on the column
-                    table.columns[col_name].primary_key = True
 
-    compiled = CreateTable(table).compile(dialect=asyncpg.dialect())
+            else:
+                if index_type == "index":
+                    index_name = f"{table_name}_{slugify(col_name)}_idx"
+                    table.append_constraint(Index(index_name, col_name))
+                # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
+
+    compiled_query = CreateTable(table).compile(dialect=asyncpg.dialect())
+    query = compiled_query.string
+
+    # Add the index creation queries to the main query
+    for index in table.indexes:
+        log.debug(f'Creating {index_type} on column "{col_name}"')
+        query_idx = CreateIndex(index).compile(dialect=asyncpg.dialect())
+        query = query + ";" + query_idx.string
 
     # compiled query will want to write "%% mon pourcent" VARCHAR but will fail when querying "% mon pourcent"
     # also, "% mon pourcent" works well in pg as a column
     # TODO: dirty hack, maybe find an alternative
-    return compiled.string.replace("%%", "%")
+    query = query.replace("%%", "%")
+    log.debug(query)
+    return query
 
 
 def generate_records(file_path: str, inspection: dict, columns: dict) -> Iterator[list]:
