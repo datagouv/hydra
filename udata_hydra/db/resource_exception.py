@@ -1,3 +1,5 @@
+import json
+
 from asyncpg import Record
 
 from udata_hydra import context
@@ -35,7 +37,7 @@ class ResourceException:
         async with pool.acquire() as connection:
             q = f"""
                 INSERT INTO resources_exceptions (resource_id, table_indexes)
-                VALUES ('{resource_id}', '{table_indexes}')
+                VALUES ('{resource_id}', '{json.dumps(table_indexes)}')
                 RETURNING *;
             """
             return await connection.fetchrow(q)
