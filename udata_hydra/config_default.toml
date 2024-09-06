@@ -51,7 +51,7 @@ MAX_FILESIZE_ALLOWED.xlsx = 13107200   # /8
 MAX_FILESIZE_ALLOWED.ods = 10485760    # /10
 
 # -- CSV analysis settings -- #
-SQL_INDEXES_TYPES_SUPPORTED = ["index", "index_unique", "primary"]
+SQL_INDEXES_TYPES_SUPPORTED = ["index"]
 
 CSV_ANALYSIS = true
 CSV_TO_DB = true

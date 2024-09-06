@@ -149,7 +149,7 @@ async def setup_catalog_with_resource_exception(setup_catalog):
     )
     await ResourceException.insert(
         resource_id=RESOURCE_ID_EXCEPTION,
-        table_indexes={"Nom": "index", "N° de certificat": "index_unique"},
+        table_indexes={"Nom": "index", "N° de certificat": "index"},
     )
 
 
