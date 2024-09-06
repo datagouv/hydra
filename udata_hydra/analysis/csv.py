@@ -224,9 +224,12 @@ def compute_create_table_query(
 
     if indexes:
         for col_name, index_type in indexes.items():
-            if index_type == "unique":
+            if index_type == "index_unique":
                 # Create a unique index on the column
-                table.append_constraint()
+                table.append_constraint(
+                    Index(f"{table_name}_{col_name}_idx", table.columns[col_name])
+                )
+                table.columns[col_name].unique = True
             elif index_type == "index":
                 # Create an index on the column
                 table.append_constraint(
