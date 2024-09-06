@@ -124,4 +124,4 @@ async def delete_resource(request: web.Request) -> web.Response:
     # Mark resource as deleted in catalog table
     await Resource.delete(resource_id=resource_id)
 
-    return web.HTTPOk()
+    return web.HTTPNoContent()

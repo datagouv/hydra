@@ -417,7 +417,7 @@ async def test_api_delete_resource(client, api_headers, api_headers_wrong_token)
 
     # Test API call success
     resp = await client.delete(path=f"/api/resources/{RESOURCE_ID}", headers=api_headers)
-    assert resp.status == 200
+    assert resp.status == 204
 
 
 async def test_api_get_crawler_status(setup_catalog, client, fake_check):
