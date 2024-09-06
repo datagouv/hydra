@@ -139,11 +139,18 @@ def setup_catalog(catalog_content, rmock):
 
 
 @pytest.fixture
-async def setup_resources_exceptions(setup_catalog):
+async def setup_catalog_with_resource_exception(setup_catalog):
+    """Setup a catalog with a resource that is too large to be processed
+    Columns for the resource RESOURCE_ID_EXCEPTION:
+    ['__id', 'Nom', 'Prenom', 'Societe', 'Adresse', 'CP', 'Ville', 'Tel1', 'Tel2', 'email', 'Organisme', 'Org Cofrac', 'Type de certificat', 'N° de certificat', 'Date début validité', 'Date fin validité']
+    """
     await Resource.insert(
         dataset_id=DATASET_ID, resource_id=RESOURCE_ID_EXCEPTION, url="http://example.com/"
     )
-    await ResourceException.insert(resource_id=RESOURCE_ID_EXCEPTION)
+    await ResourceException.insert(
+        resource_id=RESOURCE_ID_EXCEPTION,
+        table_indexes={"Nom": "index", "N° de certificat": "index_unique"},
+    )
 
 
 @pytest.fixture

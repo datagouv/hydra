@@ -4,16 +4,12 @@ from datetime import date, datetime
 from tempfile import NamedTemporaryFile
 
 import pytest
-from asyncpg import Record
 from asyncpg.exceptions import UndefinedTableError
 from yarl import URL
 
-from udata_hydra import config
+from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 from udata_hydra.db.resource import Resource
-from udata_hydra.db.resource_exception import ResourceException
-
-from .conftest import RESOURCE_ID, RESOURCE_ID_EXCEPTION
 
 pytestmark = pytest.mark.asyncio
 
@@ -86,44 +82,6 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == expected_count
-
-
-async def test_exception_analysis(setup_resources_exceptions, rmock, db, fake_check, produce_mock):
-    """
-    Tests that exception resources (files that are too large to be normally processed) are indeed processed.
-    """
-    save_config = config.MAX_FILESIZE_ALLOWED
-    config.override(MAX_FILESIZE_ALLOWED={"csv": 5000})
-    exception: Record = await ResourceException.get_by_resource_id(RESOURCE_ID_EXCEPTION)
-    check = await fake_check(resource_id=exception["resource_id"])
-    filename, expected_count = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
-    url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
-    with open(f"tests/data/{filename}", "rb") as f:
-        data = f.read()
-    rmock.get(url, status=200, body=data)
-
-    # Check resource status before analysis
-    resource = await Resource.get(exception["resource_id"])
-    assert resource["status"] is None
-
-    # Analyse the CSV
-    await analyse_csv(check_id=check["id"])
-
-    # Check resource status after analysis
-    resource = await Resource.get(exception["resource_id"])
-    assert resource["status"] is None
-
-    count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
-    assert count["count"] == expected_count
-    profile = await db.fetchrow(
-        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
-    )
-    profile = json.loads(profile["csv_detective"])
-    for attr in ("header", "columns", "formats", "profile"):
-        assert profile[attr]
-    assert profile["total_lines"] == expected_count
-    config.override(MAX_FILESIZE_ALLOWED=save_config)
 
 
 @pytest.mark.parametrize(
