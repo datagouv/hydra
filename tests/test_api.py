@@ -254,7 +254,7 @@ async def test_api_get_resource_status(
     assert resp.status == 400
 
     # Test non existing resource_id
-    resp = await client.get(path=f"/api/resources/{NOT_EXISTING_RESOURCE_ID}")
+    resp = await client.get(path=f"/api/resources/{NOT_EXISTING_RESOURCE_ID}/status")
     assert resp.status == 404
 
     # Test existing resource
