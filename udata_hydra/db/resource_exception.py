@@ -2,7 +2,7 @@ import json
 
 from asyncpg import Record
 
-from udata_hydra import context
+from udata_hydra import config, context
 from udata_hydra.db.resource import Resource
 
 
@@ -34,10 +34,27 @@ class ResourceException:
         if not resource:
             raise ValueError("Resource not found")
 
-        async with pool.acquire() as connection:
-            q = f"""
-                INSERT INTO resources_exceptions (resource_id, table_indexes)
-                VALUES ('{resource_id}', '{json.dumps(table_indexes)}')
-                RETURNING *;
-            """
-            return await connection.fetchrow(q)
+        if table_indexes:
+            for index_type in table_indexes.values():
+                if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
+                    raise ValueError(
+                        "Index type must be one of: "
+                        + ", ".join(config.SQL_INDEXES_TYPES_SUPPORTED)
+                    )
+
+            async with pool.acquire() as connection:
+                q = f"""
+                    INSERT INTO resources_exceptions (resource_id, table_indexes)
+                    VALUES ('{resource_id}', '{json.dumps(table_indexes)}')
+                    RETURNING *;
+                """
+                return await connection.fetchrow(q)
+
+        else:
+            async with pool.acquire() as connection:
+                q = f"""
+                    INSERT INTO resources_exceptions (resource_id)
+                    VALUES ('{resource_id}')
+                    RETURNING *;
+                """
+                return await connection.fetchrow(q)

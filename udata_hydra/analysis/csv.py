@@ -224,21 +224,27 @@ def compute_create_table_query(
 
     if indexes:
         for col_name, index_type in indexes.items():
-            if index_type == "index_unique":
-                # Create a unique index on the column
-                table.append_constraint(
-                    Index(f"{table_name}_{col_name}_idx", table.columns[col_name])
-                )
-                table.columns[col_name].unique = True
-            elif index_type == "index":
-                # Create an index on the column
-                table.append_constraint(
-                    Index(f"{table_name}_{col_name}_idx", table.columns[col_name])
-                )
-            else:
+            if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
                 log.error(
-                    f"Index type {index_type} is unknown or not suported yet! Index wasn't created."
+                    f'Index type "{index_type}" is unknown or not supported yet! Index for colum {col_name} was not created.'
                 )
+                continue
+            else:
+                log.debug(f'Creating index "{index_type}" on column "{col_name}"')
+                if index_type == "index":
+                    # Create an index on the column
+                    table.append_constraint(
+                        Index(f"{table_name}_{col_name}_idx", table.columns[col_name])
+                    )
+                elif index_type == "index_unique":
+                    # Create a unique index on the column
+                    table.append_constraint(
+                        Index(f"{table_name}_{col_name}_idx", table.columns[col_name])
+                    )
+                    table.columns[col_name].unique = True
+                elif index_type == "primary":
+                    # Create a primary key on the column
+                    table.columns[col_name].primary_key = True
 
     compiled = CreateTable(table).compile(dialect=asyncpg.dialect())
 
