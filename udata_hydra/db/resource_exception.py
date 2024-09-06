@@ -11,6 +11,16 @@ class ResourceException:
     Resources that are too large to be processed normally but that we want to have anyway"""
 
     @classmethod
+    async def get_all(cls) -> list[Record]:
+        """
+        Get all resource_exceptions
+        """
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = "SELECT * FROM resources_exceptions;"
+            return await connection.fetch(q)
+
+    @classmethod
     async def get_by_resource_id(cls, resource_id: str) -> Record | None:
         """
         Get a resource_exception by its resource_id
@@ -58,3 +68,13 @@ class ResourceException:
                     RETURNING *;
                 """
                 return await connection.fetchrow(q)
+
+    @classmethod
+    async def delete(cls, resource_id: str) -> None:
+        """
+        Delete a resource_exception by its resource_id
+        """
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = "DELETE FROM resources_exceptions WHERE resource_id = $1;"
+            await connection.execute(q, resource_id)

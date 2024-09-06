@@ -30,7 +30,7 @@ async def get_columns_with_indexes(table_name: str) -> list[Record] | None:
                 and a.attnum = ANY(ix.indkey)
                 and t.relkind = 'r'
                 and t.relname = $1
-            ORDER BY
+            ORDER BYp
                 t.relname,
                 i.relname;
         """

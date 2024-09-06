@@ -15,7 +15,13 @@ async def app_factory() -> web.Application:
         if "pool" in app:
             await app["pool"].close()
 
-    app = web.Application(middlewares=[token_auth_middleware(exclude_methods=("GET",))])
+    app = web.Application(
+        middlewares=[
+            token_auth_middleware(
+                exclude_methods=("GET",), exclude_routes=("/api/resources-exceptions",)
+            )
+        ]
+    )
     app.add_routes(routes)
     app.on_startup.append(app_startup)
     app.on_cleanup.append(app_cleanup)
