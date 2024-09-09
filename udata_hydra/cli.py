@@ -6,34 +6,17 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import aiohttp
-from asyncpg import Record, connect
+import asyncpg
 from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
-from sqlalchemy import (
-    JSON,
-    BigInteger,
-    Boolean,
-    Column,
-    Date,
-    DateTime,
-    Float,
-    Integer,
-    MetaData,
-    String,
-    Table,
-    UniqueConstraint,
-)
-from sqlalchemy.dialects.postgresql import asyncpg
-from sqlalchemy.schema import CreateIndex, CreateTable, Index, PrimaryKeyConstraint
 
 from udata_hydra import config
-from udata_hydra.analysis.csv import PYTHON_TYPE_TO_PG, PYTHON_TYPE_TO_PY, analyse_csv, delete_table
+from udata_hydra.analysis.csv import analyse_csv, delete_table
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
-from udata_hydra.utils.db import get_columns_with_indexes
 
 context = {}
 log = setup_logging()
@@ -56,7 +39,7 @@ async def connection(db_name: str = "main"):
             if db_name == "main"
             else getattr(config, f"DATABASE_URL_{db_name.upper()}")
         )
-        context["conn"][db_name] = await connect(
+        context["conn"][db_name] = await asyncpg.connect(
             dsn=dsn, server_settings={"search_path": config.DATABASE_SCHEMA}
         )
     return context["conn"][db_name]
@@ -155,7 +138,7 @@ async def crawl_url(url: str, method: str = "get"):
 @cli
 async def check_resource(resource_id: str, method: str = "get"):
     """Trigger a complete check for a given resource_id"""
-    resource: Record | None = await Resource.get(resource_id)
+    resource: asyncpg.Record | None = await Resource.get(resource_id)
     if not resource:
         log.error("Resource not found in catalog")
         return
@@ -314,67 +297,6 @@ async def purge_csv_tables():
         log.info(f"Deleted {len(tables_to_delete)} table(s).")
     else:
         log.info("Nothing to delete.")
-
-
-@cli
-async def create_table(table_name: str = "TEST"):
-    try:
-        conn = await connection()
-        await conn.execute(f'DROP TABLE "{table_name}" CASCADE')
-    except Exception as e:
-        log.error(e)
-
-    metadata = MetaData()
-    table: Table = Table(table_name, metadata, Column("__id", Integer, primary_key=True))
-
-    columns = {
-        "prenom": "varchar",
-        "nom": "varchar",
-        "age": "int",
-        "siren": "varchar",
-    }
-
-    indexes = {
-        "siren": "index",
-        "nom": "index",
-    }
-
-    for col_name, col_type in columns.items():
-        table.append_column(Column(col_name, PYTHON_TYPE_TO_PG.get(col_type, String)))
-
-    query = CreateTable(table).compile(dialect=asyncpg.dialect())
-    query = query.string.replace("%%", "%")
-
-    if indexes:
-        for col_name, index_type in indexes.items():
-            if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
-                log.error(
-                    f'Index type "{index_type}" is unknown or not supported yet! Index for colum {col_name} was not created.'
-                )
-                continue
-
-            else:
-                log.debug(f'Add index "{index_type}" on column "{col_name}"')
-                if index_type == "index":
-                    # Create an index on the column
-                    table.append_constraint(Index(f"{table_name}_{col_name}_idx", col_name))
-
-    # Add the index creation queries to the main query
-    for index in table.indexes:
-        log.debug(f'Creating index "{index_type}" on column "{col_name}"')
-        query_index_creation = CreateIndex(index).compile(dialect=asyncpg.dialect())
-        query_index_creation = query_index_creation.string.replace("%%", "%")
-        query = query + ";" + query_index_creation
-
-    log.debug(query)
-    conn = await connection()
-    await conn.execute(query)
-
-    # Check if a index has been created for the table
-    indexes: list[Record] | None = await get_columns_with_indexes(table_name)
-    assert indexes
-    for idx in indexes:
-        print(idx)
 
 
 @wrap
