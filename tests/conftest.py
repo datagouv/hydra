@@ -21,6 +21,7 @@ from udata_hydra.logger import stop_sentry
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
+RESOURCE_URL = "https://example.com/resource-1"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 NOT_EXISTING_RESOURCE_ID = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
 pytestmark = pytest.mark.asyncio
@@ -170,7 +171,7 @@ async def insert_fake_resource():
         await Resource.insert(
             dataset_id=DATASET_ID,
             resource_id=RESOURCE_ID,
-            url="http://dev.local/",
+            url=RESOURCE_URL,
             status=status,
             priority=True,
         )
