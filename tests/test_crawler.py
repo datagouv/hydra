@@ -4,7 +4,6 @@ import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 from unittest.mock import MagicMock
 
 import nest_asyncio
@@ -754,10 +753,8 @@ async def test_check_triggered_by_udata_entrypoint_clean_catalog(
 ):
     rurl = udata_resource_payload["document"]["url"]
     rmock.head(rurl, headers={"content-length": "1"})
-    res = await client.post(
-        path="/api/resources/", headers=api_headers, json=udata_resource_payload
-    )
-    assert res.status == 200
+    res = await client.post(path="/api/resources", headers=api_headers, json=udata_resource_payload)
+    assert res.status == 201
     res = await db.fetch("SELECT * FROM catalog")
     assert len(res) == 1
     event_loop.run_until_complete(start_checks(iterations=1))
@@ -779,10 +776,8 @@ async def test_check_triggered_by_udata_entrypoint_existing_catalog(
 ):
     rurl = udata_resource_payload["document"]["url"]
     rmock.head(rurl, headers={"content-length": "1"})
-    res = await client.post(
-        path="/api/resources/", headers=api_headers, json=udata_resource_payload
-    )
-    assert res.status == 200
+    res = await client.post(path="/api/resources", headers=api_headers, json=udata_resource_payload)
+    assert res.status == 201
     res = await db.fetch("SELECT * FROM catalog")
     assert len(res) == 2
     event_loop.run_until_complete(start_checks(iterations=1))
