@@ -7,7 +7,7 @@ import pytest
 from asyncpg.exceptions import UndefinedTableError
 from yarl import URL
 
-from tests.conftest import RESOURCE_ID
+from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 from udata_hydra.db.resource import Resource
 
@@ -41,7 +41,7 @@ async def test_analyse_csv_on_catalog(
     assert len(rows) == 2
     row = rows[0]
     assert row["id"] == RESOURCE_ID
-    assert row["url"] == "https://example.com/resource-1"
+    assert row["url"] == RESOURCE_URL
     res = await db.fetchrow("SELECT * from tables_index")
     inspection = json.loads(res["csv_detective"])
     assert all(k in inspection["columns"] for k in ["id", "url"])

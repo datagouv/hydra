@@ -4,30 +4,23 @@ import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock
 
 import nest_asyncio
 import pytest
-from aiohttp import ClientSession, RequestInfo
+from aiohttp import RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
 from aioresponses import CallbackResult
 from asyncpg import Record
 from dateparser import parse as date_parser
-from minicli import run
 from yarl import URL
 
+from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import start_checks
-from udata_hydra.crawl.check_resources import (
-    RESOURCE_RESPONSE_STATUSES,
-    check_resource,
-)
 from udata_hydra.crawl.process_check_data import get_content_type_from_header
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-
-from .conftest import DATASET_ID, RESOURCE_ID
 
 # TODO: make file content configurable
 SIMPLE_CSV_CONTENT = """code_insee,number
@@ -44,77 +37,6 @@ async def mock_download_resource(url, headers, max_size_allowed):
     tmp_file.write(SIMPLE_CSV_CONTENT.encode("utf-8"))
     tmp_file.close()
     return tmp_file
-
-
-async def test_catalog(setup_catalog, db):
-    res = await db.fetch(
-        "SELECT * FROM catalog WHERE resource_id = $1",
-        RESOURCE_ID,
-    )
-    # Only one resource because the other belonged to an archived dataset
-    assert len(res) == 1
-    resource = res[0]
-    assert resource["url"] == "https://example.com/resource-1"
-    assert resource["dataset_id"] == DATASET_ID
-    assert resource["status"] is None
-
-
-async def test_catalog_deleted(setup_catalog, db, rmock):
-    res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE")
-    assert len(res) == 1
-    with open("tests/data/catalog.csv", "rb") as cfile:
-        catalog_content = cfile.readlines()
-    catalog = "https://example.com/catalog"
-    # feed empty catalog, should delete the previously loaded resource
-    rmock.get(catalog, status=200, body=catalog_content[0])
-    run("load_catalog", url=catalog)
-    res = await db.fetch("SELECT id FROM catalog WHERE deleted = TRUE")
-    assert len(res) == 1
-    res = await db.fetch("SELECT id FROM catalog")
-    assert len(res) == 1
-
-
-async def test_catalog_deleted_with_checked_resource(
-    setup_catalog, db, rmock, event_loop, mocker, analysis_mock
-):
-    mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
-
-    rurl = "https://example.com/resource-1"
-    rmock.get(rurl)
-    event_loop.run_until_complete(start_checks(iterations=1))
-
-    res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE and last_check IS NOT NULL")
-    assert len(res) == 1
-
-    with open("tests/data/catalog.csv", "rb") as cfile:
-        catalog_content = cfile.readlines()
-    catalog = "https://example.com/catalog"
-    # feed empty catalog, should delete the previously loaded resource
-    rmock.get(catalog, status=200, body=catalog_content[0])
-    run("load_catalog", url=catalog)
-    res = await db.fetch("SELECT id FROM catalog WHERE deleted = TRUE")
-    assert len(res) == 1
-    res = await db.fetch("SELECT id FROM catalog")
-    assert len(res) == 1
-
-
-async def test_catalog_deleted_with_new_url(
-    setup_catalog, db, rmock, event_loop, mocker, analysis_mock
-):
-    # load a new catalog with a new URL for this resource
-    with open("tests/data/catalog.csv", "r") as cfile:
-        catalog_content = cfile.readlines()
-    catalog_content[1] = catalog_content[1].replace("resource-1", "resource-2")
-    catalog_content = "\n".join(catalog_content)
-    catalog = "https://example.com/catalog"
-    rmock.get(catalog, status=200, body=catalog_content.encode("utf-8"))
-    run("load_catalog", url=catalog)
-
-    # check catalog coherence, replacing the URL in the existing entry
-    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", RESOURCE_ID)
-    assert len(res) == 1
-    assert res[0]["deleted"] is False
-    assert "resource-2" in res[0]["url"]
 
 
 @pytest.mark.parametrize(
@@ -141,7 +63,7 @@ async def test_catalog_deleted_with_new_url(
 )
 async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mock, udata_url):
     status, timeout, exception = resource
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     params = {
         "status": status,
         "headers": {"Content-LENGTH": "10", "X-Do": "you"},
@@ -194,201 +116,10 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mo
         assert webhook.get("check:timeout") is False
 
 
-async def test_backoff_nb_req(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock):
-    await fake_check(resource=2, resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe")
-    mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
-    mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
-    rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
-    # verify that we actually backed-off
-    assert ("HEAD", URL(rurl)) not in rmock.requests
-
-
-@pytest.mark.parametrize(
-    "ratelimit",
-    [
-        # remain, limit, should_backoff
-        (0, 0, True),
-        (1, 100, True),
-        ("a", "b", False),
-        (20, 100, False),
-        (0, -1, False),
-    ],
-)
-async def test_backoff_rate_limiting(
-    setup_catalog, event_loop, rmock, fake_check, produce_mock, ratelimit
-):
-    remain, limit, should_backoff = ratelimit
-    await fake_check(
-        resource=2,
-        resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe",
-        headers={
-            "x-ratelimit-remaining": remain,
-            "x-ratelimit-limit": limit,
-        },
-    )
-    rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
-    rmock.get(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
-    # verify that we actually backed-off
-    if should_backoff:
-        assert ("HEAD", URL(rurl)) not in rmock.requests
-    else:
-        assert ("HEAD", URL(rurl)) in rmock.requests
-
-
-async def test_backoff_rate_limiting_lifted(
-    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock, db
-):
-    await fake_check(
-        resource=2,
-        resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe",
-        headers={
-            "x-ratelimit-remaining": 1,  # our 10% quota has been reached
-            "x-ratelimit-limit": 10,
-        },
-    )
-    mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
-    rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
-    rmock.get(rurl, status=200)
-    # We should backoff
-    row = await db.fetchrow("SELECT * FROM catalog")
-    async with ClientSession() as session:
-        res = await check_resource(url=row["url"], resource_id=row["resource_id"], session=session)
-    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
-    assert ("HEAD", URL(rurl)) not in rmock.requests
-
-    # we wait for BACKOFF_PERIOD before crawling again, it should _not_ backoff
-    async with ClientSession() as session:
-        res = await check_resource(
-            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
-        )
-    assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
-    assert ("HEAD", URL(rurl)) in rmock.requests
-
-
-async def test_backoff_rate_limiting_cooled_off(
-    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock, db
-):
-    await fake_check(
-        resource=2,
-        resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe",
-        headers={
-            "x-ratelimit-remaining": 0,  # we've messed up
-            "x-ratelimit-limit": 10,
-        },
-    )
-    mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
-    mocker.patch("udata_hydra.config.COOL_OFF_PERIOD", 0.5)
-    rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
-    rmock.get(rurl, status=200)
-    # We should backoff
-    row = await db.fetchrow("SELECT * FROM catalog")
-    async with ClientSession() as session:
-        res = await check_resource(url=row["url"], resource_id=row["resource_id"], session=session)
-    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
-    assert ("HEAD", URL(rurl)) not in rmock.requests
-
-    # waiting for BACKOFF_PERIOD is not enough since we've messed up already
-    async with ClientSession() as session:
-        res = await check_resource(
-            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
-        )
-    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
-    assert ("HEAD", URL(rurl)) not in rmock.requests
-
-    # we wait until COOL_OFF_PERIOD (0.25+0.25) before crawling again,
-    # it should _not_ backoff
-    async with ClientSession() as session:
-        res = await check_resource(
-            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
-        )
-    assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
-    assert ("HEAD", URL(rurl)) in rmock.requests
-
-
-async def test_backoff_nb_req_lifted(
-    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock, db
-):
-    await fake_check(resource=2, resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe")
-    mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
-    mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
-    rurl = "https://example.com/resource-1"
-    rmock.head(rurl, status=200)
-    row = await db.fetchrow("SELECT * FROM catalog")
-    async with ClientSession() as session:
-        res = await check_resource(url=row["url"], resource_id=row["resource_id"], session=session)
-    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
-    # verify that we actually backed-off
-    assert ("HEAD", URL(rurl)) not in rmock.requests
-    # we wait for BACKOFF_PERIOD before crawling again, it should _not_ backoff
-    async with ClientSession() as session:
-        res = await check_resource(
-            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
-        )
-    assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
-    assert ("HEAD", URL(rurl)) in rmock.requests
-
-
-async def test_backoff_on_429_status_code(
-    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock, db
-):
-    resource_id = "c5187912-24a5-49ea-a725-5e1e3d472efe"
-    await fake_check(resource=2, resource_id=resource_id)
-    mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
-    mocker.patch("udata_hydra.config.COOL_OFF_PERIOD", 0.5)
-    rurl = "https://example.com/resource-1"
-    await db.execute("UPDATE checks SET status = 429 WHERE resource_id = $1", resource_id)
-    rmock.head(rurl, status=200)
-    row = await db.fetchrow("SELECT * FROM catalog")
-
-    # we've messed up, we should backoff
-    async with ClientSession() as session:
-        res = await check_resource(url=row["url"], resource_id=row["resource_id"], session=session)
-    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
-    assert ("HEAD", URL(rurl)) not in rmock.requests
-
-    # waiting for BACKOFF_PERIOD is not enough since we've messed up already
-    async with ClientSession() as session:
-        res = await check_resource(
-            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
-        )
-    assert res == RESOURCE_RESPONSE_STATUSES["BACKOFF"]
-    assert ("HEAD", URL(rurl)) not in rmock.requests
-
-    # we wait until COOL_OFF_PERIOD (0.25+0.25) before crawling again,
-    # it should _not_ backoff
-    async with ClientSession() as session:
-        res = await check_resource(
-            url=row["url"], resource_id=row["resource_id"], session=session, sleep=0.25
-        )
-    assert res != RESOURCE_RESPONSE_STATUSES["BACKOFF"]
-    assert ("HEAD", URL(rurl)) in rmock.requests
-
-
-async def test_no_backoff_domains(
-    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock
-):
-    await fake_check(resource=2)
-    mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
-    mocker.patch("udata_hydra.config.NO_BACKOFF_DOMAINS", ["example.com"])
-    magic = MagicMock()
-    mocker.patch("udata_hydra.context.monitor").return_value = magic
-    rurl = "https://example.com/resource-1"
-    rmock.get(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
-    # verify that we actually did not back-off
-    assert not magic.add_backoff.called
-
-
 async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock, produce_mock):
     mocker.patch("udata_hydra.config.SLEEP_BETWEEN_BATCHES", 0)
     mocker.patch("udata_hydra.config.EXCLUDED_PATTERNS", ["http%example%"])
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     rmock.get(rurl, status=200)
     event_loop.run_until_complete(start_checks(iterations=1))
     # url has not been called due to excluded clause
@@ -397,7 +128,7 @@ async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock, produce
 
 async def test_outdated_check(setup_catalog, rmock, fake_check, event_loop, produce_mock):
     await fake_check(created_at=datetime.now() - timedelta(weeks=52))
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     rmock.head(rurl, status=200)
     event_loop.run_until_complete(start_checks(iterations=1))
     # url has been called because check is outdated
@@ -409,7 +140,7 @@ async def test_not_outdated_check(
 ):
     mocker.patch("udata_hydra.config.SLEEP_BETWEEN_BATCHES", 0)
     await fake_check()
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     rmock.get(rurl, status=200)
     event_loop.run_until_complete(start_checks(iterations=1))
     # url has not been called because check is fresh
@@ -417,7 +148,7 @@ async def test_not_outdated_check(
 
 
 async def test_switch_head_to_get(setup_catalog, event_loop, rmock, produce_mock):
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     rmock.head(rurl, status=501)
     rmock.get(rurl, status=200)
     event_loop.run_until_complete(start_checks(iterations=1))
@@ -426,7 +157,7 @@ async def test_switch_head_to_get(setup_catalog, event_loop, rmock, produce_mock
 
 
 async def test_switch_head_to_get_headers(setup_catalog, event_loop, rmock, produce_mock):
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     rmock.head(rurl, status=200, headers={})
     rmock.get(rurl, status=200)
     event_loop.run_until_complete(start_checks(iterations=1))
@@ -435,7 +166,7 @@ async def test_switch_head_to_get_headers(setup_catalog, event_loop, rmock, prod
 
 
 async def test_no_switch_head_to_get(setup_catalog, event_loop, rmock, produce_mock, analysis_mock):
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     rmock.head(rurl, status=200, headers={"content-length": "1"})
     event_loop.run_until_complete(start_checks(iterations=1))
     assert ("HEAD", URL(rurl)) in rmock.requests
@@ -486,7 +217,7 @@ async def test_analyse_resource_send_udata_no_change(
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
-async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db, udata_url):
+async def test_analyse_resource_from_crawl(setup_catalog, rmock, event_loop, db, udata_url):
     """
     Looks a lot like an E2E test:
     - process catalog
@@ -495,7 +226,7 @@ async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db,
     - trigger udata callbacks
     """
 
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
 
     # mock for check
     rmock.head(rurl, status=200, headers={"Content-Length": "200"})
@@ -515,10 +246,8 @@ async def test_process_resource_from_crawl(setup_catalog, rmock, event_loop, db,
 
 
 async def test_change_analysis_last_modified_header(setup_catalog, rmock, event_loop, udata_url):
-    rmock.head(
-        "https://example.com/resource-1", headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"}
-    )
-    rmock.get("https://example.com/resource-1")
+    rmock.head(RESOURCE_URL, headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"})
+    rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     requests = rmock.requests[("PUT", URL(udata_url))]
@@ -535,8 +264,8 @@ async def test_change_analysis_content_length_header(
     await fake_check(headers={"content-length": "1"})
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", RESOURCE_ID)
-    rmock.head("https://example.com/resource-1", headers={"content-length": "2"})
-    rmock.get("https://example.com/resource-1")
+    rmock.head(RESOURCE_URL, headers={"content-length": "2"})
+    rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     requests = rmock.requests[("PUT", URL(udata_url))]
@@ -558,8 +287,8 @@ async def test_change_analysis_checksum(
         checksum="136bd31d53340d234957650e042172705bf32984",
     )
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
-    rmock.head("https://example.com/resource-1")
-    rmock.get("https://example.com/resource-1")
+    rmock.head(RESOURCE_URL)
+    rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     requests = rmock.requests[("PUT", URL(udata_url))]
@@ -618,10 +347,10 @@ async def test_change_analysis_last_modified_header_twice(
         created_at=datetime.now() - timedelta(days=10),
     )
     rmock.head(
-        "https://example.com/resource-1",
+        RESOURCE_URL,
         headers={"last-modified": _date, "content-type": "application/json"},
     )
-    rmock.get("https://example.com/resource-1")
+    rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     # udata has not been called: not first check, outdated check, and last-modified stayed the same
@@ -639,10 +368,10 @@ async def test_change_analysis_last_modified_header_twice_tz(
         headers={"content-type": "application/json"},
     )
     rmock.head(
-        "https://example.com/resource-1",
+        RESOURCE_URL,
         headers={"last-modified": _date_2, "content-type": "application/json"},
     )
-    rmock.get("https://example.com/resource-1")
+    rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     # udata has been called: last-modified has changed (different timezones)
@@ -659,10 +388,10 @@ async def test_check_changed_content_length_header(
         headers={"content-type": "application/json", "content-length": "10"},
     )
     rmock.head(
-        "https://example.com/resource-1",
+        RESOURCE_URL,
         headers={"content-length": "15", "content-type": "application/json"},
     )
-    rmock.get("https://example.com/resource-1")
+    rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     # udata has been called in compute_check_has_changed: content-length has changed
@@ -679,10 +408,10 @@ async def test_no_check_changed_content_length_header(
         headers={"content-type": "application/json", "content-length": "10"},
     )
     rmock.head(
-        "https://example.com/resource-1",
+        RESOURCE_URL,
         headers={"content-length": "10", "content-type": "application/json"},
     )
-    rmock.get("https://example.com/resource-1")
+    rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     # udata has not been called: not first check, outdated check, and content-length stayed the same
@@ -697,10 +426,10 @@ async def test_check_changed_content_type_header(
         headers={"content-type": "application/json", "content-length": "10"},
     )
     rmock.head(
-        "https://example.com/resource-1",
+        RESOURCE_URL,
         headers={"content-length": "10", "content-type": "text/csv"},
     )
-    rmock.get("https://example.com/resource-1")
+    rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     # udata has been called in compute_check_has_changed: content-type has changed
@@ -717,10 +446,10 @@ async def test_no_check_changed_content_type_header(
         headers={"content-type": "application/json", "content-length": "10"},
     )
     rmock.head(
-        "https://example.com/resource-1",
+        RESOURCE_URL,
         headers={"content-length": "10", "content-type": "application/json"},
     )
-    rmock.get("https://example.com/resource-1")
+    rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     # udata has not been called: not first check, outdated check, and content-type stayed the same
@@ -734,7 +463,7 @@ async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, p
         # add content-length to avoid switching from HEAD to GET when crawling
         return CallbackResult(status=200, payload={}, headers={"content-length": "1"})
 
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     rmock.head(rurl, callback=callback)
     rmock.get(rurl, callback=callback)
     event_loop.run_until_complete(start_checks(iterations=1))
@@ -788,7 +517,7 @@ async def test_check_triggered_by_udata_entrypoint_existing_catalog(
 
 async def test_check_triggers_csv_analysis(rmock, event_loop, db, produce_mock, setup_catalog):
     """Crawl a CSV file, analyse and apify it, downloads only once"""
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     # mock for check
     rmock.head(rurl, status=200, headers={"content-length": "1", "content-type": "application/csv"})
     # mock for analysis download
@@ -811,11 +540,11 @@ async def test_check_triggers_csv_analysis(rmock, event_loop, db, produce_mock, 
 async def test_recheck_download_only_once(
     rmock, fake_check, event_loop, db, produce_mock, setup_catalog
 ):
-    """On reccheck of a (CSV) file, if it hasn't change, downloads only once"""
+    """On recheck of a (CSV) file, if it hasn't change, downloads only once"""
     await fake_check(
         resource_id=RESOURCE_ID, headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"}
     )
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     # mock for check, with same last-modified header
     rmock.head(
         rurl,
@@ -856,7 +585,7 @@ async def test_dont_check_resources_with_status(
     rmock, event_loop, db, produce_mock, setup_catalog, resource_status
 ):
     await Resource.update(resource_id=RESOURCE_ID, data={"status": resource_status})
-    rurl = "https://example.com/resource-1"
+    rurl = RESOURCE_URL
     event_loop.run_until_complete(start_checks(iterations=1))
 
     if resource_status == "BACKOFF" or resource_status is None:
