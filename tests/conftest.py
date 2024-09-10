@@ -21,7 +21,9 @@ from udata_hydra.logger import stop_sentry
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
+RESOURCE_URL = "https://example.com/resource-1"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
+NOT_EXISTING_RESOURCE_ID = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
 pytestmark = pytest.mark.asyncio
 
 nest_asyncio.apply()
@@ -135,16 +137,16 @@ def setup_catalog(catalog_content, rmock):
 
 @pytest.fixture
 def produce_mock(mocker):
-    mocker.patch("udata_hydra.crawl.send", dummy())
+    mocker.patch("udata_hydra.crawl.process_check_data.send", dummy())
     mocker.patch("udata_hydra.analysis.resource.send", dummy())
     mocker.patch("udata_hydra.analysis.csv.send", dummy())
 
 
 @pytest.fixture
 def analysis_mock(mocker):
-    """Disable process_resource while crawling"""
+    """Disable analyse_resource while crawling"""
     mocker.patch(
-        "udata_hydra.crawl.process_resource",
+        "udata_hydra.crawl.check_resources.analyse_resource",
         dummy({"error": None, "checksum": None, "filesize": None, "mime_type": None}),
     )
 
@@ -169,7 +171,7 @@ async def insert_fake_resource():
         await Resource.insert(
             dataset_id=DATASET_ID,
             resource_id=RESOURCE_ID,
-            url="http://dev.local/",
+            url=RESOURCE_URL,
             status=status,
             priority=True,
         )
@@ -212,10 +214,10 @@ async def fake_check():
             if parsing_table
             else None,
         }
-        id = await Check.insert(data)
-        data["id"] = id
+        check = await Check.insert(data)
+        data["id"] = check["id"]
         if created_at:
-            await Check.update(id, {"created_at": created_at})
+            await Check.update(check["id"], {"created_at": created_at})
             data["created_at"] = created_at
         return data
 

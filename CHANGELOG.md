@@ -56,6 +56,10 @@
 - Simplify `save_as_parquet` method, and fix type not compatible with Python 3.9; remove unused import [#156](https://github.com/datagouv/hydra/pull/156)
 - Fix and simplify project metadata loading [#157](https://github.com/datagouv/hydra/pull/157)
 - Use Python 3.11 instead of 3.9 for performance improvements and future compatibility [#101](https://github.com/datagouv/hydra/pull/101)
+- Refactor and split code from `crawl.py` into separate files using refactored `db.Resource` class methods and static methods [#135](https://github.com/datagouv/hydra/pull/135)
+- Allow routes with or without trailing slashes [#158](https://github.com/datagouv/hydra/pull/158)
+- Delete resource as a CRUD method [#161](https://github.com/datagouv/hydra/pull/161)
+- Refactor routes URLs to be more RESTful and separate legacy routes code from new routes code [#132](https://github.com/datagouv/hydra/pull/132)
 - Convert to a package-manager-agnostic project instead of a Poetry project [#143](https://github.com/datagouv/hydra/pull/143)
 
 ## 1.0.1 (2023-01-04)
