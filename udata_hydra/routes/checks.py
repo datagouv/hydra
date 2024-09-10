@@ -21,6 +21,7 @@ async def get_latest_check(request: web.Request) -> web.Response:
         raise web.HTTPNotFound()
     if data["deleted"]:
         raise web.HTTPGone()
+
     return web.json_response(CheckSchema().dump(dict(data)))
 
 
@@ -29,6 +30,7 @@ async def get_all_checks(request: web.Request) -> web.Response:
     data: list | None = await Check.get_all(url, resource_id)
     if not data:
         raise web.HTTPNotFound()
+
     return web.json_response([CheckSchema().dump(dict(r)) for r in data])
 
 
@@ -65,4 +67,4 @@ async def create_check(request: web.Request) -> web.Response:
     if not check:
         raise web.HTTPBadRequest(text=f"Check not created, status: {status}")
 
-    return web.json_response(CheckSchema().dump(dict(check)))
+    return web.json_response(CheckSchema().dump(dict(check)), status=201)
