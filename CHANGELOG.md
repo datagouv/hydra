@@ -60,6 +60,7 @@
 - Allow routes with or without trailing slashes [#158](https://github.com/datagouv/hydra/pull/158)
 - Delete resource as a CRUD method [#161](https://github.com/datagouv/hydra/pull/161)
 - Refactor routes URLs to be more RESTful and separate legacy routes code from new routes code [#132](https://github.com/datagouv/hydra/pull/132)
+- Display app version and environment in health check endpoint [#164](https://github.com/datagouv/hydra/pull/164)
 - Manage large resources exceptions differently [#148](https://github.com/datagouv/hydra/pull/148)
 
 ## 1.0.1 (2023-01-04)

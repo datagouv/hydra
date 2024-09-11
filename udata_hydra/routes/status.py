@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
@@ -122,4 +123,6 @@ async def get_stats(request: web.Request) -> web.Response:
 async def get_health(request: web.Request) -> web.Response:
     test_connection = await request.app["pool"].fetchrow("SELECT 1")
     assert next(test_connection.values()) == 1
-    return web.HTTPOk()
+    return web.json_response(
+        {"version": config.APP_VERSION, "environment": os.getenv("HYDRA_ENV", "unknown")}
+    )
