@@ -4,27 +4,8 @@ from asyncpg import Record
 from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
+from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-
-
-async def select_rows_based_on_query(connection, q: str, *args) -> list[Record]:
-    """
-    A transaction wrapper around a select query q pass as param with *args.
-    It first creates a temporary table based on this query,
-    then fetches the selected rows and drops the temporary table.
-    It finally returns the selected rows.
-    """
-    temporary_table = "check_urls"
-    create_temp_select_table_query = (
-        f"""CREATE TEMPORARY TABLE {temporary_table} AS {q} FOR UPDATE;"""
-    )
-    async with connection.transaction():
-        await connection.execute("BEGIN;")
-        await connection.execute(create_temp_select_table_query, *args)
-        to_check = await connection.fetch(f"SELECT * FROM {temporary_table};")
-        await connection.execute("COMMIT;")
-    await connection.execute(f"DROP TABLE {temporary_table};")
-    return to_check
 
 
 async def select_batch_resources_to_check() -> list[Record]:
@@ -49,7 +30,7 @@ async def select_batch_resources_to_check() -> list[Record]:
             ) s
             ORDER BY random() LIMIT {config.BATCH_SIZE}
         """
-        to_check: list[Record] = await select_rows_based_on_query(connection, q)
+        to_check: list[Record] = await connection.fetch(q)
 
         # then urls without checks
         if len(to_check) < config.BATCH_SIZE:
@@ -63,25 +44,41 @@ async def select_batch_resources_to_check() -> list[Record]:
                 ) s
                 ORDER BY random() LIMIT {config.BATCH_SIZE}
             """
-            to_check += await select_rows_based_on_query(connection, q)
+            to_check += await connection.fetch(q)
 
         # if not enough for our batch size, handle outdated checks
         if len(to_check) < config.BATCH_SIZE:
-            since = parse_timespan(config.SINCE)  # in seconds
-            since = datetime.now(timezone.utc) - timedelta(seconds=since)
             limit = config.BATCH_SIZE - len(to_check)
-            q = f"""
-            SELECT * FROM (
-                SELECT catalog.url, dataset_id, catalog.resource_id
-                FROM catalog, checks
-                WHERE catalog.last_check IS NOT NULL
-                AND {excluded}
-                AND catalog.last_check = checks.id
-                AND checks.created_at <= $1
-                AND catalog.priority = False
-            ) s
-            ORDER BY random() LIMIT {limit}
+
+            # Base query parts
+            query_start = f"""
+                SELECT * FROM (
+                    SELECT catalog.url, dataset_id, catalog.resource_id
+                    FROM catalog
+                    JOIN checks ON catalog.last_check = checks.id
+                    WHERE (
+                        (checks.detected_last_modified_at IS NULL AND checks.created_at < CURRENT_DATE - INTERVAL '{config.CHECK_DELAY_DEFAULT}')
+                        OR
+                        (checks.detected_last_modified_at IS NOT NULL AND (
             """
-            to_check += await select_rows_based_on_query(connection, q, since)
+
+            # Construct the dynamic part of the query
+            dynamic_conditions = " OR ".join(
+                f"(checks.created_at >= checks.detected_last_modified_at + INTERVAL '{delay}' AND checks.created_at < CURRENT_DATE - INTERVAL '{delay}')"
+                for delay in config.CHECK_DELAYS
+            )
+
+            query_end = f"""
+                        ))
+                    )
+                    AND catalog.priority = False
+                ) s
+                ORDER BY random() LIMIT {limit};
+            """
+
+            # Combine all parts to form the final query
+            final_query = f"{query_start} {dynamic_conditions} {query_end}"
+
+            to_check += await connection.fetch(final_query)
 
     return to_check
