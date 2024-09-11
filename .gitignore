@@ -92,8 +92,9 @@ ipython_config.py
 #   install all needed dependencies.
 #Pipfile.lock
 
-# Other package managers (Rye...)
+# Other package managers (uv, Rye...)
 requirements*.lock
+uv.lock
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/
