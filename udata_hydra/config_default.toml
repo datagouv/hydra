@@ -1,4 +1,7 @@
+ENVIRONMENT = "local"
+
 LOG_LEVEL = "DEBUG"
+
 # main database
 DATABASE_URL = "postgres://postgres:postgres@localhost:5432/postgres"
 # csv as database table
