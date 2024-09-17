@@ -2,7 +2,12 @@ from typing import Callable
 
 from aiohttp import web
 
-from udata_hydra.routes.checks import create_check, get_all_checks, get_latest_check
+from udata_hydra.routes.checks import (
+    create_check,
+    get_all_checks,
+    get_checks_aggregate,
+    get_latest_check,
+)
 from udata_hydra.routes.resources import (
     create_resource,
     delete_resource,
@@ -46,6 +51,7 @@ def generate_routes(
 routes_params = [
     (web.get, "/api/checks/latest", get_latest_check, "get-latest-check"),
     (web.get, "/api/checks/all", get_all_checks, None),
+    (web.get, "/api/checks/aggregate", get_checks_aggregate, None),
     (web.post, "/api/checks", create_check, None),
     # Routes for resources
     (web.get, "/api/resources/{resource_id}", get_resource, None),

@@ -24,3 +24,8 @@ class CheckSchema(Schema):
 
     def create(self, data):
         return self.load(data)
+
+
+class CheckGroupBy(Schema):
+    value = fields.Str()
+    count = fields.Integer()
