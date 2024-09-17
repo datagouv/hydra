@@ -116,6 +116,7 @@ The API serves the following endpoints:
 *Related to checks:*
 - `GET` on `/api/checks/latest/?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
 - `GET` on `/api/checks/all/?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
+- `GET` on `/api/checks/aggregate/?group_by={column}&created_at={date}` to get checks occurences grouped by a `column` for a specific `date`
 
 *Related to resources:*
 - `GET` on `/api/resources/?resource_id={resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
@@ -209,6 +210,48 @@ $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv
       "headers" : {},
       "id" : 65092
    }
+]
+```
+
+#### get checks occurences grouped by a column for a specific date
+
+Works with `?group_by={column}` and `?created_at={date}`.
+
+```bash
+$ curl -s "http://localhost:8000/api/checks/aggregate?group_by=domain&created_at=today" | json_pp
+[
+  {
+    "value": "www.geo2france.fr",
+    "count": 4
+  },
+  {
+    "value": "static.data.gouv.fr",
+    "count": 4
+  },
+  {
+    "value": "grandestprod.data4citizen.com",
+    "count": 3
+  },
+  {
+    "value": "www.datasud.fr",
+    "count": 2
+  },
+  {
+    "value": "koumoul.com",
+    "count": 2
+  },
+  {
+    "value": "opendata.aude.fr",
+    "count": 2
+  },
+  {
+    "value": "departement-ain.opendata.arcgis.com",
+    "count": 2
+  },
+  {
+    "value": "opendata.agglo-larochelle.fr",
+    "count": 1
+  }
 ]
 ```
 
