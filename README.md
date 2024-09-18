@@ -114,7 +114,7 @@ poetry run adev runserver udata_hydra/app.py
 The API serves the following endpoints:
 
 *Related to checks:*
-- `GET` on `/api/checks/latest/url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
+- `GET` on `/api/checks/latest?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
 - `GET` on `/api/checks/all?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
 - `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurences grouped by a `column` for a specific `date`
 
