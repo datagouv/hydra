@@ -9,6 +9,7 @@ from udata_hydra.worker import QUEUES
 
 
 async def get_crawler_status(request: web.Request) -> web.Response:
+    # Count resources with no check and resources with a check
     q = f"""
         SELECT
             SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END) AS count_left,
@@ -19,6 +20,7 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     """
     stats_catalog = await request.app["pool"].fetchrow(q)
 
+    # Count resources with an outdated (less recent than CHECK_DELAY_DEFAULT) check, and resources with a fresh check (more recent than CHECK_DELAY_DEFAULT)
     since = parse_timespan(config.CHECK_DELAY_DEFAULT)
     since = datetime.now(timezone.utc) - timedelta(seconds=since)
     q = f"""
