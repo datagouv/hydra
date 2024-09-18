@@ -12,7 +12,7 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     # Count resources with no check and resources with a check
     q = f"""
         SELECT
-            SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END) AS count_left,
+            SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END) AS count_not_checked,
             SUM(CASE WHEN last_check IS NOT NULL THEN 1 ELSE 0 END) AS count_checked
         FROM catalog
         WHERE {Resource.get_excluded_clause()}
@@ -44,18 +44,18 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     q = f"{q_start} {dynamic_conditions} {q_end}"
     stats_checks = await request.app["pool"].fetchrow(q, since)
 
-    count_left = stats_catalog["count_left"] + (stats_checks["count_outdated"] or 0)
+    count_to_check = stats_catalog["count_not_checked"] + (stats_checks["count_outdated"] or 0)
     # all w/ a check, minus those with an outdated checked
-    count_checked = stats_catalog["count_checked"] - (stats_checks["count_outdated"] or 0)
-    total = stats_catalog["count_left"] + stats_catalog["count_checked"]
+    count_recently_checked = stats_catalog["count_checked"] - (stats_checks["count_outdated"] or 0)
+    total = stats_catalog["count_not_checked"] + stats_catalog["count_checked"]
     rate_checked = round(stats_catalog["count_checked"] / total * 100, 1)
-    rate_checked_fresh = round(count_checked / total * 100, 1)
+    rate_checked_fresh = round(count_recently_checked / total * 100, 1)
 
     return web.json_response(
         {
             "total": total,
-            "pending_checks": count_left,
-            "fresh_checks": count_checked,
+            "pending_checks": count_to_check,
+            "fresh_checks": count_recently_checked,
             "checks_percentage": rate_checked,
             "fresh_checks_percentage": rate_checked_fresh,
         }
