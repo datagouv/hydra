@@ -21,17 +21,24 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     stats_catalog = await request.app["pool"].fetchrow(q)
 
     # Count resources with an outdated (less recent than CHECK_DELAY_DEFAULT) check, and resources with a fresh check (more recent than CHECK_DELAY_DEFAULT)
-    since = parse_timespan(config.CHECK_DELAY_DEFAULT)
-    since = datetime.now(timezone.utc) - timedelta(seconds=since)
-    q = f"""
-        SELECT
-            SUM(CASE WHEN checks.created_at <= $1 THEN 1 ELSE 0 END) AS count_outdated
-            --, SUM(CASE WHEN checks.created_at > $1 THEN 1 ELSE 0 END) AS count_fresh
+    since: datetime = datetime.now(timezone.utc) - timedelta(
+        seconds=parse_timespan(config.CHECK_DELAY_DEFAULT)
+    )
+    # Base query parts
+    q_start = """SELECT SUM(CASE WHEN (checks.detected_last_modified_at IS NULL AND checks.created_at <= $1 OR (checks.detected_last_modified_at IS NOT NULL AND ("""
+    # Construct the dynamic part of the query
+    dynamic_conditions = " OR ".join(
+        f"(checks.created_at >= checks.detected_last_modified_at + INTERVAL '{delay}' AND checks.created_at < CURRENT_DATE - INTERVAL '{delay}')"
+        for delay in config.CHECK_DELAYS
+    )
+    # End of the query
+    q_end = f"""))) THEN 1 ELSE 0 END) AS count_outdated
         FROM catalog, checks
         WHERE {Resource.get_excluded_clause()}
         AND catalog.last_check = checks.id
         AND catalog.deleted = False
     """
+    q = f"{q_start} {dynamic_conditions} {q_end}"
     stats_checks = await request.app["pool"].fetchrow(q, since)
 
     count_left = stats_catalog["count_left"] + (stats_checks["count_outdated"] or 0)
