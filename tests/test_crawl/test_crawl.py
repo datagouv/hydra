@@ -3,7 +3,7 @@ import json
 import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import nest_asyncio
 import pytest
@@ -12,6 +12,7 @@ from aiohttp.client_exceptions import ClientError, ClientResponseError
 from aioresponses import CallbackResult
 from asyncpg import Record
 from dateparser import parse as date_parser
+from humanfriendly import parse_timespan
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
@@ -336,6 +337,36 @@ async def test_no_change_analysis_harvested(
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     assert ("PUT", URL(udata_url)) not in rmock.requests
+
+
+async def test_check_delays(setup_catalog, rmock, event_loop, db, fake_check, udata_url):
+    check_delay_default_in_seconds = int(parse_timespan(config.CHECK_DELAY_DEFAULT))
+
+    # Resource has a last check with no detected_last_modified_at and created before the default delay
+    date_before_default_delay = (
+        datetime.now() - timedelta(seconds=check_delay_default_in_seconds) - timedelta(days=1)
+    )
+    await fake_check(created_at=date_before_default_delay, detected_last_modified_at=None)
+    # Run the checker
+    event_loop.run_until_complete(start_checks(iterations=1))
+    # Another check should have been created
+    assert ("PUT", URL(udata_url)) in rmock.requests
+    checks: list[Record] | None = await Check.get_all(resource_id=RESOURCE_ID)
+    assert len(checks) == 2
+
+    # Resource has a last check with no detected_last_modified_at and created more recently than the default delay
+    date_after_default_delay = (
+        datetime.now() - timedelta(seconds=check_delay_default_in_seconds) + timedelta(days=1)
+    )
+    await fake_check(created_at=date_after_default_delay, detected_last_modified_at=None)
+    # Run the checker
+    event_loop.run_until_complete(start_checks(iterations=1))
+    # Another check should NOT have been created
+    assert ("PUT", URL(udata_url)) in rmock.requests
+    checks: list[Record] | None = await Check.get_all(resource_id=RESOURCE_ID)
+    assert len(checks) == 1
+
+    # TODO: missing the testes for all the delays in config.CHECK_DELAY_DEFAULT
 
 
 async def test_change_analysis_last_modified_header_twice(
