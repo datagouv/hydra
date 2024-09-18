@@ -19,7 +19,7 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     """
     stats_catalog = await request.app["pool"].fetchrow(q)
 
-    since = parse_timespan(config.SINCE)
+    since = parse_timespan(config.CHECK_DELAY_DEFAULT)
     since = datetime.now(timezone.utc) - timedelta(seconds=since)
     q = f"""
         SELECT
