@@ -1,10 +1,6 @@
-from datetime import datetime, timedelta, timezone
-
 from asyncpg import Record
-from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
-from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 
 
