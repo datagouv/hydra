@@ -45,7 +45,7 @@ async def select_batch_resources_to_check() -> list[Record]:
         # 3) if not enough for our batch size, add resources with outdated checks
         # To get resources with outdated checks, their last check must either:
         # - have no detected_last_modified_at and be older than CHECK_DELAY_DEFAULT
-        # - be older than each delay in CHECK_DELAYS, while it hasn't been modified since that delay (detected_last_modified_at is also older than the delay)
+        # - be older than each delay in CHECK_DELAYS, if (and) the last modified date is older than the same delay before the last check
         if len(to_check) < config.BATCH_SIZE:
             limit = config.BATCH_SIZE - len(to_check)
             # Base query part
