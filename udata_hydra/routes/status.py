@@ -20,7 +20,10 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     """
     stats_catalog = await request.app["pool"].fetchrow(q)
 
-    # Count resources with an outdated (less recent than CHECK_DELAY_DEFAULT) check, and resources with a fresh check (more recent than CHECK_DELAY_DEFAULT)
+    # Count resources with an outdated check.
+    # To get resources with outdated checks, their last check must either:
+    # - have no detected_last_modified_at and be older than CHECK_DELAY_DEFAULT
+    # - be older than each delay in CHECK_DELAYS, while it hasn't been modified since that delay (detected_last_modified_at is also older than the delay)
     since: datetime = datetime.now(timezone.utc) - timedelta(
         seconds=parse_timespan(config.CHECK_DELAY_DEFAULT)
     )
