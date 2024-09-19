@@ -339,54 +339,80 @@ async def test_no_change_analysis_harvested(
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
-async def test_re_check_after_default_delay(
-    setup_catalog, rmock, event_loop, db, analysis_mock, udata_url, fake_check
+@pytest.mark.parametrize(
+    "re_check",
+    [
+        # days since last check, re-check
+        (6, False),
+        (8, True),
+    ],
+)
+async def test_re_check_depending_on_default_delay(
+    setup_catalog, rmock, event_loop, db, analysis_mock, udata_url, fake_check, re_check
 ):
-    # Resource has a last check with no detected_last_modified_at which was done older than the default delay
-    date_past_default_delay: datetime = (
-        datetime.now()
-        - timedelta(seconds=int(parse_timespan(config.CHECK_DELAY_DEFAULT)))
-        - timedelta(days=1)
-    )
-    await fake_check(created_at=date_past_default_delay, detected_last_modified_at=None)
+    days_since_last_check, re_check_expected = re_check
+    previous_check_date: datetime = datetime.now() - timedelta(days=days_since_last_check)
+    await fake_check(created_at=previous_check_date, detected_last_modified_at=None)
+
     # Run the checker
     rmock.head(RESOURCE_URL, status=200)
     rmock.get(RESOURCE_URL, status=200)
     rmock.put(udata_url)
     event_loop.run_until_complete(start_checks(iterations=1))
-    assert ("HEAD", URL(RESOURCE_URL)) in rmock.requests
-    # Another check should have been created
+
+    # Another check should/shouldn't have been created depending on the delay
     checks: list[Record] | None = await db.fetch(
         "SELECT * FROM checks WHERE url = $1", RESOURCE_URL
     )
-    assert len(checks) == 2
-    assert checks[-1]["url"] == RESOURCE_URL
+    if re_check_expected:
+        assert ("HEAD", URL(RESOURCE_URL)) in rmock.requests
+        assert len(checks) == 2
+        assert checks[-1]["url"] == RESOURCE_URL
+    else:
+        assert ("HEAD", URL(RESOURCE_URL)) not in rmock.requests
+        assert len(checks) == 1
 
 
-async def test_re_check_before_default_delay(
-    setup_catalog, rmock, event_loop, db, analysis_mock, udata_url, fake_check
+@pytest.mark.parametrize(
+    "re_check",
+    [
+        # days since last check, days since last modified, re-check
+        (0.5, 0.5, False),
+        (1, 1, False),
+        (1, 2, True),
+        # TODO: add more cases
+    ],
+)
+async def test_re_check_depending_on_variable_delays(
+    setup_catalog, rmock, event_loop, db, analysis_mock, udata_url, fake_check, re_check
 ):
-    # Resource has a last check with no detected_last_modified_at which was done more recently than the default delay
-    date_before_default_delay: datetime = (
-        datetime.now()
-        - timedelta(seconds=int(parse_timespan(config.CHECK_DELAY_DEFAULT)))
-        + timedelta(days=1)
+    days_after_last_check, days_since_last_modified, re_check_expected = re_check
+    previous_check_date: datetime = datetime.now() - timedelta(days=days_after_last_check)
+    previous_check_last_modified: datetime = datetime.now() - timedelta(
+        days=days_since_last_modified
     )
-    await fake_check(created_at=date_before_default_delay, detected_last_modified_at=None)
+    await fake_check(
+        created_at=previous_check_date,
+        detected_last_modified_at=previous_check_last_modified,
+    )
+
     # Run the checker
     rmock.head(RESOURCE_URL, status=200)
     rmock.get(RESOURCE_URL, status=200)
     rmock.put(udata_url)
     event_loop.run_until_complete(start_checks(iterations=1))
-    assert ("HEAD", URL(RESOURCE_URL)) not in rmock.requests
-    # Another check should NOT have been created
+
+    # Another check should/shouldn't have been created depending on the delay
     checks: list[Record] | None = await db.fetch(
         "SELECT * FROM checks WHERE url = $1", RESOURCE_URL
     )
-    assert len(checks) == 1
-
-
-# TODO: missing the testes for all the delays in config.CHECK_DELAY_DEFAULT
+    if re_check_expected:
+        assert ("HEAD", URL(RESOURCE_URL)) in rmock.requests
+        assert len(checks) == 2
+        assert checks[-1]["url"] == RESOURCE_URL
+    else:
+        assert ("HEAD", URL(RESOURCE_URL)) not in rmock.requests
+        assert len(checks) == 1
 
 
 async def test_change_analysis_last_modified_header_twice(
