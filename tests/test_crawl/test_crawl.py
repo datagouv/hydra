@@ -339,16 +339,16 @@ async def test_no_change_analysis_harvested(
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
-async def test_re_check_before_default_delay(
+async def test_re_check_after_default_delay(
     setup_catalog, rmock, event_loop, db, analysis_mock, udata_url, fake_check
 ):
-    # Resource has a last check with no detected_last_modified_at and created before the default delay
-    date_before_default_delay: datetime = (
+    # Resource has a last check with no detected_last_modified_at which was done older than the default delay
+    date_past_default_delay: datetime = (
         datetime.now()
         - timedelta(seconds=int(parse_timespan(config.CHECK_DELAY_DEFAULT)))
         - timedelta(days=1)
     )
-    await fake_check(created_at=date_before_default_delay, detected_last_modified_at=None)
+    await fake_check(created_at=date_past_default_delay, detected_last_modified_at=None)
     # Run the checker
     rmock.head(RESOURCE_URL, status=200)
     rmock.get(RESOURCE_URL, status=200)
@@ -363,16 +363,16 @@ async def test_re_check_before_default_delay(
     assert checks[-1]["url"] == RESOURCE_URL
 
 
-async def test_re_check_after_default_delay(
+async def test_re_check_before_default_delay(
     setup_catalog, rmock, event_loop, db, analysis_mock, udata_url, fake_check
 ):
-    # Resource has a last check with no detected_last_modified_at and created more recently than the default delay
-    date_after_default_delay: datetime = (
+    # Resource has a last check with no detected_last_modified_at which was done more recently than the default delay
+    date_before_default_delay: datetime = (
         datetime.now()
         - timedelta(seconds=int(parse_timespan(config.CHECK_DELAY_DEFAULT)))
         + timedelta(days=1)
     )
-    await fake_check(created_at=date_after_default_delay, detected_last_modified_at=None)
+    await fake_check(created_at=date_before_default_delay, detected_last_modified_at=None)
     # Run the checker
     rmock.head(RESOURCE_URL, status=200)
     rmock.get(RESOURCE_URL, status=200)
