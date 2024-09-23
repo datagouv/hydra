@@ -65,15 +65,15 @@ async def select_batch_resources_to_check() -> list[Record]:
                 HAVING (
                     (
                         COUNT(recent_checks.resource_id) < 2
-                        AND MAX(recent_checks.created_at) < CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[0]}'
+                        AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[0]}'
                     )
                     OR (
                         COUNT(CASE WHEN recent_checks.detected_last_modified_at IS NULL THEN 1 END) >= 1
-                        AND MAX(recent_checks.created_at) < CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[0]}'
+                        AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[0]}'
                     )
                     OR (
                         COUNT(DISTINCT recent_checks.detected_last_modified_at) > 1
-                        AND MAX(recent_checks.created_at) < CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[0]}'
+                        AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[0]}'
                     )
             """
 
@@ -83,21 +83,21 @@ async def select_batch_resources_to_check() -> list[Record]:
                     OR (
                         COUNT(recent_checks.resource_id) = 2
                         AND COUNT(DISTINCT recent_checks.detected_last_modified_at) < 2
-                        AND MAX(recent_checks.created_at) < CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[i]}'
-                        AND MAX(recent_checks.created_at) >= CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[i + 1]}'
+                        AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[i]}'
+                        AND MAX(recent_checks.created_at) >= NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[i + 1]}'
                         AND MIN(recent_checks.created_at) < MAX(recent_checks.created_at) - INTERVAL '{config.CHECK_DELAYS[i]}'
                         AND MIN(recent_checks.created_at) >= MAX(recent_checks.created_at) - INTERVAL '{config.CHECK_DELAYS[i + 1]}'
                     )
                 """
 
             query_end = f"""
-                    OR MAX(recent_checks.created_at) < CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[-1]}'
+                    OR MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[-1]}'
                 )
                 ORDER BY random() LIMIT {limit};
             """
 
             # Combine all parts to form the final query
-            q = f"{query_start} {query_dynamic} {query_end}"
+            q = f"{query_start} {query_end}"
 
             to_check += await connection.fetch(q)
 

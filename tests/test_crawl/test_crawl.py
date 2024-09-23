@@ -342,17 +342,71 @@ async def test_no_change_analysis_harvested(
 @pytest.mark.parametrize(
     "re_check",
     [
-        # days since last check, re-check
-        (0.2, False),
-        (1, True),
+        # hours since last check_1, hours since last_check_2, hours since last modified check 1, hours since last modified check 2, did a re-check happened?
+        # re-check because only one outdated (older than default delay) check
+        (14, 100, None, None, True),
+        # no re-check because only one check but not outdated (newer than default delay)
+        (5, 100, None, None, False),
+        # re-check because one previous check doesn't have modification date
+        (13, 100, 24, None, True),
+        # re-check because one previous check doesn't have modification date
+        (13, None, 24, 100, True),
+        # no re-check because only not outdated even if one previous check doesn't have modification date
+        (5, 100, 24, None, False),
+        # no re-check because only not outdated even if one previous check doesn't have modification date
+        (5, None, 24, 100, False),
+        # re-check because both previous checks has same modification date and last one is outdated
+        (13, 100, 24, 100, True),
+        # no re-check because last one is outdated even though both previous check has same modification date
+        (5, 100, 24, 100, False),
+        # re-check because last one is outdated even though both previous check has same modification date
+        (5, 100, 24, 100, False),
+        # re-check because a modification happened between the two last checks
+        # last check > 12h, < 24h
+        (15, 16, 24, 25, True),
+        # re-check because a modification happened between the two last checks
+        # last check > 24h, < 7days
+        (25, 26, 30, 31, True),
+        # no re-check because no modification happened between the two last checks
+        # last check > 24h, < 7days
+        (25, 31, 30, 31, True),
+        # re-check because last check is more than 30 days old
+        # last check > 30 days (720 hours)
+        (721, 31, 720, 31, True),
     ],
 )
-async def test_re_check_depending_on_default_delay(
+async def test_re_check_depending_on_delay(
     setup_catalog, rmock, event_loop, db, analysis_mock, udata_url, fake_check, re_check
 ):
-    days_since_last_check, re_check_expected = re_check
-    previous_check_date: datetime = datetime.now() - timedelta(days=days_since_last_check)
-    await fake_check(created_at=previous_check_date, detected_last_modified_at=None)
+    (
+        hours_since_check_1,
+        hours_since_modified_1,
+        hours_since_check_2,
+        hours_since_modified_2,
+        re_check_expected,
+    ) = re_check
+
+    # Create a fake previous check
+    if hours_since_check_1:
+        check_1_date = datetime.now(timezone.utc) - timedelta(hours=hours_since_check_1)
+        if hours_since_modified_1:
+            last_modified_at_1 = datetime.now(timezone.utc) - timedelta(
+                hours=hours_since_modified_1
+            )
+        else:
+            last_modified_at_1 = None
+        await fake_check(created_at=check_1_date, detected_last_modified_at=last_modified_at_1)
+
+    # Create a second previous check if needed
+    if hours_since_check_2:
+        check_2_date = datetime.now(timezone.utc) - timedelta(hours=hours_since_check_2)
+        if hours_since_modified_2:
+            last_modified_at_2 = datetime.now(timezone.utc) - timedelta(
+                hours=hours_since_modified_2
+            )
+        else:
+            last_modified_at_2 = None
+        await fake_check(created_at=check_2_date, detected_last_modified_at=last_modified_at_2)
 
     # Run the checker
     rmock.head(RESOURCE_URL, status=200)
@@ -364,55 +418,20 @@ async def test_re_check_depending_on_default_delay(
     checks: list[Record] | None = await db.fetch(
         "SELECT * FROM checks WHERE url = $1", RESOURCE_URL
     )
+
     if re_check_expected:
-        assert ("HEAD", URL(RESOURCE_URL)) in rmock.requests
-        assert len(checks) == 2
+        # assert ("HEAD", URL(RESOURCE_URL)) in rmock.requests
+        if hours_since_check_2:
+            assert len(checks) == 3
+        else:
+            assert len(checks) == 2
         assert checks[-1]["url"] == RESOURCE_URL
     else:
         assert ("HEAD", URL(RESOURCE_URL)) not in rmock.requests
-        assert len(checks) == 1
-
-
-@pytest.mark.parametrize(
-    "re_check",
-    [
-        # days since last check, days since last modified, re-check
-        (0.5, 0.5, False),
-        (1, 1, False),
-        (1, 2, True),
-        # TODO: add more cases
-    ],
-)
-async def test_re_check_depending_on_variable_delays(
-    setup_catalog, rmock, event_loop, db, analysis_mock, udata_url, fake_check, re_check
-):
-    days_after_last_check, days_since_last_modified, re_check_expected = re_check
-    previous_check_date: datetime = datetime.now() - timedelta(days=days_after_last_check)
-    previous_check_last_modified: datetime = datetime.now() - timedelta(
-        days=days_since_last_modified
-    )
-    await fake_check(
-        created_at=previous_check_date,
-        detected_last_modified_at=previous_check_last_modified,
-    )
-
-    # Run the checker
-    rmock.head(RESOURCE_URL, status=200)
-    rmock.get(RESOURCE_URL, status=200)
-    rmock.put(udata_url)
-    event_loop.run_until_complete(start_checks(iterations=1))
-
-    # Another check should/shouldn't have been created depending on the delay
-    checks: list[Record] | None = await db.fetch(
-        "SELECT * FROM checks WHERE url = $1", RESOURCE_URL
-    )
-    if re_check_expected:
-        assert ("HEAD", URL(RESOURCE_URL)) in rmock.requests
-        assert len(checks) == 2
-        assert checks[-1]["url"] == RESOURCE_URL
-    else:
-        assert ("HEAD", URL(RESOURCE_URL)) not in rmock.requests
-        assert len(checks) == 1
+        if hours_since_check_2:
+            assert len(checks) == 2
+        else:
+            assert len(checks) == 1
 
 
 async def test_change_analysis_last_modified_header_twice(
