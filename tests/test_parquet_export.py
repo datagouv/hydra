@@ -1,5 +1,4 @@
 from io import BytesIO
-from typing import Optional
 
 import pyarrow.parquet as pq
 import pytest
@@ -27,7 +26,7 @@ async def test_parquet_conversion(
 ):
     filename, expected_count = file_and_count
     file_path = f"tests/data/{filename}"
-    inspection: Optional[dict] = await perform_csv_inspection(file_path)
+    inspection: dict | None = await perform_csv_inspection(file_path)
     assert inspection
     columns = inspection["columns"]
     columns = {
