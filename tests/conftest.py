@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 import os
 import uuid
 from datetime import datetime
@@ -17,16 +18,21 @@ from udata_hydra import config
 from udata_hydra.app import app_factory
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.logger import stop_sentry
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
+RESOURCE_EXCEPTION_ID = "d4e3a9fb-4415-488e-ba57-d05269b27adf"
+RESOURCE_EXCEPTION_TABLE_INDEXES = {"Nom": "index", "N° de certificat": "index"}
 RESOURCE_URL = "https://example.com/resource-1"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 NOT_EXISTING_RESOURCE_ID = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
 pytestmark = pytest.mark.asyncio
 
 nest_asyncio.apply()
+
+log = logging.getLogger("udata-hydra")
 
 
 def dummy(return_value=None):
@@ -133,6 +139,21 @@ def setup_catalog(catalog_content, rmock):
     run("drop_dbs", dbs=["main"])
     run("migrate")
     run("load_catalog", url=catalog)
+
+
+@pytest.fixture
+async def setup_catalog_with_resource_exception(setup_catalog):
+    """Setup a catalog with a resource that is too large to be processed
+    Columns for the resource RESOURCE_ID_EXCEPTION:
+    ['__id', 'Nom', 'Prenom', 'Societe', 'Adresse', 'CP', 'Ville', 'Tel1', 'Tel2', 'email', 'Organisme', 'Org Cofrac', 'Type de certificat', 'N° de certificat', 'Date début validité', 'Date fin validité']
+    """
+    await Resource.insert(
+        dataset_id=DATASET_ID, resource_id=RESOURCE_EXCEPTION_ID, url="http://example.com/"
+    )
+    await ResourceException.insert(
+        resource_id=RESOURCE_EXCEPTION_ID,
+        table_indexes=RESOURCE_EXCEPTION_TABLE_INDEXES,
+    )
 
 
 @pytest.fixture
