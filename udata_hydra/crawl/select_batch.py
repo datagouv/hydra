@@ -51,7 +51,7 @@ async def select_batch_resources_to_check() -> list[Record]:
         if len(to_check) < config.BATCH_SIZE:
             limit = config.BATCH_SIZE - len(to_check)
 
-            query_start = f"""
+            q_start = f"""
                 WITH recent_checks AS (
                     SELECT resource_id, detected_last_modified_at, created_at,
                         ROW_NUMBER() OVER (PARTITION BY resource_id ORDER BY created_at DESC) AS rn
@@ -61,6 +61,7 @@ async def select_batch_resources_to_check() -> list[Record]:
                 FROM catalog
                     LEFT JOIN recent_checks ON catalog.resource_id = recent_checks.resource_id
                 WHERE catalog.priority = False
+                    AND {Resource.get_excluded_clause()}
                 GROUP BY catalog.url, dataset_id, catalog.resource_id
                 HAVING (
                     (
@@ -77,9 +78,9 @@ async def select_batch_resources_to_check() -> list[Record]:
                     )
             """
 
-            query_dynamic = ""
+            q_dynamic = ""
             for i in range(len(config.CHECK_DELAYS) - 1):
-                query_dynamic += f"""
+                q_dynamic += f"""
                     OR (
                         COUNT(recent_checks.resource_id) = 2
                         AND COUNT(DISTINCT recent_checks.detected_last_modified_at) < 2
@@ -90,14 +91,14 @@ async def select_batch_resources_to_check() -> list[Record]:
                     )
                 """
 
-            query_end = f"""
+            q_end = f"""
                     OR MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[-1]}'
                 )
                 ORDER BY random() LIMIT {limit};
             """
 
             # Combine all parts to form the final query
-            q = f"{query_start} {query_end}"
+            q = f"{q_start} {q_dynamic} {q_end}"
 
             to_check += await connection.fetch(q)
 
