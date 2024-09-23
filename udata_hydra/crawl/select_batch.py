@@ -42,40 +42,63 @@ async def select_batch_resources_to_check() -> list[Record]:
             """
             to_check += await connection.fetch(q)
 
-        # 3) if not enough for our batch size, add resources with outdated checks
-        # To get resources with outdated checks, their last check must either:
-        # - have no detected_last_modified_at and be older than CHECK_DELAY_DEFAULT
-        # - be older than each delay in CHECK_DELAYS, if (and) the last modified date is older than the same delay before the last check
+        # 3) if not enough for our batch size, add resources with outdated checks, with an increasing delay if resources are not changing:
+        # To get resources with outdated checks, they need to meet one of the following conditions:
+        # - Don't have at least two checks yet, and the last check is older than CHECK_DELAYS[0]
+        # - At least one the their two most recent last checks have no detected_last_modified_at, and the last check is older than CHECK_DELAYS[0]
+        # - Their two most recent last checks have changed, and the last check is older than CHECK_DELAYS[0]
+        # - Their last two checks have not changed, the two checks have done between two delays in CHECK_DELAYS, and the last check is older than the same delay in CHECK_DELAYS (this is in order to avoid checking too often the same resource which doesn't change)
         if len(to_check) < config.BATCH_SIZE:
             limit = config.BATCH_SIZE - len(to_check)
-            # Base query part
+
             query_start = f"""
-                SELECT * FROM (
-                    SELECT catalog.url, dataset_id, catalog.resource_id
-                    FROM catalog
-                    JOIN checks ON catalog.last_check = checks.id
-                    WHERE (
-                        (checks.detected_last_modified_at IS NULL AND checks.created_at < CURRENT_DATE - INTERVAL '{config.CHECK_DELAY_DEFAULT}')
-                        OR
-                        (checks.detected_last_modified_at IS NOT NULL AND (
-            """
-            # Dynamic part of the query
-            dynamic_conditions = " OR ".join(
-                f"(checks.created_at >= checks.detected_last_modified_at + INTERVAL '{delay}' AND checks.created_at < CURRENT_DATE - INTERVAL '{delay}')"
-                for delay in config.CHECK_DELAYS
-            )
-            # End of the query
-            query_end = f"""
-                        ))
+                WITH recent_checks AS (
+                    SELECT resource_id, detected_last_modified_at, created_at,
+                        ROW_NUMBER() OVER (PARTITION BY resource_id ORDER BY created_at DESC) AS rn
+                    FROM checks
+                )
+                SELECT catalog.url, dataset_id, catalog.resource_id
+                FROM catalog
+                    LEFT JOIN recent_checks ON catalog.resource_id = recent_checks.resource_id
+                WHERE catalog.priority = False
+                GROUP BY catalog.url, dataset_id, catalog.resource_id
+                HAVING (
+                    (
+                        COUNT(recent_checks.resource_id) < 2
+                        AND MAX(recent_checks.created_at) < CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[0]}'
                     )
-                    AND catalog.priority = False
-                ) s
+                    OR (
+                        COUNT(CASE WHEN recent_checks.detected_last_modified_at IS NULL THEN 1 END) >= 1
+                        AND MAX(recent_checks.created_at) < CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[0]}'
+                    )
+                    OR (
+                        COUNT(DISTINCT recent_checks.detected_last_modified_at) > 1
+                        AND MAX(recent_checks.created_at) < CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[0]}'
+                    )
+            """
+
+            query_dynamic = ""
+            for i in range(len(config.CHECK_DELAYS) - 1):
+                query_dynamic += f"""
+                    OR (
+                        COUNT(recent_checks.resource_id) = 2
+                        AND COUNT(DISTINCT recent_checks.detected_last_modified_at) < 2
+                        AND MAX(recent_checks.created_at) < CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[i]}'
+                        AND MAX(recent_checks.created_at) >= CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[i + 1]}'
+                        AND MIN(recent_checks.created_at) < MAX(recent_checks.created_at) - INTERVAL '{config.CHECK_DELAYS[i]}'
+                        AND MIN(recent_checks.created_at) >= MAX(recent_checks.created_at) - INTERVAL '{config.CHECK_DELAYS[i + 1]}'
+                    )
+                """
+
+            query_end = f"""
+                    OR MAX(recent_checks.created_at) < CURRENT_DATE - INTERVAL '{config.CHECK_DELAYS[-1]}'
+                )
                 ORDER BY random() LIMIT {limit};
             """
 
             # Combine all parts to form the final query
-            final_query = f"{query_start} {dynamic_conditions} {query_end}"
+            q = f"{query_start} {query_dynamic} {query_end}"
 
-            to_check += await connection.fetch(final_query)
+            to_check += await connection.fetch(q)
 
     return to_check

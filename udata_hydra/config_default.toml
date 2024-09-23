@@ -52,7 +52,6 @@ BATCH_SIZE = 40
 
 # check resource if last check is older than
 CHECK_DELAYS = ["12 hours", "1 day", "7 days", "30 days"] # must be a list of strings, postgres interval syntax
-CHECK_DELAY_DEFAULT = "7 days" # must be a string, postgres interval syntax
 
 # seconds to wait for between batches
 SLEEP_BETWEEN_BATCHES = 60

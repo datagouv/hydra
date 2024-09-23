@@ -343,8 +343,8 @@ async def test_no_change_analysis_harvested(
     "re_check",
     [
         # days since last check, re-check
-        (6, False),
-        (8, True),
+        (0.2, False),
+        (1, True),
     ],
 )
 async def test_re_check_depending_on_default_delay(
