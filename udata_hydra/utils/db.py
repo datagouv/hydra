@@ -15,23 +15,23 @@ async def get_columns_with_indexes(table_name: str) -> list[Record] | None:
     async with pool.acquire() as connection:
         q = """
             SELECT
-                t.relname as table_name,
-                i.relname as index_name,
-                a.attname as column_name
+                table_class.relname AS table_name,
+                index_class.relname AS index_name,
+                attribute.attname AS column_name
             FROM
-                pg_class t,
-                pg_class i,
-                pg_index ix,
-                pg_attribute a
+                pg_class table_class,
+                pg_class index_class,
+                pg_index index_relation,
+                pg_attribute attribute
             WHERE
-                t.oid = ix.indrelid
-                and i.oid = ix.indexrelid
-                and a.attrelid = t.oid
-                and a.attnum = ANY(ix.indkey)
-                and t.relkind = 'r'
-                and t.relname = $1
+                table_class.oid = index_relation.indrelid
+                AND index_class.oid = index_relation.indexrelid
+                AND attribute.attrelid = table_class.oid
+                AND attribute.attnum = ANY(index_relation.indkey)
+                AND table_class.relkind = 'r'
+                AND table_class.relname = $1
             ORDER BY
-                t.relname,
-                i.relname;
+                table_class.relname,
+                index_class.relname;
         """
         return await connection.fetch(q, table_name)
