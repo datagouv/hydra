@@ -62,8 +62,8 @@
 - Refactor routes URLs to be more RESTful and separate legacy routes code from new routes code [#132](https://github.com/datagouv/hydra/pull/132)
 - Display app version and environment in health check endpoint [#164](https://github.com/datagouv/hydra/pull/164)
 - Use ENVIRONMENT from config file instead of env var [#165](https://github.com/datagouv/hydra/pull/165)
-- Improve timing of checks depending on resources last modification date [#163](https://github.com/datagouv/hydra/pull/163)
 - Manage large resources exceptions differently [#148](https://github.com/datagouv/hydra/pull/148)
+- Improve timing of checks depending on resources last modification date [#163](https://github.com/datagouv/hydra/pull/163)
 
 ## 1.0.1 (2023-01-04)
 
