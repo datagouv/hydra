@@ -12,6 +12,7 @@ from asyncpg import Record
 from csv_detective.detection import engine_to_file
 from csv_detective.explore_csv import routine as csv_detective_routine
 from progressist import ProgressBar
+from slugify import slugify
 from sqlalchemy import (
     JSON,
     BigInteger,
@@ -26,7 +27,7 @@ from sqlalchemy import (
     Table,
 )
 from sqlalchemy.dialects.postgresql import asyncpg
-from sqlalchemy.schema import CreateTable
+from sqlalchemy.schema import CreateIndex, CreateTable, Index
 from str2bool import str2bool
 from str2float import str2float
 
@@ -36,6 +37,7 @@ from udata_hydra.analysis.errors import ParseException
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import Reader, Timer, download_resource, queue, send
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
@@ -121,12 +123,14 @@ async def analyse_csv(
     # Update resource status to ANALYSING_CSV
     await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
 
-    exceptions = config.LARGE_RESOURCES_EXCEPTIONS
+    # Check if the resource is in the exceptions table
+    # If it is, get the table_indexes to use them later
+    exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
+    table_indexes: dict | None = json.loads(exception["table_indexes"]) if exception else None
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
     url: str = check.get("url") or url
-    exception_file = str(check.get("resource_id", "")) in exceptions
 
     headers = json.loads(check.get("headers") or "{}")
     tmp_file = (
@@ -135,7 +139,7 @@ async def analyse_csv(
         else await download_resource(
             url=url,
             headers=headers,
-            max_size_allowed=None if exception_file else int(config.MAX_FILESIZE_ALLOWED["csv"]),
+            max_size_allowed=None if exception else int(config.MAX_FILESIZE_ALLOWED["csv"]),
         )
     )
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
@@ -151,6 +155,7 @@ async def analyse_csv(
             file_path=tmp_file.name,
             inspection=csv_inspection,
             table_name=table_name,
+            table_indexes=table_indexes,
             resource_id=resource_id,
             debug_insert=debug_insert,
         )
@@ -207,17 +212,45 @@ def smart_cast(_type: str, value, failsafe: bool = False) -> Any:
         return None
 
 
-def compute_create_table_query(table_name: str, columns: list) -> str:
+def compute_create_table_query(
+    table_name: str, columns: dict, indexes: dict[str, str] | None = None
+) -> str:
     """Use sqlalchemy to build a CREATE TABLE statement that should not be vulnerable to injections"""
+
     metadata = MetaData()
     table = Table(table_name, metadata, Column("__id", Integer, primary_key=True))
+
     for col_name, col_type in columns.items():
         table.append_column(Column(col_name, PYTHON_TYPE_TO_PG.get(col_type, String)))
-    compiled = CreateTable(table).compile(dialect=asyncpg.dialect())
+
+    if indexes:
+        for col_name, index_type in indexes.items():
+            if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
+                log.error(
+                    f'Index type "{index_type}" is unknown or not supported yet! Index for colum {col_name} was not created.'
+                )
+                continue
+
+            else:
+                if index_type == "index":
+                    index_name = f"{table_name}_{slugify(col_name)}_idx"
+                    table.append_constraint(Index(index_name, col_name))
+                # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
+
+    compiled_query = CreateTable(table).compile(dialect=asyncpg.dialect())
+    query: str = compiled_query.string
+
+    # Add the index creation queries to the main query
+    for index in table.indexes:
+        log.debug(f'Creating {index_type} on column "{col_name}"')
+        query_idx = CreateIndex(index).compile(dialect=asyncpg.dialect())
+        query: str = query + ";" + query_idx.string
+
     # compiled query will want to write "%% mon pourcent" VARCHAR but will fail when querying "% mon pourcent"
     # also, "% mon pourcent" works well in pg as a column
     # TODO: dirty hack, maybe find an alternative
-    return compiled.string.replace("%%", "%")
+    query = query.replace("%%", "%")
+    return query
 
 
 def generate_records(file_path: str, inspection: dict, columns: dict) -> Iterator[list]:
@@ -269,6 +302,7 @@ async def csv_to_db(
     file_path: str,
     inspection: dict,
     table_name: str,
+    table_indexes: dict[str, str] | None = None,
     resource_id: str | None = None,
     debug_insert: bool = False,
 ) -> None:
@@ -302,8 +336,11 @@ async def csv_to_db(
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
     await db.execute(q)
-    q = compute_create_table_query(table_name, columns)
+
+    # Create table
+    q = compute_create_table_query(table_name=table_name, columns=columns, indexes=table_indexes)
     await db.execute(q)
+
     # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
     if not debug_insert:
         # NB: also see copy_to_table for a file source
