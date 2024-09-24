@@ -123,7 +123,7 @@ jobs:
       - run:
           name: Publish on PyPI
           command: |
-            source .venv_build/bin/activate
+            source .venv/bin/activate
             pip install twine
             twine upload dist/* -u "${PYPI_USERNAME}" -p "${PYPI_PASSWORD}" --non-interactive
 
