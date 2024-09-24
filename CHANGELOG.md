@@ -68,6 +68,7 @@
 - Use ENVIRONMENT from config file instead of env var [#165](https://github.com/datagouv/hydra/pull/165)
 - Manage large resources exceptions differently [#148](https://github.com/datagouv/hydra/pull/148)
 - Add checks aggregate route [#167](https://github.com/datagouv/hydra/pull/167)
+- Convert to a package-manager-agnostic project instead of a Poetry project [#143](https://github.com/datagouv/hydra/pull/143)
 
 ## 1.0.1 (2023-01-04)
 
