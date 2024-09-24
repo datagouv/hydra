@@ -1,5 +1,9 @@
 # Changelog
 
+## Current (in progress)
+
+- Nothing yet
+
 ## 2.0.0 (2024-09-24)
 
 - Use profiling option from csv-detective [#54](https://github.com/etalab/udata-hydra/pull/54)
