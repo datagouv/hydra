@@ -16,6 +16,7 @@ parameters:
     default: "py-cache-v2"
 
 jobs:
+
   install:
     docker:
       - image: cimg/python:<< pipeline.parameters.python-version >>
@@ -26,16 +27,18 @@ jobs:
           command: export BASE_BRANCH=$(base_branch)
       - restore_cache:
           keys:
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
+            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "requirements-dev.txt" }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Branch }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
       - run:
-          name: Install python dependencies
+          name: Install Python dependencies
           command: |
-            poetry config virtualenvs.in-project true
-            poetry install
+            python3 -m pip install --upgrade pip
+            python3 -m venv .venv
+            source .venv/bin/activate
+            pip install '.[dev]'
       - save_cache:
-          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
+          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "requirements-dev.txt" }}
           paths:
             - .venv
       - persist_to_workspace:
@@ -50,12 +53,13 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Lint and format code and sort imports
-          # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
-          # ruff format --check . : check code formatting without fixing (to fix, remove --check)
+          name: Check code linting, code formatting and imports sorting
           command: |
-            poetry run ruff check --select I .
-            poetry run ruff format --check .
+            source .venv/bin/activate
+            # Check linting and imports sorting
+            ruff check
+            # Check code formatting
+            ruff format --check
 
   tests:
     docker:
@@ -74,7 +78,8 @@ jobs:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
           command: |
-            poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes
+            source .venv/bin/activate
+            pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes
       - store_test_results:
           path: reports/python
 
@@ -87,14 +92,20 @@ jobs:
       - run:
           name: Build a distributable package
           command: |
+            source .venv/bin/activate
+            pip install build
             # Build a wheel release
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
-                poetry build
+                python3 -m build
             else
-                # Relies on a dev version like "1.2.1.dev" by default
-                poetry version $(poetry version -s)$CIRCLE_BUILD_NUM
-                poetry build
+                # Relies on a dev version like "2.0.0.dev" by default
+                VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+                DEV_VERSION="${VERSION}.dev${CIRCLE_BUILD_NUM}"
+                echo "Building a dev version: ${DEV_VERSION}"
+                # Use sed to replace the version in pyproject.toml
+                sed -i "s/version = \"${VERSION}\"/version = \"${DEV_VERSION}\"/" pyproject.toml
+                python3 -m build
             fi
       - store_artifacts:
           path: dist
@@ -109,13 +120,14 @@ jobs:
     steps:
       - attach_workspace:
           at: .
-      - deploy:
+      - run:
           name: Publish on PyPI
           command: |
-            poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+            source .venv_build/bin/activate
+            pip install twine
+            twine upload dist/* -u "${PYPI_USERNAME}" -p "${PYPI_PASSWORD}" --non-interactive
 
 workflows:
-  version: 2
   build:
     jobs:
       - install:
