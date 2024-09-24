@@ -216,6 +216,7 @@ $ curl -s "http://localhost:8000/api/checks/all?url=http://www.drees.sante.gouv.
 #### get checks occurences grouped by a column for a specific date
 
 Works with `?group_by={column}` and `?created_at={date}`.
+`date` should be a date in format `YYYY-MM-DD` or the default keyword `today`.
 
 ```bash
 $ curl -s "http://localhost:8000/api/checks/aggregate?group_by=domain&created_at=today" | json_pp
