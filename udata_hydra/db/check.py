@@ -1,3 +1,5 @@
+from datetime import date
+
 from asyncpg import Record
 
 from udata_hydra import context
@@ -69,6 +71,20 @@ class Check:
             ORDER BY created_at DESC
             """
             return await connection.fetch(q, url or resource_id)
+
+    @classmethod
+    async def get_group_by_for_date(cls, column: str, date: date, page_size: int = 20):
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = f"""
+            SELECT {column} as value, count(*) as count
+            FROM checks
+            WHERE created_at::date = $1
+            GROUP BY {column}
+            ORDER BY count desc
+            LIMIT $2
+            """
+            return await connection.fetch(q, date, page_size)
 
     @classmethod
     async def insert(cls, data: dict) -> Record:

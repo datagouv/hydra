@@ -97,6 +97,40 @@ async def test_get_all_checks(setup_catalog, client, query, fake_check):
     assert second["error"] == "no-can-do"
 
 
+@pytest.mark.parametrize(
+    "query,value_template",
+    [
+        ("group_by=domain&created_at=today", "{0}.com"),
+        ("group_by=headers->>'content-type'&created_at=2024-09-05", "application/{0}"),
+    ],
+)
+async def test_api_get_checks_aggregate(setup_catalog, client, query, value_template, fake_check):
+    resp = await client.get(f"/api/checks/aggregate?{query}")
+    assert resp.status == 404
+
+    occurences = [10, 3, 1]
+
+    for i, occurence in enumerate(occurences):
+        for _ in range(occurence):
+            await fake_check(created_at=datetime.now(), domain=value_template.format(i))
+
+    for i, occurence in enumerate(occurences):
+        for _ in range(occurence):
+            await fake_check(
+                created_at=datetime(2024, 9, 5, 10, 0, 0),
+                headers={"content-type": value_template.format(i)},
+            )
+
+    resp = await client.get(f"/api/checks/aggregate?{query}")
+    assert resp.status == 200
+    data: list = await resp.json()
+    assert len(data) == len(occurences)
+
+    for i in range(len(data)):
+        assert data[i]["value"] == value_template.format(i)
+        assert data[i]["count"] == occurences[i]
+
+
 async def test_create_check_wrongly(
     setup_catalog,
     client,

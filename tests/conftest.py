@@ -218,11 +218,12 @@ async def fake_check():
         resource_id=RESOURCE_ID,
         detected_last_modified_at=None,
         parsing_table=False,
+        domain="example.com",
     ) -> dict:
         url = f"https://example.com/resource-{resource}"
         data = {
             "url": url,
-            "domain": "example.com",
+            "domain": domain,
             "status": status,
             "headers": headers,
             "timeout": timeout,

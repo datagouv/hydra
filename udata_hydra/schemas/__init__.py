@@ -1,3 +1,3 @@
 # ruff: noqa: F401
-from .check import CheckSchema
+from .check import CheckGroupBy, CheckSchema
 from .resource import ResourceDocumentSchema, ResourceSchema

@@ -124,14 +124,15 @@ python adev runserver udata_hydra/app.py
 The API serves the following endpoints:
 
 *Related to checks:*
-- `GET` on `/api/checks/latest/?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
-- `GET` on `/api/checks/all/?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
+- `GET` on `/api/checks/latest?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
+- `GET` on `/api/checks/all?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
+- `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurences grouped by a `column` for a specific `date`
 
 *Related to resources:*
-- `GET` on `/api/resources/?resource_id={resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
-- `POST` on `/api/resources/` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
-- `PUT` on `/api/resources/` to update a resource in the DB "catalog" table
-- `DELETE` on `/api/resources/` to delete a resource in the DB "catalog" table
+- `GET` on `/api/resources?resource_id={resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
+- `POST` on `/api/resources` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
+- `PUT` on `/api/resources` to update a resource in the DB "catalog" table
+- `DELETE` on `/api/resources` to delete a resource in the DB "catalog" table
 
 > :warning: **Warning: the following routes are deprecated and need be removed in the future:**
 > - `POST` on `/api/resource/created` -> use `POST` on `/api/resources/` instead
@@ -139,9 +140,9 @@ The API serves the following endpoints:
 > - `POST` on `/api/resource/deleted` -> use `DELET`E on `/api/resources/` instead
 
 *Related to some status and health check:*
-- `GET` on `/api/status/crawler/` to get the crawling status
-- `GET` on `/api/status/worker/` to get the worker status
-- `GET` on `/api/stats/` to get the crawling stats
+- `GET` on `/api/status/crawler` to get the crawling status
+- `GET` on `/api/status/worker` to get the worker status
+- `GET` on `/api/stats` to get the crawling stats
 
 More details about some enpoints are provided below with examples, but not for all of them:
 
@@ -150,7 +151,7 @@ More details about some enpoints are provided below with examples, but not for a
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
 ```bash
-$ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.saintdenis.re/datasets/661e19974bcc48849bbff7c9637c5c28_1.csv" | json_pp
+$ curl -s "http://localhost:8000/api/checks/latest?url=http://opendata-sig.saintdenis.re/datasets/661e19974bcc48849bbff7c9637c5c28_1.csv" | json_pp
 {
    "status" : 200,
    "catalog_id" : 64148,
@@ -187,7 +188,7 @@ $ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.sain
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
 ```bash
-$ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv.fr/IMG/xls/er864.xls" | json_pp
+$ curl -s "http://localhost:8000/api/checks/all?url=http://www.drees.sante.gouv.fr/IMG/xls/er864.xls" | json_pp
 [
    {
       "domain" : "www.drees.sante.gouv.fr",
@@ -222,10 +223,53 @@ $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv
 ]
 ```
 
+#### get checks occurences grouped by a column for a specific date
+
+Works with `?group_by={column}` and `?created_at={date}`.
+`date` should be a date in format `YYYY-MM-DD` or the default keyword `today`.
+
+```bash
+$ curl -s "http://localhost:8000/api/checks/aggregate?group_by=domain&created_at=today" | json_pp
+[
+  {
+    "value": "www.geo2france.fr",
+    "count": 4
+  },
+  {
+    "value": "static.data.gouv.fr",
+    "count": 4
+  },
+  {
+    "value": "grandestprod.data4citizen.com",
+    "count": 3
+  },
+  {
+    "value": "www.datasud.fr",
+    "count": 2
+  },
+  {
+    "value": "koumoul.com",
+    "count": 2
+  },
+  {
+    "value": "opendata.aude.fr",
+    "count": 2
+  },
+  {
+    "value": "departement-ain.opendata.arcgis.com",
+    "count": 2
+  },
+  {
+    "value": "opendata.agglo-larochelle.fr",
+    "count": 1
+  }
+]
+```
+
 #### Get crawling status
 
 ```bash
-$ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
+$ curl -s "http://localhost:8000/api/status/crawler" | json_pp
 {
    "fresh_checks_percentage" : 0.4,
    "pending_checks" : 142153,
@@ -238,7 +282,7 @@ $ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 #### Get worker status
 
 ```bash
-$ curl -s "http://localhost:8000/api/status/worker/" | json_pp
+$ curl -s "http://localhost:8000/api/status/worker" | json_pp
 {
    "queued" : {
       "default" : 0,
@@ -251,7 +295,7 @@ $ curl -s "http://localhost:8000/api/status/worker/" | json_pp
 #### Get crawling stats
 
 ```bash
-$ curl -s "http://localhost:8000/api/stats/" | json_pp
+$ curl -s "http://localhost:8000/api/stats" | json_pp
 {
    "status" : [
       {
