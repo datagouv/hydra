@@ -1,6 +1,6 @@
 # Changelog
 
-## Current (in progress)
+## 1.1.0 (2024-09-26)
 
 - Use profiling option from csv-detective [#54](https://github.com/etalab/udata-hydra/pull/54)
 - Remove csv_analysis, integrate into checks [#52](https://github.com/etalab/udata-hydra/pull/52)
@@ -55,6 +55,7 @@
 - Update resource statuses in DB when crawling and analysing, and add resource status route [#119](https://github.com/datagouv/hydra/pull/119)
 - Simplify `save_as_parquet` method, and fix type not compatible with Python 3.9; remove unused import [#156](https://github.com/datagouv/hydra/pull/156)
 - Fix and simplify project metadata loading [#157](https://github.com/datagouv/hydra/pull/157)
+- Pin Numpy version to 1.26.4 to avoid conflicts with pandas and csv-detective
 
 ## 1.0.1 (2023-01-04)
 

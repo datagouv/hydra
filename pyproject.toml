@@ -9,7 +9,7 @@ readme = "README.md"
 
 [tool.poetry]
 name = "udata-hydra"
-version = "2.0.0.dev"
+version = "1.1.0"
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = ["Opendata Team <opendatateam@data.gouv.fr>"]
 license = "MIT"
@@ -27,6 +27,7 @@ humanfriendly = "^10.0"
 marshmallow = "^3.14.1"
 minicli = "^0.5.3"
 minio = "7.2.7"
+numpy = "1.26.4"
 pyarrow = "16.1.0"
 python-dateutil = "^2.8.2"
 python-magic = "^0.4.25"
