@@ -143,8 +143,9 @@ async def is_backoff(domain: str) -> Tuple[bool, str]:
     Returns a tuple with if it should backoff or not (boolean) and the reason why (string)
     """
     backoff = False, ""
-    no_backoff = [f"'{d}'" for d in config.NO_BACKOFF_DOMAINS]
-    no_backoff = f"({','.join(no_backoff)})"
+    no_backoff = config.NO_BACKOFF_DOMAINS
+    if domain in no_backoff:
+        return (False, "")
     since_backoff_period = datetime.now(timezone.utc) - timedelta(seconds=config.BACKOFF_PERIOD)
     pool = await context.pool()
     async with pool.acquire() as connection:
@@ -154,7 +155,6 @@ async def is_backoff(domain: str) -> Tuple[bool, str]:
             SELECT COUNT(*) FROM checks
             WHERE domain = $1
             AND created_at >= $2
-            AND domain NOT IN {no_backoff}
         """,
             domain,
             since_backoff_period,
@@ -176,7 +176,7 @@ async def is_backoff(domain: str) -> Tuple[bool, str]:
                     status,
                     created_at
                 FROM checks
-                WHERE domain = $1 AND domain NOT IN {no_backoff}
+                WHERE domain = $1
                 AND created_at >= $2
                 ORDER BY created_at DESC
                 LIMIT 1
