@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 import aiohttp
 from aiohttp import web
@@ -9,7 +10,7 @@ from udata_hydra import config, context
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.schemas import CheckSchema
+from udata_hydra.schemas import CheckGroupBy, CheckSchema
 from udata_hydra.utils import get_request_params
 
 
@@ -32,6 +33,28 @@ async def get_all_checks(request: web.Request) -> web.Response:
         raise web.HTTPNotFound()
 
     return web.json_response([CheckSchema().dump(dict(r)) for r in data])
+
+
+async def get_checks_aggregate(request: web.Request) -> web.Response:
+    created_at: str = request.query.get("created_at")
+    if not created_at:
+        raise web.HTTPBadRequest(
+            text="Missing mandatory 'created_at' param. You can use created_at=today to filter on today checks."
+        )
+
+    if created_at == "today":
+        created_at_date: date = date.today()
+    else:
+        created_at_date: date = date.fromisoformat(created_at)
+
+    column: str = request.query.get("group_by")
+    if not column:
+        raise web.HTTPBadRequest(text="Missing mandatory 'group_by' param.")
+    data: list | None = await Check.get_group_by_for_date(column, created_at_date)
+    if not data:
+        raise web.HTTPNotFound()
+
+    return web.json_response([CheckGroupBy().dump(dict(r)) for r in data])
 
 
 async def create_check(request: web.Request) -> web.Response:

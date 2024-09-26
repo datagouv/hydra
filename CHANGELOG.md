@@ -2,6 +2,11 @@
 
 ## Current (in progress)
 
+- Refactor function to get no_backoff domains and add PostgreSQL indexes to improve DB queries perfs [#171](https://github.com/datagouv/hydra/pull/171)
+- Improve timing of checks depending on resources last modification date [#163](https://github.com/datagouv/hydra/pull/163)
+
+## 2.0.0 (2024-09-24)
+
 - Use profiling option from csv-detective [#54](https://github.com/etalab/udata-hydra/pull/54)
 - Remove csv_analysis, integrate into checks [#52](https://github.com/etalab/udata-hydra/pull/52)
 - Add new types for csv parsing: json, date and datetime [#51](https://github.com/etalab/udata-hydra/pull/51)
@@ -63,8 +68,7 @@
 - Display app version and environment in health check endpoint [#164](https://github.com/datagouv/hydra/pull/164)
 - Use ENVIRONMENT from config file instead of env var [#165](https://github.com/datagouv/hydra/pull/165)
 - Manage large resources exceptions differently [#148](https://github.com/datagouv/hydra/pull/148)
-- Convert to a package-manager-agnostic project instead of a Poetry project [#143](https://github.com/datagouv/hydra/pull/143)
-- Improve timing of checks depending on resources last modification date [#163](https://github.com/datagouv/hydra/pull/163)
+- Add checks aggregate route [#167](https://github.com/datagouv/hydra/pull/167)
 
 ## 1.0.1 (2023-01-04)
 

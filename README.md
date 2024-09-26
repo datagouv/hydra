@@ -22,39 +22,28 @@ The hydra crawler is one of the components of the architecture. It will check if
 
 ## Dependencies
 
-### System
-
 This project uses `libmagic`, which needs to be installed on your system, eg:
-`brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on Linux.
 
-### Python
-
-This project uses Python >=3.9.
-
-Project dependencies are listed in `pyproject.toml`, while dependencies are locked in `requirements.txt` (for production only deps) and in `requirements-dev.txt` files.
-
-To install the exact same environment locally including the dev dependencies, use the lock file:
-`pip install -r requirements-dev.txt`
-...or `pip-sync requirements-dev.txt` with [pip-tools](https://pip-tools.readthedocs.io/en/stable/).
-
-To update the lock files, you can use any modern Python package manager (except Poetry) like [pip-tools](https://pip-tools.readthedocs.io/en/stable/), [PDM](https://pdm.fming.dev/) or [uv](https://uv.readthedocs.io/en/latest/), while defining `requirement.txt` and `requirement-dev.txt` as the output lock files.
-With [pip-tools](https://pip-tools.readthedocs.io/en/stable/), the commands are `pip-compile` for requirements.txt, and `pip-compile --extra dev -o requirements-dev.txt` for requirements-dev.txt.
+`brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on linux.
 
 ## CLI
 
 ### Create database structure
 
-`python udata-hydra migrate`
+Install udata-hydra dependencies and cli.
+`poetry install`
+
+`poetry run udata-hydra migrate`
 
 ### Load (UPSERT) latest catalog version from data.gouv.fr
 
-`python udata-hydra load-catalog`
+`poetry run udata-hydra load-catalog`
 
 ## Crawler
 
-`python udata_hydra.crawl:run`
+`poetry run udata-hydra-crawl`
 
-It will crawl (forever) the catalog according to config set in `udata_hydra/config.toml`, with a default config in `udata_hydra/config_default.toml`.
+It will crawl (forever) the catalog according to the config set in `config.toml`, with a default config in `udata_hydra/config_default.toml`.
 
 `BATCH_SIZE` URLs are queued at each loop run.
 
@@ -68,11 +57,11 @@ If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
 A job queuing system is used to process long-running tasks. Launch the worker with the following command:
 
-`python rq worker -c udata_hydra.worker`
+`poetry run rq worker -c udata_hydra.worker`
 
 Monitor worker status:
 
-`python rq info -c udata_hydra.worker --interval 1`
+`poetry run rq info -c udata_hydra.worker --interval 1`
 
 ## CSV conversion to database
 
@@ -82,13 +71,13 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 
 To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
 
-Then you can run the tests with `pytest`.
+Then you can run the tests with `poetry run pytest`.
 
-To run a specific test file, you can pass the path to the file to pytest, like this: `pytest tests/test_app.py`.
+To run a specific test file, you can pass the path to the file to pytest, like this: `poetry run pytest tests/test_app.py`.
 
-To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `pytest tests/test_app.py::test_get_latest_check`.
+To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `poetry run pytest tests/test_app.py::test_get_latest_check`.
 
-If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`pytest -s`). However, note that this can sometimes be difficult to parse.
+If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
 
 ### Tests coverage
 
@@ -116,7 +105,8 @@ RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
 ### Run
 
 ```bash
-python adev runserver udata_hydra/app.py
+poetry install
+poetry run adev runserver udata_hydra/app.py
 ```
 
 ### Routes/endpoints
@@ -124,14 +114,15 @@ python adev runserver udata_hydra/app.py
 The API serves the following endpoints:
 
 *Related to checks:*
-- `GET` on `/api/checks/latest/?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
-- `GET` on `/api/checks/all/?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
+- `GET` on `/api/checks/latest?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
+- `GET` on `/api/checks/all?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
+- `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurences grouped by a `column` for a specific `date`
 
 *Related to resources:*
-- `GET` on `/api/resources/?resource_id={resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
-- `POST` on `/api/resources/` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
-- `PUT` on `/api/resources/` to update a resource in the DB "catalog" table
-- `DELETE` on `/api/resources/` to delete a resource in the DB "catalog" table
+- `GET` on `/api/resources?resource_id={resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
+- `POST` on `/api/resources` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
+- `PUT` on `/api/resources` to update a resource in the DB "catalog" table
+- `DELETE` on `/api/resources` to delete a resource in the DB "catalog" table
 
 > :warning: **Warning: the following routes are deprecated and need be removed in the future:**
 > - `POST` on `/api/resource/created` -> use `POST` on `/api/resources/` instead
@@ -139,9 +130,9 @@ The API serves the following endpoints:
 > - `POST` on `/api/resource/deleted` -> use `DELET`E on `/api/resources/` instead
 
 *Related to some status and health check:*
-- `GET` on `/api/status/crawler/` to get the crawling status
-- `GET` on `/api/status/worker/` to get the worker status
-- `GET` on `/api/stats/` to get the crawling stats
+- `GET` on `/api/status/crawler` to get the crawling status
+- `GET` on `/api/status/worker` to get the worker status
+- `GET` on `/api/stats` to get the crawling stats
 
 More details about some enpoints are provided below with examples, but not for all of them:
 
@@ -150,7 +141,7 @@ More details about some enpoints are provided below with examples, but not for a
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
 ```bash
-$ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.saintdenis.re/datasets/661e19974bcc48849bbff7c9637c5c28_1.csv" | json_pp
+$ curl -s "http://localhost:8000/api/checks/latest?url=http://opendata-sig.saintdenis.re/datasets/661e19974bcc48849bbff7c9637c5c28_1.csv" | json_pp
 {
    "status" : 200,
    "catalog_id" : 64148,
@@ -187,7 +178,7 @@ $ curl -s "http://localhost:8000/api/checks/latest/?url=http://opendata-sig.sain
 Works with `?url={url}` and `?resource_id={resource_id}`.
 
 ```bash
-$ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv.fr/IMG/xls/er864.xls" | json_pp
+$ curl -s "http://localhost:8000/api/checks/all?url=http://www.drees.sante.gouv.fr/IMG/xls/er864.xls" | json_pp
 [
    {
       "domain" : "www.drees.sante.gouv.fr",
@@ -222,10 +213,53 @@ $ curl -s "http://localhost:8000/api/checks/all/?url=http://www.drees.sante.gouv
 ]
 ```
 
+#### get checks occurences grouped by a column for a specific date
+
+Works with `?group_by={column}` and `?created_at={date}`.
+`date` should be a date in format `YYYY-MM-DD` or the default keyword `today`.
+
+```bash
+$ curl -s "http://localhost:8000/api/checks/aggregate?group_by=domain&created_at=today" | json_pp
+[
+  {
+    "value": "www.geo2france.fr",
+    "count": 4
+  },
+  {
+    "value": "static.data.gouv.fr",
+    "count": 4
+  },
+  {
+    "value": "grandestprod.data4citizen.com",
+    "count": 3
+  },
+  {
+    "value": "www.datasud.fr",
+    "count": 2
+  },
+  {
+    "value": "koumoul.com",
+    "count": 2
+  },
+  {
+    "value": "opendata.aude.fr",
+    "count": 2
+  },
+  {
+    "value": "departement-ain.opendata.arcgis.com",
+    "count": 2
+  },
+  {
+    "value": "opendata.agglo-larochelle.fr",
+    "count": 1
+  }
+]
+```
+
 #### Get crawling status
 
 ```bash
-$ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
+$ curl -s "http://localhost:8000/api/status/crawler" | json_pp
 {
    "fresh_checks_percentage" : 0.4,
    "pending_checks" : 142153,
@@ -238,7 +272,7 @@ $ curl -s "http://localhost:8000/api/status/crawler/" | json_pp
 #### Get worker status
 
 ```bash
-$ curl -s "http://localhost:8000/api/status/worker/" | json_pp
+$ curl -s "http://localhost:8000/api/status/worker" | json_pp
 {
    "queued" : {
       "default" : 0,
@@ -251,7 +285,7 @@ $ curl -s "http://localhost:8000/api/status/worker/" | json_pp
 #### Get crawling stats
 
 ```bash
-$ curl -s "http://localhost:8000/api/stats/" | json_pp
+$ curl -s "http://localhost:8000/api/stats" | json_pp
 {
    "status" : [
       {
@@ -361,7 +395,7 @@ For example, to set the log level to `DEBUG` when initializing the database, use
 
 Refer to each section to learn how to launch them. The only differences from dev to prod are:
 - use `HYDRA_SETTINGS` env var to point to your custom `config.toml`
-- use `HYDRA_APP_SOCKET_PATH` to configure where aiohttp should listen to a [reverse proxy connection (eg nginx)](https://docs.aiohttp.org/en/stable/deployment.html#nginx-configuration) and use `udata_hydra.app:run` to launch the app server
+- use `HYDRA_APP_SOCKET_PATH` to configure where aiohttp should listen to a [reverse proxy connection (eg nginx)](https://docs.aiohttp.org/en/stable/deployment.html#nginx-configuration) and use `udata-hydra-app` to launch the app server
 
 ## Contributing
 
