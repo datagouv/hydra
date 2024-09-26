@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Refactor function to get no_backoff domains and add PostgreSQL indexes to improve DB queries perfs [#171](https://github.com/datagouv/hydra/pull/171)
+- Refactor purge_checks CLI to use a date limit instead of a number [#174](https://github.com/datagouv/hydra/pull/174)
 
 ## 2.0.0 (2024-09-24)
 
