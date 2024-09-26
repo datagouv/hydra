@@ -7,6 +7,7 @@ from tempfile import NamedTemporaryFile
 
 import aiohttp
 import asyncpg
+from asyncpg import Record
 from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
@@ -252,13 +253,15 @@ async def migrate(skip_errors: bool = False, dbs: list[str] = ["main", "csv"]):
 
 
 @cli
-async def purge_checks(retention_days: int = 60):
+async def purge_checks(retention_days: int = 60) -> None:
     """Delete outdated checks that are more than `retention_days` days old"""
     conn = await connection()
-    log.debug(f"Deleting checks that are more than {retention_days} days old")
-    await conn.execute(
-        f"""DELETE FROM checks WHERE created_at < now() - interval '{retention_days} days'"""
+    log.debug(f"Deleting checks that are more than {retention_days} days old...")
+    res: Record = await conn.fetchrow(
+        f"""WITH deleted AS (DELETE FROM checks WHERE created_at < now() - interval '{retention_days} days' RETURNING *) SELECT count(*) FROM deleted"""
     )
+    deleted: int = res["count"]
+    log.info(f"Deleted {deleted} checks.")
 
 
 @cli
