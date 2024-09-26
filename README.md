@@ -54,7 +54,7 @@ With [pip-tools](https://pip-tools.readthedocs.io/en/stable/), the commands are 
 
 `python udata_hydra.crawl:run`
 
-It will crawl (forever) the catalog according to config set in `udata_hydra/config.toml`, with a default config in `udata_hydra/config_default.toml`.
+It will crawl (forever) the catalog according to the config set in `config.toml`, with a default config in `udata_hydra/config_default.toml`.
 
 `BATCH_SIZE` URLs are queued at each loop run.
 
