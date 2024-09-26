@@ -341,28 +341,27 @@ async def test_no_change_analysis_harvested(
 @pytest.mark.parametrize(
     "re_check",
     [
-        # hours since last check_1, hours since last_check_2, hours since last modified check 1, hours since last modified check 2, did a re-check happened?
-        # re-check because only one outdated (older than default delay) check
-        (14, 100, None, None, True),
-        # no re-check because only one check but not outdated (newer than default delay)
-        (5, 100, None, None, False),
-        # re-check because one previous check doesn't have modification date
-        (13, 100, 24, None, True),
-        # re-check because one previous check doesn't have modification date
-        (13, None, 24, 100, True),
-        # no re-check because only not outdated even if one previous check doesn't have modification date
-        (5, 100, 24, None, False),
-        # no re-check because only not outdated even if one previous check doesn't have modification date
-        (5, None, 24, 100, False),
-        # re-check because both previous checks has same modification date and last one is outdated
-        (13, 100, 24, 100, True),
-        # no re-check because last one is outdated even though both previous check has same modification date
-        (5, 100, 24, 100, False),
-        # re-check because last one is outdated even though both previous check has same modification date
-        (5, 100, 24, 100, False),
+        # hours since last check_1, hours since last modified check 1, hours since last_check_2, hours since last modified check 2, did a re-check happened?
+        # DEFAULT DELAYS:
+        # re-check because only one outdated (older than default delay) check (8 days = 192 hours)
+        (192, 100, None, None, True),
+        # no re-check because only one check but not outdated (newer than default delay) (6 days = 144 hours)
+        (144, 100, None, None, False),
+        # re-check because one previous check doesn't have modification date (6 days = 144 hours)
+        (144, 100, 24, None, True),
+        # re-check because one previous check doesn't have modification date (6 days = 144 hours)
+        (144, None, 24, 100, True),
+        # re-check because both previous checks has same modification date and last one is outdated (8 days = 192 hours)
+        (192, 100, 24, 100, True),
+        # INCREMENTAL DELAYS
+        # no re-check because too early even though a modification happened between the two last checks
+        (11, 2, 13, 14, False),
         # re-check because a modification happened between the two last checks
         # last check > 12h, < 24h
-        (15, 16, 24, 25, True),
+        (13, 2, 13, 14, True),
+        # no re-check because no modification happened between the two last checks
+        # last check > 12h, < 24h
+        (13, 21, 20, 21, False),
         # re-check because a modification happened between the two last checks
         # last check > 24h, < 7days
         (25, 26, 30, 31, True),

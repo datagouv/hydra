@@ -44,9 +44,9 @@ async def select_batch_resources_to_check() -> list[Record]:
 
         # 3) if not enough for our batch size, add resources with outdated checks, with an increasing delay if resources are not changing:
         # To get resources with outdated checks, they need to meet one of the following conditions:
-        # - Don't have at least two checks yet, and the last check is older than CHECK_DELAYS[0]
-        # - At least one the their two most recent last checks have no detected_last_modified_at, and the last check is older than CHECK_DELAYS[0]
-        # - Their two most recent last checks have changed, and the last check is older than CHECK_DELAYS[0]
+        # - Don't have at least two checks yet, and the last check is older than CHECK_DELAY_DEFAULT
+        # - At least one the their two most recent last checks have no detected_last_modified_at, and the last check is older than CHECK_DELAY_DEFAULT
+        # - Their two most recent last checks have changed, and the last check is older than CHECK_DELAY_DEFAULT
         # - Their last two checks have not changed, the two checks have done between two delays in CHECK_DELAYS, and the last check is older than the same delay in CHECK_DELAYS (this is in order to avoid checking too often the same resource which doesn't change)
         if len(to_check) < config.BATCH_SIZE:
             limit = config.BATCH_SIZE - len(to_check)
@@ -66,11 +66,11 @@ async def select_batch_resources_to_check() -> list[Record]:
                 HAVING (
                     (
                         COUNT(recent_checks.resource_id) < 2
-                        AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[0]}'
+                        AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAY_DEFAULT}'
                     )
                     OR (
                         COUNT(CASE WHEN recent_checks.detected_last_modified_at IS NULL THEN 1 END) >= 1
-                        AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[0]}'
+                        AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAY_DEFAULT}'
                     )
                     OR (
                         COUNT(DISTINCT recent_checks.detected_last_modified_at) > 1

@@ -43,6 +43,7 @@ COOL_OFF_PERIOD = 86400 # 1 day to cool off when we've messed up
 BATCH_SIZE = 40
 
 # check resource if last check is older than
+CHECK_DELAY_DEFAULT = "7 days" # postgres interval syntax
 CHECK_DELAYS = ["12 hours", "1 day", "7 days", "30 days"] # must be a list of strings, postgres interval syntax
 
 # seconds to wait for between batches
