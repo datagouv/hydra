@@ -52,6 +52,33 @@ async def create_resource_exception(request: web.Request) -> web.Response:
     return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)), status=201)
 
 
+async def update_resource_exception(request: web.Request) -> web.Response:
+    """Endpoint to update a resource exception in the DB
+    Respond with a 200 status code with the updated resource exception
+    """
+    try:
+        resource_id = str(uuid.UUID(request.match_info["resource_exception_id"]))
+    except Exception as e:
+        raise web.HTTPBadRequest(text=f"error: {str(e)}")
+
+    resource: Record | None = await Resource.get(resource_id)
+    if not resource:
+        raise web.HTTPNotFound()
+
+    try:
+        payload = await request.json()
+        table_indexes: dict[str, str] | None = payload.get("table_indexes", None)
+    except Exception as err:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
+
+    resource_exception: Record = await ResourceException.update(
+        resource_id=resource_id,
+        table_indexes=table_indexes,
+    )
+
+    return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)))
+
+
 async def delete_resource_exception(request: web.Request) -> web.Response:
     """Endpoint to delete a resource exception from the DB
     Respond with a 204 status code

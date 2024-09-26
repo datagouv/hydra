@@ -83,6 +83,53 @@ async def test_create_resource_exception(
     assert data["resource_id"] == RESOURCE_ID
 
 
+async def test_update_resource_exception(
+    setup_catalog_with_resource_exception, client, api_headers
+):
+    # Test API call with no token
+    resp = await client.put(
+        path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
+        headers=None,
+        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
+    )
+    assert resp.status == 401
+
+    # Test API call with invalid token
+    resp = await client.put(
+        path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
+        headers=api_headers,
+        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
+    )
+    assert resp.status == 403
+
+    # Test API call with invalid PUT data
+    resp = await client.put(
+        path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
+        headers=api_headers,
+        json={"stupid": "stupid"},
+    )
+    assert resp.status == 400
+
+    # Test API call with non existing resource id data
+    resp = await client.put(
+        path=f"/api/resources-exceptions/{NOT_EXISTING_RESOURCE_ID}",
+        headers=api_headers,
+        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
+    )
+    assert resp.status == 404
+
+    # Test API call success
+    resp = await client.put(
+        path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
+        headers=api_headers,
+        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
+    )
+    assert resp.status == 200
+    data: dict = await resp.json()
+    assert data["resource_id"] == RESOURCE_EXCEPTION_ID
+    assert json.loads(data["table_indexes"]) == RESOURCE_EXCEPTION_TABLE_INDEXES
+
+
 async def test_delete_resource_exception(
     setup_catalog_with_resource_exception, client, api_headers, api_headers_wrong_token
 ):

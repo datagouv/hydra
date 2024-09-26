@@ -132,6 +132,7 @@ The API serves the following endpoints:
 *Related to resources exceptions:*
 - `GET` on `/api/resources-exceptions` to get the list all resources exceptions
 - `POST` on `/api/resources-exceptions` to create a new resource exception in the DB
+- `PUT` on `/api/resources-exceptions/{resource_id}` to update a resource exception in the DB
 - `DELETE` on `/api/resources-exceptions/{resource_id}` to delete a resource exception from the DB
 
 *Related to some status and health check:*
@@ -275,6 +276,14 @@ $ curl  -X POST http://localhost:8000/api/resources-exceptions
 $ curl  -X POST http://localhost:8000/api/resources-exceptions
         -H "Authorization: Bearer <myAPIkey>"
         -d "{'resource_id': 'f868cca6-8da1-4369-a78d-47463f19a9a3'}"
+```
+
+#### Updating a resource exception
+
+```bash
+$ curl  -X PUT http://localhost:8000/api/resources-exceptions/f868cca6-8da1-4369-a78d-47463f19a9a3
+        -H "Authorization: Bearer <myAPIkey>"
+         -d "{'table_indexes': {'SIRET': "index", "immatriculation": "index"}}"
 ```
 
 #### Deleting a resource exception

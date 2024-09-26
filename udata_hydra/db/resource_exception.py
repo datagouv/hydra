@@ -70,6 +70,47 @@ class ResourceException:
                 return await connection.fetchrow(q)
 
     @classmethod
+    async def update(cls, resource_id: str, table_indexes: dict[str, str] | None = {}) -> Record:
+        """
+        Update a resource_exception
+        table_indexes is a JSON object of column names and index types
+        e.g. {"siren": "unique", "code_postal": "index"}
+        """
+        pool = await context.pool()
+
+        # First, check if the resource_id exists in the catalog table
+        resource: dict | None = await Resource.get(resource_id)
+        if not resource:
+            raise ValueError("Resource not found")
+
+        if table_indexes:
+            for index_type in table_indexes.values():
+                if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
+                    raise ValueError(
+                        "Index type must be one of: "
+                        + ", ".join(config.SQL_INDEXES_TYPES_SUPPORTED)
+                    )
+
+            async with pool.acquire() as connection:
+                q = f"""
+                    UPDATE resources_exceptions
+                    SET table_indexes = '{json.dumps(table_indexes)}'
+                    WHERE resource_id = '{resource_id}'
+                    RETURNING *;
+                """
+                return await connection.fetchrow(q)
+
+        else:
+            async with pool.acquire() as connection:
+                q = f"""
+                    UPDATE resources_exceptions
+                    SET table_indexes = NULL
+                    WHERE resource_id = '{resource_id}'
+                    RETURNING *;
+                """
+                return await connection.fetchrow(q)
+
+    @classmethod
     async def delete(cls, resource_id: str) -> None:
         """
         Delete a resource_exception by its resource_id
