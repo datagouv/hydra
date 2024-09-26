@@ -3,9 +3,22 @@
 ## Current (in progress)
 
 - Refactor function to get no_backoff domains and add PostgreSQL indexes to improve DB queries perfs [#171](https://github.com/datagouv/hydra/pull/171)
+- Clean changelog and remove useless section in pyproject.toml [#175](https://github.com/datagouv/hydra/pull/175)
 - Improve timing of checks depending on resources last modification date [#163](https://github.com/datagouv/hydra/pull/163)
 
 ## 2.0.0 (2024-09-24)
+
+- Use Python 3.11 instead of 3.9 for performance improvements and future compatibility [#101](https://github.com/datagouv/hydra/pull/101)
+- Refactor and split code from `crawl.py` into separate files using refactored `db.Resource` class methods and static methods [#135](https://github.com/datagouv/hydra/pull/135)
+- Allow routes with or without trailing slashes [#158](https://github.com/datagouv/hydra/pull/158)
+- Delete resource as a CRUD method [#161](https://github.com/datagouv/hydra/pull/161)
+- Refactor routes URLs to be more RESTful and separate legacy routes code from new routes code [#132](https://github.com/datagouv/hydra/pull/132)
+- Display app version and environment in health check endpoint [#164](https://github.com/datagouv/hydra/pull/164)
+- Use ENVIRONMENT from config file instead of env var [#165](https://github.com/datagouv/hydra/pull/165)
+- Manage large resources exceptions differently [#148](https://github.com/datagouv/hydra/pull/148)
+- Add checks aggregate route [#167](https://github.com/datagouv/hydra/pull/167)
+
+## 1.1.0 (2024-09-26)
 
 - Use profiling option from csv-detective [#54](https://github.com/etalab/udata-hydra/pull/54)
 - Remove csv_analysis, integrate into checks [#52](https://github.com/etalab/udata-hydra/pull/52)
@@ -60,15 +73,7 @@
 - Update resource statuses in DB when crawling and analysing, and add resource status route [#119](https://github.com/datagouv/hydra/pull/119)
 - Simplify `save_as_parquet` method, and fix type not compatible with Python 3.9; remove unused import [#156](https://github.com/datagouv/hydra/pull/156)
 - Fix and simplify project metadata loading [#157](https://github.com/datagouv/hydra/pull/157)
-- Use Python 3.11 instead of 3.9 for performance improvements and future compatibility [#101](https://github.com/datagouv/hydra/pull/101)
-- Refactor and split code from `crawl.py` into separate files using refactored `db.Resource` class methods and static methods [#135](https://github.com/datagouv/hydra/pull/135)
-- Allow routes with or without trailing slashes [#158](https://github.com/datagouv/hydra/pull/158)
-- Delete resource as a CRUD method [#161](https://github.com/datagouv/hydra/pull/161)
-- Refactor routes URLs to be more RESTful and separate legacy routes code from new routes code [#132](https://github.com/datagouv/hydra/pull/132)
-- Display app version and environment in health check endpoint [#164](https://github.com/datagouv/hydra/pull/164)
-- Use ENVIRONMENT from config file instead of env var [#165](https://github.com/datagouv/hydra/pull/165)
-- Manage large resources exceptions differently [#148](https://github.com/datagouv/hydra/pull/148)
-- Add checks aggregate route [#167](https://github.com/datagouv/hydra/pull/167)
+- Pin Numpy version to 1.26.4 to avoid conflicts with pandas and csv-detective
 
 ## 1.0.1 (2023-01-04)
 
