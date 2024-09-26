@@ -71,19 +71,19 @@ async def is_domain_backoff(domain: str) -> Tuple[bool, str]:
     - we have hit the rate limit on our side
     Returns a tuple with if it should backoff or not (boolean) and the reason why (string)
     """
-    backoff = False, ""
-    no_backoff = [f"'{d}'" for d in config.NO_BACKOFF_DOMAINS]
-    no_backoff = f"({','.join(no_backoff)})"
+    backoff = (False, "")
+    no_backoff = config.NO_BACKOFF_DOMAINS
+    if domain in no_backoff:
+        return backoff
     since_backoff_period = datetime.now(timezone.utc) - timedelta(seconds=config.BACKOFF_PERIOD)
     pool = await context.pool()
     async with pool.acquire() as connection:
         # check if we trigger BACKOFF_NB_REQ for BACKOFF_PERIOD on this domain
         res = await connection.fetchrow(
-            f"""
+            """
             SELECT COUNT(*) FROM checks
             WHERE domain = $1
             AND created_at >= $2
-            AND domain NOT IN {no_backoff}
         """,
             domain,
             since_backoff_period,
@@ -98,14 +98,14 @@ async def is_domain_backoff(domain: str) -> Tuple[bool, str]:
             since_cool_off_period = datetime.now(timezone.utc) - timedelta(
                 seconds=config.COOL_OFF_PERIOD
             )
-            q = f"""
+            q = """
                 SELECT
                     headers->>'x-ratelimit-remaining' as ratelimit_remaining,
                     headers->>'x-ratelimit-limit' as ratelimit_limit,
                     status,
                     created_at
                 FROM checks
-                WHERE domain = $1 AND domain NOT IN {no_backoff}
+                WHERE domain = $1
                 AND created_at >= $2
                 ORDER BY created_at DESC
                 LIMIT 1
