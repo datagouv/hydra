@@ -14,10 +14,10 @@ async def test_purge_checks(setup_catalog, db, fake_check):
     await fake_check(created_at=datetime.now() - timedelta(days=50))
     await fake_check(created_at=datetime.now() - timedelta(days=30))
     await fake_check(created_at=datetime.now() - timedelta(days=10))
-    run("purge_checks", days_until=40)
+    run("purge_checks", retention_days=40)
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 2
-    run("purge_checks", days_until=20)
+    run("purge_checks", retention_days=20)
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 1
 

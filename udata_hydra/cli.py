@@ -252,12 +252,12 @@ async def migrate(skip_errors: bool = False, dbs: list[str] = ["main", "csv"]):
 
 
 @cli
-async def purge_checks(days_until: int = 60):
-    """Delete outdated checks that are more than `days_until` days old"""
+async def purge_checks(retention_days: int = 60):
+    """Delete outdated checks that are more than `retention_days` days old"""
     conn = await connection()
-    log.debug(f"Deleting checks that are more than {days_until} days old")
+    log.debug(f"Deleting checks that are more than {retention_days} days old")
     await conn.execute(
-        f"""DELETE FROM checks WHERE created_at < now() - interval '{days_until} days'"""
+        f"""DELETE FROM checks WHERE created_at < now() - interval '{retention_days} days'"""
     )
 
 
