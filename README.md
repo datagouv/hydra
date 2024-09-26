@@ -397,6 +397,13 @@ Refer to each section to learn how to launch them. The only differences from dev
 - use `HYDRA_SETTINGS` env var to point to your custom `config.toml`
 - use `HYDRA_APP_SOCKET_PATH` to configure where aiohttp should listen to a [reverse proxy connection (eg nginx)](https://docs.aiohttp.org/en/stable/deployment.html#nginx-configuration) and use `udata-hydra-app` to launch the app server
 
+## Adding large resources exceptions
+
+Here is an example of how to add a large resource exception to Hydra's database through the API:
+```bash
+curl -X POST https://dev-crawler.data.gouv.fr/api/resources-exceptions  -H "Authorization: Bearer abcdefghijklmopqrstuvw1234567890" -d "{'resource_id': 'f868cca6-8da1-4369-a78d-47463f19a9a3', 'table_indexes': {'SIRET': "index", "immatriculation": "index"}}"
+```
+
 ## Contributing
 
 Before contributing to the repository and making any PR, it is necessary to initialize the pre-commit hooks:
