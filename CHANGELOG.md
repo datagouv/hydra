@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Refactor function to get no_backoff domains and add PostgreSQL indexes to improve DB queries perfs [#171](https://github.com/datagouv/hydra/pull/171)
+- Clean changelog and remove useless section in pyproject.toml [#175](https://github.com/datagouv/hydra/pull/175)
 
 ## 2.0.0 (2024-09-24)
 
