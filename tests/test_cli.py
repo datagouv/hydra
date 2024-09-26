@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import nest_asyncio
 import pytest
 from minicli import run
@@ -9,12 +11,15 @@ nest_asyncio.apply()
 
 
 async def test_purge_checks(setup_catalog, db, fake_check):
-    await fake_check()
-    await fake_check()
-    check = await fake_check()
-    run("purge_checks", limit=2)
-    res = await db.fetch("SELECT id FROM checks WHERE resource_id = $1", check["resource_id"])
+    await fake_check(created_at=datetime.now() - timedelta(days=50))
+    await fake_check(created_at=datetime.now() - timedelta(days=30))
+    await fake_check(created_at=datetime.now() - timedelta(days=10))
+    run("purge_checks", retention_days=40)
+    res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 2
+    run("purge_checks", retention_days=20)
+    res = await db.fetch("SELECT * FROM checks")
+    assert len(res) == 1
 
 
 async def test_purge_csv_tables(setup_catalog, db, fake_check):
