@@ -12,7 +12,6 @@ from aiohttp.client_exceptions import ClientError, ClientResponseError
 from aioresponses import CallbackResult
 from asyncpg import Record
 from dateparser import parse as date_parser
-from humanfriendly import parse_timespan
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
