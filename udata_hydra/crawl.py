@@ -145,7 +145,7 @@ async def is_backoff(domain: str) -> Tuple[bool, str]:
     backoff = False, ""
     no_backoff = config.NO_BACKOFF_DOMAINS
     if domain in no_backoff:
-        return (False, "")
+        return backoff
     since_backoff_period = datetime.now(timezone.utc) - timedelta(seconds=config.BACKOFF_PERIOD)
     pool = await context.pool()
     async with pool.acquire() as connection:
