@@ -1,8 +1,9 @@
 import importlib.metadata
 import logging
 import os
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 log = logging.getLogger("udata-hydra")
 
