@@ -1,7 +1,4 @@
-"""
-NB: we can't use pytest-aiohttp helpers because
-it will interfere with the rest of our async code
-"""
+import json
 
 import pytest
 
@@ -11,8 +8,7 @@ from tests.conftest import (
     RESOURCE_EXCEPTION_TABLE_INDEXES,
     RESOURCE_ID,
 )
-from udata_hydra.db.resource import Resource
-from udata_hydra.utils import is_valid_uri
+from udata_hydra.db.resource_exception import ResourceException
 
 pytestmark = pytest.mark.asyncio
 
@@ -51,13 +47,12 @@ async def test_create_resource_exception(
     assert resp.status == 403
 
     # Test API call with invalid POST data
-    stupid_post_data: dict = {"stupid": "stupid"}
     resp = await client.post(
-        path="/api/resources-exceptions", headers=api_headers, json=stupid_post_data
+        path="/api/resources-exceptions", headers=api_headers, json={"stupid": "stupid"}
     )
     assert resp.status == 400
 
-    # Test API call success
+    # Test API post success
     resp = await client.post(
         path="/api/resources-exceptions",
         headers=api_headers,
@@ -65,6 +60,23 @@ async def test_create_resource_exception(
             "resource_id": RESOURCE_ID,
             "table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES,
         },
+    )
+    assert resp.status == 201
+    data: dict = await resp.json()
+    assert data["resource_id"] == RESOURCE_ID
+    assert json.loads(data["table_indexes"]) == RESOURCE_EXCEPTION_TABLE_INDEXES
+
+    # Test posting the same resource exception
+    resp = await client.post(
+        path="/api/resources-exceptions", headers=api_headers, json={"resource_id": RESOURCE_ID}
+    )
+    assert resp.status == 400
+    assert "Resource exception already exists" in await resp.text()
+
+    # Test API post success with no table indexes
+    await ResourceException.delete(RESOURCE_ID)  # First, delete any existing resource exception
+    resp = await client.post(
+        path="/api/resources-exceptions", headers=api_headers, json={"resource_id": RESOURCE_ID}
     )
     assert resp.status == 201
     data: dict = await resp.json()
