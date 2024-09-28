@@ -6,6 +6,7 @@
 - Clean changelog and remove useless section in pyproject.toml [#175](https://github.com/datagouv/hydra/pull/175)
 - Refactor purge_checks CLI to use a date limit instead of a number [#174](https://github.com/datagouv/hydra/pull/174)
 - Fix resources exceptions routes responses, add resources exceptions tests [#176](https://github.com/datagouv/hydra/pull/176)
+- Add a `PUT` `/api/resources-exceptions/{id}` route to update a resource exception [#178](https://github.com/datagouv/hydra/pull/178)
 
 ## 2.0.0 (2024-09-24)
 
