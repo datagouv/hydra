@@ -84,12 +84,12 @@ async def test_create_resource_exception(
 
 
 async def test_update_resource_exception(
-    setup_catalog_with_resource_exception, client, api_headers
+    setup_catalog_with_resource_exception, client, api_headers, api_headers_wrong_token
 ):
     # Test API call with invalid token
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
-        headers=api_headers,
+        headers=api_headers_wrong_token,
         json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
     )
     assert resp.status == 403
@@ -98,9 +98,18 @@ async def test_update_resource_exception(
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
         headers=api_headers,
-        json={"stupid": "stupid"},
+        json={"table_indexes": "stupid"},
     )
     assert resp.status == 400
+    assert "error, table_indexes must be a JSON" in await resp.text()
+
+    resp = await client.put(
+        path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
+        headers=api_headers,
+        json={"table_indexes": {"column1": "stupid"}},
+    )
+    assert resp.status == 400
+    assert "error, index type must be one of" in await resp.text()
 
     # Test API call with non existing resource id data
     resp = await client.put(

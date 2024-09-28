@@ -5,6 +5,7 @@ from aiohttp import web
 from asyncpg import Record
 from asyncpg.exceptions import UniqueViolationError
 
+from udata_hydra import config
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.schemas import ResourceExceptionSchema
@@ -68,8 +69,17 @@ async def update_resource_exception(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
         table_indexes: dict[str, str] | None = payload.get("table_indexes", None)
-    except Exception as err:
-        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
+        if table_indexes:
+            if not isinstance(table_indexes, dict):
+                raise web.HTTPBadRequest(text="error, table_indexes must be a JSON object")
+            for index_type in table_indexes.values():
+                if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
+                    raise web.HTTPBadRequest(
+                        text="error, index type must be one of: "
+                        + ", ".join(config.SQL_INDEXES_TYPES_SUPPORTED)
+                    )
+    except Exception as e:
+        raise web.HTTPBadRequest(text=f"error: {str(e)}")
 
     resource_exception: Record = await ResourceException.update(
         resource_id=resource_id,
