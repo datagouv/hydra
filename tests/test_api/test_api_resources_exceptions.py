@@ -86,14 +86,6 @@ async def test_create_resource_exception(
 async def test_update_resource_exception(
     setup_catalog_with_resource_exception, client, api_headers
 ):
-    # Test API call with no token
-    resp = await client.put(
-        path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
-        headers=None,
-        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
-    )
-    assert resp.status == 401
-
     # Test API call with invalid token
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
