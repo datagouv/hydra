@@ -119,20 +119,26 @@ The API serves the following endpoints:
 - `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurences grouped by a `column` for a specific `date`
 
 *Related to resources:*
-- `GET` on `/api/resources?resource_id={resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
+- `GET` on `/api/resource/{resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
 - `POST` on `/api/resources` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
-- `PUT` on `/api/resources` to update a resource in the DB "catalog" table
-- `DELETE` on `/api/resources` to delete a resource in the DB "catalog" table
+- `PUT` on `/api/resources/{resource_id}` to update a resource in the DB "catalog" table
+- `DELETE` on `/api/resources/{resource_id}` to delete a resource in the DB "catalog" table
 
 > :warning: **Warning: the following routes are deprecated and need be removed in the future:**
 > - `POST` on `/api/resource/created` -> use `POST` on `/api/resources/` instead
 > - `POST` on `/api/resource/updated` -> use `PUT` on `/api/resources/` instead
 > - `POST` on `/api/resource/deleted` -> use `DELET`E on `/api/resources/` instead
 
+*Related to resources exceptions:*
+- `GET` on `/api/resources-exceptions` to get the list all resources exceptions
+- `POST` on `/api/resources-exceptions` to create a new resource exception in the DB
+- `DELETE` on `/api/resources-exceptions/{resource_id}` to delete a resource exception from the DB
+
 *Related to some status and health check:*
 - `GET` on `/api/status/crawler` to get the crawling status
 - `GET` on `/api/status/worker` to get the worker status
 - `GET` on `/api/stats` to get the crawling stats
+- `GET` on `/api/health` to get the API version number and environment
 
 More details about some enpoints are provided below with examples, but not for all of them:
 
@@ -213,7 +219,7 @@ $ curl -s "http://localhost:8000/api/checks/all?url=http://www.drees.sante.gouv.
 ]
 ```
 
-#### get checks occurences grouped by a column for a specific date
+#### Get checks occurences grouped by a column for a specific date
 
 Works with `?group_by={column}` and `?created_at={date}`.
 `date` should be a date in format `YYYY-MM-DD` or the default keyword `today`.
@@ -254,6 +260,28 @@ $ curl -s "http://localhost:8000/api/checks/aggregate?group_by=domain&created_at
     "count": 1
   }
 ]
+```
+
+#### Adding a resource exception
+
+```bash
+$ curl  -X POST http://localhost:8000/api/resources-exceptions
+        -H "Authorization: Bearer <myAPIkey>"
+        -d "{'resource_id': 'f868cca6-8da1-4369-a78d-47463f19a9a3', 'table_indexes': {'SIRET': "index", "immatriculation": "index"}}"
+```
+
+...or, if you don't want to add table indexes:
+```bash
+$ curl  -X POST http://localhost:8000/api/resources-exceptions
+        -H "Authorization: Bearer <myAPIkey>"
+        -d "{'resource_id': 'f868cca6-8da1-4369-a78d-47463f19a9a3'}"
+```
+
+#### Deleting a resource exception
+
+```bash
+$ curl  -X DELETE http://localhost:8000/api/resources-exceptions/f868cca6-8da1-4369-a78d-47463f19a9a3
+        -H "Authorization: Bearer <myAPIkey>"
 ```
 
 #### Get crawling status

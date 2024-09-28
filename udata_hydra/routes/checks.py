@@ -67,7 +67,7 @@ async def create_check(request: web.Request) -> web.Response:
     except ValidationError as err:
         raise web.HTTPBadRequest(text=json.dumps(err.messages))
     except KeyError as e:
-        raise web.HTTPBadRequest(text=f"Missing key: {e}")
+        raise web.HTTPBadRequest(text=f"Missing key: {str(e)}")
 
     # Get URL from resource_id
     try:

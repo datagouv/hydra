@@ -5,6 +5,7 @@
 - Refactor function to get no_backoff domains and add PostgreSQL indexes to improve DB queries perfs [#171](https://github.com/datagouv/hydra/pull/171)
 - Clean changelog and remove useless section in pyproject.toml [#175](https://github.com/datagouv/hydra/pull/175)
 - Refactor purge_checks CLI to use a date limit instead of a number [#174](https://github.com/datagouv/hydra/pull/174)
+- Fix resources exceptions routes responses, add resources exceptions tests [#176](https://github.com/datagouv/hydra/pull/176)
 - Improve timing of checks depending on resources last modification date [#163](https://github.com/datagouv/hydra/pull/163)
 
 ## 2.0.0 (2024-09-24)
