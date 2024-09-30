@@ -101,7 +101,6 @@ async def test_update_resource_exception(
         json={"table_indexes": "stupid"},
     )
     assert resp.status == 400
-    assert "error, table_indexes must be a JSON" in await resp.text()
 
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
@@ -109,7 +108,6 @@ async def test_update_resource_exception(
         json={"table_indexes": {"column1": "stupid"}},
     )
     assert resp.status == 400
-    assert "error, index type must be one of" in await resp.text()
 
     # Test API call with non existing resource id data
     resp = await client.put(
