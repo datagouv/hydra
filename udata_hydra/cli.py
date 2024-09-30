@@ -155,10 +155,11 @@ async def check_resource(resource_id: str, method: str = "get"):
 
 @cli(name="analyse-csv")
 async def analyse_csv_cli(
-    check_id: int | None = None, url: str | None = None, debug_insert: bool = False
+    check_id: str | None = None, url: str | None = None, debug_insert: bool = False
 ):
     """Trigger a csv analysis from a check_id or an url"""
-    await analyse_csv(check_id=check_id, url=url, debug_insert=debug_insert)
+    check_id = int(check_id) if check_id else None
+    await analyse_csv(check_id, url, debug_insert)
 
 
 @cli
