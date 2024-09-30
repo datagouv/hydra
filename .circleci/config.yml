@@ -34,6 +34,9 @@ jobs:
           command: |
             poetry config virtualenvs.in-project true
             poetry install
+      - run:
+          name: Save commit hash in a file
+          command: echo $CIRCLE_SHA1 > .git-commit
       - save_cache:
           key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
           paths:
