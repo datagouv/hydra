@@ -115,10 +115,12 @@ async def analyse_csv(
         return
 
     # Get check and resource_id
-    check: Record | None = (
-        await Check.get_by_id(check_id, with_deleted=True) if check_id is not None else {}
-    )
-    resource_id: str = check.get("resource_id")
+    check: Record | None = await Check.get_by_id(check_id, with_deleted=True) if check_id else None
+    if not check:
+        log.error("Check not found")
+        return
+
+    resource_id: str = check["resource_id"]
 
     # Update resource status to ANALYSING_CSV
     await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
@@ -130,7 +132,7 @@ async def analyse_csv(
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
-    url: str = check.get("url") or url
+    url: str = check["url"] or url
 
     headers = json.loads(check.get("headers") or "{}")
     tmp_file = (
