@@ -70,14 +70,9 @@ async def update_resource_exception(request: web.Request) -> web.Response:
         payload = await request.json()
         table_indexes: dict[str, str] | None = payload.get("table_indexes", None)
         if table_indexes:
-            if not isinstance(table_indexes, dict):
-                raise web.HTTPBadRequest(text="error, table_indexes must be a JSON object")
-            for index_type in table_indexes.values():
-                if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
-                    raise web.HTTPBadRequest(
-                        text="error, index type must be one of: "
-                        + ", ".join(config.SQL_INDEXES_TYPES_SUPPORTED)
-                    )
+            valid, error = ResourceExceptionSchema.are_table_indexes_valid(table_indexes)
+            if not valid:
+                raise web.HTTPBadRequest(text=error)
     except Exception as e:
         raise web.HTTPBadRequest(text=f"error: {str(e)}")
 
