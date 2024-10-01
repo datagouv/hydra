@@ -19,6 +19,7 @@ from udata_hydra.routes.resources_exceptions import (
     create_resource_exception,
     delete_resource_exception,
     get_all_resources_exceptions,
+    update_resource_exception,
 )
 from udata_hydra.routes.resources_legacy import (
     create_resource_legacy,
@@ -72,6 +73,7 @@ routes_params = [
     # Routes for resources exceptions
     (web.get, "/api/resources-exceptions", get_all_resources_exceptions, None),
     (web.post, "/api/resources-exceptions", create_resource_exception, None),
+    (web.put, "/api/resources-exceptions/{resource_exception_id}", update_resource_exception, None),
     (
         web.delete,
         "/api/resources-exceptions/{resource_exception_id}",
