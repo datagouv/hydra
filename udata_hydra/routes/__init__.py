@@ -1,7 +1,6 @@
 from typing import Callable
 
 from aiohttp import web
-from numpy import put
 
 from udata_hydra.routes.checks import (
     create_check,
