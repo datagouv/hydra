@@ -31,6 +31,13 @@ class Configurator:
         self.configuration = configuration
         self.check()
 
+        # Read commit hash from .git-commit file
+        try:
+            with open(Path.cwd() / ".git-commit", "r") as f:
+                self.configuration["GIT_COMMIT"] = f.read().strip()
+        except FileNotFoundError:
+            log.warning("No .git-commit file")
+
         # add project metadata to config
         self.configuration["APP_NAME"] = "udata-hydra"
         self.configuration["APP_VERSION"] = importlib.metadata.version("udata-hydra")
