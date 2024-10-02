@@ -69,7 +69,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "catalog_harvested: use catalog_harvested.csv as source",
 ]
-addopts = "--cov=udata_hydra/ --cov-report term-missing"
+addopts = "--cov=udata_hydra/ --cov-report term-missing --cov-fail-under=88"
 
 [tool.ruff]
 lint = { extend-select = ["I"] }

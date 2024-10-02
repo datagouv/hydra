@@ -7,6 +7,7 @@ from tempfile import NamedTemporaryFile
 
 import aiohttp
 import asyncpg
+from asyncpg import Record
 from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
@@ -154,10 +155,11 @@ async def check_resource(resource_id: str, method: str = "get"):
 
 @cli(name="analyse-csv")
 async def analyse_csv_cli(
-    check_id: int | None = None, url: str | None = None, debug_insert: bool = False
+    check_id: str | None = None, url: str | None = None, debug_insert: bool = False
 ):
     """Trigger a csv analysis from a check_id or an url"""
-    await analyse_csv(check_id=check_id, url=url, debug_insert=debug_insert)
+    check_id = int(check_id) if check_id else None
+    await analyse_csv(check_id, url, debug_insert)
 
 
 @cli
@@ -252,29 +254,31 @@ async def migrate(skip_errors: bool = False, dbs: list[str] = ["main", "csv"]):
 
 
 @cli
-async def purge_checks(limit: int = 2):
-    """Delete past checks for each resource_id, keeping only `limit` number of checks"""
-    q = "SELECT resource_id FROM checks GROUP BY resource_id HAVING count(id) > $1"
+async def purge_checks(retention_days: int = 60, quiet: bool = False) -> None:
+    """Delete outdated checks that are more than `retention_days` days old"""
+    if quiet:
+        log.setLevel(logging.ERROR)
+
     conn = await connection()
-    resources = await conn.fetch(q, limit)
-    for r in resources:
-        resource_id = r["resource_id"]
-        log.debug(f"Deleting outdated checks for resource {resource_id}")
-        q = """DELETE FROM checks WHERE id IN (
-            SELECT id FROM checks WHERE resource_id = $1 ORDER BY created_at DESC OFFSET $2
-        )
-        """
-        await conn.execute(q, resource_id, limit)
+    log.debug(f"Deleting checks that are more than {retention_days} days old...")
+    res: Record = await conn.fetchrow(
+        f"""WITH deleted AS (DELETE FROM checks WHERE created_at < now() - interval '{retention_days} days' RETURNING *) SELECT count(*) FROM deleted"""
+    )
+    deleted: int = res["count"]
+    log.info(f"Deleted {deleted} checks.")
 
 
 @cli
-async def purge_csv_tables():
+async def purge_csv_tables(quiet: bool = False):
     """Delete converted CSV tables for resources url no longer in catalog"""
     # TODO: check if we should use parsing_table from table_index?
     # And are they necessarily in sync?
 
     # Fetch all parsing tables from checks where we don't have any entry on
     # md5(url) in catalog or all entries are marked as deleted.
+    if quiet:
+        log.setLevel(logging.ERROR)
+
     q = """
     SELECT DISTINCT checks.parsing_table
     FROM checks
