@@ -125,6 +125,17 @@ jobs:
           name: Publish on PyPI
           command: |
             poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+      - run:
+          name: Trigger GitLab CI pipeline to deploy
+          command: | # https://docs.gitlab.com/ee/api/pipeline_triggers.html
+            curl --request POST \
+              --form token=${GITLAB_PIPELINE_TOKEN} \
+              --form ref=main \
+              --form "variables[SITE]=dev" \
+              --form "variables[APP]=hydra" \
+              --form "variables[TAGS]=light" \
+              --form "variables[PACKAGE_VERSION]=$(poetry version -s)" \
+              https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/trigger/pipeline
 
 workflows:
   build:
