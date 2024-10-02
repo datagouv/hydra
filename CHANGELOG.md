@@ -9,6 +9,7 @@
 - Fix CSV analysis CLI [#181](https://github.com/datagouv/hydra/pull/181)
 - Add a `PUT` `/api/resources-exceptions/{id}` route to update a resource exception [#178](https://github.com/datagouv/hydra/pull/178)
 - Add a `quiet` argument for `purge_check` and `purge_csv_table` CLIs [#184](https://github.com/datagouv/hydra/pull/184)
+- Save git commit hash in CI and use it for health check [#182](https://github.com/datagouv/hydra/pull/182) and [#185](https://github.com/datagouv/hydra/pull/185)
 
 ## 2.0.0 (2024-09-24)
 
