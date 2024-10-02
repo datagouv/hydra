@@ -163,5 +163,9 @@ async def get_health(request: web.Request) -> web.Response:
     test_connection = await request.app["pool"].fetchrow("SELECT 1")
     assert next(test_connection.values()) == 1
     return web.json_response(
-        {"version": config.APP_VERSION, "environment": config.ENVIRONMENT or "unknown"}
+        {
+            "version": config.APP_VERSION,
+            "commit": config.GIT_COMMIT or "unknown",
+            "environment": config.ENVIRONMENT or "unknown",
+        }
     )
