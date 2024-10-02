@@ -34,9 +34,6 @@ jobs:
           command: |
             poetry config virtualenvs.in-project true
             poetry install
-      - run:
-          name: Save commit hash in a file
-          command: echo $CIRCLE_SHA1 > .git-commit
       - save_cache:
           key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
           paths:
@@ -87,6 +84,16 @@ jobs:
     steps:
       - attach_workspace:
           at: .
+      - run:
+          name: Write commit hash to .git-commit
+          command: echo $CIRCLE_SHA1 > .git-commit
+      - run:
+          name: Check contents of .git-commit
+          command: cat .git-commit
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .git-commit
       - run:
           name: Build a distributable package
           command: |
