@@ -254,8 +254,11 @@ async def migrate(skip_errors: bool = False, dbs: list[str] = ["main", "csv"]):
 
 
 @cli
-async def purge_checks(retention_days: int = 60) -> None:
+async def purge_checks(retention_days: int = 60, quiet: bool = False) -> None:
     """Delete outdated checks that are more than `retention_days` days old"""
+    if quiet:
+        log.setLevel(logging.ERROR)
+
     conn = await connection()
     log.debug(f"Deleting checks that are more than {retention_days} days old...")
     res: Record = await conn.fetchrow(
@@ -266,13 +269,16 @@ async def purge_checks(retention_days: int = 60) -> None:
 
 
 @cli
-async def purge_csv_tables():
+async def purge_csv_tables(quiet: bool = False):
     """Delete converted CSV tables for resources url no longer in catalog"""
     # TODO: check if we should use parsing_table from table_index?
     # And are they necessarily in sync?
 
     # Fetch all parsing tables from checks where we don't have any entry on
     # md5(url) in catalog or all entries are marked as deleted.
+    if quiet:
+        log.setLevel(logging.ERROR)
+
     q = """
     SELECT DISTINCT checks.parsing_table
     FROM checks
