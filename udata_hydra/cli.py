@@ -141,7 +141,7 @@ async def check_resource(resource_id: str, method: str = "get"):
     """Trigger a complete check for a given resource_id"""
     resource: asyncpg.Record | None = await Resource.get(resource_id)
     if not resource:
-        log.error("Resource not found in catalog")
+        log.error(f"Resource {resource_id} not found in catalog")
         return
     async with aiohttp.ClientSession(timeout=None) as session:
         await crawl_check_resource(
