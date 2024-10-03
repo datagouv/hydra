@@ -11,7 +11,6 @@ class Resource:
         "BACKOFF": "backoff period for this domain, will be checked later",
         "CRAWLING_URL": "resource URL currently being crawled",
         "TO_ANALYSE_RESOURCE": "resource to be processed for change, type and size analysis",
-        "ANALYSING_RESOURCE": "currently being processed for change, type and size analysis",
         "TO_ANALYSE_CSV": "resource content to be analysed by CSV detective",
         "ANALYSING_CSV": "resource content currently being analysed by CSV detective",
         "INSERTING_IN_DB": "currently being inserted in DB",
