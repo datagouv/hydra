@@ -10,6 +10,7 @@
 - Add a `PUT` `/api/resources-exceptions/{id}` route to update a resource exception [#178](https://github.com/datagouv/hydra/pull/178)
 - Add a `quiet` argument for `purge_check` and `purge_csv_table` CLIs [#184](https://github.com/datagouv/hydra/pull/184)
 - Fix wrong resource status [#187](https://github.com/datagouv/hydra/pull/187)
+- More informative error relative to check resource CLI [#188](https://github.com/datagouv/hydra/pull/188)
 
 ## 2.0.0 (2024-09-24)
 
