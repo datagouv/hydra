@@ -34,6 +34,9 @@ jobs:
           command: |
             poetry config virtualenvs.in-project true
             poetry install
+      - run:
+          name: Save commit hash in a file
+          command: echo $CIRCLE_SHA1 > .git-commit
       - save_cache:
           key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
           paths:
@@ -85,9 +88,8 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Build a distributable package
+          name: Set the version number
           command: |
-            # Set the version
             if [[ $CIRCLE_TAG ]]; then
                 export VERSION=$CIRCLE_TAG
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
@@ -99,6 +101,13 @@ jobs:
             fi
             # Display some debug info
             echo "Building a wheel release with version $VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
+            # Save the version number in a file
+            echo "export VERSION=\"$VERSION\"" >> .env_vars
+      - run:
+          name: Build a distributable package
+          command: |
+            # Get the version number
+            source .env_vars
             # Build a wheel release
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
@@ -125,16 +134,25 @@ jobs:
           name: Publish on PyPI
           command: |
             poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+
+  deploy:
+    docker:
+      - image: cimg/python:<< pipeline.parameters.python-version >>
+    steps:
+      - attach_workspace:
+          at: .
       - run:
           name: Trigger GitLab CI pipeline to deploy
           command: | # https://docs.gitlab.com/ee/api/pipeline_triggers.html
+            source .env_vars
+            echo "Triggering a GitLab Pipeline to deploy Hydra version $VERSION on dev with tag light..."
             curl --request POST \
               --form token=${GITLAB_PIPELINE_TOKEN} \
               --form ref=main \
               --form "variables[SITE]=dev" \
               --form "variables[APP]=hydra" \
               --form "variables[TAGS]=light" \
-              --form "variables[PACKAGE_VERSION]=$(poetry version -s)" \
+              --form "variables[PACKAGE_VERSION]=${VERSION}" \
               https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/trigger/pipeline
 
 workflows:
@@ -172,6 +190,13 @@ workflows:
                 - << pipeline.parameters.publish-branch >>
                 - /[0-9]+(\.[0-9]+)+/
                 - /rc[0-9]+/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
+          context: org-global
+      - deploy:
+          requires:
+            - build
+          filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
           context: org-global
