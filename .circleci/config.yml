@@ -142,18 +142,14 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Trigger GitLab CI pipeline to deploy
+          name: Create a GitLab CI pipeline for deploying
           command: | # https://docs.gitlab.com/ee/api/pipeline_triggers.html
             source .env_vars
-            echo "Triggering a GitLab Pipeline to deploy Hydra version $VERSION on dev with tag light..."
+            echo "Create a GitLab CI pipeline for deploying Hydra version $VERSION on dev with tag light..."
             curl --request POST \
-              --form token=${GITLAB_PIPELINE_TOKEN} \
-              --form ref=main \
-              --form "variables[SITE]=dev" \
-              --form "variables[APP]=hydra" \
-              --form "variables[TAGS]=light" \
-              --form "variables[PACKAGE_VERSION]=${VERSION}" \
-              https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/trigger/pipeline
+              --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
+              --data '{ "ref": "main", "variables": [{"key": "SITE", "value": "dev.data.gouv.fr" }, {"key": "APP", "value": "hydra"}, {"key": "TAGS", "value": "light" }] }' \
+              https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/pipeline
 
   publish:
     docker:
