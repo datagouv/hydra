@@ -114,17 +114,6 @@ jobs:
           paths:
             - .
 
-  publish:
-    docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
-    steps:
-      - attach_workspace:
-          at: .
-      - deploy:
-          name: Publish on PyPI
-          command: |
-            poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
-
   deploy:
     docker:
       - image: cimg/python:<< pipeline.parameters.python-version >>
@@ -144,6 +133,17 @@ jobs:
               --form "variables[TAGS]=light" \
               --form "variables[PACKAGE_VERSION]=${VERSION}" \
               https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/trigger/pipeline
+
+  publish:
+    docker:
+      - image: cimg/python:<< pipeline.parameters.python-version >>
+    steps:
+      - attach_workspace:
+          at: .
+      - deploy:
+          name: Publish on PyPI
+          command: |
+            poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
 
 workflows:
   version: 2
@@ -172,6 +172,16 @@ workflows:
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only:
+                - main
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
+          context: org-global
       - publish:
           requires:
             - build
@@ -181,13 +191,6 @@ workflows:
                 - << pipeline.parameters.publish-branch >>
                 - /[0-9]+(\.[0-9]+)+/
                 - /rc[0-9]+/
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-          context: org-global
-      - deploy:
-          requires:
-            - build
-          filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
           context: org-global
