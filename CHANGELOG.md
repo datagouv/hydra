@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Fix typos in README in curl commands examples [#189](https://github.com/datagouv/hydra/pull/189)
+- Add comment column/field to ressources exceptions [#191](https://github.com/datagouv/hydra/pull/191)
 
 ## 2.0.1 (2024-10-04)
 
