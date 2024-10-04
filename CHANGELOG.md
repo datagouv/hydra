@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Fix typos in README in curl commands examples [#189](https://github.com/datagouv/hydra/pull/189)
+- Save git commit hash in CI and use it for health check [#182](https://github.com/datagouv/hydra/pull/182) and [#185](https://github.com/datagouv/hydra/pull/185)
 
 ## 2.0.1 (2024-10-04)
 

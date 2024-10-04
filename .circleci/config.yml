@@ -34,9 +34,6 @@ jobs:
           command: |
             poetry config virtualenvs.in-project true
             poetry install
-      - run:
-          name: Save commit hash in a file
-          command: echo $CIRCLE_SHA1 > .git-commit
       - save_cache:
           key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
           paths:
@@ -90,13 +87,21 @@ jobs:
       - run:
           name: Build a distributable package
           command: |
+            # Set the version
+            if [[ $CIRCLE_TAG ]]; then
+                export VERSION=$CIRCLE_TAG
+            else
+                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
+            fi
+            # Display some debug info
+            echo "Building a wheel release with version $VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
             # Build a wheel release
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
                 poetry build
             else
                 # Relies on a dev version like "1.2.1.dev" by default
-                poetry version $(poetry version -s)$CIRCLE_BUILD_NUM
+                poetry version $VERSION
                 poetry build
             fi
       - store_artifacts:
