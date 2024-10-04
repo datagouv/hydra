@@ -1,6 +1,6 @@
 # Changelog
 
-## Current (in progress)
+## 2.0.1 (2024-10-04)
 
 - Refactor function to get no_backoff domains and add PostgreSQL indexes to improve DB queries perfs [#171](https://github.com/datagouv/hydra/pull/171)
 - Clean changelog and remove useless section in pyproject.toml [#175](https://github.com/datagouv/hydra/pull/175)
