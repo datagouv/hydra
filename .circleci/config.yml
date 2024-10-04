@@ -94,7 +94,7 @@ jobs:
                 export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
             fi
             # Display some debug info
-            echo "Building a wheel release with version $VERSION\nTag: $CIRCLE_TAG\nBuild number: $CIRCLE_BUILD_NUM\nCommit hash: ${CIRCLE_SHA1:0:7}"
+            echo "Building a wheel release with version $VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
             # Build a wheel release
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
