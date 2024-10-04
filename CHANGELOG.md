@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Fix typos in README in curl commands examples [#189](https://github.com/datagouv/hydra/pull/189)
 
 ## 2.0.1 (2024-10-04)
 
