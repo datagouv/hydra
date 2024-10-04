@@ -266,12 +266,18 @@ $ curl -s "http://localhost:8000/api/checks/aggregate?group_by=domain&created_at
 #### Adding a resource exception
 
 ```bash
-$ curl  -X POST http://localhost:8000/api/resources-exceptions \
-        -H 'Authorization: Bearer <myAPIkey>' \
-        -d '{"resource_id": "f868cca6-8da1-4369-a78d-47463f19a9a3", "table_indexes": {"SIRET": "index", "immatriculation": "index"}}'
+$ curl   -X POST http://localhost:8000/api/resources-exceptions \
+         -H 'Authorization: Bearer <myAPIkey>' \
+         -d '{
+            "resource_id": "123e4567-e89b-12d3-a456-426614174000",
+            "table_indexes": {
+                  "siren": "index"
+            },
+            "comment": "This is a comment for the resource exception."
+         }'
 ```
 
-...or, if you don't want to add table indexes:
+...or, if you don't want to add table indexes and a comment:
 ```bash
 $ curl  -X POST localhost:8000/api/resources-exceptions \
         -H 'Authorization: Bearer <myAPIkey>" \
@@ -281,9 +287,15 @@ $ curl  -X POST localhost:8000/api/resources-exceptions \
 #### Updating a resource exception
 
 ```bash
-$ curl  -X PUT http://localhost:8000/api/resources-exceptions/f868cca6-8da1-4369-a78d-47463f19a9a3 \
-        -H "Authorization: Bearer <myAPIkey>" \
-        -d '{"table_indexes": {"SIRET": "index", "immatriculation": "index"}}'
+$ curl   -X PUT http://localhost:8000/api/resources-exceptions/f868cca6-8da1-4369-a78d-47463f19a9a3 \
+         -H "Authorization: Bearer <myAPIkey>" \
+         -d '{
+            "table_indexes": {
+                  "siren": "index",
+                  "code_postal": "index"
+            },
+            "comment": "Updated comment for the resource exception."
+         }'
 ```
 
 #### Deleting a resource exception
