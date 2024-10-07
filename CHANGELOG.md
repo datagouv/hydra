@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Fix typos in README in curl commands examples [#189](https://github.com/datagouv/hydra/pull/189)
+- Bump csv-detective to 0.7.3 [#192](https://github.com/datagouv/hydra/pull/192)
 
 ## 2.0.1 (2024-10-04)
 
