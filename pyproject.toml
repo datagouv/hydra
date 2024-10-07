@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "udata-hydra"
-version = "2.0.2.dev"
+version = "2.0.2"
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = ["Opendata Team <opendatateam@data.gouv.fr>"]
 license = "MIT"
