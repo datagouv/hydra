@@ -35,7 +35,7 @@ class MinIOClient:
         if os.path.isfile(file_name):
             self.client.fput_object(
                 self.bucket,
-                config.MINIO_FOLDER,
+                f"{config.MINIO_FOLDER}/{file_name}",
                 file_name,
             )
             if delete_source:
