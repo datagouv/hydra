@@ -163,7 +163,7 @@ async def analyse_csv(
         )
         timer.mark("csv-to-db")
 
-        await csv_to_parquet(
+        parquet_file = await csv_to_parquet(
             file_path=tmp_file.name,
             inspection=csv_inspection,
             table_name=table_name,
@@ -177,6 +177,7 @@ async def analyse_csv(
                 {
                     "parsing_table": table_name,
                     "parsing_finished_at": datetime.now(timezone.utc),
+                    "parsing_parquet_file": parquet_file,
                 },
             )
         await csv_to_db_index(table_name, csv_inspection, check)
@@ -298,6 +299,7 @@ async def csv_to_parquet(
         output_name=table_name,
     )
     minio_client.send_file(parquet_file)
+    return parquet_file
 
 
 async def csv_to_db(
