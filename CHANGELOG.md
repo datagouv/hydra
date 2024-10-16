@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Save git commit hash in CI and use it for health check [#182](https://github.com/datagouv/hydra/pull/182) and [#185](https://github.com/datagouv/hydra/pull/185)
 
 ## 2.0.2 (2024-10-07)
 
