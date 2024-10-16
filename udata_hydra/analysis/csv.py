@@ -99,7 +99,7 @@ async def notify_udata(check_id: int, table_name: str) -> None:
             },
         }
         if config.CSV_TO_PARQUET:
-            payload["parquet_id"] = table_name
+            payload["document"]['analysis:parquet_url'] = check["parquet_url"]
         queue.enqueue(send, _priority="high", **payload)
 
 
@@ -163,7 +163,7 @@ async def analyse_csv(
         )
         timer.mark("csv-to-db")
 
-        parquet_file = await csv_to_parquet(
+        parquet_url = await csv_to_parquet(
             file_path=tmp_file.name,
             inspection=csv_inspection,
             table_name=table_name,
@@ -177,7 +177,7 @@ async def analyse_csv(
                 {
                     "parsing_table": table_name,
                     "parsing_finished_at": datetime.now(timezone.utc),
-                    "parsing_parquet_file": parquet_file,
+                    "parquet_url": parquet_url,
                 },
             )
         await csv_to_db_index(table_name, csv_inspection, check)
@@ -270,7 +270,7 @@ async def csv_to_parquet(
     inspection: dict,
     table_name: str,
     resource_id: str | None = None,
-) -> None:
+) -> str | None:
     """
     Convert a csv file to parquet using inspection data.
 
@@ -298,8 +298,8 @@ async def csv_to_parquet(
         columns=columns,
         output_name=table_name,
     )
-    minio_client.send_file(parquet_file)
-    return parquet_file
+    parquet_url: str | None = minio_client.send_file(parquet_file)
+    return parquet_url
 
 
 async def csv_to_db(
