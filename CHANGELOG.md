@@ -2,6 +2,16 @@
 
 ## Current (in progress)
 
+- Save git commit hash in CI and use it for health check [#182](https://github.com/datagouv/hydra/pull/182) and [#185](https://github.com/datagouv/hydra/pull/185)
+- Add comment column/field to ressources exceptions [#191](https://github.com/datagouv/hydra/pull/191)
+
+## 2.0.2 (2024-10-07)
+
+- Fix typos in README in curl commands examples [#189](https://github.com/datagouv/hydra/pull/189)
+- Bump csv-detective to 0.7.3 [#192](https://github.com/datagouv/hydra/pull/192)
+
+## 2.0.1 (2024-10-04)
+
 - Refactor function to get no_backoff domains and add PostgreSQL indexes to improve DB queries perfs [#171](https://github.com/datagouv/hydra/pull/171)
 - Clean changelog and remove useless section in pyproject.toml [#175](https://github.com/datagouv/hydra/pull/175)
 - Refactor purge_checks CLI to use a date limit instead of a number [#174](https://github.com/datagouv/hydra/pull/174)

@@ -153,6 +153,7 @@ async def setup_catalog_with_resource_exception(setup_catalog):
     await ResourceException.insert(
         resource_id=RESOURCE_EXCEPTION_ID,
         table_indexes=RESOURCE_EXCEPTION_TABLE_INDEXES,
+        comment="This is a test comment.",
     )
 
 
