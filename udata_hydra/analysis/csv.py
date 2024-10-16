@@ -171,15 +171,20 @@ async def analyse_csv(
             resource_id=resource_id,
         )
         timer.mark("csv-to-parquet")
-
+        # Update resource with parquet url and size
+        await Resource.update(
+            resource_id,
+            {
+                "parquet_url": parquet_args[0] if parquet_args else None,
+                "parquet_size": parquet_args[1] if parquet_args else None,
+            },
+        )
         if check_id:
             await Check.update(
                 check_id,
                 {
                     "parsing_table": table_name,
                     "parsing_finished_at": datetime.now(timezone.utc),
-                    "parquet_url": parquet_args[0] if parquet_args else None,
-                    "parquet_size": parquet_args[1] if parquet_args else None,
                 },
             )
         await csv_to_db_index(table_name, csv_inspection, check)
@@ -276,9 +281,14 @@ async def csv_to_parquet(
     """
     Convert a csv file to parquet using inspection data.
 
-    :file_path: CSV file path to convert
-    :inspection: CSV detective report
-    :table_name: used to name the parquet file
+    Args:
+        :file_path: CSV file path to convert
+        :inspection: CSV detective report
+        :table_name: used to name the parquet file
+
+    Returns:
+        :parquet_url: URL of the parquet file
+        :parquet_size: size of the parquet file
     """
     if not config.CSV_TO_PARQUET:
         log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
