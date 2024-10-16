@@ -151,17 +151,6 @@ jobs:
               --data '{ "ref": "main", "variables": [{"key": "SITE", "value": "dev" }, {"key": "APP", "value": "hydra"}, {"key": "TAGS", "value": "light" }, {"key": "PACKAGE_VERSION", "value": "$PACKAGE_VERSION" }] }' \
               https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/pipeline
 
-  publish:
-    docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
-    steps:
-      - attach_workspace:
-          at: .
-      - run:
-          name: Publish on PyPI
-          command: |
-            poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
-
 workflows:
   build:
     jobs:
@@ -188,16 +177,6 @@ workflows:
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
-      - deploy:
-          requires:
-            - build
-          filters:
-            branches:
-              only:
-                - main
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-          context: org-global
       - publish:
           requires:
             - build
@@ -207,6 +186,16 @@ workflows:
                 - << pipeline.parameters.publish-branch >>
                 - /[0-9]+(\.[0-9]+)+/
                 - /rc[0-9]+/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
+          context: org-global
+      - deploy:
+          requires:
+            - publish
+          filters:
+            branches:
+              only:
+                - main
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
           context: org-global
