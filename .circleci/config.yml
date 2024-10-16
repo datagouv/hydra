@@ -91,18 +91,18 @@ jobs:
           name: Set the version number
           command: |
             if [[ $CIRCLE_TAG ]]; then
-                export VERSION=$CIRCLE_TAG
+                export PACKAGE_VERSION=$CIRCLE_TAG
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
                 # for main branches, can't add the commit hash since it's not a valid format for publishing
-                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
+                export PACKAGE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
             else
                 # for feature branches, add the commit hash
-                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
+                export PACKAGE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
             fi
             # Display some debug info
-            echo "Building a wheel release with version $VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
+            echo "Building a wheel release with version $PACKAGE_VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
             # Save the version number in a file
-            echo "export VERSION=\"$VERSION\"" >> .env_vars
+            echo "export PACKAGE_VERSION=\"$PACKAGE_VERSION\"" >> .env_vars
       - run:
           name: Build a distributable package
           command: |
@@ -114,7 +114,7 @@ jobs:
                 poetry build
             else
                 # Relies on a dev version like "1.2.1.dev" by default
-                poetry version $VERSION
+                poetry version $PACKAGE_VERSION
                 poetry build
             fi
       - store_artifacts:
@@ -145,10 +145,10 @@ jobs:
           name: Create a GitLab CI pipeline for deploying
           command: | # https://docs.gitlab.com/ee/api/pipeline_triggers.html
             source .env_vars
-            echo "Create a GitLab CI pipeline for deploying Hydra version $VERSION on dev with tag light..."
+            echo "Create a GitLab CI pipeline for deploying Hydra version $PACKAGE_VERSION on dev with tag light..."
             curl --request POST \
               --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
-              --data '{ "ref": "main", "variables": [{"key": "SITE", "value": "dev.data.gouv.fr" }, {"key": "APP", "value": "hydra"}, {"key": "TAGS", "value": "light" }] }' \
+              --data '{ "ref": "main", "variables": [{"key": "SITE", "value": "dev" }, {"key": "APP", "value": "hydra"}, {"key": "TAGS", "value": "light" }, {"key": "PACKAGE_VERSION", "value": "$PACKAGE_VERSION" }] }' \
               https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/pipeline
 
   publish:
