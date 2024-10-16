@@ -310,11 +310,9 @@ async def csv_to_parquet(
         columns=columns,
         output_filename=table_name,
     )
-    parquet_url: str | None = minio_client.send_file(parquet_file)
-    if parquet_url:
-        parquet_size: int = os.path.getsize(parquet_file)
-        return parquet_url, parquet_size
-    return None
+    parquet_size: int = os.path.getsize(parquet_file)
+    parquet_url: str = minio_client.send_file(parquet_file)
+    return parquet_url, parquet_size
 
 
 async def csv_to_db(

@@ -29,7 +29,7 @@ class MinIOClient:
         self,
         file_name,
         delete_source=True,
-    ) -> str | None:
+    ) -> str:
         if self.bucket is None:
             raise AttributeError("A bucket has to be specified.")
         if os.path.isfile(file_name):
