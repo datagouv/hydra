@@ -85,23 +85,30 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Build a distributable package
+          name: Build version number
           command: |
             # Set the version
             if [[ $CIRCLE_TAG ]]; then
-                export VERSION=$CIRCLE_TAG
+                export PACKAGE_VERSION=$CIRCLE_TAG
             else
-                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
+                export PACKAGE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
             fi
+            # Write it in a file
+            echo "export PACKAGE_VERSION=\"$PACKAGE_VERSION\"" >> .env_vars
             # Display some debug info
-            echo "Building a wheel release with version $VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
+            echo "Building a wheel release with version $PACKAGE_VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
+      - run:
+          name: Build a distributable package
+          command: |
+            # Get the version number
+            source .env_vars
             # Build a wheel release
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
                 poetry build
             else
                 # Relies on a dev version like "1.2.1.dev" by default
-                poetry version $VERSION
+                poetry version $PACKAGE_VERSION
                 poetry build
             fi
       - store_artifacts:
@@ -121,6 +128,22 @@ jobs:
           name: Publish on PyPI
           command: |
             poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+
+  deploy:
+    docker:
+      - image: cimg/python:<< pipeline.parameters.python-version >>
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Create a GitLab CI pipeline for deploying
+          command: | # https://docs.gitlab.com/ee/api/pipeline_triggers.html
+            source .env_vars
+            echo "Create a GitLab CI pipeline for deploying Hydra version $PACKAGE_VERSION on dev with tag light..."
+            curl --request POST \
+              --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
+              --data '{ "ref": "main", "variables": [{"key": "SITE", "value": "dev.data.gouv.fr" }, {"key": "APP", "value": "hydra"}, {"key": "TAGS", "value": "light" }, {"key": "PACKAGE_VERSION", "value": "$PACKAGE_VERSION" }] }' \
+              https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/pipeline
 
 workflows:
   version: 2
@@ -158,6 +181,16 @@ workflows:
                 - << pipeline.parameters.publish-branch >>
                 - /[0-9]+(\.[0-9]+)+/
                 - /rc[0-9]+/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
+          context: org-global
+      - deploy:
+          requires:
+            - publish
+          filters:
+            branches:
+              only:
+                - main
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
           context: org-global
