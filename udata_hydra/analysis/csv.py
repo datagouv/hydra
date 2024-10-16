@@ -99,8 +99,8 @@ async def notify_udata(check_id: int, table_name: str) -> None:
             },
         }
         if config.CSV_TO_PARQUET:
-            payload["document"]['analysis:parsing:parquet_url'] = check.get("parquet_url")
-            payload["document"]['analysis:parsing:parquet_size'] = check.get("parquet_size")
+            payload["document"]["analysis:parsing:parquet_url"] = check.get("parquet_url")
+            payload["document"]["analysis:parsing:parquet_size"] = check.get("parquet_size")
         queue.enqueue(send, _priority="high", **payload)
 
 
