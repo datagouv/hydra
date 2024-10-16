@@ -33,7 +33,10 @@ class ResourceException:
 
     @classmethod
     async def insert(
-        cls, resource_id: str, table_indexes: dict[str, str] | None = {}, comment: str | None = None
+        cls,
+        resource_id: str,
+        table_indexes: dict[str, str] | None = None,
+        comment: str | None = None,
     ) -> Record:
         """
         Insert a new resource_exception
@@ -47,7 +50,9 @@ class ResourceException:
         if not resource:
             raise ValueError("Resource not found")
 
-        if table_indexes:
+        if table_indexes is None:
+            table_indexes = {}
+        else:
             valid, error = ResourceExceptionSchema.are_table_indexes_valid(table_indexes)
             if not valid:
                 raise ValueError(error)
@@ -64,7 +69,10 @@ class ResourceException:
 
     @classmethod
     async def update(
-        cls, resource_id: str, table_indexes: dict[str, str] | None = {}, comment: str | None = None
+        cls,
+        resource_id: str,
+        table_indexes: dict[str, str] | None = None,
+        comment: str | None = None,
     ) -> Record:
         """
         Update a resource_exception
@@ -78,7 +86,9 @@ class ResourceException:
         if not resource:
             raise ValueError("Resource not found")
 
-        if table_indexes:
+        if table_indexes is None:
+            table_indexes = {}
+        else:
             valid, error = ResourceExceptionSchema.are_table_indexes_valid(table_indexes)
             if not valid:
                 raise ValueError(error)
