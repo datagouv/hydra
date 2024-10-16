@@ -2,8 +2,13 @@
 
 ## Current (in progress)
 
-- Fix typos in README in curl commands examples [#189](https://github.com/datagouv/hydra/pull/189)
+- Save git commit hash in CI and use it for health check [#182](https://github.com/datagouv/hydra/pull/182) and [#185](https://github.com/datagouv/hydra/pull/185)
 - Add comment column/field to ressources exceptions [#191](https://github.com/datagouv/hydra/pull/191)
+
+## 2.0.2 (2024-10-07)
+
+- Fix typos in README in curl commands examples [#189](https://github.com/datagouv/hydra/pull/189)
+- Bump csv-detective to 0.7.3 [#192](https://github.com/datagouv/hydra/pull/192)
 
 ## 2.0.1 (2024-10-04)
 
