@@ -59,12 +59,14 @@ async def test_create_resource_exception(
         json={
             "resource_id": RESOURCE_ID,
             "table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES,
+            "comment": "This is a test comment.",
         },
     )
     assert resp.status == 201
     data: dict = await resp.json()
     assert data["resource_id"] == RESOURCE_ID
     assert json.loads(data["table_indexes"]) == RESOURCE_EXCEPTION_TABLE_INDEXES
+    assert data["comment"] == "This is a test comment."
 
     # Test posting the same resource exception
     resp = await client.post(
@@ -121,12 +123,16 @@ async def test_update_resource_exception(
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
         headers=api_headers,
-        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
+        json={
+            "table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES,
+            "comment": "Updated test comment.",
+        },
     )
     assert resp.status == 200
     data: dict = await resp.json()
     assert data["resource_id"] == RESOURCE_EXCEPTION_ID
     assert json.loads(data["table_indexes"]) == RESOURCE_EXCEPTION_TABLE_INDEXES
+    assert data["comment"] == "Updated test comment."
 
 
 async def test_delete_resource_exception(

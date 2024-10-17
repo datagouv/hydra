@@ -2,6 +2,17 @@
 
 ## Current (in progress)
 
+- Save git commit hash in CI and use it for health check [#182](https://github.com/datagouv/hydra/pull/182) and [#185](https://github.com/datagouv/hydra/pull/185)
+- Add comment column/field to ressources exceptions [#191](https://github.com/datagouv/hydra/pull/191)
+- Convert to a package-manager-agnostic project instead of a Poetry project [#143](https://github.com/datagouv/hydra/pull/143)
+
+## 2.0.2 (2024-10-07)
+
+- Fix typos in README in curl commands examples [#189](https://github.com/datagouv/hydra/pull/189)
+- Bump csv-detective to 0.7.3 [#192](https://github.com/datagouv/hydra/pull/192)
+
+## 2.0.1 (2024-10-04)
+
 - Refactor function to get no_backoff domains and add PostgreSQL indexes to improve DB queries perfs [#171](https://github.com/datagouv/hydra/pull/171)
 - Clean changelog and remove useless section in pyproject.toml [#175](https://github.com/datagouv/hydra/pull/175)
 - Refactor purge_checks CLI to use a date limit instead of a number [#174](https://github.com/datagouv/hydra/pull/174)
@@ -9,7 +20,8 @@
 - Fix CSV analysis CLI [#181](https://github.com/datagouv/hydra/pull/181)
 - Add a `PUT` `/api/resources-exceptions/{id}` route to update a resource exception [#178](https://github.com/datagouv/hydra/pull/178)
 - Add a `quiet` argument for `purge_check` and `purge_csv_table` CLIs [#184](https://github.com/datagouv/hydra/pull/184)
-- Convert to a package-manager-agnostic project instead of a Poetry project [#143](https://github.com/datagouv/hydra/pull/143)
+- Fix wrong resource status [#187](https://github.com/datagouv/hydra/pull/187)
+- More informative error relative to check resource CLI [#188](https://github.com/datagouv/hydra/pull/188)
 
 ## 2.0.0 (2024-09-24)
 

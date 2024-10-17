@@ -37,9 +37,6 @@ jobs:
             python3 -m venv .venv
             source .venv/bin/activate
             pip install '.[dev]'
-      - run:
-          name: Save commit hash in a file
-          command: echo $CIRCLE_SHA1 > .git-commit
       - save_cache:
           key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "requirements-dev.txt" }}
           paths:
@@ -97,6 +94,14 @@ jobs:
           command: |
             source .venv/bin/activate
             pip install build
+            # Set the version
+            if [[ $CIRCLE_TAG ]]; then
+                export VERSION=$CIRCLE_TAG
+            else
+                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
+            fi
+            # Display some debug info
+            echo "Building a wheel release with version $VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
             # Build a wheel release
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream

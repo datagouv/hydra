@@ -32,7 +32,12 @@ class ResourceException:
             return await connection.fetchrow(q, resource_id)
 
     @classmethod
-    async def insert(cls, resource_id: str, table_indexes: dict[str, str] | None = {}) -> Record:
+    async def insert(
+        cls,
+        resource_id: str,
+        table_indexes: dict[str, str] | None = None,
+        comment: str | None = None,
+    ) -> Record:
         """
         Insert a new resource_exception
         table_indexes is a JSON object of column names and index types
@@ -45,30 +50,30 @@ class ResourceException:
         if not resource:
             raise ValueError("Resource not found")
 
-        if table_indexes:
+        if table_indexes is None:
+            table_indexes = {}
+        else:
             valid, error = ResourceExceptionSchema.are_table_indexes_valid(table_indexes)
             if not valid:
                 raise ValueError(error)
 
-            async with pool.acquire() as connection:
-                q = f"""
-                    INSERT INTO resources_exceptions (resource_id, table_indexes)
-                    VALUES ('{resource_id}', '{json.dumps(table_indexes)}')
-                    RETURNING *;
-                """
-                return await connection.fetchrow(q)
-
-        else:
-            async with pool.acquire() as connection:
-                q = f"""
-                    INSERT INTO resources_exceptions (resource_id)
-                    VALUES ('{resource_id}')
-                    RETURNING *;
-                """
-                return await connection.fetchrow(q)
+        async with pool.acquire() as connection:
+            q = """
+                INSERT INTO resources_exceptions (resource_id, table_indexes, comment)
+                VALUES ($1, $2, $3)
+                RETURNING *;
+            """
+            return await connection.fetchrow(
+                q, resource_id, json.dumps(table_indexes) if table_indexes else None, comment
+            )
 
     @classmethod
-    async def update(cls, resource_id: str, table_indexes: dict[str, str] | None = {}) -> Record:
+    async def update(
+        cls,
+        resource_id: str,
+        table_indexes: dict[str, str] | None = None,
+        comment: str | None = None,
+    ) -> Record:
         """
         Update a resource_exception
         table_indexes is a JSON object of column names and index types
@@ -81,29 +86,23 @@ class ResourceException:
         if not resource:
             raise ValueError("Resource not found")
 
-        if table_indexes:
+        if table_indexes is None:
+            table_indexes = {}
+        else:
             valid, error = ResourceExceptionSchema.are_table_indexes_valid(table_indexes)
             if not valid:
                 raise ValueError(error)
 
-            async with pool.acquire() as connection:
-                q = f"""
-                    UPDATE resources_exceptions
-                    SET table_indexes = '{json.dumps(table_indexes)}'
-                    WHERE resource_id = '{resource_id}'
-                    RETURNING *;
-                """
-                return await connection.fetchrow(q)
-
-        else:
-            async with pool.acquire() as connection:
-                q = f"""
-                    UPDATE resources_exceptions
-                    SET table_indexes = NULL
-                    WHERE resource_id = '{resource_id}'
-                    RETURNING *;
-                """
-                return await connection.fetchrow(q)
+        async with pool.acquire() as connection:
+            q = """
+                UPDATE resources_exceptions
+                SET table_indexes = $2, comment = $3
+                WHERE resource_id = $1
+                RETURNING *;
+            """
+            return await connection.fetchrow(
+                q, resource_id, json.dumps(table_indexes) if table_indexes else None, comment
+            )
 
     @classmethod
     async def delete(cls, resource_id: str) -> None:

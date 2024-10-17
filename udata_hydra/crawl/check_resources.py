@@ -118,8 +118,8 @@ async def check_resource(
                 },
             )
 
-            # Update resource status to TO_PROCESS_RESOURCE
-            await Resource.update(resource_id, data={"status": "TO_PROCESS_RESOURCE"})
+            # Update resource status to TO_ANALYSE_RESOURCE
+            await Resource.update(resource_id, data={"status": "TO_ANALYSE_RESOURCE"})
 
             # Enqueue the resource for analysis
             queue.enqueue(analyse_resource, check["id"], is_first_check, _priority=worker_priority)
