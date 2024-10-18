@@ -2,7 +2,7 @@ import json
 
 from aiohttp import web
 from asyncpg import Record
-from marshmallow import ValidationError
+from pydantic import ValidationError
 
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import ResourceSchema
@@ -19,7 +19,7 @@ async def get_resource_legacy(request: web.Request) -> web.Response:
     if not resource:
         raise web.HTTPNotFound()
 
-    return web.json_response(ResourceSchema().dump(dict(resource)))
+    return web.Response(text=json.dumps(resource, default=str), content_type="application/json")
 
 
 async def create_resource_legacy(request: web.Request) -> web.Response:

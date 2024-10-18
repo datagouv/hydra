@@ -4,7 +4,7 @@ from datetime import date
 import aiohttp
 from aiohttp import web
 from asyncpg import Record
-from marshmallow import ValidationError
+from pydantic import ValidationError
 
 from udata_hydra import config, context
 from udata_hydra.crawl.check_resources import check_resource
@@ -17,13 +17,15 @@ from udata_hydra.utils import get_request_params
 async def get_latest_check(request: web.Request) -> web.Response:
     """Get the latest check for a given URL or resource_id"""
     url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
-    data: Record | None = await Check.get_latest(url, resource_id)
-    if not data:
+    record: Record | None = await Check.get_latest(url, resource_id)
+    if not record:
         raise web.HTTPNotFound()
-    if data["deleted"]:
+    if record["deleted"]:
         raise web.HTTPGone()
 
-    return web.json_response(CheckSchema().dump(dict(data)))
+    check = CheckSchema.model_validate(record)
+    return web.Response(text="test", content_type="application/json")
+    # return web.Response(text=json.dumps(check, default=str), content_type="application/json")
 
 
 async def get_all_checks(request: web.Request) -> web.Response:
@@ -31,8 +33,7 @@ async def get_all_checks(request: web.Request) -> web.Response:
     data: list | None = await Check.get_all(url, resource_id)
     if not data:
         raise web.HTTPNotFound()
-
-    return web.json_response([CheckSchema().dump(dict(r)) for r in data])
+    return web.json_response([r for r in data])
 
 
 async def get_checks_aggregate(request: web.Request) -> web.Response:
@@ -54,7 +55,7 @@ async def get_checks_aggregate(request: web.Request) -> web.Response:
     if not data:
         raise web.HTTPNotFound()
 
-    return web.json_response([CheckGroupBy().dump(dict(r)) for r in data])
+    return web.json_response([r for r in data])
 
 
 async def create_check(request: web.Request) -> web.Response:
@@ -65,7 +66,7 @@ async def create_check(request: web.Request) -> web.Response:
         payload: dict = await request.json()
         resource_id: str = payload["resource_id"]
     except ValidationError as err:
-        raise web.HTTPBadRequest(text=json.dumps(err.messages))
+        raise web.HTTPBadRequest(text=err.json())
     except KeyError as e:
         raise web.HTTPBadRequest(text=f"Missing key: {str(e)}")
 
@@ -90,4 +91,4 @@ async def create_check(request: web.Request) -> web.Response:
     if not check:
         raise web.HTTPBadRequest(text=f"Check not created, status: {status}")
 
-    return web.json_response(CheckSchema().dump(dict(check)), status=201)
+    return web.Response(text=json.dumps(check, default=str), content_type="application/json")

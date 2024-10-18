@@ -55,7 +55,10 @@ class Check:
             WHERE checks.id = catalog.last_check
             AND catalog.{column} = $1
             """
-            return await connection.fetchrow(q, url or resource_id)
+            record = await connection.fetchrow(q, url or resource_id)
+            if record:
+                return dict(record)
+            return None
 
     @classmethod
     async def get_all(cls, url: str | None = None, resource_id: str | None = None) -> list | None:

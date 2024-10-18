@@ -1,13 +1,13 @@
-from marshmallow import Schema, fields
+from pydantic import BaseModel
 
 from udata_hydra import config
 
 
-class ResourceExceptionSchema(Schema):
-    id = fields.Str(required=True)
-    resource_id = fields.Str(required=True)
-    table_indexes = fields.Str(allow_none=True)
-    comment = fields.Str(allow_none=True)
+class ResourceExceptionSchema(BaseModel):
+    id: str
+    resource_id: str
+    table_indexes: dict | None = None
+    comment: str | None = None
 
     @staticmethod
     def are_table_indexes_valid(table_indexes: dict[str, str]) -> tuple[bool, str | None]:
