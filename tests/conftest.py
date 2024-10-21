@@ -238,7 +238,7 @@ async def fake_check():
             if parsing_table
             else None,
             "parquet_url": "https://example.org/file.parquet" if parquet_url else None,
-            "parquet_size": 2048 if parquet_url else None
+            "parquet_size": 2048 if parquet_url else None,
         }
         check = await Check.insert(data)
         data["id"] = check["id"]
