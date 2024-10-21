@@ -171,20 +171,14 @@ async def analyse_csv(
             resource_id=resource_id,
         )
         timer.mark("csv-to-parquet")
-        # Update resource with parquet url and size
-        await Resource.update(
-            resource_id,
-            {
-                "parquet_url": parquet_args[0] if parquet_args else None,
-                "parquet_size": parquet_args[1] if parquet_args else None,
-            },
-        )
         if check_id:
             await Check.update(
                 check_id,
                 {
                     "parsing_table": table_name,
                     "parsing_finished_at": datetime.now(timezone.utc),
+                    "parquet_url": parquet_args[0] if parquet_args else None,
+                    "parquet_size": parquet_args[1] if parquet_args else None,
                 },
             )
         await csv_to_db_index(table_name, csv_inspection, check)
