@@ -26,7 +26,7 @@ pytestmark = pytest.mark.asyncio
     ],
 )
 async def test_get_latest_check(setup_catalog, client, query, fake_check, fake_resource_id):
-    await fake_check(parsing_table=True)
+    await fake_check(parsing_table=True, parquet_url=True)
 
     # Test invalid query
     stupid_query: str = "stupid=stupid"
@@ -66,6 +66,8 @@ async def test_get_latest_check(setup_catalog, client, query, fake_check, fake_r
         "parsing_finished_at": None,
         "parsing_started_at": None,
         "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest(),
+        "parquet_url": "https://example.org/file.parquet",
+        "parquet_size": 2048,
     }
 
     # Test deleted resource
