@@ -27,20 +27,19 @@ class MinIOClient:
 
     def send_file(
         self,
-        file_path,
+        file_name,
         delete_source=True,
-    ):
+    ) -> str:
         if self.bucket is None:
             raise AttributeError("A bucket has to be specified.")
-        is_file = os.path.isfile(os.path.join(file_path))
-        if is_file:
-            dest_path = f"{config.MINIO_FOLDER}{file_path.split('/')[-1]}"
+        if os.path.isfile(file_name):
             self.client.fput_object(
                 self.bucket,
-                dest_path,
-                file_path,
+                f"{config.MINIO_FOLDER}/{file_name}",
+                file_name,
             )
             if delete_source:
-                os.remove(file_path)
+                os.remove(file_name)
+            return f"https://{self.url}/{self.bucket}/{config.MINIO_FOLDER}/{file_name}"
         else:
-            raise Exception(f"file '{file_path}' does not exists")
+            raise Exception(f"file '{file_name}' does not exists")

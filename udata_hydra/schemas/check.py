@@ -21,6 +21,8 @@ class CheckSchema(Schema):
     parsing_finished_at = fields.DateTime()
     parsing_error = fields.Str()
     parsing_table = fields.Str()
+    parquet_url = fields.Str()
+    parquet_size = fields.Integer()
 
     def create(self, data):
         return self.load(data)

@@ -4,6 +4,7 @@
 
 - Save git commit hash in CI and use it for health check [#182](https://github.com/datagouv/hydra/pull/182) and [#185](https://github.com/datagouv/hydra/pull/185)
 - Add comment column/field to ressources exceptions [#191](https://github.com/datagouv/hydra/pull/191)
+- Add extra args and DB fields for parquet export [#193](https://github.com/datagouv/hydra/pull/193)
 
 ## 2.0.2 (2024-10-07)
 
