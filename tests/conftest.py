@@ -153,6 +153,7 @@ async def setup_catalog_with_resource_exception(setup_catalog):
     await ResourceException.insert(
         resource_id=RESOURCE_EXCEPTION_ID,
         table_indexes=RESOURCE_EXCEPTION_TABLE_INDEXES,
+        comment="This is a test comment.",
     )
 
 
@@ -218,6 +219,7 @@ async def fake_check():
         resource_id=RESOURCE_ID,
         detected_last_modified_at=None,
         parsing_table=False,
+        parquet_url=False,
         domain="example.com",
     ) -> dict:
         url = f"https://example.com/resource-{resource}"
@@ -235,6 +237,8 @@ async def fake_check():
             "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest()
             if parsing_table
             else None,
+            "parquet_url": "https://example.org/file.parquet" if parquet_url else None,
+            "parquet_size": 2048 if parquet_url else None,
         }
         check = await Check.insert(data)
         data["id"] = check["id"]

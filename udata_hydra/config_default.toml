@@ -73,8 +73,8 @@ UDATA_URI_API_KEY = ""
 
 # -- Minio / datalake settings -- #
 CSV_TO_PARQUET = false
-MINIO_FOLDER = ""
-MINIO_URL = ""
+MINIO_FOLDER = "" # no trailing slash
+MINIO_URL = "" # no scheme
 MINIO_BUCKET = ""
 MINIO_USER = ""
 MINIO_PWD = ""

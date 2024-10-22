@@ -30,13 +30,14 @@ async def create_resource_exception(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
         resource_id: str = payload["resource_id"]
-        table_indexes: dict[str, str] | None = payload.get("table_indexes", None)
+        table_indexes: dict[str, str] | None = payload.get("table_indexes")
         # format should be like this:
         #    {
         #       "column_name": "index_type",
         #       "column_name": "index_type"
         #       ...
         #    },
+        comment: str | None = payload.get("comment")
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
@@ -44,6 +45,7 @@ async def create_resource_exception(request: web.Request) -> web.Response:
         resource_exception: Record = await ResourceException.insert(
             resource_id=resource_id,
             table_indexes=table_indexes,
+            comment=comment,
         )
     except ValueError as err:
         raise web.HTTPBadRequest(text=f"Resource exception could not be created: {str(err)}")
@@ -68,7 +70,8 @@ async def update_resource_exception(request: web.Request) -> web.Response:
 
     try:
         payload = await request.json()
-        table_indexes: dict[str, str] | None = payload.get("table_indexes", None)
+        table_indexes: dict[str, str] | None = payload.get("table_indexes")
+        comment: str | None = payload.get("comment")
         if table_indexes:
             valid, error = ResourceExceptionSchema.are_table_indexes_valid(table_indexes)
             if not valid:
@@ -79,6 +82,7 @@ async def update_resource_exception(request: web.Request) -> web.Response:
     resource_exception: Record = await ResourceException.update(
         resource_id=resource_id,
         table_indexes=table_indexes,
+        comment=comment,
     )
 
     return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)))

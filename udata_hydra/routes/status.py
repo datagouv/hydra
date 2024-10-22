@@ -165,7 +165,6 @@ async def get_health(request: web.Request) -> web.Response:
     return web.json_response(
         {
             "version": config.APP_VERSION,
-            "commit": config.GIT_COMMIT or "unknown",
             "environment": config.ENVIRONMENT or "unknown",
         }
     )
