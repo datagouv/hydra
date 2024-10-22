@@ -51,7 +51,7 @@ async def select_batch_resources_to_check() -> list[Record]:
         """
         to_check: list[Record] = await select_rows_based_on_query(connection, q)
 
-        # then urls without checks
+        # then resources which have never been checked before
         if len(to_check) < config.BATCH_SIZE:
             q = f"""
                 SELECT * FROM (
@@ -65,7 +65,8 @@ async def select_batch_resources_to_check() -> list[Record]:
             """
             to_check += await select_rows_based_on_query(connection, q)
 
-        # if not enough for our batch size, handle outdated checks
+        # if not enough for our batch size, handle resources with outdated last check
+        # or with last check that don't exist anymore
         if len(to_check) < config.BATCH_SIZE:
             since = parse_timespan(config.SINCE)  # in seconds
             since = datetime.now(timezone.utc) - timedelta(seconds=since)
