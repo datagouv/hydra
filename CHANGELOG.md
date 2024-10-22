@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Crawl resource with last checks that don't exist anymore [#195](https://github.com/datagouv/hydra/pull/195)
 
 ## 2.0.3 (2024-10-22)
 
