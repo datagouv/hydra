@@ -71,16 +71,18 @@ async def select_batch_resources_to_check() -> list[Record]:
             since = datetime.now(timezone.utc) - timedelta(seconds=since)
             limit = config.BATCH_SIZE - len(to_check)
             q = f"""
-            SELECT * FROM (
-                SELECT catalog.url, dataset_id, catalog.resource_id
-                FROM catalog, checks
-                WHERE catalog.last_check IS NOT NULL
-                AND {excluded}
-                AND catalog.last_check = checks.id
-                AND checks.created_at <= $1
-                AND catalog.priority = False
-            ) s
-            ORDER BY random() LIMIT {limit}
+                SELECT * FROM (
+                    SELECT catalog.url, dataset_id, catalog.resource_id
+                    FROM catalog, checks
+                    WHERE catalog.last_check IS NOT NULL
+                        AND {excluded}
+                        AND (
+                            (catalog.last_check = checks.id AND checks.created_at <= $1)
+                            OR catalog.last_check NOT IN (SELECT id FROM checks)
+                        )
+                        AND catalog.priority = False
+                ) s
+                ORDER BY random() LIMIT {limit}
             """
             to_check += await select_rows_based_on_query(connection, q, since)
 
