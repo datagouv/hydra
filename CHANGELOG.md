@@ -1,6 +1,6 @@
 # Changelog
 
-## Current (in progress)
+## 2.0.3 (2024-10-22)
 
 - Save git commit hash in CI and use it for health check [#182](https://github.com/datagouv/hydra/pull/182) and [#185](https://github.com/datagouv/hydra/pull/185)
 - Add comment column/field to ressources exceptions [#191](https://github.com/datagouv/hydra/pull/191)
