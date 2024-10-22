@@ -7,7 +7,7 @@ from udata_hydra.db.resource import Resource
 async def select_batch_resources_to_check() -> list[Record]:
     """Select a batch of resources to check from the catalog
     1) It first selects resources with priority=True
-    2) ...then resources without checks
+    2) ...then resources which have never been checked before
     3) and if the total number of selected resources is still less than the batch size, it will also add resources with outdated checks in the batch
     """
     context.monitor().set_status("Getting a batch from catalog...")
@@ -28,7 +28,7 @@ async def select_batch_resources_to_check() -> list[Record]:
         """
         to_check: list[Record] = await connection.fetch(q)
 
-        # 2) Resources without checks
+        # 2) Resources which have never been checked before
         if len(to_check) < config.BATCH_SIZE:
             q = f"""
                 SELECT * FROM (
