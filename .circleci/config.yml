@@ -90,7 +90,11 @@ jobs:
             # Set the version
             if [[ $CIRCLE_TAG ]]; then
                 export VERSION=$CIRCLE_TAG
+            elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
+                # for main branches, can't add the commit hash since it's not a valid format for publishing
+                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
             else
+                # for feature branches, add the commit hash
                 export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
             fi
             # Display some debug info
