@@ -130,13 +130,8 @@ async def analyse_csv(
     # If it is, get the table_indexes to use them later
     exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
     table_indexes: dict | None = None
-    if exception:
-        try:
-            table_indexes: dict | None = json.loads(exception["table_indexes"])
-        except TypeError:
-            raise TypeError(
-                f"table_indexes should be a JSON object, got {exception.get('table_indexes')}"
-            )
+    if exception and exception.get("table_indexes"):
+        table_indexes = json.loads(exception["table_indexes"])
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
