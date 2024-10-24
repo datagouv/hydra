@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Fix wrong resource status [#196](https://github.com/datagouv/hydra/pull/196)
 
 ## 2.0.3 (2024-10-22)
 

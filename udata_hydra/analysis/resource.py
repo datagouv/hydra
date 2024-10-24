@@ -57,8 +57,8 @@ async def analyse_resource(check_id: int, is_first_check: bool) -> None:
 
     log.debug(f"Analysis for resource {resource_id} in dataset {dataset_id}")
 
-    # Update resource status to PROCESSING_RESOURCE
-    await Resource.update(resource_id, data={"status": "PROCESSING_RESOURCE"})
+    # Update resource status to ANALYSING_RESOURCE
+    await Resource.update(resource_id, data={"status": "ANALYSING_RESOURCE"})
 
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
     change_status, change_payload = await detect_resource_change_on_early_hints(resource_id)
