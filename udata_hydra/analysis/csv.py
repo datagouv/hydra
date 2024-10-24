@@ -129,7 +129,9 @@ async def analyse_csv(
     # Check if the resource is in the exceptions table
     # If it is, get the table_indexes to use them later
     exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
-    table_indexes: dict | None = json.loads(exception["table_indexes"]) if exception else None
+    table_indexes: dict | None = None
+    if exception and exception.get("table_indexes"):
+        table_indexes = json.loads(exception["table_indexes"])
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
@@ -238,7 +240,12 @@ def compute_create_table_query(
             else:
                 if index_type == "index":
                     index_name = f"{table_name}_{slugify(col_name)}_idx"
-                    table.append_constraint(Index(index_name, col_name))
+                    try:
+                        table.append_constraint(Index(index_name, col_name))
+                    except KeyError:
+                        raise KeyError(
+                            f'Error creating index "{index_name}" on column "{col_name}". Does the column "{col_name}" exist in the table?'
+                        )
                 # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
 
     compiled_query = CreateTable(table).compile(dialect=asyncpg.dialect())
