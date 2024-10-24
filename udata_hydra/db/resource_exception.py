@@ -63,9 +63,7 @@ class ResourceException:
                 VALUES ($1, $2, $3)
                 RETURNING *;
             """
-            return await connection.fetchrow(
-                q, resource_id, json.dumps(table_indexes) if table_indexes else None, comment
-            )
+            return await connection.fetchrow(q, resource_id, json.dumps(table_indexes), comment)
 
     @classmethod
     async def update(
@@ -100,9 +98,7 @@ class ResourceException:
                 WHERE resource_id = $1
                 RETURNING *;
             """
-            return await connection.fetchrow(
-                q, resource_id, json.dumps(table_indexes) if table_indexes else None, comment
-            )
+            return await connection.fetchrow(q, resource_id, json.dumps(table_indexes), comment)
 
     @classmethod
     async def delete(cls, resource_id: str) -> None:

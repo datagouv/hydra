@@ -83,6 +83,7 @@ async def test_create_resource_exception(
     assert resp.status == 201
     data: dict = await resp.json()
     assert data["resource_id"] == RESOURCE_ID
+    assert data["table_indexes"] == "{}"
 
 
 async def test_update_resource_exception(
