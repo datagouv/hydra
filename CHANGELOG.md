@@ -2,6 +2,7 @@
 
 ## Current (in progress)
 
+- Fix wrong resource status [#196](https://github.com/datagouv/hydra/pull/196)
 - Improve timing of checks depending on resources last modification date [#163](https://github.com/datagouv/hydra/pull/163)
 
 ## 2.0.3 (2024-10-22)
