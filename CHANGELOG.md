@@ -4,7 +4,7 @@
 
 - Fix wrong resource status [#196](https://github.com/datagouv/hydra/pull/196)
 - Fix issue related to empty `table_indexes` column instead of default `{}` [#197](https://github.com/datagouv/hydra/pull/197)
-
+- Make the `last_check` column of the `catalog` table as a foreign key to `checks` table, in order to fix error when crawling resources with last checks that don't exist anymore [#195](https://github.com/datagouv/hydra/pull/195)
 
 ## 2.0.3 (2024-10-22)
 
