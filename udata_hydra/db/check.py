@@ -42,6 +42,17 @@ class Check:
             return await connection.fetchrow(q, resource_id)
 
     @classmethod
+    async def get_by_url(cls, url: str) -> list[Record]:
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = """
+                SELECT * FROM checks
+                WHERE url = $1
+                ORDER BY created_at DESC
+            """
+            return await connection.fetch(q, url)
+
+    @classmethod
     async def get_latest(
         cls, url: str | None = None, resource_id: str | None = None
     ) -> Record | None:
