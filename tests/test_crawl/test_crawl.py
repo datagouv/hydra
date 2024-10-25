@@ -147,6 +147,25 @@ async def test_not_outdated_check(
     assert ("GET", URL(rurl)) not in rmock.requests
 
 
+async def test_deleted_check(setup_catalog, rmock, fake_check, event_loop, produce_mock):
+    check = await fake_check(created_at=datetime.now() - timedelta(weeks=52))
+    # associate check with a resource
+    await Resource.update(resource_id=RESOURCE_ID, data={"last_check": check["id"]})
+    # delete check
+    await Check.delete(check_id=check["id"])
+
+    # Assert foreign key is now None
+    resource = await Resource.get(resource_id=RESOURCE_ID)
+    assert resource["last_check"] is None
+
+    # Test crawl is triggered
+    rurl = RESOURCE_URL
+    rmock.head(rurl, status=200)
+    event_loop.run_until_complete(start_checks(iterations=1))
+    # Assert url has been called because check is deleted
+    assert ("HEAD", URL(rurl)) in rmock.requests
+
+
 async def test_switch_head_to_get(setup_catalog, event_loop, rmock, produce_mock):
     rurl = RESOURCE_URL
     rmock.head(rurl, status=501)

@@ -30,8 +30,8 @@ async def select_rows_based_on_query(connection, q: str, *args) -> list[Record]:
 async def select_batch_resources_to_check() -> list[Record]:
     """Select a batch of resources to check from the catalog
     - It first selects resources with priority=True
-    - ...then resources without checks
-    - and if the total number of selected resources is still less than the batch size, it will also add resources with outdated checks in the batch.
+    - ...then resources without last check
+    - and if the total number of selected resources is still less than the batch size, it will also add resources with outdated last check in the batch
     """
     context.monitor().set_status("Getting a batch from catalog...")
 
@@ -39,7 +39,7 @@ async def select_batch_resources_to_check() -> list[Record]:
     async with pool.acquire() as connection:
         excluded = Resource.get_excluded_clause()
 
-        # first urls that are prioritised
+        # first resources that are prioritised
         q = f"""
             SELECT * FROM (
                 SELECT catalog.url, dataset_id, resource_id
@@ -51,7 +51,8 @@ async def select_batch_resources_to_check() -> list[Record]:
         """
         to_check: list[Record] = await select_rows_based_on_query(connection, q)
 
-        # then urls without checks
+        # then resources with no last check
+        # (either because they have never been checked before, or because the last check has been deleted)
         if len(to_check) < config.BATCH_SIZE:
             q = f"""
                 SELECT * FROM (
@@ -65,7 +66,7 @@ async def select_batch_resources_to_check() -> list[Record]:
             """
             to_check += await select_rows_based_on_query(connection, q)
 
-        # if not enough for our batch size, handle outdated checks
+        # if not enough for our batch size, handle resources with outdated last check
         if len(to_check) < config.BATCH_SIZE:
             since = parse_timespan(config.SINCE)  # in seconds
             since = datetime.now(timezone.utc) - timedelta(seconds=since)
