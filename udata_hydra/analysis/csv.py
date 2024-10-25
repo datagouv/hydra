@@ -114,7 +114,7 @@ async def analyse_csv(
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
 
-    # Get the check and resource_id. Try to get the check from the check ID, then from the URL
+    # Get check and resource_id. Try to get the check from the check ID, then from the URL
     check: Record | None = await Check.get_by_id(check_id, with_deleted=True) if check_id else None
     if not check:
         checks: list[Record] | None = await Check.get_by_url(url) if url else None
@@ -418,7 +418,7 @@ async def handle_parse_exception(e: Exception, check: Record, table_name: str) -
     if check:
         if config.SENTRY_DSN:
             with sentry_sdk.push_scope() as scope:
-                scope.set_extra("check_id", check["check_id"])
+                scope.set_extra("check_id", check["id"])
                 scope.set_extra("csv_url", check["url"])
                 scope.set_extra("resource_id", check["resource_id"])
                 event_id = sentry_sdk.capture_exception(e)
@@ -426,7 +426,7 @@ async def handle_parse_exception(e: Exception, check: Record, table_name: str) -
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
         await Check.update(
-            check["check_id"],
+            check["id"],
             {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
         )
         log.error("Parsing error", exc_info=e)
