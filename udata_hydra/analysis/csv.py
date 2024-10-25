@@ -140,7 +140,7 @@ async def analyse_csv(
         table_indexes = json.loads(exception["table_indexes"])
 
     timer = Timer("analyse-csv")
-    assert any(_ is not None for _ in (check_id, url))
+    assert any(_ is not None for _ in (check["id"], url))
 
     headers = json.loads(check.get("headers") or "{}")
     tmp_file = (
@@ -156,7 +156,7 @@ async def analyse_csv(
     timer.mark("download-file")
 
     try:
-        await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
+        await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
         csv_inspection = await perform_csv_inspection(tmp_file.name)
         timer.mark("csv-inspection")
 
