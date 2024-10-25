@@ -78,8 +78,10 @@ RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
 minio_client = MinIOClient()
 
 
-async def notify_udata(check: Record, table_name: str) -> None:
+async def notify_udata(check_id: int, table_name: str) -> None:
     """Notify udata of the result of a parsing"""
+    # Get the check again to get its updated data
+    check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
     resource_id = check["resource_id"]
     db = await context.pool()
     record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
@@ -175,22 +177,21 @@ async def analyse_csv(
             resource_id=resource_id,
         )
         timer.mark("csv-to-parquet")
-        if check_id:
-            await Check.update(
-                check_id,
-                {
-                    "parsing_table": table_name,
-                    "parsing_finished_at": datetime.now(timezone.utc),
-                    "parquet_url": parquet_args[0] if parquet_args else None,
-                    "parquet_size": parquet_args[1] if parquet_args else None,
-                },
-            )
+        await Check.update(
+            check["id"],
+            {
+                "parsing_table": table_name,
+                "parsing_finished_at": datetime.now(timezone.utc),
+                "parquet_url": parquet_args[0] if parquet_args else None,
+                "parquet_size": parquet_args[1] if parquet_args else None,
+            },
+        )  # TODO: return the outdated check so that we don't have to re-request it in notify_data again
         await csv_to_db_index(table_name, csv_inspection, check)
 
     except ParseException as e:
         await handle_parse_exception(e, check, table_name)
     finally:
-        await notify_udata(check, table_name)
+        await notify_udata(check["id"], table_name)
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
