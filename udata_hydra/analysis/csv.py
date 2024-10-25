@@ -115,13 +115,28 @@ async def analyse_csv(
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
 
-    # Get check and resource_id
-    check: Record | None = await Check.get_by_id(check_id, with_deleted=True) if check_id else None
-    if not check:
-        log.error("Check not found")
+    if not check_id and not url:
+        log.error("No check_id or URL provided")
         return
 
-    resource_id: str = check["resource_id"]
+    # Get the resource. Try to get it from the check, then from the URL
+    check: Record | None = await Check.get_by_id(check_id, with_deleted=True) if check_id else None
+    if check:
+        resource_id = check["resource_id"]
+        url = check["url"]
+    else:
+        if not url:
+            log.error("No check found or URL provided")
+            return
+        resources: list[Record] = await Resource.get_by_url(url=url, column_name="resource_id")
+        if len(resources) == 0:
+            log.error("No resource found for the provided URL")
+            return
+        if len(resources) > 1:
+            log.error("Multiple resources found for the same URL")
+            return
+        resource_id = resources[0]["resource_id"]
+        url = resources[0]["url"]
 
     # Update resource status to ANALYSING_CSV
     await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
@@ -135,7 +150,6 @@ async def analyse_csv(
 
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check_id, url))
-    url: str = check["url"] or url
 
     headers = json.loads(check.get("headers") or "{}")
     tmp_file = (
