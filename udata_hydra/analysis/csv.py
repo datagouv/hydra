@@ -124,20 +124,18 @@ async def analyse_csv(
     if check:
         resource_id = check["resource_id"]
         url = check["url"]
-    else:
-        if not url:
-            log.error("No check found or URL provided")
-            return
-        resources: list[Record] = await Resource.get_by_url(url=url, column_name="resource_id")
-        if len(resources) == 0:
-            log.error("No resource found for the provided URL")
-            return
-        if len(resources) > 1:
-            log.error("Multiple resources found for the same URL")
-            # TODO: handle this case, we could still analyse without update resources status
-            return
-        resource_id = resources[0]["resource_id"]
-        url = resources[0]["url"]
+    if not url:
+        log.error("No check found or URL provided")
+        return
+    resources: list[Record] = await Resource.get_by_url(url=url, column_name="resource_id")
+    if len(resources) == 0:
+        log.error("No resource found for the provided URL")
+        return
+    if len(resources) > 1:
+        log.error("Multiple resources found for the same URL")
+        # TODO: handle this case, we could still analyse without update resources status
+        return
+    resource_id = resources[0]["resource_id"]
 
     # Update resource status to ANALYSING_CSV
     await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
