@@ -26,13 +26,6 @@ class Resource:
             return await connection.fetchrow(q)
 
     @classmethod
-    async def get_by_url(cls, url: str, column_name: str = "*") -> list[Record]:
-        pool = await context.pool()
-        async with pool.acquire() as connection:
-            q = f"""SELECT {column_name} FROM catalog WHERE url = '{url}';"""
-            return await connection.fetch(q)
-
-    @classmethod
     async def insert(
         cls,
         dataset_id: str,
