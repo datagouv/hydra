@@ -134,6 +134,7 @@ async def analyse_csv(
             return
         if len(resources) > 1:
             log.error("Multiple resources found for the same URL")
+            # TODO: handle this case, we could still analyse without update resources status
             return
         resource_id = resources[0]["resource_id"]
         url = resources[0]["url"]
