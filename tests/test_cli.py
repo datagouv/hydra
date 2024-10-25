@@ -12,13 +12,15 @@ nest_asyncio.apply()
 
 
 async def test_analysis_csv(setup_catalog, rmock, catalog_content, db, fake_check, produce_mock):
+    # Analyse using check_id
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
-
-    # Analyse using check_id
     run("analyse-csv", check_id=str(check["id"]))
     # Analyse using URL
+    check = await fake_check()
+    url = check["url"]
+    rmock.get(url, status=200, body=catalog_content)
     run("analyse-csv", url=RESOURCE_URL)
 
 
