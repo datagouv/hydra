@@ -31,7 +31,9 @@ class Change(Enum):
 log = logging.getLogger("udata-hydra")
 
 
-async def analyse_resource(check_id: int, is_first_check: bool, force_analysis: bool = False) -> None:
+async def analyse_resource(
+    check_id: int, is_first_check: bool, force_analysis: bool = False
+) -> None:
     """
     Perform analysis on the resource designated by check_id:
     - change analysis

@@ -81,7 +81,11 @@ async def create_check(request: web.Request) -> web.Response:
         timeout=None, headers={"user-agent": config.USER_AGENT}
     ) as session:
         status: str = await check_resource(
-            url=url, resource_id=resource_id, force_analysis=force_analysis, session=session, worker_priority="high"
+            url=url,
+            resource_id=resource_id,
+            force_analysis=force_analysis,
+            session=session,
+            worker_priority="high",
         )
         context.monitor().refresh(status)
 
