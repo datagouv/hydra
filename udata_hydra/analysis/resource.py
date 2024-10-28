@@ -31,9 +31,9 @@ class Change(Enum):
 log = logging.getLogger("udata-hydra")
 
 
-async def analyse_resource(check_id: int, is_first_check: bool) -> None:
+async def analyse_resource(check: Record, is_first_check: bool) -> None:
     """
-    Perform analysis on the resource designated by check_id:
+    Perform analysis on the resource designated by its check:
     - change analysis
     - size (optional)
     - mime_type (optional)
@@ -42,9 +42,9 @@ async def analyse_resource(check_id: int, is_first_check: bool) -> None:
 
     Will call udata if first check or changes found, and update check with optional infos
     """
-    check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
-    if not check:
-        log.error(f"Check not found by id {check_id}")
+
+    if check.get("resource_id") is None:
+        log.error("No resource ID associated with that check. Skipping analysis.")
         return
 
     # Check if the resource is in the exceptions table
@@ -93,7 +93,7 @@ async def analyse_resource(check_id: int, is_first_check: bool) -> None:
             if tmp_file and not is_tabular:
                 os.remove(tmp_file.name)
             await Check.update(
-                check_id,
+                check["id"],
                 {
                     "checksum": dl_analysis.get("analysis:checksum"),
                     "analysis_error": dl_analysis.get("analysis:error"),
@@ -103,7 +103,7 @@ async def analyse_resource(check_id: int, is_first_check: bool) -> None:
             )
 
     if change_status == Change.HAS_CHANGED:
-        await store_last_modified_date(change_payload or {}, check_id)
+        await store_last_modified_date(change_payload or {}, check["id"])
 
     analysis_results = {**dl_analysis, **(change_payload or {})}
 
@@ -112,7 +112,7 @@ async def analyse_resource(check_id: int, is_first_check: bool) -> None:
             # Change status to TO_ANALYSE_CSV
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_CSV"})
             # Analyse CSV and create a table in the CSV database
-            queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="default")
+            queue.enqueue(analyse_csv, check["id"], file_path=tmp_file.name, _priority="default")
 
         else:
             await Resource.update(resource_id, data={"status": None})
