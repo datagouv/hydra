@@ -189,7 +189,7 @@ async def analyse_csv(
         await csv_to_db_index(table_name, csv_inspection, check)
 
     except ParseException as e:
-        await handle_parse_exception(e, check, table_name)
+        await handle_parse_exception(e, table_name, check)
     finally:
         await notify_udata(check["id"], table_name)
         timer.stop()
@@ -411,7 +411,7 @@ async def delete_table(table_name: str) -> None:
     await db.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)
 
 
-async def handle_parse_exception(e: Exception, check: Record, table_name: str) -> None:
+async def handle_parse_exception(e: Exception, table_name: str, check: Record | None) -> None:
     """Specific ParsingError handling. Enriches sentry w/ context if available,
     and store error if in a check context. Also cleanup :table_name: if needed."""
     db = await context.pool("csv")
