@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Fix minor types issues [#204](https://github.com/datagouv/hydra/pull/204)
 
 ## 2.0.4 (2024-10-28)
 
