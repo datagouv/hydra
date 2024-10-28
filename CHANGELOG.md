@@ -1,6 +1,6 @@
 # Changelog
 
-## Current (in progress)
+## 2.0.4 (2024-10-28)
 
 - Fix wrong resource status [#196](https://github.com/datagouv/hydra/pull/196)
 - Fix issue related to empty `table_indexes` column instead of default `{}` [#197](https://github.com/datagouv/hydra/pull/197)
