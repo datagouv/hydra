@@ -64,6 +64,7 @@ async def create_check(request: web.Request) -> web.Response:
     try:
         payload: dict = await request.json()
         resource_id: str = payload["resource_id"]
+        force_analysis: bool = payload["force_analysis"]
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
@@ -80,7 +81,7 @@ async def create_check(request: web.Request) -> web.Response:
         timeout=None, headers={"user-agent": config.USER_AGENT}
     ) as session:
         status: str = await check_resource(
-            url=url, resource_id=resource_id, session=session, worker_priority="high"
+            url=url, resource_id=resource_id, force_analysis=force_analysis, session=session, worker_priority="high"
         )
         context.monitor().refresh(status)
 

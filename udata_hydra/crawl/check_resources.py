@@ -58,6 +58,7 @@ async def check_resource(
     url: str,
     resource_id: str,
     session,
+    force_analysis: bool = False,
     sleep: float = 0,
     method: str = "head",
     worker_priority: str = "default",
@@ -101,7 +102,8 @@ async def check_resource(
             end = time.time()
             if method != "get" and not has_nice_head(resp):
                 return await check_resource(
-                    url, resource_id, session, method="get", worker_priority=worker_priority
+                    url, resource_id, session,
+                    force_analysis=force_analysis, method="get", worker_priority=worker_priority
                 )
             resp.raise_for_status()
 

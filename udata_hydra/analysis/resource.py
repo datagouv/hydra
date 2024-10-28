@@ -31,7 +31,7 @@ class Change(Enum):
 log = logging.getLogger("udata-hydra")
 
 
-async def analyse_resource(check_id: int, is_first_check: bool) -> None:
+async def analyse_resource(check_id: int, is_first_check: bool, force_analysis: bool = False) -> None:
     """
     Perform analysis on the resource designated by check_id:
     - change analysis
@@ -107,7 +107,7 @@ async def analyse_resource(check_id: int, is_first_check: bool) -> None:
 
     analysis_results = {**dl_analysis, **(change_payload or {})}
 
-    if change_status == Change.HAS_CHANGED or is_first_check:
+    if change_status == Change.HAS_CHANGED or is_first_check or force_analysis:
         if is_tabular and tmp_file:
             # Change status to TO_ANALYSE_CSV
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_CSV"})
