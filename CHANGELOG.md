@@ -1,5 +1,9 @@
 # Changelog
 
+## Current (in progress)
+
+- Nothing yet
+
 ## 2.0.4 (2024-10-28)
 
 - Fix wrong resource status [#196](https://github.com/datagouv/hydra/pull/196)
