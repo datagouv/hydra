@@ -66,8 +66,8 @@ async def create_resource(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
         valid_payload: dict = ResourceSchema().load(payload)
-    except ValidationError as err:
-        raise web.HTTPBadRequest(text=json.dumps(err.messages))
+    except Exception as err:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
     document: dict | None = valid_payload["document"]
     if not document:
@@ -96,8 +96,8 @@ async def update_resource(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
         valid_payload: dict = ResourceSchema().load(payload)
-    except ValidationError as err:
-        raise web.HTTPBadRequest(text=json.dumps(err.messages))
+    except Exception as err:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
     document: dict | None = valid_payload["document"]
     if not document:

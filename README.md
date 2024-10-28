@@ -93,7 +93,7 @@ The token is configured in the `config.toml` file as `API_KEY`, and has a defaul
 If you're using hydra as an external service to receive resource events from [udata](https://github.com/opendatateam/udata), then udata needs to also configure this
 API key in its `udata.cfg` file:
 
-```
+```python
 # Wether udata should publish the resource events
 PUBLISH_ON_RESOURCE_EVENTS = True
 # Where to publish the events
