@@ -76,8 +76,8 @@ async def update_resource_exception(request: web.Request) -> web.Response:
             valid, error = ResourceExceptionSchema.are_table_indexes_valid(table_indexes)
             if not valid:
                 raise web.HTTPBadRequest(text=error)
-    except Exception as e:
-        raise web.HTTPBadRequest(text=f"error: {str(e)}")
+    except Exception as err:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
     resource_exception: Record = await ResourceException.update(
         resource_id=resource_id,

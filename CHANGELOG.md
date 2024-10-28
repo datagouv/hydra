@@ -6,6 +6,7 @@
 - Fix issue related to empty `table_indexes` column instead of default `{}` [#197](https://github.com/datagouv/hydra/pull/197)
 - Make the `last_check` column of the `catalog` table as a foreign key to `checks` table, in order to fix error when crawling resources with last checks that don't exist anymore [#195](https://github.com/datagouv/hydra/pull/195)
 - Fix `analyse-csv` CLI when using by url, and refactor errors for cases when resource or url not found [#200](https://github.com/datagouv/hydra/pull/200)
+- Fix errors when sending malformed request, and make API error responses more consistent [#202](https://github.com/datagouv/hydra/pull/202)
 
 ## 2.0.3 (2024-10-22)
 
