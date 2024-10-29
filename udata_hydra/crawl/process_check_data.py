@@ -31,6 +31,13 @@ async def process_check_data(check_data: dict) -> Tuple[Record, bool]:
 
     is_first_check: bool = last_check is None
 
+    # TODO: add the next_check datetime data to the check_data
+    # - No last check: next check will be after this check date + CHECK_DELAY_DEFAULT
+    # - Last check and/or this check doens't have detected_last_modified_at: next check will be after this check date + CHECK_DELAY_DEFAULT
+    # - Last check and this check have detected_last_modified_at:
+    #   - both are different: next check will be after this check date + CHECK_DELAY_DEFAULT
+    #   - both are the same: calculate the time bewteen this check and last check, and add it to this check date. If it's less than CHECK_DELAYS[i] but more than CHECK_DELAYS[i-1], next check will be after this check date + CHECK_DELAYS[i].
+
     return await Check.insert(check_data), is_first_check
 
 
