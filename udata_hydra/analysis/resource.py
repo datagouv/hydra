@@ -65,7 +65,7 @@ async def analyse_resource(check_id: int, is_first_check: bool) -> None:
 
     # could it be a CSV? If we get hints, we will analyse the file further depending on change status
     is_tabular, file_format = await detect_tabular_from_headers(check)
-    max_size_allowed = None if exception else float(config.MAX_FILESIZE_ALLOWED[file_format])
+    max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}

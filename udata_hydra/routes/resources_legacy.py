@@ -31,8 +31,8 @@ async def create_resource_legacy(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
         valid_payload: dict = ResourceSchema().load(payload)
-    except ValidationError as err:
-        raise web.HTTPBadRequest(text=json.dumps(err.messages))
+    except Exception as err:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
     resource: dict = valid_payload["document"]
     if not resource:
@@ -60,8 +60,8 @@ async def update_resource_legacy(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
         valid_payload: dict = ResourceSchema().load(payload)
-    except ValidationError as err:
-        raise web.HTTPBadRequest(text=json.dumps(err.messages))
+    except Exception as err:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
     resource: dict = valid_payload["document"]
     if not resource:
@@ -79,8 +79,8 @@ async def delete_resource_legacy(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
         valid_payload: dict = ResourceSchema().load(payload)
-    except ValidationError as err:
-        raise web.HTTPBadRequest(text=json.dumps(err.messages))
+    except Exception as err:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
     resource_id: str = valid_payload["resource_id"]
 

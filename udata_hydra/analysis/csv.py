@@ -80,6 +80,7 @@ minio_client = MinIOClient()
 
 async def notify_udata(check_id: int, table_name: str) -> None:
     """Notify udata of the result of a parsing"""
+    # Get the check again to get its updated data
     check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
     resource_id = check["resource_id"]
     db = await context.pool()
@@ -115,13 +116,18 @@ async def analyse_csv(
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
 
-    # Get check and resource_id
+    # Get check and resource_id. Try to get the check from the check ID, then from the URL
     check: Record | None = await Check.get_by_id(check_id, with_deleted=True) if check_id else None
     if not check:
-        log.error("Check not found")
+        checks: list[Record] | None = await Check.get_by_url(url) if url else None
+        if checks and len(checks) > 1:
+            log.warning(f"Multiple checks found for URL {url}, using the latest one")
+        check = checks[0] if checks else None
+    if not check:
+        log.error("No check found or URL provided")
         return
-
-    resource_id: str = check["resource_id"]
+    resource_id = check["resource_id"]
+    url = check["url"]
 
     # Update resource status to ANALYSING_CSV
     await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
@@ -134,8 +140,7 @@ async def analyse_csv(
         table_indexes = json.loads(exception["table_indexes"])
 
     timer = Timer("analyse-csv")
-    assert any(_ is not None for _ in (check_id, url))
-    url: str = check["url"] or url
+    assert any(_ is not None for _ in (check["id"], url))
 
     headers = json.loads(check.get("headers") or "{}")
     tmp_file = (
@@ -151,8 +156,7 @@ async def analyse_csv(
     timer.mark("download-file")
 
     try:
-        if check_id:
-            await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
+        await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
         csv_inspection = await perform_csv_inspection(tmp_file.name)
         timer.mark("csv-inspection")
 
@@ -173,23 +177,21 @@ async def analyse_csv(
             resource_id=resource_id,
         )
         timer.mark("csv-to-parquet")
-        if check_id:
-            await Check.update(
-                check_id,
-                {
-                    "parsing_table": table_name,
-                    "parsing_finished_at": datetime.now(timezone.utc),
-                    "parquet_url": parquet_args[0] if parquet_args else None,
-                    "parquet_size": parquet_args[1] if parquet_args else None,
-                },
-            )
+        await Check.update(
+            check["id"],
+            {
+                "parsing_table": table_name,
+                "parsing_finished_at": datetime.now(timezone.utc),
+                "parquet_url": parquet_args[0] if parquet_args else None,
+                "parquet_size": parquet_args[1] if parquet_args else None,
+            },
+        )  # TODO: return the outdated check so that we don't have to re-request it in notify_data again
         await csv_to_db_index(table_name, csv_inspection, check)
 
     except ParseException as e:
-        await handle_parse_exception(e, check_id, table_name)
+        await handle_parse_exception(e, table_name, check)
     finally:
-        if check_id:
-            await notify_udata(check_id, table_name)
+        await notify_udata(check["id"], table_name)
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
@@ -380,7 +382,7 @@ async def csv_to_db(
             await db.execute(q, *data.values())
 
 
-async def csv_to_db_index(table_name: str, inspection: dict, check: dict) -> None:
+async def csv_to_db_index(table_name: str, inspection: dict, check: Record) -> None:
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)"
@@ -409,25 +411,23 @@ async def delete_table(table_name: str) -> None:
     await db.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)
 
 
-async def handle_parse_exception(e: Exception, check_id: int, table_name: str) -> None:
+async def handle_parse_exception(e: Exception, table_name: str, check: Record | None) -> None:
     """Specific ParsingError handling. Enriches sentry w/ context if available,
     and store error if in a check context. Also cleanup :table_name: if needed."""
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
-    if check_id:
+    if check:
         if config.SENTRY_DSN:
-            check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
-            url = check["url"]
             with sentry_sdk.push_scope() as scope:
-                scope.set_extra("check_id", check_id)
-                scope.set_extra("csv_url", url)
+                scope.set_extra("check_id", check["id"])
+                scope.set_extra("csv_url", check["url"])
                 scope.set_extra("resource_id", check["resource_id"])
                 event_id = sentry_sdk.capture_exception(e)
         # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
         await Check.update(
-            check_id,
+            check["id"],
             {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
         )
         log.error("Parsing error", exc_info=e)
