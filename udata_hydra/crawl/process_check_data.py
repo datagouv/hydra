@@ -32,33 +32,29 @@ async def process_check_data(check_data: dict) -> tuple[Record, bool]:
     is_first_check: bool = last_check is None
 
     # Calculate next check date
-    if (
-        is_first_check
-        or not last_check.get("detected_last_modified_at")
-        or not check_data.get("detected_last_modified_at")
-    ):
-        # No last check, or last check and/or this check doesn't have detected_last_modified_at
+    if is_first_check:
         next_check = datetime.now(timezone.utc) + timedelta(hours=config.CHECK_DELAY_DEFAULT)
-    # Last check and this check have detected_last_modified_at:
+
     else:
-        if last_check["detected_last_modified_at"] != check_data["detected_last_modified_at"]:
-            # resource has been modified since last check
-            next_check = datetime.now(timezone.utc) + timedelta(hours=config.CHECK_DELAYS[0])
+        if has_check_changed:
+            # Resource has been modified since last check, we will check it again in in the soonest of the CHECK_DELAYS
+            next_check = datetime.now(timezone.utc) + timedelta(
+                hours=config.CHECK_DELAYS[0]
+            )  # TODO: should this be CHECK_DELAY_DEFAULT?
         else:
-            # resource has not been modified since last check: calculate the time between this check and last check, and add it to this check date. If it's less than CHECK_DELAYS[i], next check will be after this check date + CHECK_DELAYS[i]
-            previous_delay: timedelta = datetime.fromisoformat(
-                check["created_at"]
-            ) - datetime.fromisoformat(last_check["created_at"])
-            for d in config.CHECK_DELAYS:
-                if previous_delay <= timedelta(hours=d):
-                    next_check = datetime.fromisoformat(check_data["created_at"]) + timedelta(
-                        hours=d
-                    )
-                    break
+            # Resource has not been modified since last check:
+            # if the time since last check is greater than the longest delay in CHECK_DELAYS, next check will be after the longest delay
+            # if the time since last check is less than CHECK_DELAYS[i], next check will be after in CHECK_DELAYS[i]
+            previous_delay: timedelta = datetime.now(timezone.utc) - datetime.fromisoformat(
+                last_check["created_at"]
+            )
             if previous_delay > timedelta(hours=config.CHECK_DELAYS[-1]):
-                next_check = datetime.fromisoformat(check_data["created_at"]) + timedelta(
-                    hours=config.CHECK_DELAYS[-1]
-                )
+                next_check = datetime.now(timezone.utc) + timedelta(hours=config.CHECK_DELAYS[-1])
+            else:
+                for d in config.CHECK_DELAYS:
+                    if previous_delay <= timedelta(hours=d):
+                        next_check = datetime.now(timezone.utc) + timedelta(hours=d)
+                        break
         check_data["next_check"] = next_check
 
     return await Check.insert(check_data), is_first_check
