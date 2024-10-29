@@ -44,7 +44,7 @@ async def process_check_data(check_data: dict) -> tuple[Record, bool]:
         else:
             # Resource has not been modified since last check:
             # if the time since last check is greater than the longest delay in CHECK_DELAYS, next check will be after the longest delay
-            # if the time since last check is less than CHECK_DELAYS[i], next check will be after in CHECK_DELAYS[i]
+            # if the time since last check is less than CHECK_DELAYS[i], next check will be after this CHECK_DELAYS[i]
             previous_delay: timedelta = datetime.now(timezone.utc) - datetime.fromisoformat(
                 last_check["created_at"]
             )
