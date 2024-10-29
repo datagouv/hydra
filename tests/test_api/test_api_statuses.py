@@ -5,32 +5,44 @@ it will interfere with the rest of our async code
 
 import pytest
 
+from udata_hydra.db.resource import Resource
+
 pytestmark = pytest.mark.asyncio
 
 
 async def test_get_crawler_status(setup_catalog, client, fake_check):
-    resp = await client.get("/api/status/crawler")
-    assert resp.status == 200
-    data: dict = await resp.json()
-    assert data == {
+    expected_resources_statuses_count = {s: 0 for s in Resource.STATUSES if s}
+    expected_resources_statuses_count["null"] = 1
+    expected_data = {
         "total": 1,
         "pending_checks": 1,
         "fresh_checks": 0,
         "checks_percentage": 0.0,
         "fresh_checks_percentage": 0.0,
+        "resources_statuses_count": expected_resources_statuses_count,
+    }
+
+    resp = await client.get("/api/status/crawler")
+    assert resp.status == 200
+    data: dict = await resp.json()
+    assert data == expected_data
+
+    expected_resources_statuses_count = {s: 0 for s in Resource.STATUSES if s}
+    expected_resources_statuses_count["null"] = 1
+    expected_data = {
+        "total": 1,
+        "pending_checks": 0,
+        "fresh_checks": 1,
+        "checks_percentage": 100.0,
+        "fresh_checks_percentage": 100.0,
+        "resources_statuses_count": expected_resources_statuses_count,
     }
 
     await fake_check()
     resp = await client.get("/api/status/crawler")
     assert resp.status == 200
     data: dict = await resp.json()
-    assert data == {
-        "total": 1,
-        "pending_checks": 0,
-        "fresh_checks": 1,
-        "checks_percentage": 100.0,
-        "fresh_checks_percentage": 100.0,
-    }
+    assert data == expected_data
 
 
 async def test_get_stats(setup_catalog, client, fake_check):

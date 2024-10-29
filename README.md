@@ -93,7 +93,7 @@ The token is configured in the `config.toml` file as `API_KEY`, and has a defaul
 If you're using hydra as an external service to receive resource events from [udata](https://github.com/opendatateam/udata), then udata needs to also configure this
 API key in its `udata.cfg` file:
 
-```
+```python
 # Wether udata should publish the resource events
 PUBLISH_ON_RESOURCE_EVENTS = True
 # Where to publish the events
@@ -314,7 +314,18 @@ $ curl -s "http://localhost:8000/api/status/crawler" | json_pp
    "pending_checks" : 142153,
    "total" : 142687,
    "fresh_checks" : 534,
-   "checks_percentage" : 0.4
+   "checks_percentage" : 0.4,
+   "resources_statuses_count": {
+      "null": 195339,
+      "BACKOFF": 0,
+      "CRAWLING_URL": 0,
+      "TO_ANALYSE_RESOURCE": 1,
+      "ANALYSING_RESOURCE": 0,
+      "TO_ANALYSE_CSV": 0,
+      "ANALYSING_CSV": 0,
+      "INSERTING_IN_DB": 0,
+      "CONVERTING_TO_PARQUET": 0
+  }
 }
 ```
 
