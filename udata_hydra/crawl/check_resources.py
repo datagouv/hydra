@@ -128,7 +128,13 @@ async def check_resource(
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_RESOURCE"})
 
             # Enqueue the resource for analysis
-            queue.enqueue(analyse_resource, check["id"], is_first_check, force_analysis, _priority=worker_priority)
+            queue.enqueue(
+                analyse_resource,
+                check["id"],
+                is_first_check,
+                force_analysis,
+                _priority=worker_priority,
+            )
 
             return RESOURCE_RESPONSE_STATUSES["OK"]
 
