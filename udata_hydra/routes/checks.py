@@ -64,7 +64,7 @@ async def create_check(request: web.Request) -> web.Response:
     try:
         payload: dict = await request.json()
         resource_id: str = payload["resource_id"]
-        force_analysis: bool = payload.get("force_analysis", False)
+        force_analysis: bool = payload.get("force_analysis", True)
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 

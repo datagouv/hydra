@@ -58,10 +58,10 @@ async def check_resource(
     url: str,
     resource_id: str,
     session,
-    force_analysis: bool = False,
     sleep: float = 0,
     method: str = "head",
     worker_priority: str = "default",
+    force_analysis: bool = False,
 ) -> str:
     log.debug(f"check {url}, sleep {sleep}, method {method}")
 
@@ -128,7 +128,7 @@ async def check_resource(
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_RESOURCE"})
 
             # Enqueue the resource for analysis
-            queue.enqueue(analyse_resource, check["id"], is_first_check, _priority=worker_priority)
+            queue.enqueue(analyse_resource, check["id"], is_first_check, force_analysis, _priority=worker_priority)
 
             return RESOURCE_RESPONSE_STATUSES["OK"]
 
