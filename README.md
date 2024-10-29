@@ -314,7 +314,18 @@ $ curl -s "http://localhost:8000/api/status/crawler" | json_pp
    "pending_checks" : 142153,
    "total" : 142687,
    "fresh_checks" : 534,
-   "checks_percentage" : 0.4
+   "checks_percentage" : 0.4,
+   "resources_statuses_count": {
+      "null": 195339,
+      "BACKOFF": 0,
+      "CRAWLING_URL": 0,
+      "TO_ANALYSE_RESOURCE": 1,
+      "ANALYSING_RESOURCE": 0,
+      "TO_ANALYSE_CSV": 0,
+      "ANALYSING_CSV": 0,
+      "INSERTING_IN_DB": 0,
+      "CONVERTING_TO_PARQUET": 0
+  }
 }
 ```
 
