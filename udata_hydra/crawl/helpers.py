@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Tuple
+from typing import Any
 
-from aiohttp import web
 from multidict import CIMultiDictProxy
 
 from udata_hydra import config, context
@@ -55,7 +54,7 @@ def has_nice_head(resp) -> bool:
     return True
 
 
-def is_valid_status(status: str) -> Optional[bool]:
+def is_valid_status(status: str) -> bool | None:
     if not status:
         return False
     status_nb = int(status)
@@ -65,7 +64,7 @@ def is_valid_status(status: str) -> Optional[bool]:
     return status_nb >= 200 and status_nb < 400
 
 
-async def is_domain_backoff(domain: str) -> Tuple[bool, str]:
+async def is_domain_backoff(domain: str) -> tuple[bool, str]:
     """Check if we should not crawl on this domain, in order to avoid 429 errors/bans as much as we can. We backoff if:
     - we have hit a 429
     - we have hit the rate limit on our side

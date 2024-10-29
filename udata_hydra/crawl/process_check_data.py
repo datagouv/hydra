@@ -1,16 +1,16 @@
 import json
-from datetime import datetime, timezone
-from typing import Optional, Tuple
+from datetime import datetime, timedelta, timezone
 
 from asyncpg import Record
 
+from udata_hydra import config
 from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_status
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import queue, send
 
 
-async def process_check_data(check_data: dict) -> Tuple[Record, bool]:
+async def process_check_data(check_data: dict) -> tuple[Record, bool]:
     """Preprocess a check before saving it
     Return the check and a boolean indicating if it's the first check for this resource"""
 
@@ -31,17 +31,40 @@ async def process_check_data(check_data: dict) -> Tuple[Record, bool]:
 
     is_first_check: bool = last_check is None
 
-    # TODO: add the next_check datetime data to the check_data
-    # - No last check: next check will be after this check date + CHECK_DELAY_DEFAULT
-    # - Last check and/or this check doens't have detected_last_modified_at: next check will be after this check date + CHECK_DELAY_DEFAULT
-    # - Last check and this check have detected_last_modified_at:
-    #   - both are different: next check will be after this check date + CHECK_DELAY_DEFAULT
-    #   - both are the same: calculate the time bewteen this check and last check, and add it to this check date. If it's less than CHECK_DELAYS[i] but more than CHECK_DELAYS[i-1], next check will be after this check date + CHECK_DELAYS[i].
+    # Calculate next check date
+    if (
+        is_first_check
+        or not last_check.get("detected_last_modified_at")
+        or not check_data.get("detected_last_modified_at")
+    ):
+        # No last check, or last check and/or this check doesn't have detected_last_modified_at
+        next_check = datetime.now(timezone.utc) + timedelta(hours=config.CHECK_DELAY_DEFAULT)
+    # Last check and this check have detected_last_modified_at:
+    else:
+        if last_check["detected_last_modified_at"] != check_data["detected_last_modified_at"]:
+            # resource has been modified since last check
+            next_check = datetime.now(timezone.utc) + timedelta(hours=config.CHECK_DELAYS[0])
+        else:
+            # resource has not been modified since last check: calculate the time between this check and last check, and add it to this check date. If it's less than CHECK_DELAYS[i], next check will be after this check date + CHECK_DELAYS[i]
+            previous_delay: timedelta = datetime.fromisoformat(
+                check["created_at"]
+            ) - datetime.fromisoformat(last_check["created_at"])
+            for d in config.CHECK_DELAYS:
+                if previous_delay <= timedelta(hours=d):
+                    next_check = datetime.fromisoformat(check_data["created_at"]) + timedelta(
+                        hours=d
+                    )
+                    break
+            if previous_delay > timedelta(hours=config.CHECK_DELAYS[-1]):
+                next_check = datetime.fromisoformat(check_data["created_at"]) + timedelta(
+                    hours=config.CHECK_DELAYS[-1]
+                )
+        check_data["next_check"] = next_check
 
     return await Check.insert(check_data), is_first_check
 
 
-async def has_check_changed(check_data: dict, last_check: Optional[dict]) -> bool:
+async def has_check_changed(check_data: dict, last_check: dict | None) -> bool:
     """Check if the check has changed compared to the last one"""
 
     is_first_check: bool = last_check is None
