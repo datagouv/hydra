@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Fix minor types issues [#204](https://github.com/datagouv/hydra/pull/204)
+- Return resources statuses count in crawler status endpoint response [#206](https://github.com/datagouv/hydra/pull/206)
 
 ## 2.0.4 (2024-10-28)
 
