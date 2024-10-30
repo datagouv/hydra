@@ -43,8 +43,8 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     now = datetime.now(timezone.utc)
     q = f"""
         SELECT
-            SUM(CASE WHEN checks.next_check <= $1 THEN 1 ELSE 0 END) AS count_outdated
-            --, SUM(CASE WHEN checks.next_check > $1 THEN 1 ELSE 0 END) AS count_fresh
+            SUM(CASE WHEN checks.next_check_at <= $1 THEN 1 ELSE 0 END) AS count_outdated
+            --, SUM(CASE WHEN checks.next_check_at > $1 THEN 1 ELSE 0 END) AS count_fresh
         FROM catalog, checks
         WHERE {Resource.get_excluded_clause()}
         AND catalog.last_check = checks.id
