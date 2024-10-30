@@ -70,11 +70,13 @@ async def is_domain_backoff(domain: str) -> tuple[bool, str]:
     - we have hit the rate limit on our side
     Returns a tuple with if it should backoff or not (boolean) and the reason why (string)
     """
-    backoff = (False, "")
-    no_backoff = config.NO_BACKOFF_DOMAINS
-    if domain in no_backoff:
+    backoff: tuple = (False, "")
+
+    if domain in config.NO_BACKOFF_DOMAINS:
         return backoff
+
     since_backoff_period = datetime.now(timezone.utc) - timedelta(seconds=config.BACKOFF_PERIOD)
+
     pool = await context.pool()
     async with pool.acquire() as connection:
         # check if we trigger BACKOFF_NB_REQ for BACKOFF_PERIOD on this domain

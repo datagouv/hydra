@@ -7,27 +7,6 @@ from udata_hydra.db.resource import Resource
 from udata_hydra.worker import QUEUES
 
 
-async def get_status_counts(request: web.Request) -> dict[str | None, int]:
-    pool = request.app["pool"]
-
-    status_counts = {status: 0 for status in Resource.STATUSES}
-    status_counts[None] = 0
-
-    async with pool.acquire() as connection:
-        q = """
-            SELECT COALESCE(status, 'NULL') AS status, COUNT(*) AS count
-            FROM catalog
-            GROUP BY COALESCE(status, 'NULL');
-        """
-        rows = await connection.fetch(q)
-
-        for row in rows:
-            status = row["status"] if row["status"] != "NULL" else None
-            status_counts[status] = row["count"]
-
-        return status_counts
-
-
 async def get_crawler_status(request: web.Request) -> web.Response:
     # Count resources with no check and resources with a check
     q = f"""
@@ -63,6 +42,23 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     rate_checked: float = round(stats_resources["count_checked"] / total * 100, 1)
     rate_checked_fresh: float = round(count_fresh_checks / total * 100, 1)
 
+    async def get_resources_status_counts(request: web.Request) -> dict[str | None, int]:
+        status_counts: dict = {status: 0 for status in Resource.STATUSES}
+        status_counts[None] = 0
+
+        q = """
+            SELECT COALESCE(status, 'NULL') AS status, COUNT(*) AS count
+            FROM catalog
+            GROUP BY COALESCE(status, 'NULL');
+        """
+        rows = await request.app["pool"].fetch(q)
+
+        for row in rows:
+            status = row["status"] if row["status"] != "NULL" else None
+            status_counts[status] = row["count"]
+
+        return status_counts
+
     return web.json_response(
         {
             "total": total,
@@ -70,7 +66,7 @@ async def get_crawler_status(request: web.Request) -> web.Response:
             "fresh_checks": count_fresh_checks,
             "checks_percentage": rate_checked,
             "fresh_checks_percentage": rate_checked_fresh,
-            "resources_statuses_count": await get_status_counts(request),
+            "resources_statuses_count": await get_resources_status_counts(request),
         }
     )
 
