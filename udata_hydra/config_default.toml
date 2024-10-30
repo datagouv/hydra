@@ -43,7 +43,6 @@ COOL_OFF_PERIOD = 86400 # 1 day to cool off when we've messed up
 BATCH_SIZE = 40
 
 # check resource if last check is older than
-CHECK_DELAY_DEFAULT = 168 # in hours (7 days)
 CHECK_DELAYS = [12, 24, 168, 720] # in hours (1/2, 1, 7, 30 days)
 
 # seconds to wait for between batches
