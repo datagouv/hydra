@@ -81,6 +81,9 @@ async def notify_udata(check_id: int) -> None:
     """Notify udata of the result of a parsing"""
     # Get the check again to get its updated data
     check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
+    if check is None:
+        log.error("Check not found anymore when trying to notify udata")
+        return
     resource_id = check["resource_id"]
     db = await context.pool()
     record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
