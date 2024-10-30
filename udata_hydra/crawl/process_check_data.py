@@ -36,8 +36,8 @@ async def process_check_data(check_data: dict) -> tuple[Record, bool]:
         next_check = datetime.now(timezone.utc) + timedelta(hours=config.CHECK_DELAY_DEFAULT)
 
     else:
-        if has_check_changed:
-            # Resource has been modified since last check, we will check it again in in the soonest of the CHECK_DELAYS
+        if has_changed:
+            # Resource has been modified since last check, we will check it again in the soonest of the CHECK_DELAYS
             next_check = datetime.now(timezone.utc) + timedelta(
                 hours=config.CHECK_DELAYS[0]
             )  # TODO: should this be CHECK_DELAY_DEFAULT?
