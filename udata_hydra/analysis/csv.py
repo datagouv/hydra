@@ -74,7 +74,7 @@ PYTHON_TYPE_TO_PY = {
     "datetime": helpers.to_datetime,
 }
 
-RESERVED_COLS = ("__id", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid")
+RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
 minio_client = MinIOClient()
 
 
