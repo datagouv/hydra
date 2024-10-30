@@ -1,11 +1,14 @@
+from datetime import datetime, timedelta, timezone
+
 from aiohttp import web
+from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
 from udata_hydra.db.resource import Resource
 from udata_hydra.worker import QUEUES
 
 
-async def get_status_counts(request: web.Request) -> dict[str, int]:
+async def get_status_counts(request: web.Request) -> dict[str | None, int]:
     pool = request.app["pool"]
 
     status_counts = {status: 0 for status in Resource.STATUSES}
@@ -38,60 +41,18 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     """
     stats_catalog = await request.app["pool"].fetchrow(q)
 
-    # Count resources with an outdated check.
-    # To get resources with outdated checks, they need to meet one of the following conditions:
-    # - Don't have at least two checks yet, and the last check is older than CHECK_DELAYS[0]
-    # - At least one the their two most recent last checks have no detected_last_modified_at, and the last check is older than CHECK_DELAYS[0]
-    # - Their two most recent last checks have changed, and the last check is older than CHECK_DELAYS[0]
-    # - Their last two checks have not changed, the two checks have done between two delays in CHECK_DELAYS, and the last check is older than the same delay in CHECK_DELAYS (this is in order to avoid checking too often the same resource which doesn't change)
-    q_start = f"""
-        WITH recent_checks AS (
-            SELECT resource_id, detected_last_modified_at, created_at,
-                ROW_NUMBER() OVER (PARTITION BY resource_id ORDER BY created_at DESC) AS rn
-            FROM checks
-        )
-        SELECT COUNT(*) AS count_outdated
-        FROM (
-            SELECT catalog.url, dataset_id, catalog.resource_id
-            FROM catalog
-                LEFT JOIN recent_checks ON catalog.resource_id = recent_checks.resource_id
-            WHERE catalog.priority = False
-                AND {Resource.get_excluded_clause()}
-            GROUP BY catalog.url, dataset_id, catalog.resource_id
-            HAVING (
-                (
-                    COUNT(recent_checks.resource_id) < 2
-                    AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[0]}'
-                )
-                OR (
-                    COUNT(CASE WHEN recent_checks.detected_last_modified_at IS NULL THEN 1 END) >= 1
-                    AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[0]}'
-                )
-                OR (
-                    COUNT(DISTINCT recent_checks.detected_last_modified_at) > 1
-                    AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[0]}'
-                )
+    since = parse_timespan(config.SINCE)
+    since = datetime.now(timezone.utc) - timedelta(seconds=since)
+    q = f"""
+        SELECT
+            SUM(CASE WHEN checks.created_at <= $1 THEN 1 ELSE 0 END) AS count_outdated
+            --, SUM(CASE WHEN checks.created_at > $1 THEN 1 ELSE 0 END) AS count_fresh
+        FROM catalog, checks
+        WHERE {Resource.get_excluded_clause()}
+        AND catalog.last_check = checks.id
+        AND catalog.deleted = False
     """
-    q_dynamic = ""
-    for i in range(len(config.CHECK_DELAYS) - 1):
-        q_dynamic += f"""
-                OR (
-                    COUNT(recent_checks.resource_id) = 2
-                    AND COUNT(DISTINCT recent_checks.detected_last_modified_at) < 2
-                    AND MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[i]}'
-                    AND MAX(recent_checks.created_at) >= NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[i + 1]}'
-                    AND MIN(recent_checks.created_at) < MAX(recent_checks.created_at) - INTERVAL '{config.CHECK_DELAYS[i]}'
-                    AND MIN(recent_checks.created_at) >= MAX(recent_checks.created_at) - INTERVAL '{config.CHECK_DELAYS[i + 1]}'
-                )
-        """
-
-    q_end = f"""
-                OR MAX(recent_checks.created_at) < NOW() AT TIME ZONE 'UTC' - INTERVAL '{config.CHECK_DELAYS[-1]}'
-            )
-        ) AS subquery;
-    """
-    q = f"{q_start} {q_dynamic} {q_end}"
-    stats_checks = await request.app["pool"].fetchrow(q)
+    stats_checks = await request.app["pool"].fetchrow(q, since)
 
     count_to_check = stats_catalog["count_not_checked"] + (stats_checks["count_outdated"] or 0)
     # all w/ a check, minus those with an outdated checked
