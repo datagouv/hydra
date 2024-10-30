@@ -8,27 +8,6 @@ from udata_hydra.db.resource import Resource
 from udata_hydra.worker import QUEUES
 
 
-async def get_status_counts(request: web.Request) -> dict[str, int]:
-    pool = request.app["pool"]
-
-    status_counts = {status: 0 for status in Resource.STATUSES}
-    status_counts[None] = 0
-
-    async with pool.acquire() as connection:
-        q = """
-            SELECT COALESCE(status, 'NULL') AS status, COUNT(*) AS count
-            FROM catalog
-            GROUP BY COALESCE(status, 'NULL');
-        """
-        rows = await connection.fetch(q)
-
-        for row in rows:
-            status = row["status"] if row["status"] != "NULL" else None
-            status_counts[status] = row["count"]
-
-        return status_counts
-
-
 async def get_crawler_status(request: web.Request) -> web.Response:
     q = f"""
         SELECT
@@ -40,8 +19,8 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     """
     stats_catalog = await request.app["pool"].fetchrow(q)
 
-    since = parse_timespan(config.SINCE)
-    since = datetime.now(timezone.utc) - timedelta(seconds=since)
+    since_seconds: float = parse_timespan(config.SINCE)
+    since: datetime = datetime.now(timezone.utc) - timedelta(seconds=since_seconds)
     q = f"""
         SELECT
             SUM(CASE WHEN checks.created_at <= $1 THEN 1 ELSE 0 END) AS count_outdated
@@ -60,6 +39,23 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     rate_checked = round(stats_catalog["count_checked"] / total * 100, 1)
     rate_checked_fresh = round(count_checked / total * 100, 1)
 
+    async def get_resources_status_counts(request: web.Request) -> dict[str | None, int]:
+        status_counts: dict = {status: 0 for status in Resource.STATUSES}
+        status_counts[None] = 0
+
+        q = """
+            SELECT COALESCE(status, 'NULL') AS status, COUNT(*) AS count
+            FROM catalog
+            GROUP BY COALESCE(status, 'NULL');
+        """
+        rows = await request.app["pool"].fetch(q)
+
+        for row in rows:
+            status = row["status"] if row["status"] != "NULL" else None
+            status_counts[status] = row["count"]
+
+        return status_counts
+
     return web.json_response(
         {
             "total": total,
@@ -67,7 +63,7 @@ async def get_crawler_status(request: web.Request) -> web.Response:
             "fresh_checks": count_checked,
             "checks_percentage": rate_checked,
             "fresh_checks_percentage": rate_checked_fresh,
-            "resources_statuses_count": await get_status_counts(request),
+            "resources_statuses_count": await get_resources_status_counts(request),
         }
     )
 

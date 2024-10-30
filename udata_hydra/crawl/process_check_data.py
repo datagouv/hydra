@@ -1,6 +1,5 @@
 import json
 from datetime import datetime, timezone
-from typing import Optional, Tuple
 
 from asyncpg import Record
 
@@ -10,7 +9,7 @@ from udata_hydra.db.resource import Resource
 from udata_hydra.utils import queue, send
 
 
-async def process_check_data(check_data: dict) -> Tuple[Record, bool]:
+async def process_check_data(check_data: dict) -> tuple[Record, bool]:
     """Preprocess a check before saving it
     Return the check and a boolean indicating if it's the first check for this resource"""
 
@@ -34,7 +33,7 @@ async def process_check_data(check_data: dict) -> Tuple[Record, bool]:
     return await Check.insert(check_data), is_first_check
 
 
-async def has_check_changed(check_data: dict, last_check: Optional[dict]) -> bool:
+async def has_check_changed(check_data: dict, last_check: dict | None) -> bool:
     """Check if the check has changed compared to the last one"""
 
     is_first_check: bool = last_check is None
