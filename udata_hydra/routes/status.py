@@ -1,7 +1,6 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from aiohttp import web
-from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
 from udata_hydra.db.resource import Resource
