@@ -32,28 +32,27 @@ async def process_check_data(check_data: dict) -> tuple[Record, bool]:
     is_first_check: bool = last_check is None
 
     # Calculate next check date
+    now: datetime = datetime.now(timezone.utc)
     if is_first_check:
-        next_check = datetime.now(timezone.utc) + timedelta(hours=config.CHECK_DELAY_DEFAULT)
+        next_check: datetime = now + timedelta(hours=config.CHECK_DELAY_DEFAULT)
 
     else:
         if has_changed:
-            # Resource has been modified since last check, we will check it again in the soonest of the CHECK_DELAYS
-            next_check = datetime.now(timezone.utc) + timedelta(
-                hours=config.CHECK_DELAYS[0]
-            )  # TODO: should this be CHECK_DELAY_DEFAULT?
+            # Resource has been modified since last check, next check will happen in the earliest delay
+            next_check = now + timedelta(hours=config.CHECK_DELAYS[0])
+            # TODO: should this be CHECK_DELAY_DEFAULT?
         else:
             # Resource has not been modified since last check:
-            # if the time since last check is greater than the longest delay in CHECK_DELAYS, next check will be after the longest delay
-            # if the time since last check is less than CHECK_DELAYS[i], next check will be after this CHECK_DELAYS[i]
-            previous_delay: timedelta = datetime.now(timezone.utc) - datetime.fromisoformat(
-                last_check["created_at"]
-            )
-            if previous_delay > timedelta(hours=config.CHECK_DELAYS[-1]):
-                next_check = datetime.now(timezone.utc) + timedelta(hours=config.CHECK_DELAYS[-1])
+            since_last_check: timedelta = now - datetime.fromisoformat(last_check["created_at"])
+
+            if since_last_check > timedelta(hours=config.CHECK_DELAYS[-1]):
+                # 1) Last check happened after the longest delay, next check will be after the longest delay
+                next_check = now + timedelta(hours=config.CHECK_DELAYS[-1])
             else:
-                for d in config.CHECK_DELAYS:
-                    if previous_delay <= timedelta(hours=d):
-                        next_check = datetime.now(timezone.utc) + timedelta(hours=d)
+                # 2) Last check happened before CHECK_DELAYS[i], next check will be after this CHECK_DELAYS[i]
+                for delay in config.CHECK_DELAYS:
+                    if since_last_check <= timedelta(hours=delay):
+                        next_check = now + timedelta(hours=delay)
                         break
         check_data["next_check"] = next_check
 
