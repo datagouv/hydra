@@ -52,15 +52,18 @@ async def download_resource(
     async with aiohttp.ClientSession(
         headers={"user-agent": config.USER_AGENT}, raise_for_status=True
     ) as session:
-        async with session.get(url, allow_redirects=True) as response:
-            async for chunk in response.content.iter_chunked(chunk_size):
-                if max_size_allowed is None or i * chunk_size < max_size_allowed:
-                    tmp_file.write(chunk)
-                else:
-                    tmp_file.close()
-                    log.warning(f"File {url} is too big, skipping")
-                    raise IOError("File too large to download")
-                i += 1
+        try:
+            async with session.get(url, allow_redirects=True) as response:
+                async for chunk in response.content.iter_chunked(chunk_size):
+                    if max_size_allowed is None or i * chunk_size < max_size_allowed:
+                        tmp_file.write(chunk)
+                    else:
+                        tmp_file.close()
+                        log.warning(f"File {url} is too big, skipping")
+                        raise IOError("File too large to download")
+                    i += 1
+        except aiohttp.ClientResponseError as e:
+            raise IOError(f"Error downloading CSV: {e}")
     tmp_file.close()
     if magic.from_file(tmp_file.name, mime=True) in [
         "application/x-gzip",
