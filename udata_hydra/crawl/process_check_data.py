@@ -44,7 +44,7 @@ async def process_check_data(check_data: dict) -> tuple[Record, bool]:
             # 1) Last check happened after the longest delay, next check will be after the longest delay
             next_check_at = now + timedelta(hours=config.CHECK_DELAYS[-1])
         else:
-            # 2) Last check happened before CHECK_DELAYS[i], next check will be after this CHECK_DELAYS[i]
+            # 2) Last check happened before CHECK_DELAYS[i], next check will happen in CHECK_DELAYS[i]
             for delay in config.CHECK_DELAYS:
                 if since_last_check <= timedelta(hours=delay):
                     next_check_at = now + timedelta(hours=delay)
