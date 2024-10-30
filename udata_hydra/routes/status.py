@@ -33,39 +33,42 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     # Count resources with no check and resources with a check
     q = f"""
         SELECT
-            SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END) AS count_not_checked,
+            SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END) AS count_never_checked,
             SUM(CASE WHEN last_check IS NOT NULL THEN 1 ELSE 0 END) AS count_checked
         FROM catalog
         WHERE {Resource.get_excluded_clause()}
         AND catalog.deleted = False
     """
-    stats_catalog = await request.app["pool"].fetchrow(q)
+    stats_resources: dict = await request.app["pool"].fetchrow(q)
 
-    since = parse_timespan(config.SINCE)
-    since = datetime.now(timezone.utc) - timedelta(seconds=since)
+    now = datetime.now(timezone.utc)
     q = f"""
         SELECT
-            SUM(CASE WHEN checks.created_at <= $1 THEN 1 ELSE 0 END) AS count_outdated
-            --, SUM(CASE WHEN checks.created_at > $1 THEN 1 ELSE 0 END) AS count_fresh
+            SUM(CASE WHEN checks.next_check <= $1 THEN 1 ELSE 0 END) AS count_outdated
+            --, SUM(CASE WHEN checks.next_check > $1 THEN 1 ELSE 0 END) AS count_fresh
         FROM catalog, checks
         WHERE {Resource.get_excluded_clause()}
         AND catalog.last_check = checks.id
         AND catalog.deleted = False
     """
-    stats_checks = await request.app["pool"].fetchrow(q, since)
+    stats_checks: dict = await request.app["pool"].fetchrow(q, now)
 
-    count_to_check = stats_catalog["count_not_checked"] + (stats_checks["count_outdated"] or 0)
+    count_pending_checks: int = stats_resources["count_never_checked"] + (
+        stats_checks["count_outdated"] or 0
+    )
     # all w/ a check, minus those with an outdated checked
-    count_recently_checked = stats_catalog["count_checked"] - (stats_checks["count_outdated"] or 0)
-    total = stats_catalog["count_not_checked"] + stats_catalog["count_checked"]
-    rate_checked = round(stats_catalog["count_checked"] / total * 100, 1)
-    rate_checked_fresh = round(count_recently_checked / total * 100, 1)
+    count_fresh_checks: int = stats_resources["count_checked"] - (
+        stats_checks["count_outdated"] or 0
+    )
+    total: int = stats_resources["count_not_checked"] + stats_resources["count_checked"]
+    rate_checked: float = round(stats_resources["count_checked"] / total * 100, 1)
+    rate_checked_fresh: float = round(count_fresh_checks / total * 100, 1)
 
     return web.json_response(
         {
             "total": total,
-            "pending_checks": count_to_check,
-            "fresh_checks": count_recently_checked,
+            "pending_checks": count_pending_checks,
+            "fresh_checks": count_fresh_checks,
             "checks_percentage": rate_checked,
             "fresh_checks_percentage": rate_checked_fresh,
             "resources_statuses_count": await get_status_counts(request),
