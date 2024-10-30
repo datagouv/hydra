@@ -5,6 +5,7 @@
 - Fix minor types issues [#204](https://github.com/datagouv/hydra/pull/204)
 - Return resources statuses count in crawler status endpoint response [#206](https://github.com/datagouv/hydra/pull/206)
 - Fix deprecated CircleCI config [#207](https://github.com/datagouv/hydra/pull/207)
+- Fix Sentry issue #4195 [#209](https://github.com/datagouv/hydra/pull/209)
 
 ## 2.0.4 (2024-10-28)
 
