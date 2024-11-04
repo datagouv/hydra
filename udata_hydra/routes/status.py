@@ -38,7 +38,7 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     count_fresh_checks: int = stats_resources["count_checked"] - (
         stats_checks["count_outdated"] or 0
     )
-    total: int = stats_resources["count_not_checked"] + stats_resources["count_checked"]
+    total: int = stats_resources["count_never_checked"] + stats_resources["count_checked"]
     rate_checked: float = round(stats_resources["count_checked"] / total * 100, 1)
     rate_checked_fresh: float = round(count_fresh_checks / total * 100, 1)
 
