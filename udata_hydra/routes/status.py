@@ -98,7 +98,7 @@ async def get_stats(request: web.Request) -> web.Response:
     """
     stats_status = await request.app["pool"].fetchrow(q)
 
-    def cmp_rate(key):
+    def cmp_rate(key: str) -> float | int:
         if stats_catalog["count_checked"] == 0:
             return 0
         return round(stats_status[key] / stats_catalog["count_checked"] * 100, 1)
