@@ -330,16 +330,22 @@ async def test_forced_analysis(
     udata_url,
 ):
     force_analysis, table_exists = forced_analysis
-    check = await fake_check(headers={
-        "content-type": "application/csv",
-        "content-length": "100",
-    })
+    check = await fake_check(
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        }
+    )
     url = check["url"]
     rid = check["resource_id"]
-    rmock.head(url, status=200, headers={
-        "content-type": "application/csv",
-        "content-length": "100",
-    })
+    rmock.head(
+        url,
+        status=200,
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        },
+    )
     rmock.get(
         url,
         status=200,
@@ -352,14 +358,16 @@ async def test_forced_analysis(
     )
     rmock.put(udata_url, status=200, repeat=True)
     async with ClientSession() as session:
-        await check_resource(url=url, resource_id=rid, session=session, force_analysis=force_analysis)
+        await check_resource(
+            url=url, resource_id=rid, session=session, force_analysis=force_analysis
+        )
 
     # check that csv was indeed pushed to db
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     tables = await db.fetch(
         "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'public';"
     )
-    assert (table_name in [r['table_name'] for r in tables]) == table_exists
+    assert (table_name in [r["table_name"] for r in tables]) == table_exists
 
     # check whether udata was pinged
     if force_analysis:
