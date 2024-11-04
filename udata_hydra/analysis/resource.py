@@ -72,7 +72,7 @@ async def analyse_resource(
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
     tmp_file = None
-    if change_status != Change.HAS_NOT_CHANGED:
+    if change_status != Change.HAS_NOT_CHANGED or force_analysis:
         try:
             tmp_file = await download_resource(url, headers, max_size_allowed)
         except IOError:
