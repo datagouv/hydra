@@ -260,7 +260,7 @@ async def detect_resource_change_on_early_hints(
 
 
 async def detect_resource_change_from_harvest(
-    checks_data: dict, resource_id: str
+    checks_data: list, resource_id: str
 ) -> tuple[Change, dict | None]:
     """
     Checks if resource has a harvest.modified_at
