@@ -9,7 +9,7 @@ def calculate_next_check_date(
     """Calculate the datetime of the next check, depending on the last check data.
 
     Args:
-        has_changed: Whether the check has changed since the last check.
+        has_check_changed: Whether the check has changed since the last check.
         last_check: The last check data as a dict, or None if there is no last check.
         last_modified_at: The last modification date of the ressource as analysed by the earliest change detection methods, or None if it could not be determined.
 
