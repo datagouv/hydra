@@ -22,8 +22,7 @@ async def get_content_type_from_header(headers: dict) -> str:
 
 
 def convert_headers(headers: CIMultiDictProxy) -> dict:
-    """
-    Convert headers from aiohttp CIMultiDict type to dict type
+    """Convert headers from aiohttp CIMultiDict type to dict type.
 
     :warning: this will only take the first value for a given header key but multidict is not json serializable
     """
@@ -68,7 +67,10 @@ async def is_domain_backoff(domain: str) -> tuple[bool, str]:
     """Check if we should not crawl on this domain, in order to avoid 429 errors/bans as much as we can. We backoff if:
     - we have hit a 429
     - we have hit the rate limit on our side
-    Returns a tuple with if it should backoff or not (boolean) and the reason why (string)
+
+    Returns:
+        A boolean indicating if it should backoff or not
+        A string with the message why we should backoff
     """
     backoff: tuple = (False, "")
 

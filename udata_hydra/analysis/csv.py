@@ -285,13 +285,13 @@ async def csv_to_parquet(
     Convert a csv file to parquet using inspection data.
 
     Args:
-        :file_path: CSV file path to convert
-        :inspection: CSV detective report
-        :table_name: used to name the parquet file
+        file_path: CSV file path to convert.
+        inspection: CSV detective report.
+        table_name: used to name the parquet file.
 
     Returns:
-        :parquet_url: URL of the parquet file
-        :parquet_size: size of the parquet file
+        parquet_url: URL of the parquet file.
+        parquet_size: size of the parquet file.
     """
     if not config.CSV_TO_PARQUET:
         log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
