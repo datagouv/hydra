@@ -15,7 +15,7 @@ from udata_hydra.crawl.helpers import (
     has_nice_head,
     is_domain_backoff,
 )
-from udata_hydra.crawl.process_check_data import process_check_data
+from udata_hydra.crawl.preprocess_check_data import preprocess_check_data
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import queue
 
@@ -76,7 +76,7 @@ async def check_resource(
     if not domain:
         log.warning(f"[warning] not netloc in url, skipping {url}")
         # Process the check data. If it has changed, it will be sent to udata
-        await process_check_data(
+        await preprocess_check_data(
             {
                 "resource_id": resource_id,
                 "url": url,
@@ -105,8 +105,8 @@ async def check_resource(
                 )
             resp.raise_for_status()
 
-            # Process the check data. If it has changed, it will be sent to udata
-            check, is_first_check = await process_check_data(
+            # Preprocess the check data. If it has changed, it will be sent to udata
+            new_check, last_check = await preprocess_check_data(
                 {
                     "resource_id": resource_id,
                     "url": url,
@@ -122,13 +122,13 @@ async def check_resource(
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_RESOURCE"})
 
             # Enqueue the resource for analysis
-            queue.enqueue(analyse_resource, check["id"], is_first_check, _priority=worker_priority)
+            queue.enqueue(analyse_resource, new_check["id"], last_check, _priority=worker_priority)
 
             return RESOURCE_RESPONSE_STATUSES["OK"]
 
     except asyncio.exceptions.TimeoutError:
         # Process the check data. If it has changed, it will be sent to udata
-        await process_check_data(
+        await preprocess_check_data(
             {
                 "resource_id": resource_id,
                 "url": url,
@@ -154,7 +154,7 @@ async def check_resource(
     ) as e:
         error = getattr(e, "message", None) or str(e)
         # Process the check data. If it has changed, it will be sent to udata
-        await process_check_data(
+        await preprocess_check_data(
             {
                 "resource_id": resource_id,
                 "url": url,

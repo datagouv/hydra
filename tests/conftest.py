@@ -159,7 +159,7 @@ async def setup_catalog_with_resource_exception(setup_catalog):
 
 @pytest.fixture
 def produce_mock(mocker):
-    mocker.patch("udata_hydra.crawl.process_check_data.send", dummy())
+    mocker.patch("udata_hydra.crawl.preprocess_check_data.send", dummy())
     mocker.patch("udata_hydra.analysis.resource.send", dummy())
     mocker.patch("udata_hydra.analysis.csv.send", dummy())
 
