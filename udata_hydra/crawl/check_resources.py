@@ -61,6 +61,7 @@ async def check_resource(
     sleep: float = 0,
     method: str = "head",
     worker_priority: str = "default",
+    force_analysis: bool = False,
 ) -> str:
     log.debug(f"check {url}, sleep {sleep}, method {method}")
 
@@ -101,7 +102,12 @@ async def check_resource(
             end = time.time()
             if method != "get" and not has_nice_head(resp):
                 return await check_resource(
-                    url, resource_id, session, method="get", worker_priority=worker_priority
+                    url,
+                    resource_id,
+                    session,
+                    force_analysis=force_analysis,
+                    method="get",
+                    worker_priority=worker_priority,
                 )
             resp.raise_for_status()
 
@@ -122,7 +128,13 @@ async def check_resource(
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_RESOURCE"})
 
             # Enqueue the resource for analysis
-            queue.enqueue(analyse_resource, new_check["id"], last_check, _priority=worker_priority)
+            queue.enqueue(
+                analyse_resource,
+                new_check["id"],
+                last_check,
+                force_analysis,
+                _priority=worker_priority,
+            )
 
             return RESOURCE_RESPONSE_STATUSES["OK"]
 
