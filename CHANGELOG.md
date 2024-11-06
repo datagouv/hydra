@@ -8,6 +8,7 @@
 - Fix Sentry issue #4195 [#209](https://github.com/datagouv/hydra/pull/209)
 - Clean doctrings for more consistent style [#215](https://github.com/datagouv/hydra/pull/215)
 - Fix some type hints [#214](https://github.com/datagouv/hydra/pull/214)
+- Add option to force analysis even if resource has not changed[#205](https://github.com/datagouv/hydra/pull/205)
 
 ## 2.0.4 (2024-10-28)
 
