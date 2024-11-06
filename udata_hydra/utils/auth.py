@@ -24,13 +24,13 @@ def token_auth_middleware(
     Token auth middleware that checks the "Authorization" http header for token and, if the token in the requet headers is valid, then middleware adds the user to request with key that contain the "request_property" variable, else it will raise an HTTPForbiddenexception.
 
     Args:
-        request_property (str, optional): Key for save in request object.
+        request_property: Key for save in request object.
             Defaults to 'user'.
-        auth_scheme (str, optional): Prefix for value in "Authorization" header.
+        auth_scheme: Prefix for value in "Authorization" header.
             Defaults to 'Bearer'.
-        exclude_routes: (tuple, optional): Tuple of pathes that will be excluded.
+        exclude_routes: Tuple of pathes that will be excluded.
             Defaults to empty tuple.
-        exclude_methods(tuple, optional): Tuple of http methods that will be
+        exclude_methods: Tuple of http methods that will be
             excluded. Defaults to empty tuple.
 
     Raises:
@@ -38,7 +38,7 @@ def token_auth_middleware(
         web.HTTPForbidden: Wrong token, schema or header.
 
     Returns:
-        Coroutine: Aiohttp middleware.
+        Aiohttp middleware.
     """
 
     @web.middleware
