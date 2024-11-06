@@ -7,6 +7,7 @@
 - Fix deprecated CircleCI config [#207](https://github.com/datagouv/hydra/pull/207)
 - Fix Sentry issue #4195 [#209](https://github.com/datagouv/hydra/pull/209)
 - Clean doctrings for more consistent style [#215](https://github.com/datagouv/hydra/pull/215)
+- Fix some type hints [#214](https://github.com/datagouv/hydra/pull/214)
 
 ## 2.0.4 (2024-10-28)
 
