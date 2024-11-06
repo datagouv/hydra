@@ -297,6 +297,11 @@ async def csv_to_parquet(
         log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
         return
 
+    if int(inspection.get("total_lines", 0)) < config.MIN_LINES_FOR_PARQUET:
+        log.debug(
+            f"Skipping parquet export for {table_name} because it has less than {config.MIN_LINES_FOR_PARQUET} lines."
+        )
+
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
         f"to parquet for {table_name} and sending to Minio."
