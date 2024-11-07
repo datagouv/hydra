@@ -1,3 +1,4 @@
+import os
 from io import BytesIO
 
 import pyarrow.parquet as pq
@@ -70,3 +71,5 @@ async def test_csv_to_parquet(mocker, parquet_config):
         # TODO: don't use the exception as the assertion, better to mock the minio client sending the file
         with pytest.raises(ValueError, match="invalid bucket name"):
             await execute_csv_to_parquet()
+        # Clean the remaining parquet file
+        os.remove("test_table.parquet")
