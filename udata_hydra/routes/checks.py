@@ -4,7 +4,6 @@ from datetime import date
 import aiohttp
 from aiohttp import web
 from asyncpg import Record
-from marshmallow import ValidationError
 
 from udata_hydra import config, context
 from udata_hydra.crawl.check_resources import check_resource

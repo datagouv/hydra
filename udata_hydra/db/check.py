@@ -63,8 +63,8 @@ class Check:
             SELECT catalog.id as catalog_id, checks.id as check_id,
                 catalog.status as catalog_status, checks.status as check_status, catalog.deleted as deleted, *
             FROM checks, catalog
-            WHERE checks.id = catalog.last_check
-            AND catalog.{column} = $1
+            WHERE catalog.{column} = $1
+            AND checks.id = catalog.last_check
             """
             return await connection.fetchrow(q, url or resource_id)
 
@@ -78,7 +78,7 @@ class Check:
                 catalog.status as catalog_status, checks.status as check_status, catalog.deleted as deleted, *
             FROM checks, catalog
             WHERE catalog.{column} = $1
-            AND catalog.url = checks.url
+            AND catalog.{column} = checks.{column}
             ORDER BY created_at DESC
             """
             return await connection.fetch(q, url or resource_id)
