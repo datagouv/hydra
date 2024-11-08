@@ -2,16 +2,19 @@
 
 ## Current (in progress)
 
+- Improve timing of checks depending on changes since last check [#163](https://github.com/datagouv/hydra/pull/163)
+
+## 2.0.5 (2024-11-08)
+
 - Fix minor types issues [#204](https://github.com/datagouv/hydra/pull/204)
 - Return resources statuses count in crawler status endpoint response [#206](https://github.com/datagouv/hydra/pull/206)
 - Fix deprecated CircleCI config [#207](https://github.com/datagouv/hydra/pull/207)
 - Fix Sentry issue #4195 [#209](https://github.com/datagouv/hydra/pull/209)
 - Clean doctrings for more consistent style [#215](https://github.com/datagouv/hydra/pull/215)
 - Fix some type hints [#214](https://github.com/datagouv/hydra/pull/214)
-- Add option to force analysis even if resource has not changed[#205](https://github.com/datagouv/hydra/pull/205)
+- Add option to force analysis even if resource has not changed [#205](https://github.com/datagouv/hydra/pull/205)
 - Fix get all checks CRUD method [#217](https://github.com/datagouv/hydra/pull/217)
 - Deactivate parquet export for small CSVs [#216](https://github.com/datagouv/hydra/pull/216)
-- Improve timing of checks depending on changes since last check [#163](https://github.com/datagouv/hydra/pull/163)
 
 ## 2.0.4 (2024-10-28)
 
