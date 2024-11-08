@@ -1,5 +1,9 @@
 # Changelog
 
+## Current (in progress)
+
+- Nothing yet
+
 ## 2.0.5 (2024-11-08)
 
 - Fix minor types issues [#204](https://github.com/datagouv/hydra/pull/204)
