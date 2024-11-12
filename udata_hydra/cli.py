@@ -137,7 +137,7 @@ async def crawl_url(url: str, method: str = "get"):
 
 
 @cli
-async def check_resource(resource_id: str, method: str = "get"):
+async def check_resource(resource_id: str, method: str = "get", force_analysis: bool = True):
     """Trigger a complete check for a given resource_id"""
     resource: asyncpg.Record | None = await Resource.get(resource_id)
     if not resource:
@@ -149,6 +149,7 @@ async def check_resource(resource_id: str, method: str = "get"):
             resource_id=resource_id,
             session=session,
             method=method,
+            force_analysis=force_analysis,
             worker_priority="high",
         )
 
