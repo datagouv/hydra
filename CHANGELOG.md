@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Handle Sentry issue #2333 with more explicit error reporting [#213](https://github.com/datagouv/hydra/pull/213)
+- Handle Sentry issue #2333 with more explicit error reporting and not raising an error anymore for uadata 404 errors [#213](https://github.com/datagouv/hydra/pull/213)
 
 ## 2.0.5 (2024-11-08)
 
