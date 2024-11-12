@@ -50,7 +50,7 @@ async def send(dataset_id: str, resource_id: str, document: dict) -> None:
             # we're raising since we should be in a worker thread
             if resp.status == 404:
                 raise IOError("Resource not found on udata")
-            elif resp.status == 502:
+            elif resp.status == 410:
                 raise IOError("Resource has been deleted on udata")
             if resp.status == 502:
                 raise IOError("Udata is unreachable")
