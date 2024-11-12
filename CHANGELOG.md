@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Remove legacy routes [#203](https://github.com/datagouv/hydra/pull/203)
 
 ## 2.0.5 (2024-11-08)
 
