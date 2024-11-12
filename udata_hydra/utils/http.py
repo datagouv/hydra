@@ -49,7 +49,7 @@ async def send(dataset_id: str, resource_id: str, document: dict) -> None:
         async with session.put(uri, json=document, headers=headers) as resp:
             # we're raising since we should be in a worker thread
             if resp.status == 404:
-                raise IOError("Resource not found on udata")
+                pass
             elif resp.status == 410:
                 raise IOError("Resource has been deleted on udata")
             if resp.status == 502:
