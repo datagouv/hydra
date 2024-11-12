@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Handle Sentry issue #2333 with more explicit error reporting [#213](https://github.com/datagouv/hydra/pull/213)
 
 ## 2.0.5 (2024-11-08)
 
