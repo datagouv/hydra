@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Fix Sentry issue #4096 regarding duplicate columns names [#218](https://github.com/datagouv/hydra/pull/218)
 
 ## 2.0.5 (2024-11-08)
 
