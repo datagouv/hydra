@@ -6,9 +6,9 @@ import pytest
 
 from udata_hydra.analysis.csv import (
     RESERVED_COLS,
+    csv_detective_routine,
     csv_to_parquet,
     generate_records,
-    perform_csv_inspection,
 )
 from udata_hydra.utils.parquet import save_as_parquet
 
@@ -26,7 +26,9 @@ pytestmark = pytest.mark.asyncio
 async def test_save_as_parquet(file_and_count):
     filename, expected_count = file_and_count
     file_path = f"tests/data/{filename}"
-    inspection: dict | None = await perform_csv_inspection(file_path)
+    inspection: dict | None = csv_detective_routine(
+        csv_file_path=file_path, output_profile=True, num_rows=-1, save_results=False
+    )
     assert inspection
     columns = inspection["columns"]
     columns = {
@@ -54,7 +56,9 @@ async def test_save_as_parquet(file_and_count):
 async def test_csv_to_parquet(mocker, parquet_config):
     async def execute_csv_to_parquet() -> tuple[str, int] | None:
         file_path = "tests/data/catalog.csv"
-        inspection: dict | None = await perform_csv_inspection(file_path)
+        inspection: dict | None = csv_detective_routine(
+            csv_file_path=file_path, output_profile=True, num_rows=-1, save_results=False
+        )
         assert inspection
         return await csv_to_parquet(
             file_path=file_path, inspection=inspection, table_name="test_table"

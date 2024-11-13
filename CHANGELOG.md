@@ -2,6 +2,7 @@
 
 ## Current (in progress)
 
+- Refactor ParseError to enrich Sentry with context and to inquire about Sentry errors like #4096  [#218](https://github.com/datagouv/hydra/pull/218)
 - Remove legacy routes [#203](https://github.com/datagouv/hydra/pull/203)
 
 ## 2.0.5 (2024-11-08)
