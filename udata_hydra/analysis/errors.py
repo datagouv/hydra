@@ -29,7 +29,8 @@ class ParseException(Exception):
         if step:
             self.step = step
         if config.SENTRY_DSN:
-            with sentry_sdk.push_scope() as scope:
+            with sentry_sdk.new_scope() as scope:
+                # scope.set_level("warning")
                 scope.set_tags(
                     {
                         "resource_id": resource_id or "unknown",
@@ -48,7 +49,7 @@ async def handle_parse_exception(e: ParseException, table_name: str, check: Reco
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if check:
         if config.SENTRY_DSN:
-            with sentry_sdk.push_scope():
+            with sentry_sdk.new_scope():
                 event_id = sentry_sdk.capture_exception(e)
         # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
