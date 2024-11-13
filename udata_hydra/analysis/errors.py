@@ -43,7 +43,7 @@ class ParseException(Exception):
 
 
 async def handle_parse_exception(e: ParseException, table_name: str, check: Record | None) -> None:
-    """Specific ParsingError handling. Store error if in a check context. Also cleanup :table_name: if needed."""
+    """Specific ParseException handling. Store error if in a check context. Also cleanup :table_name: if needed."""
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if check:
