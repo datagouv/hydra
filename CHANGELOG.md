@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Refactor ParseError to enrich Sentry with context and to inquire about Sentry errors like #4096  [#218](https://github.com/datagouv/hydra/pull/218)
 
 ## 2.0.5 (2024-11-08)
 
