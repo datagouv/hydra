@@ -354,15 +354,11 @@ async def csv_to_db(
         # Update resource status to INSERTING_IN_DB
         await Resource.update(resource_id, {"status": "INSERTING_IN_DB"})
 
-    # build a `column_name: type` mapping and rename columns that are duplicate or reserved
-    seen = set()
-    columns: dict = {}
-    for c, v in inspection["columns"].items():
-        new_key = c
-        if (c in seen) or (c.lower() in RESERVED_COLS):
-            new_key = f"{c}__hydra_renamed"
-        seen.add(new_key)
-        columns[new_key] = v["python_type"]
+    # build a `column_name: type` mapping and explicitely rename reserved column names
+    columns = {
+        f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
+        for c, v in inspection["columns"].items()
+    }
 
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
@@ -370,7 +366,12 @@ async def csv_to_db(
 
     # Create table
     q = compute_create_table_query(table_name=table_name, columns=columns, indexes=table_indexes)
-    await db.execute(q)
+    try:
+        await db.execute(q)
+    except Exception as e:
+        raise type(e)(
+            f"Error creating table {table_name} from ressource ID {resource_id}: {str(e)}"
+        )
 
     # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
     if not debug_insert:
