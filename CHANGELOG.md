@@ -2,6 +2,9 @@
 
 ## Current (in progress)
 
+- Refactor ParseError to enrich Sentry with context and to inquire about Sentry errors like #4096  [#218](https://github.com/datagouv/hydra/pull/218)
+- Remove legacy routes [#203](https://github.com/datagouv/hydra/pull/203)
+- More explicit error reporting when sending to udata without raising errors for udata responding with a 404 [#213](https://github.com/datagouv/hydra/pull/213)
 - Improve timing of checks depending on changes since last check [#163](https://github.com/datagouv/hydra/pull/163)
 
 ## 2.0.5 (2024-11-08)

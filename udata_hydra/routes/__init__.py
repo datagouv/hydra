@@ -21,12 +21,6 @@ from udata_hydra.routes.resources_exceptions import (
     get_all_resources_exceptions,
     update_resource_exception,
 )
-from udata_hydra.routes.resources_legacy import (
-    create_resource_legacy,
-    delete_resource_legacy,
-    get_resource_legacy,
-    update_resource_legacy,
-)
 from udata_hydra.routes.status import get_crawler_status, get_health, get_stats, get_worker_status
 
 
@@ -84,13 +78,3 @@ routes_params = [
 
 # Generate the routes
 routes: list[web.RouteDef] = generate_routes(routes_params)
-
-# TODO: legacy, to remove
-legacy_routes_params = [
-    (web.get, "/api/resources", get_resource_legacy, None),
-    (web.post, "/api/resource/created", create_resource_legacy, None),
-    (web.post, "/api/resource/updated", update_resource_legacy, None),
-    (web.post, "/api/resource/deleted", delete_resource_legacy, None),
-]
-legacy_routes: list[web.RouteDef] = generate_routes(legacy_routes_params)
-routes.extend(legacy_routes)
