@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime, timezone
-from tkinter import N
 
 import sentry_sdk
 from asyncpg import Record
