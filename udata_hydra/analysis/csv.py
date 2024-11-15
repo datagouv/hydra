@@ -77,7 +77,7 @@ RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin"
 minio_client = MinIOClient()
 
 
-async def notify_udata(check_id: int, table_name: str) -> None:
+async def notify_udata(check_id: int) -> None:
     """Notify udata of the result of a parsing"""
     # Get the check again to get its updated data
     check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
@@ -200,7 +200,7 @@ async def analyse_csv(
     except ParseException as e:
         await handle_parse_exception(e, table_name, check)
     finally:
-        await notify_udata(check["id"], table_name)
+        await notify_udata(check["id"])
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
