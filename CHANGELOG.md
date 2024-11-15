@@ -6,6 +6,7 @@
 - Remove legacy routes [#203](https://github.com/datagouv/hydra/pull/203)
 - More explicit error reporting when sending to udata without raising errors for udata responding with a 404 [#213](https://github.com/datagouv/hydra/pull/213)
 - Minor cleaning: remove unused arg in function [#219](https://github.com/datagouv/hydra/pull/219)
+- Fix type issue regarding `resource_id` [#220](https://github.com/datagouv/hydra/pull/220)
 
 ## 2.0.5 (2024-11-08)
 
