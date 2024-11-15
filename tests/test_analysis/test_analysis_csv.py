@@ -4,11 +4,16 @@ from datetime import date, datetime
 from tempfile import NamedTemporaryFile
 
 import pytest
+from aiohttp import ClientSession
 from asyncpg.exceptions import UndefinedTableError
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
+from udata_hydra.crawl.check_resources import (
+    RESOURCE_RESPONSE_STATUSES,
+    check_resource,
+)
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -306,3 +311,69 @@ async def test_analyse_csv_send_udata_webhook(
     assert webhook.get("analysis:parsing:started_at")
     assert webhook.get("analysis:parsing:finished_at")
     assert webhook.get("analysis:parsing:error") is None
+
+
+@pytest.mark.parametrize(
+    "forced_analysis",
+    (
+        (True, True),
+        (False, False),
+    ),
+)
+async def test_forced_analysis(
+    setup_catalog,
+    rmock,
+    catalog_content,
+    db,
+    fake_check,
+    forced_analysis,
+    udata_url,
+):
+    force_analysis, table_exists = forced_analysis
+    check = await fake_check(
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        }
+    )
+    url = check["url"]
+    rid = check["resource_id"]
+    rmock.head(
+        url,
+        status=200,
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        },
+    )
+    rmock.get(
+        url,
+        status=200,
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        },
+        body="a,b,c\n1,2,3".encode("utf-8"),
+        repeat=True,
+    )
+    rmock.put(udata_url, status=200, repeat=True)
+    async with ClientSession() as session:
+        await check_resource(
+            url=url, resource_id=rid, session=session, force_analysis=force_analysis
+        )
+
+    # check that csv was indeed pushed to db
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    tables = await db.fetch(
+        "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'public';"
+    )
+    assert (table_name in [r["table_name"] for r in tables]) == table_exists
+
+    # check whether udata was pinged
+    if force_analysis:
+        webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+        assert webhook.get("analysis:parsing:started_at")
+        assert webhook.get("analysis:parsing:finished_at")
+        assert webhook.get("analysis:parsing:error") is None
+    else:
+        assert ("PUT", URL(udata_url)) not in rmock.requests.keys()

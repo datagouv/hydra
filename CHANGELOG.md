@@ -2,10 +2,23 @@
 
 ## Current (in progress)
 
+- Refactor ParseError to enrich Sentry with context and to inquire about Sentry errors like #4096 [#218](https://github.com/datagouv/hydra/pull/218)
+- Remove legacy routes [#203](https://github.com/datagouv/hydra/pull/203)
+- More explicit error reporting when sending to udata without raising errors for udata responding with a 404 [#213](https://github.com/datagouv/hydra/pull/213)
+- Minor cleaning: remove unused arg in function [#219](https://github.com/datagouv/hydra/pull/219)
+- Fix type issue regarding `resource_id` [#220](https://github.com/datagouv/hydra/pull/220)
+
+## 2.0.5 (2024-11-08)
+
 - Fix minor types issues [#204](https://github.com/datagouv/hydra/pull/204)
 - Return resources statuses count in crawler status endpoint response [#206](https://github.com/datagouv/hydra/pull/206)
 - Fix deprecated CircleCI config [#207](https://github.com/datagouv/hydra/pull/207)
 - Fix Sentry issue #4195 [#209](https://github.com/datagouv/hydra/pull/209)
+- Clean doctrings for more consistent style [#215](https://github.com/datagouv/hydra/pull/215)
+- Fix some type hints [#214](https://github.com/datagouv/hydra/pull/214)
+- Add option to force analysis even if resource has not changed [#205](https://github.com/datagouv/hydra/pull/205)
+- Fix get all checks CRUD method [#217](https://github.com/datagouv/hydra/pull/217)
+- Deactivate parquet export for small CSVs [#216](https://github.com/datagouv/hydra/pull/216)
 
 ## 2.0.4 (2024-10-28)
 

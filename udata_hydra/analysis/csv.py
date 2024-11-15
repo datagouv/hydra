@@ -7,7 +7,6 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Iterator
 
-import sentry_sdk
 from asyncpg import Record
 from csv_detective.detection import engine_to_file
 from csv_detective.explore_csv import routine as csv_detective_routine
@@ -33,7 +32,7 @@ from str2float import str2float
 
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
-from udata_hydra.analysis.errors import ParseException
+from udata_hydra.analysis.errors import ParseException, handle_parse_exception
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -78,7 +77,7 @@ RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin"
 minio_client = MinIOClient()
 
 
-async def notify_udata(check_id: int, table_name: str) -> None:
+async def notify_udata(check_id: int) -> None:
     """Notify udata of the result of a parsing"""
     # Get the check again to get its updated data
     check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
@@ -126,7 +125,7 @@ async def analyse_csv(
     if not check:
         log.error("No check found or URL provided")
         return
-    resource_id = check["resource_id"]
+    resource_id: str = str(check["resource_id"])
     url = check["url"]
 
     # Update resource status to ANALYSING_CSV
@@ -157,7 +156,17 @@ async def analyse_csv(
 
     try:
         await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
-        csv_inspection = await perform_csv_inspection(tmp_file.name)
+
+        # Launch csv-detective against given file
+        try:
+            csv_inspection: dict | None = csv_detective_routine(
+                csv_file_path=tmp_file.name, output_profile=True, num_rows=-1, save_results=False
+            )
+        except Exception as e:
+            raise ParseException(
+                step="csv_detective", resource_id=resource_id, url=url, check_id=check_id
+            ) from e
+
         timer.mark("csv-inspection")
 
         await csv_to_db(
@@ -191,7 +200,7 @@ async def analyse_csv(
     except ParseException as e:
         await handle_parse_exception(e, table_name, check)
     finally:
-        await notify_udata(check["id"], table_name)
+        await notify_udata(check["id"])
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
@@ -285,16 +294,22 @@ async def csv_to_parquet(
     Convert a csv file to parquet using inspection data.
 
     Args:
-        :file_path: CSV file path to convert
-        :inspection: CSV detective report
-        :table_name: used to name the parquet file
+        file_path: CSV file path to convert.
+        inspection: CSV detective report.
+        table_name: used to name the parquet file.
 
     Returns:
-        :parquet_url: URL of the parquet file
-        :parquet_size: size of the parquet file
+        parquet_url: URL of the parquet file.
+        parquet_size: size of the parquet file.
     """
     if not config.CSV_TO_PARQUET:
         log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
+        return
+
+    if int(inspection.get("total_lines", 0)) < config.MIN_LINES_FOR_PARQUET:
+        log.debug(
+            f"Skipping parquet export for {table_name} because it has less than {config.MIN_LINES_FOR_PARQUET} lines."
+        )
         return
 
     log.debug(
@@ -353,13 +368,19 @@ async def csv_to_db(
         f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
         for c, v in inspection["columns"].items()
     }
+
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
     await db.execute(q)
 
     # Create table
     q = compute_create_table_query(table_name=table_name, columns=columns, indexes=table_indexes)
-    await db.execute(q)
+    try:
+        await db.execute(q)
+    except Exception as e:
+        raise ParseException(
+            step="create_table_query", resource_id=resource_id, table_name=table_name
+        ) from e
 
     # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
     if not debug_insert:
@@ -371,7 +392,9 @@ async def csv_to_db(
                 columns=columns.keys(),
             )
         except Exception as e:  # I know what I'm doing, pinky swear
-            raise ParseException("copy_records_to_table") from e
+            raise ParseException(
+                step="copy_records_to_table", resource_id=resource_id, table_name=table_name
+            ) from e
     # this inserts rows from iterator one by one, slow but useful for debugging
     else:
         bar = ProgressBar(total=inspection["total_lines"])
@@ -395,41 +418,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: Record) -> N
     )
 
 
-async def perform_csv_inspection(file_path: str) -> dict | None:
-    """Launch csv-detective against given file"""
-    try:
-        return csv_detective_routine(
-            file_path, output_profile=True, num_rows=-1, save_results=False
-        )
-    except Exception as e:
-        raise ParseException("csv_detective") from e
-
-
 async def delete_table(table_name: str) -> None:
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     await db.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)
-
-
-async def handle_parse_exception(e: Exception, table_name: str, check: Record | None) -> None:
-    """Specific ParsingError handling. Enriches sentry w/ context if available,
-    and store error if in a check context. Also cleanup :table_name: if needed."""
-    db = await context.pool("csv")
-    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
-    if check:
-        if config.SENTRY_DSN:
-            with sentry_sdk.push_scope() as scope:
-                scope.set_extra("check_id", check["id"])
-                scope.set_extra("csv_url", check["url"])
-                scope.set_extra("resource_id", check["resource_id"])
-                event_id = sentry_sdk.capture_exception(e)
-        # e.__cause__ let us access the "inherited" error of ParseException (raise e from cause)
-        # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
-        err = f"{e.step}:sentry:{event_id}" if config.SENTRY_DSN else f"{e.step}:{str(e.__cause__)}"
-        await Check.update(
-            check["id"],
-            {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
-        )
-        log.error("Parsing error", exc_info=e)
-    else:
-        raise e
