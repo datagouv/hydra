@@ -8,6 +8,7 @@ import aiohttp
 import magic
 
 from udata_hydra import config
+from udata_hydra.utils import IOException
 
 log = logging.getLogger("udata-hydra")
 
@@ -38,14 +39,14 @@ async def download_resource(
     """
     Attempts downloading a resource from a given url.
     Returns the downloaded file object.
-    Raises IOError if the resource is too large.
+    Raises custom IOException if the resource is too large.
     """
     tmp_file = tempfile.NamedTemporaryFile(
         dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False
     )
 
     if max_size_allowed is not None and float(headers.get("content-length", -1)) > max_size_allowed:
-        raise IOError("File too large to download")
+        raise IOException("File too large to download")
 
     chunk_size = 1024
     i = 0
@@ -60,10 +61,10 @@ async def download_resource(
                     else:
                         tmp_file.close()
                         log.warning(f"File {url} is too big, skipping")
-                        raise IOError("File too large to download")
+                        raise IOException("File too large to download", url=url)
                     i += 1
         except aiohttp.ClientResponseError as e:
-            raise IOError(f"Error downloading CSV: {e}")
+            raise IOException("Error downloading CSV", url=url) from e
     tmp_file.close()
     if magic.from_file(tmp_file.name, mime=True) in [
         "application/x-gzip",
