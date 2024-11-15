@@ -39,7 +39,7 @@ async def download_resource(
     """
     Attempts downloading a resource from a given url.
     Returns the downloaded file object.
-    Raises custom IOException if the resource is too large.
+    Raises custom IOException if the resource is too large or if the URL is unreachable.
     """
     tmp_file = tempfile.NamedTemporaryFile(
         dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False
@@ -50,10 +50,10 @@ async def download_resource(
 
     chunk_size = 1024
     i = 0
-    async with aiohttp.ClientSession(
-        headers={"user-agent": config.USER_AGENT}, raise_for_status=True
-    ) as session:
-        try:
+    try:
+        async with aiohttp.ClientSession(
+            headers={"user-agent": config.USER_AGENT}, raise_for_status=True
+        ) as session:
             async with session.get(url, allow_redirects=True) as response:
                 async for chunk in response.content.iter_chunked(chunk_size):
                     if max_size_allowed is None or i * chunk_size < max_size_allowed:
@@ -63,12 +63,13 @@ async def download_resource(
                         log.warning(f"File {url} is too big, skipping")
                         raise IOException("File too large to download", url=url)
                     i += 1
-        except aiohttp.ClientResponseError as e:
-            raise IOException("Error downloading CSV", url=url) from e
-    tmp_file.close()
-    if magic.from_file(tmp_file.name, mime=True) in [
-        "application/x-gzip",
-        "application/gzip",
-    ]:
-        tmp_file = read_csv_gz(tmp_file.name)
-    return tmp_file
+    except aiohttp.ClientResponseError as e:
+        raise IOException("Error downloading CSV", url=url) from e
+    finally:
+        tmp_file.close()
+        if magic.from_file(tmp_file.name, mime=True) in [
+            "application/x-gzip",
+            "application/gzip",
+        ]:
+            tmp_file = read_csv_gz(tmp_file.name)
+        return tmp_file
