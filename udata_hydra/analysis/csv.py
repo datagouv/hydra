@@ -125,7 +125,7 @@ async def analyse_csv(
     if not check:
         log.error("No check found or URL provided")
         return
-    resource_id = check["resource_id"]
+    resource_id: str = str(check["resource_id"])
     url = check["url"]
 
     # Update resource status to ANALYSING_CSV
