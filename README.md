@@ -141,6 +141,7 @@ The API serves the following endpoints:
 - `GET` on `/api/stats` to get the crawling stats
 - `GET` on `/api/health` to get the API version number and environment
 
+You may want to you a helper such as [Bruno](https://www.usebruno.com/) to handle API calls, in which case all the endpoints are ready to use [here](https://github.com/datagouv/api-calls).
 More details about some enpoints are provided below with examples, but not for all of them:
 
 #### Get latest check
