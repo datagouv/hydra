@@ -164,6 +164,26 @@ async def check_resource(
         AssertionError,
         UnicodeError,
     ) as e:
+        # if we get a 404, it might be that the resource's URL has changed since last catalog import
+        # we compare the actual URL to the one we have here to handle these cases
+        if getattr(e, "status", None) == 404:
+            stable_resource_url = f"{config.UDATA_URI.replace('api/2', 'fr')}/datasets/r/{resource_id}"
+            async with session.head(stable_resource_url, timeout=timeout) as resp:
+                resp.raise_for_status()
+                actual_url = resp.headers.get("location")
+            if actual_url and url != actual_url:
+                await Resource.update(
+                    resource_id=resource_id, data={"url": actual_url}
+                )
+                return await check_resource(
+                    actual_url,
+                    resource_id,
+                    session,
+                    force_analysis=force_analysis,
+                    method="get",
+                    worker_priority=worker_priority,
+                )
+
         error = getattr(e, "message", None) or str(e)
         # Process the check data. If it has changed, it will be sent to udata
         await process_check_data(
