@@ -633,35 +633,47 @@ async def test_dont_check_resources_with_status(
         assert resource["status"] == resource_status
 
 
-async def test_wrong_url_in_catalog(setup_catalog, rmock, produce_mock):
+@pytest.mark.parametrize(
+    "url_changed",
+    [
+        True,
+        False,
+    ],
+)
+async def test_wrong_url_in_catalog(setup_catalog, rmock, produce_mock, url_changed):
     r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
-    wrong_url = r["url"]
+    not_found_url = r["url"]
     new_url = "https://example.com/has-been-modified-lately"
     rmock.head(
-        wrong_url,
+        not_found_url,
         status=404,
     )
     rmock.get(
-        wrong_url,
+        not_found_url,
         status=404,
     )
     rmock.head(
         f"{config.UDATA_URI.replace('api/2', 'fr')}/datasets/r/{RESOURCE_ID}",
         status=200,
         headers={
-            "location": new_url,
+            "location": new_url if url_changed else not_found_url,
         },
     )
-    rmock.head(
-        new_url,
-        status=200,
-        headers={
-            "last-modified": "Thu, 09 Jan 2020 09:33:37 GMT",
-            "content-type": "application/csv",
-        },
-    )
+    if url_changed:
+        rmock.head(
+            new_url,
+            status=200,
+            headers={
+                "last-modified": "Thu, 09 Jan 2020 09:33:37 GMT",
+                "content-type": "application/csv",
+            },
+        )
     async with ClientSession() as session:
-        await check_resource(url=wrong_url, resource_id=RESOURCE_ID, session=session)
-    r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
-    current_url = r["url"]
-    assert current_url == new_url
+        await check_resource(url=not_found_url, resource_id=RESOURCE_ID, session=session)
+    if url_changed:
+        r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
+        current_url = r["url"]
+        assert current_url == new_url
+    else:
+        check = await Check.get_by_resource_id(RESOURCE_ID)
+        assert check["status"] == 404
