@@ -75,7 +75,7 @@ async def select_batch_resources_to_check() -> list[Record]:
                 FROM catalog, checks
                 WHERE catalog.last_check IS NOT NULL
                 AND catalog.last_check = checks.id
-                AND (checks.next_check_at >= $1 OR checks.next_check_at IS NULL)
+                AND (checks.next_check_at <= $1 OR checks.next_check_at IS NULL)
                 AND {excluded}
                 AND catalog.priority = False
             ) s
