@@ -180,7 +180,7 @@ async def check_resource(
                     resource_id,
                     session,
                     force_analysis=force_analysis,
-                    method="get",
+                    method="head",
                     worker_priority=worker_priority,
                 )
 
