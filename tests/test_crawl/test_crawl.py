@@ -640,7 +640,9 @@ async def test_dont_check_resources_with_status(
         False,
     ],
 )
-async def test_wrong_url_in_catalog(setup_catalog, rmock, produce_mock, url_changed):
+async def test_wrong_url_in_catalog(
+    setup_catalog, rmock, produce_mock, url_changed, catalog_content
+):
     r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
     not_found_url = r["url"]
     new_url = "https://example.com/has-been-modified-lately"
@@ -668,12 +670,19 @@ async def test_wrong_url_in_catalog(setup_catalog, rmock, produce_mock, url_chan
                 "content-type": "application/csv",
             },
         )
+        rmock.get(
+            new_url,
+            status=200,
+            body=catalog_content,
+        )
     async with ClientSession() as session:
         await check_resource(url=not_found_url, resource_id=RESOURCE_ID, session=session)
     if url_changed:
         r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
-        current_url = r["url"]
-        assert current_url == new_url
+        assert r["url"] == new_url
+        check = await Check.get_by_resource_id(RESOURCE_ID)
+        assert check.get("parsing_finished_at")
     else:
         check = await Check.get_by_resource_id(RESOURCE_ID)
         assert check["status"] == 404
+        breakpoint()
