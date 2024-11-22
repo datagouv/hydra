@@ -167,13 +167,15 @@ async def check_resource(
         # if we get a 404, it might be that the resource's URL has changed since last catalog load
         # we compare the actual URL to the one we have here to handle these cases
         if getattr(e, "status", None) == 404 and config.UDATA_URI:
-            return await handle_wrong_resource_url(
+            handled = await handle_wrong_resource_url(
                 resource_id=resource_id,
                 session=session,
                 url=url,
                 force_analysis=force_analysis,
                 worker_priority=worker_priority,
             )
+            if handled is not None:
+                return handled
 
         error = getattr(e, "message", None) or str(e)
         # Process the check data. If it has changed, it will be sent to udata
@@ -218,3 +220,4 @@ async def handle_wrong_resource_url(
             method="head",
             worker_priority=worker_priority,
         )
+    return
