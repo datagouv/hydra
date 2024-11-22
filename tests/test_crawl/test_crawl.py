@@ -685,4 +685,3 @@ async def test_wrong_url_in_catalog(
     else:
         check = await Check.get_by_resource_id(RESOURCE_ID)
         assert check["status"] == 404
-        breakpoint()
