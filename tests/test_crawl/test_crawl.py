@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import nest_asyncio
 import pytest
-from aiohttp import RequestInfo, ClientSession
+from aiohttp import ClientSession, RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
 from aioresponses import CallbackResult
 from asyncpg import Record

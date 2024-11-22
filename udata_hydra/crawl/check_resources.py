@@ -204,9 +204,7 @@ async def handle_wrong_resource_url(
     force_analysis: bool,
     worker_priority: str,
 ):
-    stable_resource_url = (
-        f"{config.UDATA_URI.replace('api/2', 'fr')}/datasets/r/{resource_id}"
-    )
+    stable_resource_url = f"{config.UDATA_URI.replace('api/2', 'fr')}/datasets/r/{resource_id}"
     async with session.head(stable_resource_url) as resp:
         resp.raise_for_status()
         actual_url = resp.headers.get("location")
