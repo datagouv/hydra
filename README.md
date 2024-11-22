@@ -471,3 +471,7 @@ If you cannot use pre-commit, it is necessary to format, lint, and sort imports 
 ruff check --fix .
 ruff format .
 ```
+
+### Releases
+
+The release process uses [bump'X](https://github.com/datagouv/bumpx).
