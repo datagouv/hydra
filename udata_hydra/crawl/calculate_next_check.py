@@ -29,7 +29,7 @@ def calculate_next_check_date(
             since_last_modif: timedelta = now - last_modified_at
         else:
             # If no last modification date, we use the last check date
-            since_last_modif: timedelta = now - datetime.fromisoformat(last_check["created_at"])
+            since_last_modif: timedelta = now - last_check["created_at"]
 
         if since_last_modif > timedelta(hours=config.CHECK_DELAYS[-1]):
             # 1) Last check or last ressource modification happened change after the maximum delay, next check will be after the same maximum delay
