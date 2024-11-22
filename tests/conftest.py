@@ -218,6 +218,7 @@ async def fake_check():
         checksum=None,
         resource_id=RESOURCE_ID,
         detected_last_modified_at=None,
+        next_check_at=None,
         parsing_table=False,
         parquet_url=False,
         domain="example.com",
@@ -234,6 +235,7 @@ async def fake_check():
             "error": error,
             "checksum": checksum,
             "detected_last_modified_at": detected_last_modified_at,
+            "next_check_at": next_check_at,
             "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest()
             if parsing_table
             else None,

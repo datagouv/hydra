@@ -126,25 +126,33 @@ async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock, produce
     assert ("GET", URL(rurl)) not in rmock.requests
 
 
-async def test_outdated_check(setup_catalog, rmock, fake_check, event_loop, produce_mock):
-    await fake_check(created_at=datetime.now() - timedelta(weeks=52))
+@pytest.mark.parametrize(
+    "last_check_params",
+    [
+        # last_check, next_check_at, new_check_expected
+        (False, None, True),
+        (True, None, True),
+        (True, datetime.now() - timedelta(hours=1), True),
+        (True, datetime.now() + timedelta(hours=1), False),
+    ],
+)
+async def test_outdated_check(
+    setup_catalog, rmock, fake_check, event_loop, produce_mock, last_check_params
+):
+    last_check, next_check_at, new_check_expected = last_check_params
+    if last_check:
+        await fake_check(
+            created_at=datetime.now() - timedelta(hours=24), next_check_at=next_check_at
+        )
     rurl = RESOURCE_URL
     rmock.head(rurl, status=200)
     event_loop.run_until_complete(start_checks(iterations=1))
-    # url has been called because check is outdated
-    assert ("HEAD", URL(rurl)) in rmock.requests
-
-
-async def test_not_outdated_check(
-    setup_catalog, rmock, fake_check, event_loop, mocker, produce_mock
-):
-    mocker.patch("udata_hydra.config.SLEEP_BETWEEN_BATCHES", 0)
-    await fake_check()
-    rurl = RESOURCE_URL
-    rmock.get(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
-    # url has not been called because check is fresh
-    assert ("GET", URL(rurl)) not in rmock.requests
+    if new_check_expected:
+        # url has been called because check is outdated
+        assert ("HEAD", URL(rurl)) in rmock.requests
+    else:
+        # url has not been called because last check is recent
+        assert ("HEAD", URL(rurl)) not in rmock.requests
 
 
 async def test_deleted_check(setup_catalog, rmock, fake_check, event_loop, produce_mock):
