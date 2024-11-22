@@ -198,7 +198,7 @@ async def test_analyse_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
     check = await fake_check()
-    await analyse_resource(check["id"], False)
+    await analyse_resource(check_id=check["id"], last_check=None)
     result: Record | None = await Check.get_by_id(check["id"])
 
     assert result["error"] is None
@@ -212,7 +212,7 @@ async def test_analyse_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
     rmock.put(udata_url, status=200, repeat=True)
 
     check = await fake_check()
-    await analyse_resource(check["id"], True)
+    await analyse_resource(check_id=check["id"], last_check=None)
 
     req = rmock.requests[("PUT", URL(udata_url))]
     assert len(req) == 1
@@ -228,9 +228,11 @@ async def test_analyse_resource_send_udata_no_change(
     rmock.put(udata_url, status=200, repeat=True)
 
     # previous check with same checksum
-    await fake_check(checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest())
+    last_check = await fake_check(
+        checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
+    )
     check = await fake_check()
-    await analyse_resource(check["id"], False)
+    await analyse_resource(check_id=check["id"], last_check=last_check)
 
     # udata has not been called
     assert ("PUT", URL(udata_url)) not in rmock.requests
