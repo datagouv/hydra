@@ -166,7 +166,7 @@ async def check_resource(
     ) as e:
         # if we get a 404, it might be that the resource's URL has changed since last catalog load
         # we compare the actual URL to the one we have here to handle these cases
-        if getattr(e, "status", None) == 404:
+        if getattr(e, "status", None) == 404 and config.UDATA_URI:
             stable_resource_url = (
                 f"{config.UDATA_URI.replace('api/2', 'fr')}/datasets/r/{resource_id}"
             )
