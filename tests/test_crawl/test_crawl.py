@@ -136,8 +136,8 @@ async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock, produce
         (True, datetime.now() + timedelta(hours=1), False),
     ],
 )
-async def test_outdated_check(
-    setup_catalog, rmock, fake_check, event_loop, produce_mock, last_check_params
+async def test_next_check(
+    setup_catalog, db, rmock, fake_check, event_loop, produce_mock, last_check_params
 ):
     last_check, next_check_at, new_check_expected = last_check_params
     if last_check:
@@ -145,18 +145,27 @@ async def test_outdated_check(
             created_at=datetime.now() - timedelta(hours=24), next_check_at=next_check_at
         )
     rurl = RESOURCE_URL
-    rmock.head(rurl, status=200)
+    rmock.get(rurl, status=200)
     event_loop.run_until_complete(start_checks(iterations=1))
+    checks: list[Record] = await db.fetch(
+        f"SELECT * FROM checks WHERE url = '{rurl}' ORDER BY created_at DESC"
+    )
     if new_check_expected:
-        # url has been called because check is outdated
         assert ("HEAD", URL(rurl)) in rmock.requests
+        assert len(checks) == [1, 2][last_check]
+        assert checks[0]["url"] == rurl
+        # assert the next check datetime is very close to what's expected, let's say by 10 seconds
+        assert (
+            checks[0]["next_check_at"]
+            - (datetime.now(timezone.utc) + timedelta(hours=config.CHECK_DELAYS[0]))
+        ).total_seconds() < 10
     else:
-        # url has not been called because last check is recent
         assert ("HEAD", URL(rurl)) not in rmock.requests
+        assert len(checks) == [0, 1][last_check]
 
 
 async def test_deleted_check(setup_catalog, rmock, fake_check, event_loop, produce_mock):
-    check = await fake_check(created_at=datetime.now() - timedelta(weeks=52))
+    check = await fake_check(created_at=datetime.now() - timedelta(hours=24))
     # associate check with a resource
     await Resource.update(resource_id=RESOURCE_ID, data={"last_check": check["id"]})
     # delete check
