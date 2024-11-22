@@ -70,7 +70,7 @@ async def has_check_changed(check_data: dict, last_check_data: dict | None) -> b
         else {}
     )
     content_has_changed = last_check_data and (
-        current_headers.get("content-length") != last_check_data.get("content-length")
+        current_headers.get("content-length") != last_check_headers.get("content-length")
         or current_headers.get("content-type") != last_check_headers.get("content-type")
     )
 
