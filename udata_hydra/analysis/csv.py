@@ -84,28 +84,25 @@ RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin"
 minio_client = MinIOClient()
 
 
-async def notify_udata(check: Record | None, resource: Record | None) -> None:
+async def notify_udata(resource: Record, check: Record) -> None:
     """Notify udata of the result of a parsing"""
-    if not check:
-        return
-    if resource:
-        payload = {
-            "resource_id": check["resource_id"],
-            "dataset_id": resource["dataset_id"],
-            "document": {
-                "analysis:parsing:error": check["parsing_error"],
-                "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
-                if check["parsing_started_at"]
-                else None,
-                "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
-                if check["parsing_finished_at"]
-                else None,
-            },
-        }
-        if config.CSV_TO_PARQUET:
-            payload["document"]["analysis:parsing:parquet_url"] = check.get("parquet_url")
-            payload["document"]["analysis:parsing:parquet_size"] = check.get("parquet_size")
-        queue.enqueue(send, _priority="high", **payload)
+    payload = {
+        "resource_id": check["resource_id"],
+        "dataset_id": resource["dataset_id"],
+        "document": {
+            "analysis:parsing:error": check["parsing_error"],
+            "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
+            if check["parsing_started_at"]
+            else None,
+            "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
+            if check["parsing_finished_at"]
+            else None,
+        },
+    }
+    if config.CSV_TO_PARQUET:
+        payload["document"]["analysis:parsing:parquet_url"] = check.get("parquet_url")
+        payload["document"]["analysis:parsing:parquet_size"] = check.get("parquet_size")
+    queue.enqueue(send, _priority="high", **payload)
 
 
 async def analyse_csv(
@@ -204,7 +201,7 @@ async def analyse_csv(
     except ParseException as e:
         await handle_parse_exception(e, table_name, check)
     finally:
-        await notify_udata(check, resource)
+        await notify_udata(resource, check)
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)
