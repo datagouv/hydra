@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import nest_asyncio
 import pytest
-from aiohttp import RequestInfo
+from aiohttp import RequestInfo, ClientSession
 from aiohttp.client_exceptions import ClientError, ClientResponseError
 from aioresponses import CallbackResult
 from asyncpg import Record
@@ -18,6 +18,7 @@ from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import start_checks
+from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.crawl.process_check_data import get_content_type_from_header
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -630,3 +631,37 @@ async def test_dont_check_resources_with_status(
             "SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID
         )
         assert resource["status"] == resource_status
+
+
+async def test_wrong_url_in_catalog(setup_catalog, rmock, produce_mock):
+    r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
+    wrong_url = r["url"]
+    new_url = "https://example.com/has-been-modified-lately"
+    rmock.head(
+        wrong_url,
+        status=404,
+    )
+    rmock.get(
+        wrong_url,
+        status=404,
+    )
+    rmock.head(
+        f"{config.UDATA_URI.replace('api/2', 'fr')}/datasets/r/{RESOURCE_ID}",
+        status=200,
+        headers={
+            "location": new_url,
+        },
+    )
+    rmock.head(
+        new_url,
+        status=200,
+        headers={
+            "last-modified": "Thu, 09 Jan 2020 09:33:37 GMT",
+            "content-type": "application/csv",
+        },
+    )
+    async with ClientSession() as session:
+        await check_resource(url=wrong_url, resource_id=RESOURCE_ID, session=session)
+    r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
+    current_url = r["url"]
+    assert current_url == new_url
