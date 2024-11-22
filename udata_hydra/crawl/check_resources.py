@@ -68,7 +68,7 @@ async def check_resource(
     from udata_hydra.analysis.resource import analyse_resource
 
     # Update resource status to CRAWLING_URL
-    await Resource.update(resource_id, data={"status": "CRAWLING_URL"})
+    resource: Record = await Resource.update(resource_id, data={"status": "CRAWLING_URL"})
 
     if sleep:
         await asyncio.sleep(sleep)
@@ -80,12 +80,13 @@ async def check_resource(
         log.warning(f"[warning] not netloc in url, skipping {url}")
         # Process the check data. If it has changed, it will be sent to udata
         await preprocess_check_data(
-            {
+            dataset_id=resource["dataset_id"],
+            check_data={
                 "resource_id": resource_id,
                 "url": url,
                 "error": "Not netloc in url",
                 "timeout": False,
-            }
+            },
         )
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
 
@@ -115,7 +116,8 @@ async def check_resource(
 
             # Preprocess the check data. If it has changed, it will be sent to udata
             new_check, last_check = await preprocess_check_data(
-                {
+                dataset_id=resource["dataset_id"],
+                check_data={
                     "resource_id": resource_id,
                     "url": url,
                     "domain": domain,
@@ -143,12 +145,13 @@ async def check_resource(
     except asyncio.exceptions.TimeoutError:
         # Process the check data. If it has changed, it will be sent to udata
         await preprocess_check_data(
-            {
+            dataset_id=resource["dataset_id"],
+            check_data={
                 "resource_id": resource_id,
                 "url": url,
                 "domain": domain,
                 "timeout": True,
-            }
+            },
         )
 
         # Reset resource status so that it's not forbidden to be checked again
@@ -182,7 +185,8 @@ async def check_resource(
         error = getattr(e, "message", None) or str(e)
         # Process the check data. If it has changed, it will be sent to udata
         await preprocess_check_data(
-            {
+            dataset_id=resource["dataset_id"],
+            check_data={
                 "resource_id": resource_id,
                 "url": url,
                 "domain": domain,
@@ -190,7 +194,7 @@ async def check_resource(
                 "error": fix_surrogates(error),
                 "headers": convert_headers(getattr(e, "headers", {})),
                 "status": getattr(e, "status", None),
-            }
+            },
         )
 
         log.warning(f"Crawling error for url {url}", exc_info=e)
