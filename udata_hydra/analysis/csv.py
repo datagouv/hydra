@@ -32,12 +32,19 @@ from str2float import str2float
 
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
-from udata_hydra.analysis.errors import ParseException, handle_parse_exception
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
-from udata_hydra.utils import Reader, Timer, download_resource, queue, send
+from udata_hydra.utils import (
+    ParseException,
+    Reader,
+    Timer,
+    download_resource,
+    handle_parse_exception,
+    queue,
+    send,
+)
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
 
