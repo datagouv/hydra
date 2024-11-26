@@ -164,6 +164,19 @@ async def check_resource(
         AssertionError,
         UnicodeError,
     ) as e:
+        # if we get a 404, it might be that the resource's URL has changed since last catalog load
+        # we compare the actual URL to the one we have here to handle these cases
+        if getattr(e, "status", None) == 404 and config.UDATA_URI:
+            handled = await handle_wrong_resource_url(
+                resource_id=resource_id,
+                session=session,
+                url=url,
+                force_analysis=force_analysis,
+                worker_priority=worker_priority,
+            )
+            if handled is not None:
+                return handled
+
         error = getattr(e, "message", None) or str(e)
         # Process the check data. If it has changed, it will be sent to udata
         await process_check_data(
@@ -184,3 +197,27 @@ async def check_resource(
         await Resource.update(resource_id=resource_id, data={"status": None})
 
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
+
+
+async def handle_wrong_resource_url(
+    resource_id: str,
+    session,
+    url: str,
+    force_analysis: bool,
+    worker_priority: str,
+):
+    stable_resource_url = f"{config.UDATA_URI.replace('api/2', 'fr')}/datasets/r/{resource_id}"
+    async with session.head(stable_resource_url) as resp:
+        resp.raise_for_status()
+        actual_url = resp.headers.get("location")
+    if actual_url and url != actual_url:
+        await Resource.update(resource_id=resource_id, data={"url": actual_url})
+        return await check_resource(
+            actual_url,
+            resource_id,
+            session,
+            force_analysis=force_analysis,
+            method="head",
+            worker_priority=worker_priority,
+        )
+    return
