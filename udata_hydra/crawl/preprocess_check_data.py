@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from asyncpg import Record
 
-from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
+from udata_hydra.crawl.calculate_next_check_date import calculate_next_check_date
 from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_status
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource

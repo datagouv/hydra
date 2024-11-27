@@ -3,7 +3,7 @@ import pytest
 from minicli import run
 
 from tests.conftest import DATASET_ID, RESOURCE_ID, RESOURCE_URL
-from udata_hydra.crawl import start_checks
+from udata_hydra.crawl.start_checks import start_checks
 
 pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
