@@ -8,6 +8,7 @@
 - Minor cleaning: remove unused arg in function [#219](https://github.com/datagouv/hydra/pull/219)
 - Fix type issue regarding `resource_id` [#220](https://github.com/datagouv/hydra/pull/220)
 - Use bump'X [#226](https://github.com/datagouv/hydra/pull/226)
+- Get actual resource URL in case of 404 (change since last catalog load) [#225](https://github.com/datagouv/hydra/pull/225)
 - Improve timing of checks depending on changes since last check [#163](https://github.com/datagouv/hydra/pull/163)
 
 ## 2.0.5 (2024-11-08)
