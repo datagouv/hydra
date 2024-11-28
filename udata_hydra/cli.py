@@ -304,6 +304,49 @@ async def purge_csv_tables(quiet: bool = False):
         log.info("Nothing to delete.")
 
 
+@cli
+async def insert_resource_into_catalog(resource_id: str):
+    """Insert a resource into the catalog
+    Useful for local tests, instead of having to resync the whole catalog for one new resource
+
+    :resource_id: id of the resource to insert
+    """
+    resource: asyncpg.Record | None = await Resource.get(resource_id)
+    action = "insert"
+    if resource:
+        logging.warning("Resource already exists in catalog, updating...")
+        action = "updat"
+    url = f"https://www.data.gouv.fr/api/2/datasets/resources/{resource_id}/"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            resp.raise_for_status()
+            resource = await resp.json()
+    try:
+        conn = await connection()
+        await conn.execute(
+            """
+            INSERT INTO catalog (
+                dataset_id, resource_id, url, harvest_modified_at,
+                deleted, priority, status
+            )
+            VALUES ($1, $2, $3, $4, FALSE, FALSE, NULL)
+            ON CONFLICT (resource_id) DO UPDATE SET
+                dataset_id = $1,
+                url = $3,
+                deleted = FALSE;
+        """,
+            resource["dataset_id"],
+            resource["resource"]["id"],
+            resource["resource"]["url"],
+            # force timezone info to UTC (catalog data should be in UTC)
+            datetime.fromisoformat(resource["resource"]["harvest"]["modified_at"]).replace(tzinfo=timezone.utc)
+            if resource["resource"].get("harvest") else None,
+        )
+        log.info(f"Resource {resource_id} successfully {action}ed into DB.")
+    except Exception as e:
+        raise e
+
+
 @wrap
 async def cli_wrapper():
     context["conn"] = {}
