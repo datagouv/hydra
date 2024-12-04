@@ -9,6 +9,7 @@
 - Fix type issue regarding `resource_id` [#220](https://github.com/datagouv/hydra/pull/220)
 - Use bump'X [#226](https://github.com/datagouv/hydra/pull/226)
 - Get actual resource URL in case of 404 (change since last catalog load) [#225](https://github.com/datagouv/hydra/pull/225)
+- Fix dealdocks errors when purging CSV tables by refactorin `purge_csv_tables` to use atomic transactions [#230](https://github.com/datagouv/hydra/pull/230)
 
 ## 2.0.5 (2024-11-08)
 
