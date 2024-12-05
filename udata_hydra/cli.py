@@ -339,8 +339,11 @@ async def insert_resource_into_catalog(resource_id: str):
             resource["resource"]["id"],
             resource["resource"]["url"],
             # force timezone info to UTC (catalog data should be in UTC)
-            datetime.fromisoformat(resource["resource"]["harvest"]["modified_at"]).replace(tzinfo=timezone.utc)
-            if resource["resource"].get("harvest") else None,
+            datetime.fromisoformat(resource["resource"]["harvest"]["modified_at"]).replace(
+                tzinfo=timezone.utc
+            )
+            if resource["resource"].get("harvest")
+            else None,
         )
         log.info(f"Resource {resource_id} successfully {action}ed into DB.")
     except Exception as e:
