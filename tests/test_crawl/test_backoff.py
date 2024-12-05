@@ -6,11 +6,11 @@ from aiohttp import ClientSession
 from yarl import URL
 
 from tests.conftest import RESOURCE_URL
+from udata_hydra.crawl import start_checks
 from udata_hydra.crawl.check_resources import (
     RESOURCE_RESPONSE_STATUSES,
     check_resource,
 )
-from udata_hydra.crawl.start_checks import start_checks
 
 # TODO: make file content configurable
 SIMPLE_CSV_CONTENT = """code_insee,number

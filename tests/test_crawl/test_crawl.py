@@ -17,9 +17,9 @@ from yarl import URL
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
+from udata_hydra.crawl import start_checks
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.crawl.preprocess_check_data import get_content_type_from_header
-from udata_hydra.crawl.start_checks import start_checks
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 

@@ -10,7 +10,7 @@ from dateparser import parse as date_parser
 
 from udata_hydra import config, context
 from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.crawl.calculate_next_check_date import calculate_next_check_date
+from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
