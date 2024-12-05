@@ -8,7 +8,6 @@ import aiohttp
 from asyncpg import Record
 
 from udata_hydra import config, context
-from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.helpers import (
     convert_headers,
     fix_surrogates,
@@ -64,6 +63,9 @@ async def check_resource(
     force_analysis: bool = False,
 ) -> str:
     log.debug(f"check {url}, sleep {sleep}, method {method}")
+
+    # Import here to avoid circular import issues
+    from udata_hydra.analysis.resource import analyse_resource
 
     # Update resource status to CRAWLING_URL
     await Resource.update(resource_id, data={"status": "CRAWLING_URL"})
