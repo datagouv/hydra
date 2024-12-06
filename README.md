@@ -47,7 +47,7 @@ It will crawl (forever) the catalog according to the config set in `config.toml`
 
 `BATCH_SIZE` URLs are queued at each loop run.
 
-The crawler will start with URLs never checked and then proceed with URLs crawled before `SINCE` interval. It will then wait until something changes (catalog or time).
+The crawler will start with URLs never checked and then proceed with URLs crawled before `CHECK_DELAYS` interval. It will then wait until something changes (catalog or time).
 
 There's a by-domain backoff mecanism. The crawler will wait when, for a given domain in a given batch, `BACKOFF_NB_REQ` is exceeded in a period of `BACKOFF_PERIOD` seconds. It will retry until the backoff is lifted.
 
