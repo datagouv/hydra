@@ -7,9 +7,9 @@ from tempfile import NamedTemporaryFile
 
 import aiohttp
 import asyncpg
+import typer
 from asyncpg import Record
 from humanfriendly import parse_size
-from minicli import cli, run, wrap
 from progressist import ProgressBar
 
 from udata_hydra import config
@@ -19,7 +19,7 @@ from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
 
-context = {}
+typer_app = typer.Typer()
 log = setup_logging()
 
 
@@ -33,22 +33,26 @@ async def download_file(url: str, fd):
                 fd.write(chunk)
 
 
-async def connection(db_name: str = "main"):
-    if db_name not in context["conn"]:
+async def connection(ctx: typer.Context, db_name: str = "main"):
+    if db_name not in ctx.obj["conn"]:
         dsn = (
             config.DATABASE_URL
             if db_name == "main"
             else getattr(config, f"DATABASE_URL_{db_name.upper()}")
         )
-        context["conn"][db_name] = await asyncpg.connect(
+        ctx.obj["conn"][db_name] = await asyncpg.connect(
             dsn=dsn, server_settings={"search_path": config.DATABASE_SCHEMA}
         )
-    return context["conn"][db_name]
+    return ctx.obj["conn"][db_name]
 
 
-@cli
+@typer_app.command()
 async def load_catalog(
-    url: str | None = None, drop_meta: bool = False, drop_all: bool = False, quiet: bool = False
+    ctx: typer.Context,
+    url: str | None = None,
+    drop_meta: bool = False,
+    drop_all: bool = False,
+    quiet: bool = False,
 ):
     """Load the catalog into DB from CSV file
 
@@ -83,7 +87,7 @@ async def load_catalog(
             await download_file(url, fd)
         log.info("Upserting resources catalog in database...")
         # consider everything deleted, deleted will be updated when loading new catalog
-        conn = await connection()
+        conn = await connection(ctx)
         await conn.execute("UPDATE catalog SET deleted = TRUE")
         with open(fd.name) as fd:
             reader = csv.DictReader(fd, delimiter=";")
@@ -121,7 +125,7 @@ async def load_catalog(
         os.unlink(fd.name)
 
 
-@cli
+@typer_app.command()
 async def crawl_url(url: str, method: str = "get"):
     """Quickly crawl an URL"""
     log.info(f"Checking url {url}")
@@ -136,7 +140,7 @@ async def crawl_url(url: str, method: str = "get"):
             log.error(e)
 
 
-@cli
+@typer_app.command()
 async def check_resource(resource_id: str, method: str = "get", force_analysis: bool = True):
     """Trigger a complete check for a given resource_id"""
     resource: asyncpg.Record | None = await Resource.get(resource_id)
@@ -154,7 +158,7 @@ async def check_resource(resource_id: str, method: str = "get", force_analysis: 
         )
 
 
-@cli(name="analyse-csv")
+@typer_app.command(name="analyse-csv")
 async def analyse_csv_cli(
     check_id: str | None = None, url: str | None = None, debug_insert: bool = False
 ):
@@ -163,8 +167,10 @@ async def analyse_csv_cli(
     await analyse_csv(check_id, url, debug_insert)
 
 
-@cli
-async def csv_sample(size: int = 1000, download: bool = False, max_size: str = "100M"):
+@typer_app.command()
+async def csv_sample(
+    ctx: typer.Context, size: int = 1000, download: bool = False, max_size: str = "100M"
+):
     """Get a csv sample from latest checks
 
     :size: Size of the sample (how many files to query)
@@ -195,7 +201,7 @@ async def csv_sample(size: int = 1000, download: bool = False, max_size: str = "
         AND checks.domain <> 'static.data.gouv.fr'
         {end_q}
     """
-    conn = await connection()
+    conn = await connection(ctx)
     res = await conn.fetch(q)
     # and from us for the rest
     q = f"""{start_q}
@@ -233,10 +239,13 @@ async def csv_sample(size: int = 1000, download: bool = False, max_size: str = "
         writer.writerows(lines)
 
 
-@cli
-async def drop_dbs(dbs: list = []):
+@typer_app.command()
+async def drop_dbs(
+    ctx: typer.Context, dbs: list[str] = typer.Option(["main"], help="List of databases to drop")
+):
+    """Drop tables from specified databases"""
     for db in dbs:
-        conn = await connection(db)
+        conn = await connection(ctx, db)
         tables = await conn.fetch(f"""
             SELECT tablename FROM pg_catalog.pg_tables
             WHERE schemaname = '{config.DATABASE_SCHEMA}';
@@ -245,7 +254,7 @@ async def drop_dbs(dbs: list = []):
             await conn.execute(f'DROP TABLE "{table["tablename"]}" CASCADE')
 
 
-@cli
+@typer_app.command()
 async def migrate(skip_errors: bool = False, dbs: list[str] = ["main", "csv"]):
     """Migrate the database(s)"""
     for db in dbs:
@@ -254,13 +263,13 @@ async def migrate(skip_errors: bool = False, dbs: list[str] = ["main", "csv"]):
         await migrator.migrate()
 
 
-@cli
-async def purge_checks(retention_days: int = 60, quiet: bool = False) -> None:
+@typer_app.command()
+async def purge_checks(ctx: typer.Context, retention_days: int = 60, quiet: bool = False) -> None:
     """Delete outdated checks that are more than `retention_days` days old"""
     if quiet:
         log.setLevel(logging.ERROR)
 
-    conn = await connection()
+    conn = await connection(ctx)
     log.debug(f"Deleting checks that are more than {retention_days} days old...")
     res: Record = await conn.fetchrow(
         f"""WITH deleted AS (DELETE FROM checks WHERE created_at < now() - interval '{retention_days} days' RETURNING *) SELECT count(*) FROM deleted"""
@@ -269,8 +278,8 @@ async def purge_checks(retention_days: int = 60, quiet: bool = False) -> None:
     log.info(f"Deleted {deleted} checks.")
 
 
-@cli
-async def purge_csv_tables(quiet: bool = False) -> None:
+@typer_app.command()
+async def purge_csv_tables(ctx: typer.Context, quiet: bool = False) -> None:
     """Delete converted CSV tables for resources url no longer in catalog"""
     # TODO: check if we should use parsing_table from table_index?
     # And are they necessarily in sync?
@@ -290,7 +299,7 @@ async def purge_csv_tables(quiet: bool = False) -> None:
     ON checks.parsing_table = md5(c.url)
     WHERE checks.parsing_table IS NOT NULL AND (c.id IS NULL OR c.deleted = TRUE);
     """
-    conn = await connection()
+    conn = await connection(ctx)
     res: list[Record] = await conn.fetch(q)
     tables_to_delete: list[str] = [r["parsing_table"] for r in res]
 
@@ -320,13 +329,15 @@ async def purge_csv_tables(quiet: bool = False) -> None:
         log.info("Nothing to delete.")
 
 
-@wrap
-async def cli_wrapper():
-    context["conn"] = {}
+@typer_app.callback()
+async def main(ctx: typer.Context):
+    ctx.obj = {"conn": {}}
     yield
-    for db in context["conn"]:
-        await context["conn"][db].close()
+    for db in ctx.obj["conn"]:
+        await ctx.obj["conn"][db].close()
 
 
 if __name__ == "__main__":
-    run()
+    import asyncio
+
+    asyncio.run(typer_app())

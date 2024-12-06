@@ -1,11 +1,16 @@
 import nest_asyncio
 import pytest
-from minicli import run
+import typer
+from typer.testing import CliRunner
 
 from tests.conftest import DATASET_ID, RESOURCE_ID, RESOURCE_URL
+from udata_hydra.cli import load_catalog
 from udata_hydra.crawl import start_checks
 
 pytestmark = pytest.mark.asyncio
+typer_app = typer.Typer()
+typer_app.command()(load_catalog)
+runner = CliRunner()
 # allows nested async to test async with async :mindblown:
 nest_asyncio.apply()
 
@@ -31,7 +36,7 @@ async def test_catalog_deleted(setup_catalog, db, rmock):
     catalog = "https://example.com/catalog"
     # feed empty catalog, should delete the previously loaded resource
     rmock.get(catalog, status=200, body=catalog_content[0])
-    run("load_catalog", url=catalog)
+    runner.invoke(typer_app, url=catalog)
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = TRUE")
     assert len(res) == 1
     res = await db.fetch("SELECT id FROM catalog")
@@ -55,7 +60,7 @@ async def test_catalog_deleted_with_checked_resource(
     catalog = "https://example.com/catalog"
     # feed empty catalog, should delete the previously loaded resource
     rmock.get(catalog, status=200, body=catalog_content[0])
-    run("load_catalog", url=catalog)
+    runner.invoke(typer_app, url=catalog)
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = TRUE")
     assert len(res) == 1
     res = await db.fetch("SELECT id FROM catalog")
@@ -72,7 +77,7 @@ async def test_catalog_deleted_with_new_url(
     catalog_content = "\n".join(catalog_content)
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content.encode("utf-8"))
-    run("load_catalog", url=catalog)
+    runner.invoke(typer_app, url=catalog)
 
     # check catalog coherence, replacing the URL in the existing entry
     res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", RESOURCE_ID)

@@ -3,11 +3,15 @@ from datetime import datetime, timedelta
 
 import nest_asyncio
 import pytest
-from minicli import run
+import typer
+from typer.testing import CliRunner
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
+from udata_hydra.cli import analyse_csv, load_catalog, purge_checks, purge_csv_tables
 
 pytestmark = pytest.mark.asyncio
+typer_app = typer.Typer()
+runner = CliRunner()
 nest_asyncio.apply()
 
 
@@ -16,22 +20,26 @@ async def test_analysis_csv(setup_catalog, rmock, catalog_content, db, fake_chec
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
-    run("analyse-csv", check_id=str(check["id"]))
+    typer_app.command()(analyse_csv)
+    runner.invoke(typer_app, check_id=str(check["id"]))
     # Analyse using URL
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
-    run("analyse-csv", url=RESOURCE_URL)
+    typer_app.command()(analyse_csv)
+    runner.invoke(typer_app, url=RESOURCE_URL)
 
 
 async def test_purge_checks(setup_catalog, db, fake_check):
     await fake_check(created_at=datetime.now() - timedelta(days=50))
     await fake_check(created_at=datetime.now() - timedelta(days=30))
     await fake_check(created_at=datetime.now() - timedelta(days=10))
-    run("purge_checks", retention_days=40)
+    typer_app.command()(purge_checks)
+    runner.invoke(typer_app, retention_days=40)
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 2
-    run("purge_checks", retention_days=20)
+    typer_app.command()(purge_checks)
+    runner.invoke(typer_app, retention_days=20)
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 1
 
@@ -47,7 +55,8 @@ async def test_purge_csv_tables(setup_catalog, db, fake_check):
     # pretend the resource is deleted
     await db.execute("UPDATE catalog SET deleted = TRUE")
     # purge
-    run("purge_csv_tables")
+    typer_app.command()(purge_csv_tables)
+    runner.invoke(typer_app)
     # check table is gone
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
     assert res is None
@@ -76,7 +85,8 @@ async def test_purge_csv_tables_url_used_by_other_resource(setup_catalog, db, fa
         False,
     )
     # purge
-    run("purge_csv_tables")
+    typer_app.command()(purge_csv_tables)
+    runner.invoke(typer_app)
     # check table is _not_ gone
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
     assert res is not None
@@ -103,7 +113,8 @@ async def test_purge_csv_tables_url_used_by_deleted_resource_only(setup_catalog,
         False,
     )
     # purge
-    run("purge_csv_tables")
+    typer_app.command()(purge_csv_tables)
+    runner.invoke(typer_app)
     # check table is gone
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
     assert res is None
@@ -123,7 +134,8 @@ async def test_purge_csv_tables_url_not_in_catalog(setup_catalog, db, fake_check
     # pretend the resource URL have been updated
     await db.execute("UPDATE catalog SET url = 'https://example.com/resource-0'")
     # purge
-    run("purge_csv_tables")
+    typer_app.command()(purge_csv_tables)
+    runner.invoke(typer_app)
     # check table is gone
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
     assert res is None
@@ -138,8 +150,8 @@ async def test_load_catalog_url_has_changed(setup_catalog, rmock, db, catalog_co
     )
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    run("load_catalog", url=catalog)
-
+    typer_app.command()(load_catalog)
+    runner.invoke(typer_app, url=catalog)
     # check that we still only have one entry for this resource in the catalog
     res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", f"{RESOURCE_ID}")
     assert len(res) == 1

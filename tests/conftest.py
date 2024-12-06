@@ -9,13 +9,15 @@ import asyncpg
 import nest_asyncio
 import pytest
 import pytest_asyncio
+import typer
 from aiohttp.test_utils import TestClient, TestServer
 from aioresponses import aioresponses
-from minicli import run
+from typer.testing import CliRunner
 
 import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra import config
 from udata_hydra.app import app_factory
+from udata_hydra.cli import drop_dbs, load_catalog, migrate
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -28,8 +30,10 @@ RESOURCE_EXCEPTION_TABLE_INDEXES = {"Nom": "index", "N° de certificat": "index"
 RESOURCE_URL = "https://example.com/resource-1"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 NOT_EXISTING_RESOURCE_ID = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
-pytestmark = pytest.mark.asyncio
 
+pytestmark = pytest.mark.asyncio
+typer_app = typer.Typer()
+runner = CliRunner()
 nest_asyncio.apply()
 
 log = logging.getLogger("udata-hydra")
@@ -127,8 +131,10 @@ def catalog_content(is_harvested):
 
 @pytest.fixture
 def clean_db():
-    run("drop_dbs", dbs=["main"])
-    run("migrate")
+    typer_app.command()(drop_dbs)
+    runner.invoke(typer_app, dbs=["main"])
+    typer_app.command()(migrate)
+    runner.invoke(typer_app)
     yield
 
 
@@ -136,9 +142,12 @@ def clean_db():
 def setup_catalog(catalog_content, rmock):
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    run("drop_dbs", dbs=["main"])
-    run("migrate")
-    run("load_catalog", url=catalog)
+    typer_app.command()(drop_dbs)
+    runner.invoke(typer_app, dbs=["main"])
+    typer_app.command()(migrate)
+    runner.invoke(typer_app)
+    typer_app.command()(load_catalog)
+    runner.invoke(typer_app, url=catalog)
 
 
 @pytest.fixture
