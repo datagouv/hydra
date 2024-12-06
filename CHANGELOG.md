@@ -10,6 +10,8 @@
 - Use bump'X [#226](https://github.com/datagouv/hydra/pull/226)
 - Get actual resource URL in case of 404 (change since last catalog load) [#225](https://github.com/datagouv/hydra/pull/225)
 - Add CLI util to insert or update a resource into the catalog (change since last catalog load) [#228](https://github.com/datagouv/hydra/pull/228)
+- Fix deadlocks errors when purging CSV tables by refactoring `purge_csv_tables` to use atomic transactions [#230](https://github.com/datagouv/hydra/pull/230)
+
 
 ## 2.0.5 (2024-11-08)
 

@@ -426,6 +426,8 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: Record) -> N
 
 
 async def delete_table(table_name: str) -> None:
-    db = await context.pool("csv")
-    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
-    await db.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)
+    pool = await context.pool("csv")
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+            await conn.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)
