@@ -9,6 +9,7 @@
 - Fix type issue regarding `resource_id` [#220](https://github.com/datagouv/hydra/pull/220)
 - Use bump'X [#226](https://github.com/datagouv/hydra/pull/226)
 - Get actual resource URL in case of 404 (change since last catalog load) [#225](https://github.com/datagouv/hydra/pull/225)
+- Add CLI util to insert or update a resource into the catalog (change since last catalog load) [#228](https://github.com/datagouv/hydra/pull/228)
 
 ## 2.0.5 (2024-11-08)
 
