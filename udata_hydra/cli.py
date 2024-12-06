@@ -305,7 +305,7 @@ async def purge_csv_tables(quiet: bool = False):
 
 
 @cli
-async def insert_resource_into_catalog(resource_id: str):
+async def insert_resource_into_catalog(resource_id: str = "default"):
     """Insert a resource into the catalog
     Useful for local tests, instead of having to resync the whole catalog for one new resource
 
