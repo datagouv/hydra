@@ -61,10 +61,12 @@ async def analyse_resource(
     log.debug(f"Analysis for resource {resource_id} in dataset {dataset_id}")
 
     # Update resource status to ANALYSING_RESOURCE
-    await Resource.update(resource_id, data={"status": "ANALYSING_RESOURCE"})
+    resource: Record | None = await Resource.update(
+        resource_id, data={"status": "ANALYSING_RESOURCE"}
+    )
 
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
-    change_status, change_payload = await detect_resource_change_on_early_hints(resource_id)
+    change_status, change_payload = await detect_resource_change_on_early_hints(resource)
 
     # could it be a CSV? If we get hints, we will analyse the file further depending on change status
     is_tabular, file_format = await detect_tabular_from_headers(check)
@@ -89,7 +91,7 @@ async def analyse_resource(
                     change_status,
                     change_payload,
                 ) = await detect_resource_change_from_checksum(
-                    resource_id, dl_analysis["analysis:checksum"]
+                    new_checksum=dl_analysis["analysis:checksum"], last_check=last_check
                 )
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
@@ -158,7 +160,7 @@ async def update_check_with_modification_and_next_dates(
 
 
 async def detect_resource_change_from_checksum(
-    resource_id, new_checksum
+    new_checksum, last_check: dict | None
 ) -> tuple[Change, dict | None]:
     """
     Checks if resource checksum has changed over time
@@ -168,21 +170,11 @@ async def detect_resource_change_from_checksum(
         "analysis:last-modified-detection": "computed-checksum",
     }
     """
-    q = """
-    SELECT checksum
-    FROM checks
-    WHERE resource_id = $1 and checksum IS NOT NULL
-    ORDER BY created_at DESC
-    LIMIT 1
-    """
-    pool = await context.pool()
-    async with pool.acquire() as connection:
-        data = await connection.fetchrow(q, resource_id)
-        if data and data["checksum"] != new_checksum:
-            return Change.HAS_CHANGED, {
-                "analysis:last-modified-at": datetime.now(timezone.utc).isoformat(),
-                "analysis:last-modified-detection": "computed-checksum",
-            }
+    if last_check and "checksum" in last_check and last_check["checksum"] != new_checksum:
+        return Change.HAS_CHANGED, {
+            "analysis:last-modified-at": datetime.now(timezone.utc).isoformat(),
+            "analysis:last-modified-detection": "computed-checksum",
+        }
     return Change.NO_GUESS, None
 
 
@@ -226,7 +218,7 @@ async def detect_resource_change_from_content_length_header(
 
 
 async def detect_resource_change_on_early_hints(
-    resource_id: str,
+    resource: Record | None,
 ) -> tuple[Change, dict | None]:
     """
     Try to guess if a resource has been modified from harvest and headers in check data:
@@ -239,28 +231,31 @@ async def detect_resource_change_on_early_hints(
         "analysis:last-modified-detection": "detection-method",
     }
     """
-    # Fetch current and last check headers
-    q = """
-    SELECT
-        created_at,
-        headers->>'last-modified' as last_modified,
-        headers->>'content-length' as content_length,
-        detected_last_modified_at
-    FROM checks
-    WHERE resource_id = $1
-    ORDER BY created_at DESC
-    LIMIT 2
-    """
-    pool = await context.pool()
-    async with pool.acquire() as connection:
-        data = await connection.fetch(q, resource_id)
+    data = None
+
+    if resource:
+        # Fetch current and last check headers
+        q = """
+        SELECT
+            created_at,
+            headers->>'last-modified' as last_modified,
+            headers->>'content-length' as content_length,
+            detected_last_modified_at
+        FROM checks
+        WHERE resource_id = $1
+        ORDER BY created_at DESC
+        LIMIT 2
+        """
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            data = await connection.fetch(q, str(resource["resource_id"]))
 
     # not enough checks to make a comparison
     if not data:
         return Change.NO_GUESS, None
 
     # let's see if we can infer a modification date from harvest infos
-    change_status, change_payload = await detect_resource_change_from_harvest(data, resource_id)
+    change_status, change_payload = await detect_resource_change_from_harvest(data, resource)
     if change_status != Change.NO_GUESS:
         return change_status, change_payload
 
@@ -277,7 +272,7 @@ async def detect_resource_change_on_early_hints(
 
 
 async def detect_resource_change_from_harvest(
-    checks_data: tuple, resource_id: str
+    checks_data: tuple, resource: Record | None
 ) -> tuple[Change, dict | None]:
     """
     Checks if resource has a harvest.modified_at
@@ -289,19 +284,14 @@ async def detect_resource_change_from_harvest(
     """
     if len(checks_data) == 1:
         return Change.NO_GUESS, None
+
     last_check = checks_data[1]
-    q = """
-        SELECT catalog.harvest_modified_at FROM catalog
-        WHERE catalog.resource_id = $1
-    """
-    pool = await context.pool()
-    async with pool.acquire() as connection:
-        catalog_data = await connection.fetchrow(q, resource_id)
-        if catalog_data and catalog_data["harvest_modified_at"]:
-            if catalog_data["harvest_modified_at"] == last_check["detected_last_modified_at"]:
-                return Change.HAS_NOT_CHANGED, None
-            return Change.HAS_CHANGED, {
-                "analysis:last-modified-at": catalog_data["harvest_modified_at"].isoformat(),
-                "analysis:last-modified-detection": "harvest-resource-metadata",
-            }
+
+    if resource and resource.get("harvest_modified_at"):
+        if resource["harvest_modified_at"] == last_check["detected_last_modified_at"]:
+            return Change.HAS_NOT_CHANGED, None
+        return Change.HAS_CHANGED, {
+            "analysis:last-modified-at": resource["harvest_modified_at"].isoformat(),
+            "analysis:last-modified-detection": "harvest-resource-metadata",
+        }
     return Change.NO_GUESS, None

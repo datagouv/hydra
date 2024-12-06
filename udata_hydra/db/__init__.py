@@ -1,5 +1,7 @@
 import json
 
+from asyncpg import Record
+
 from udata_hydra import context
 
 
@@ -22,11 +24,11 @@ def compute_insert_query(table_name: str, data: dict, returning: str = "id") -> 
     return f"""
         INSERT INTO "{table_name}" ({columns})
         VALUES ({placeholders})
-        RETURNING {returning}
+        RETURNING {returning};
     """
 
 
-def compute_update_query(table_name: str, data: dict) -> str:
+def compute_update_query(table_name: str, data: dict, returning: str = "*") -> str:
     columns = data.keys()
     # $1, $2...
     placeholders = [f"${x + 1}" for x in range(len(data.values()))]
@@ -35,12 +37,12 @@ def compute_update_query(table_name: str, data: dict) -> str:
         UPDATE "{table_name}"
         SET {set_clause}
         WHERE id = ${len(placeholders) + 1}
+        RETURNING {returning};
     """
 
 
-async def update_table_record(table_name: str, record_id: int, data: dict) -> int:
+async def update_table_record(table_name: str, record_id: int, data: dict) -> Record | None:
     data = convert_dict_values_to_json(data)
     q = compute_update_query(table_name, data)
     pool = await context.pool()
-    await pool.execute(q, *data.values(), record_id)
-    return record_id
+    return await pool.fetchrow(q, *data.values(), record_id)
