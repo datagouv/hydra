@@ -84,31 +84,25 @@ RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin"
 minio_client = MinIOClient()
 
 
-async def notify_udata(check_id: int) -> None:
+async def notify_udata(resource: Record, check: Record) -> None:
     """Notify udata of the result of a parsing"""
-    # Get the check again to get its updated data
-    check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
-    resource_id = check["resource_id"]
-    db = await context.pool()
-    record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
-    if record:
-        payload = {
-            "resource_id": resource_id,
-            "dataset_id": record["dataset_id"],
-            "document": {
-                "analysis:parsing:error": check["parsing_error"],
-                "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
-                if check["parsing_started_at"]
-                else None,
-                "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
-                if check["parsing_finished_at"]
-                else None,
-            },
-        }
-        if config.CSV_TO_PARQUET:
-            payload["document"]["analysis:parsing:parquet_url"] = check.get("parquet_url")
-            payload["document"]["analysis:parsing:parquet_size"] = check.get("parquet_size")
-        queue.enqueue(send, _priority="high", **payload)
+    payload = {
+        "resource_id": check["resource_id"],
+        "dataset_id": resource["dataset_id"],
+        "document": {
+            "analysis:parsing:error": check["parsing_error"],
+            "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
+            if check["parsing_started_at"]
+            else None,
+            "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
+            if check["parsing_finished_at"]
+            else None,
+        },
+    }
+    if config.CSV_TO_PARQUET:
+        payload["document"]["analysis:parsing:parquet_url"] = check.get("parquet_url")
+        payload["document"]["analysis:parsing:parquet_size"] = check.get("parquet_size")
+    queue.enqueue(send, _priority="high", **payload)
 
 
 async def analyse_csv(
@@ -136,7 +130,7 @@ async def analyse_csv(
     url = check["url"]
 
     # Update resource status to ANALYSING_CSV
-    await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
+    resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
 
     # Check if the resource is in the exceptions table
     # If it is, get the table_indexes to use them later
@@ -162,7 +156,7 @@ async def analyse_csv(
     timer.mark("download-file")
 
     try:
-        await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
+        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
 
         # Launch csv-detective against given file
         try:
@@ -193,7 +187,7 @@ async def analyse_csv(
             resource_id=resource_id,
         )
         timer.mark("csv-to-parquet")
-        await Check.update(
+        check = await Check.update(
             check["id"],
             {
                 "parsing_table": table_name,
@@ -207,7 +201,7 @@ async def analyse_csv(
     except ParseException as e:
         await handle_parse_exception(e, table_name, check)
     finally:
-        await notify_udata(check["id"])
+        await notify_udata(resource, check)
         timer.stop()
         tmp_file.close()
         os.remove(tmp_file.name)

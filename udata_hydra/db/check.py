@@ -113,7 +113,7 @@ class Check:
             return last_check
 
     @classmethod
-    async def update(cls, check_id: int, data: dict) -> int:
+    async def update(cls, check_id: int, data: dict) -> Record | None:
         """Update a check in DB with new data and return the check id in DB"""
         return await update_table_record(table_name="checks", record_id=check_id, data=data)
 
