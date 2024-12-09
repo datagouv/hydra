@@ -19,7 +19,7 @@ from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import start_checks
 from udata_hydra.crawl.check_resources import check_resource
-from udata_hydra.crawl.process_check_data import get_content_type_from_header
+from udata_hydra.crawl.preprocess_check_data import get_content_type_from_header
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 
@@ -127,29 +127,46 @@ async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock, produce
     assert ("GET", URL(rurl)) not in rmock.requests
 
 
-async def test_outdated_check(setup_catalog, rmock, fake_check, event_loop, produce_mock):
-    await fake_check(created_at=datetime.now() - timedelta(weeks=52))
-    rurl = RESOURCE_URL
-    rmock.head(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
-    # url has been called because check is outdated
-    assert ("HEAD", URL(rurl)) in rmock.requests
-
-
-async def test_not_outdated_check(
-    setup_catalog, rmock, fake_check, event_loop, mocker, produce_mock
+@pytest.mark.parametrize(
+    "last_check_params",
+    [
+        # last_check, next_check_at, new_check_expected
+        (False, None, True),
+        (True, None, True),
+        (True, datetime.now() - timedelta(hours=1), True),
+        (True, datetime.now() + timedelta(hours=1), False),
+    ],
+)
+async def test_next_check(
+    setup_catalog, db, rmock, fake_check, event_loop, produce_mock, last_check_params
 ):
-    mocker.patch("udata_hydra.config.SLEEP_BETWEEN_BATCHES", 0)
-    await fake_check()
+    last_check, next_check_at, new_check_expected = last_check_params
+    if last_check:
+        await fake_check(
+            created_at=datetime.now() - timedelta(hours=24), next_check_at=next_check_at
+        )
     rurl = RESOURCE_URL
     rmock.get(rurl, status=200)
     event_loop.run_until_complete(start_checks(iterations=1))
-    # url has not been called because check is fresh
-    assert ("GET", URL(rurl)) not in rmock.requests
+    checks: list[Record] = await db.fetch(
+        f"SELECT * FROM checks WHERE url = '{rurl}' ORDER BY created_at DESC"
+    )
+    if new_check_expected:
+        assert ("HEAD", URL(rurl)) in rmock.requests
+        assert len(checks) == [1, 2][last_check]
+        assert checks[0]["url"] == rurl
+        # assert the next check datetime is very close to what's expected, let's say by 10 seconds
+        assert (
+            checks[0]["next_check_at"]
+            - (datetime.now(timezone.utc) + timedelta(hours=config.CHECK_DELAYS[0]))
+        ).total_seconds() < 10
+    else:
+        assert ("HEAD", URL(rurl)) not in rmock.requests
+        assert len(checks) == [0, 1][last_check]
 
 
 async def test_deleted_check(setup_catalog, rmock, fake_check, event_loop, produce_mock):
-    check = await fake_check(created_at=datetime.now() - timedelta(weeks=52))
+    check = await fake_check(created_at=datetime.now() - timedelta(hours=24))
     # associate check with a resource
     await Resource.update(resource_id=RESOURCE_ID, data={"last_check": check["id"]})
     # delete check
@@ -199,7 +216,7 @@ async def test_analyse_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
     check = await fake_check()
-    await analyse_resource(check["id"], False)
+    await analyse_resource(check_id=check["id"], last_check=None)
     result: Record | None = await Check.get_by_id(check["id"])
 
     assert result["error"] is None
@@ -213,7 +230,7 @@ async def test_analyse_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
     rmock.put(udata_url, status=200, repeat=True)
 
     check = await fake_check()
-    await analyse_resource(check["id"], True)
+    await analyse_resource(check_id=check["id"], last_check=None)
 
     req = rmock.requests[("PUT", URL(udata_url))]
     assert len(req) == 1
@@ -229,9 +246,11 @@ async def test_analyse_resource_send_udata_no_change(
     rmock.put(udata_url, status=200, repeat=True)
 
     # previous check with same checksum
-    await fake_check(checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest())
+    last_check = await fake_check(
+        checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
+    )
     check = await fake_check()
-    await analyse_resource(check["id"], False)
+    await analyse_resource(check_id=check["id"], last_check=last_check)
 
     # udata has not been called
     assert ("PUT", URL(udata_url)) not in rmock.requests
