@@ -195,7 +195,7 @@ async def analyse_csv(
                 "parquet_url": parquet_args[0] if parquet_args else None,
                 "parquet_size": parquet_args[1] if parquet_args else None,
             },
-        )  # TODO: return the outdated check so that we don't have to re-request it in notify_data again
+        )
         await csv_to_db_index(table_name, csv_inspection, check)
 
     except ParseException as e:
