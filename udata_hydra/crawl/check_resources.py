@@ -134,9 +134,9 @@ async def check_resource(
             # Enqueue the resource for analysis
             queue.enqueue(
                 analyse_resource,
-                new_check["id"],
-                last_check,
-                force_analysis,
+                check=new_check,
+                last_check=last_check,
+                force_analysis=force_analysis,
                 _priority=worker_priority,
             )
 

@@ -98,19 +98,27 @@ class Check:
             return await connection.fetch(q, date, page_size)
 
     @classmethod
-    async def insert(cls, data: dict) -> Record:
+    async def insert(cls, data: dict, returning: str = "id") -> dict:
         """
-        Insert a new check in DB and return the check record in DB
+        Insert a new check in DB, update the resource and return the check dict, optionally associated with the resource dataset_id
         This use the info from the last check of the same resource
         """
         data = convert_dict_values_to_json(data)
-        q1: str = compute_insert_query(table_name="checks", data=data)
+        q1: str = compute_insert_query(table_name="checks", data=data, returning=returning)
         pool = await context.pool()
         async with pool.acquire() as connection:
-            last_check = await connection.fetchrow(q1, *data.values())
-            q2 = """UPDATE catalog SET last_check = $1 WHERE resource_id = $2"""
-            await connection.execute(q2, last_check["id"], data["resource_id"])
-            return last_check
+            last_check: Record = await connection.fetchrow(q1, *data.values())
+            last_check_dict = dict(last_check)
+            q2 = (
+                """UPDATE catalog SET last_check = $1 WHERE resource_id = $2 RETURNING dataset_id"""
+            )
+            updated_resource: Record | None = await connection.fetchrow(
+                q2, last_check["id"], data["resource_id"]
+            )
+            # Add the dataset_id arg to the check response, if we can, and if it's asked
+            if returning in ["*", "dataset_id"] and updated_resource:
+                last_check_dict["dataset_id"] = updated_resource["dataset_id"]
+            return last_check_dict
 
     @classmethod
     async def update(cls, check_id: int, data: dict) -> Record | None:

@@ -242,8 +242,10 @@ async def fake_check():
             "parquet_url": "https://example.org/file.parquet" if parquet_url else None,
             "parquet_size": 2048 if parquet_url else None,
         }
-        check = await Check.insert(data)
+        check: dict = await Check.insert(data=data, returning="*")
         data["id"] = check["id"]
+        if check.get("dataset_id"):
+            data["dataset_id"] = check["dataset_id"]
         if created_at:
             await Check.update(check["id"], {"created_at": created_at})
             data["created_at"] = created_at

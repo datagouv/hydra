@@ -33,7 +33,7 @@ log = logging.getLogger("udata-hydra")
 
 
 async def analyse_resource(
-    check_id: int, last_check: dict | None, force_analysis: bool = False
+    check: dict, last_check: dict | None, force_analysis: bool = False
 ) -> None:
     """
     Perform analysis on the resource designated by check_id:
@@ -45,10 +45,6 @@ async def analyse_resource(
 
     Will call udata if first check or changes found, and update check with optional infos
     """
-    check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
-    if not check:
-        log.error(f"Check not found by id {check_id}")
-        return
 
     # Check if the resource is in the exceptions table
     exception: Record | None = await ResourceException.get_by_resource_id(str(check["resource_id"]))
@@ -98,7 +94,7 @@ async def analyse_resource(
             if tmp_file and not is_tabular:
                 os.remove(tmp_file.name)
             await Check.update(
-                check_id,
+                check["id"],
                 {
                     "checksum": dl_analysis.get("analysis:checksum"),
                     "analysis_error": dl_analysis.get("analysis:error"),
@@ -109,7 +105,7 @@ async def analyse_resource(
 
     if change_status == Change.HAS_CHANGED:
         await update_check_with_modification_and_next_dates(
-            change_payload or {}, check_id, last_check
+            change_payload or {}, check["id"], last_check
         )
 
     analysis_results = {**dl_analysis, **(change_payload or {})}
@@ -119,7 +115,9 @@ async def analyse_resource(
             # Change status to TO_ANALYSE_CSV
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_CSV"})
             # Analyse CSV and create a table in the CSV database
-            queue.enqueue(analyse_csv, check_id, file_path=tmp_file.name, _priority="default")
+            queue.enqueue(
+                analyse_csv, check_id=check["id"], file_path=tmp_file.name, _priority="default"
+            )
 
         else:
             await Resource.update(resource_id, data={"status": None})

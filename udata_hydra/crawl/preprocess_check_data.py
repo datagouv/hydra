@@ -62,9 +62,10 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
     )
 
     check_data["next_check_at"] = calculate_next_check_date(has_changed, last_check, None)
-    new_check: Record = await Check.insert(check_data)
 
-    return dict(new_check), last_check
+    new_check: dict = await Check.insert(data=check_data, returning="*")
+
+    return new_check, last_check
 
 
 async def has_check_changed(check_data: dict, last_check_data: dict | None) -> bool:
