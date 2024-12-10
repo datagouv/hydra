@@ -84,7 +84,7 @@ RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin"
 minio_client = MinIOClient()
 
 
-async def notify_udata(resource: Record, check: Record) -> None:
+async def notify_udata(resource: Record, check: dict) -> None:
     """Notify udata of the result of a parsing"""
     payload = {
         "resource_id": check["resource_id"],
