@@ -48,8 +48,9 @@ class Resource:
                         url = $3,
                         deleted = FALSE,
                         status = $4,
-                        priority = $5;"""
-            await connection.execute(q, dataset_id, resource_id, url, status, priority)
+                        priority = $5
+                    RETURNING *;"""
+            await connection.fetchrow(q, dataset_id, resource_id, url, status, priority)
 
     @classmethod
     async def update(cls, resource_id: str, data: dict) -> Record:
@@ -63,9 +64,9 @@ class Resource:
             q = f"""
                     UPDATE catalog
                     SET {set_clause}
-                    WHERE resource_id = ${len(placeholders) + 1};"""
-            pool = await context.pool()
-            return await connection.execute(q, *data.values(), resource_id)
+                    WHERE resource_id = ${len(placeholders) + 1}
+                    RETURNING *;"""
+            return await connection.fetchrow(q, *data.values(), resource_id)
 
     @classmethod
     async def update_or_insert(
@@ -86,7 +87,8 @@ class Resource:
                 q = """
                         UPDATE catalog
                         SET dataset_id = $1, url = $3, status = $4, priority = $5
-                        WHERE resource_id = $2;"""
+                        WHERE resource_id = $2
+                        RETURNING *;"""
             else:
                 q = """
                         INSERT INTO catalog (dataset_id, resource_id, url, deleted, status, priority)
@@ -96,8 +98,9 @@ class Resource:
                             url = $3,
                             deleted = FALSE,
                             status = $4,
-                            priority = $5;"""
-            await connection.execute(q, dataset_id, resource_id, url, status, priority)
+                            priority = $5
+                        RETURNING *;"""
+            await connection.fetchrow(q, dataset_id, resource_id, url, status, priority)
 
     @classmethod
     async def delete(
