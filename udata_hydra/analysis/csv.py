@@ -106,8 +106,7 @@ async def notify_udata(resource: Record, check: Record) -> None:
 
 
 async def analyse_csv(
-    check_id: int | None = None,
-    url: str | None = None,
+    check: dict,
     file_path: str | None = None,
     debug_insert: bool = False,
 ) -> None:
@@ -116,16 +115,6 @@ async def analyse_csv(
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
 
-    # Get check and resource_id. Try to get the check from the check ID, then from the URL
-    check: Record | None = await Check.get_by_id(check_id, with_deleted=True) if check_id else None
-    if not check:
-        checks: list[Record] | None = await Check.get_by_url(url) if url else None
-        if checks and len(checks) > 1:
-            log.warning(f"Multiple checks found for URL {url}, using the latest one")
-        check = checks[0] if checks else None
-    if not check:
-        log.error("No check found or URL provided")
-        return
     resource_id: str = str(check["resource_id"])
     url = check["url"]
 
@@ -147,7 +136,7 @@ async def analyse_csv(
         open(file_path, "rb")
         if file_path
         else await download_resource(
-            url=url,
+            url=check["url"],
             headers=headers,
             max_size_allowed=None if exception else int(config.MAX_FILESIZE_ALLOWED["csv"]),
         )
@@ -165,7 +154,7 @@ async def analyse_csv(
             )
         except Exception as e:
             raise ParseException(
-                step="csv_detective", resource_id=resource_id, url=url, check_id=check_id
+                step="csv_detective", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
 
         timer.mark("csv-inspection")

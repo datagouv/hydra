@@ -33,7 +33,7 @@ async def test_analyse_csv_on_catalog(
     assert resource["status"] is None
 
     # Analyse the CSV
-    await analyse_csv(check_id=check["id"])
+    await analyse_csv(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
@@ -72,7 +72,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     assert resource["status"] is None
 
     # Analyse the CSV
-    await analyse_csv(check_id=check["id"])
+    await analyse_csv(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
@@ -248,7 +248,7 @@ async def test_error_reporting_csv_detective(
     rmock.get(url, status=200, body="".encode("utf-8"))
 
     # Analyse the CSV
-    await analyse_csv(check_id=check["id"])
+    await analyse_csv(check=check)
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
@@ -269,7 +269,7 @@ async def test_error_reporting_parsing(
     rmock.get(url, status=200, body="a,b,c\n1,2".encode("utf-8"))
 
     # Analyse the CSV
-    await analyse_csv(check_id=check["id"])
+    await analyse_csv(check=check)
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
@@ -286,12 +286,6 @@ async def test_error_reporting_parsing(
         await db.execute(f'SELECT * FROM "{table_name}"')
 
 
-async def test_analyse_csv_url_param(rmock, catalog_content, clean_db):
-    url = "https://example.com/another-url"
-    rmock.get(url, status=200, body=catalog_content)
-    await analyse_csv(url=url)
-
-
 async def test_analyse_csv_send_udata_webhook(
     setup_catalog, rmock, catalog_content, db, fake_check, udata_url
 ):
@@ -301,7 +295,7 @@ async def test_analyse_csv_send_udata_webhook(
     rmock.put(udata_url, status=200)
 
     # Analyse the CSV
-    await analyse_csv(check_id=check["id"])
+    await analyse_csv(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)

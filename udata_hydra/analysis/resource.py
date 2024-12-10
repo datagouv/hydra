@@ -115,9 +115,7 @@ async def analyse_resource(
             # Change status to TO_ANALYSE_CSV
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_CSV"})
             # Analyse CSV and create a table in the CSV database
-            queue.enqueue(
-                analyse_csv, check_id=check["id"], file_path=tmp_file.name, _priority="default"
-            )
+            queue.enqueue(analyse_csv, check=check, file_path=tmp_file.name, _priority="default")
 
         else:
             await Resource.update(resource_id, data={"status": None})
