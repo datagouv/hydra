@@ -100,8 +100,8 @@ class Check:
     @classmethod
     async def insert(cls, data: dict, returning: str = "id") -> dict:
         """
-        Insert a new check in DB, update the resource and return the check dict, optionally associated with the resource dataset_id
-        This use the info from the last check of the same resource
+        Insert a new check in DB, associate it with the resource and return the check dict, optionally associated with the resource dataset_id.
+        This uses the info from the last check of the same resource.
         """
         data = convert_dict_values_to_json(data)
         q1: str = compute_insert_query(table_name="checks", data=data, returning=returning)
