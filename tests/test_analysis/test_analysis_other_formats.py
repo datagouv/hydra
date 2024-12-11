@@ -24,7 +24,7 @@ async def test_formats_analysis(setup_catalog, rmock, db, fake_check, produce_mo
     with open(f"tests/data/{filename}", "rb") as f:
         data = f.read()
     rmock.get(url, status=200, body=data)
-    await analyse_csv(check_id=check["id"])
+    await analyse_csv(check=check)
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
     profile = await db.fetchrow(
