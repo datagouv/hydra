@@ -364,7 +364,7 @@ async def insert_resource_into_catalog(resource_id: str = "default"):
                 dataset_id = $1,
                 url = $3,
                 deleted = FALSE;
-        """,
+            """,
             resource["dataset_id"],
             resource["resource"]["id"],
             resource["resource"]["url"],

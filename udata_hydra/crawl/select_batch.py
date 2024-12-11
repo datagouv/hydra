@@ -20,7 +20,7 @@ async def select_rows_based_on_query(connection, q: str, *args) -> list[Record]:
     async with connection.transaction():
         await connection.execute("BEGIN;")
         await connection.execute(create_temp_select_table_query, *args)
-        to_check = await connection.fetch(f"SELECT * FROM {temporary_table};")
+        to_check: list[Record] = await connection.fetch(f"SELECT * FROM {temporary_table};")
         await connection.execute("COMMIT;")
     await connection.execute(f"DROP TABLE {temporary_table};")
     return to_check
