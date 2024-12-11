@@ -166,7 +166,7 @@ async def detect_resource_change_from_checksum(
         "analysis:last-modified-detection": "computed-checksum",
     }
     """
-    if last_check and "checksum" in last_check and last_check["checksum"] != new_checksum:
+    if last_check and last_check.get("checksum") != new_checksum:
         return Change.HAS_CHANGED, {
             "analysis:last-modified-at": datetime.now(timezone.utc).isoformat(),
             "analysis:last-modified-detection": "computed-checksum",
