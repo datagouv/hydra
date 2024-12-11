@@ -67,8 +67,7 @@ async def check_resource(
     # Import here to avoid circular import issues
     from udata_hydra.analysis.resource import analyse_resource
 
-    # Update resource status to CRAWLING_URL
-    resource: Record = await Resource.update(resource_id, data={"status": "CRAWLING_URL"})
+    resource: Record = await Resource.get(resource_id)
 
     if sleep:
         await asyncio.sleep(sleep)
