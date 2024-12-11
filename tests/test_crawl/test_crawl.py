@@ -662,7 +662,7 @@ async def test_dont_check_resources_with_status(
 async def test_wrong_url_in_catalog(
     setup_catalog, rmock, produce_mock, url_changed, catalog_content
 ):
-    r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
+    r = await Resource.get(RESOURCE_ID)
     not_found_url = r["url"]
     new_url = "https://example.com/has-been-modified-lately"
     rmock.head(
@@ -695,7 +695,7 @@ async def test_wrong_url_in_catalog(
             body=catalog_content,
         )
     async with ClientSession() as session:
-        await check_resource(url=not_found_url, resource_id=RESOURCE_ID, session=session)
+        await check_resource(url=not_found_url, resource=r, session=session)
     if url_changed:
         r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
         assert r["url"] == new_url

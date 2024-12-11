@@ -42,7 +42,7 @@ async def check_batch_resources(to_parse: list[Record]) -> None:
             tasks.append(
                 check_resource(
                     url=row["url"],
-                    resource_id=row["resource_id"],
+                    resource=row,
                     session=session,
                     worker_priority="low",
                 )
@@ -55,7 +55,7 @@ async def check_batch_resources(to_parse: list[Record]) -> None:
 
 async def check_resource(
     url: str,
-    resource_id: str,
+    resource: Record,
     session,
     sleep: float = 0,
     method: str = "head",
@@ -66,8 +66,6 @@ async def check_resource(
 
     # Import here to avoid circular import issues
     from udata_hydra.analysis.resource import analyse_resource
-
-    resource: Record = await Resource.get(resource_id)
 
     if sleep:
         await asyncio.sleep(sleep)
@@ -81,7 +79,7 @@ async def check_resource(
         await preprocess_check_data(
             dataset_id=resource["dataset_id"],
             check_data={
-                "resource_id": resource_id,
+                "resource_id": str(resource["resource_id"]),
                 "url": url,
                 "error": "Not netloc in url",
                 "timeout": False,
@@ -93,7 +91,9 @@ async def check_resource(
     if should_backoff:
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
-        await Resource.update(resource_id, data={"status": "BACKOFF", "priority": False})
+        await Resource.update(
+            str(resource["resource_id"]), data={"status": "BACKOFF", "priority": False}
+        )
         return RESOURCE_RESPONSE_STATUSES["BACKOFF"]
 
     try:
@@ -105,7 +105,7 @@ async def check_resource(
             if method != "get" and not has_nice_head(resp):
                 return await check_resource(
                     url,
-                    resource_id,
+                    resource,
                     session,
                     force_analysis=force_analysis,
                     method="get",
@@ -117,7 +117,7 @@ async def check_resource(
             new_check, last_check = await preprocess_check_data(
                 dataset_id=resource["dataset_id"],
                 check_data={
-                    "resource_id": resource_id,
+                    "resource_id": str(resource["resource_id"]),
                     "url": url,
                     "domain": domain,
                     "status": resp.status,
@@ -128,7 +128,9 @@ async def check_resource(
             )
 
             # Update resource status to TO_ANALYSE_RESOURCE
-            await Resource.update(resource_id, data={"status": "TO_ANALYSE_RESOURCE"})
+            await Resource.update(
+                str(resource["resource_id"]), data={"status": "TO_ANALYSE_RESOURCE"}
+            )
 
             # Enqueue the resource for analysis
             queue.enqueue(
@@ -146,7 +148,7 @@ async def check_resource(
         await preprocess_check_data(
             dataset_id=resource["dataset_id"],
             check_data={
-                "resource_id": resource_id,
+                "resource_id": str(resource["resource_id"]),
                 "url": url,
                 "domain": domain,
                 "timeout": True,
@@ -154,7 +156,7 @@ async def check_resource(
         )
 
         # Reset resource status so that it's not forbidden to be checked again
-        await Resource.update(resource_id=resource_id, data={"status": None})
+        await Resource.update(str(resource["resource_id"]), data={"status": None})
 
         return RESOURCE_RESPONSE_STATUSES["TIMEOUT"]
 
@@ -172,11 +174,11 @@ async def check_resource(
         # we compare the actual URL to the one we have here to handle these cases
         if getattr(e, "status", None) == 404 and config.UDATA_URI:
             handled = await handle_wrong_resource_url(
-                resource_id=resource_id,
-                session=session,
-                url=url,
-                force_analysis=force_analysis,
-                worker_priority=worker_priority,
+                resource,
+                session,
+                url,
+                force_analysis,
+                worker_priority,
             )
             if handled is not None:
                 return handled
@@ -186,7 +188,7 @@ async def check_resource(
         await preprocess_check_data(
             dataset_id=resource["dataset_id"],
             check_data={
-                "resource_id": resource_id,
+                "resource_id": str(resource["resource_id"]),
                 "url": url,
                 "domain": domain,
                 "timeout": False,
@@ -199,27 +201,28 @@ async def check_resource(
         log.warning(f"Crawling error for url {url}", exc_info=e)
 
         # Reset resource status so that it's not forbidden to be checked again
-        await Resource.update(resource_id=resource_id, data={"status": None})
+        await Resource.update(str(resource["resource_id"]), data={"status": None})
 
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
 
 
 async def handle_wrong_resource_url(
-    resource_id: str,
+    resource: Record,
     session,
     url: str,
     force_analysis: bool,
     worker_priority: str,
 ):
+    resource_id = resource["resource_id"]
     stable_resource_url = f"{config.UDATA_URI.replace('api/2', 'fr')}/datasets/r/{resource_id}"
     async with session.head(stable_resource_url) as resp:
         resp.raise_for_status()
         actual_url = resp.headers.get("location")
     if actual_url and url != actual_url:
-        await Resource.update(resource_id=resource_id, data={"url": actual_url})
+        await Resource.update(resource_id, data={"url": actual_url})
         return await check_resource(
             actual_url,
-            resource_id,
+            resource,
             session,
             force_analysis=force_analysis,
             method="head",

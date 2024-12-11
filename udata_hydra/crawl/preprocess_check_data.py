@@ -57,9 +57,7 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
     # Update resource following check:
     # Reset resource status so that it's not forbidden to be checked again.
     # Reset priority so that it's not prioritised anymore.
-    await Resource.update(
-        resource_id=check_data["resource_id"], data={"status": None, "priority": False}
-    )
+    await Resource.update(check_data["resource_id"], data={"status": None, "priority": False})
 
     check_data["next_check_at"] = calculate_next_check_date(has_changed, last_check, None)
 

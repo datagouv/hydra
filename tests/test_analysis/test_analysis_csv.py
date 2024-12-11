@@ -10,10 +10,7 @@ from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
-from udata_hydra.crawl.check_resources import (
-    RESOURCE_RESPONSE_STATUSES,
-    check_resource,
-)
+from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -331,7 +328,7 @@ async def test_forced_analysis(
         }
     )
     url = check["url"]
-    rid = check["resource_id"]
+    resource = await Resource.get(RESOURCE_ID)
     rmock.head(
         url,
         status=200,
@@ -353,7 +350,7 @@ async def test_forced_analysis(
     rmock.put(udata_url, status=200, repeat=True)
     async with ClientSession() as session:
         await check_resource(
-            url=url, resource_id=rid, session=session, force_analysis=force_analysis
+            url=url, resource=resource, session=session, force_analysis=force_analysis
         )
 
     # check that csv was indeed pushed to db
