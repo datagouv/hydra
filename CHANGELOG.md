@@ -12,6 +12,7 @@
 - Add CLI util to insert or update a resource into the catalog (change since last catalog load) [#228](https://github.com/datagouv/hydra/pull/228)
 - Fix deadlocks errors when purging CSV tables by refactoring `purge_csv_tables` to use atomic transactions [#230](https://github.com/datagouv/hydra/pull/230)
 - Improve timing of checks depending on changes since last check [#163](https://github.com/datagouv/hydra/pull/163)
+- Remove bad default value in CLI to insert a resource [#235](https://github.com/datagouv/hydra/pull/235)
 
 
 ## 2.0.5 (2024-11-08)
