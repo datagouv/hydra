@@ -1,5 +1,6 @@
-import pandas as pd
 from io import BytesIO
+
+import pandas as pd
 
 
 def save_as_parquet(

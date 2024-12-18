@@ -7,9 +7,8 @@ from unittest.mock import patch
 import pytest
 from aiohttp import ClientSession
 from asyncpg.exceptions import UndefinedTableError
-from csv_detective.explore_csv import validate_then_detect
+from csv_detective import routine as csv_detective_routine, validate_then_detect
 from yarl import URL
-from csv_detective import routine as csv_detective_routine
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
@@ -104,7 +103,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
 )
 async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
     line, expected, separator = line_expected
-    header = separator.join(['int', 'float', 'string', 'bool'])
+    header = separator.join(["int", "float", "string", "bool"])
     with NamedTemporaryFile() as fp:
         fp.write(f"{header}\n{line}".encode("utf-8"))
         fp.seek(0)

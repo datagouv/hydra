@@ -5,14 +5,20 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Iterator
 from math import isnan
+from typing import Iterator
 
+<<<<<<< HEAD
 from asyncpg import Record
 from csv_detective.detection.engine import engine_to_file
 from csv_detective.explore_csv import routine as csv_detective_routine
 from csv_detective.explore_csv import validate_then_detect
+=======
+>>>>>>> 3d65bc5 (fix: lint)
 import pandas as pd
+from asyncpg import Record
+from csv_detective import routine as csv_detective_routine
+from csv_detective.detection import engine_to_file
 from progressist import ProgressBar
 from slugify import slugify
 from sqlalchemy import (
@@ -228,7 +234,7 @@ def compute_create_table_query(
             if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
                 log.error(
                     f'Index type "{index_type}" is unknown or not supported yet! '
-                    f'Index for column {col_name} was not created.'
+                    f"Index for column {col_name} was not created."
                 )
                 continue
 
@@ -268,10 +274,12 @@ def generate_records(df: pd.DataFrame) -> Iterator[list]:
     # NaN-int values to None for db insertion, and we also change NaN to None
     for row in df.values:
         yield tuple(
-            cell if not (
+            cell
+            if not (
                 isinstance(cell, pd._libs.missing.NAType)
                 or (isinstance(cell, float) and isnan(cell))
-            ) else None
+            )
+            else None
             for cell in row
         )
 

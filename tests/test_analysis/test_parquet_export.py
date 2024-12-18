@@ -71,9 +71,7 @@ async def test_csv_to_parquet(mocker, parquet_config):
             save_results=False,
         )
         assert inspection
-        return await csv_to_parquet(
-            df=df, inspection=inspection, table_name="test_table"
-        )
+        return await csv_to_parquet(df=df, inspection=inspection, table_name="test_table")
 
     csv_to_parquet_config, min_lines_for_parquet_config, expected_conversion = parquet_config
     mocker.patch("udata_hydra.config.CSV_TO_PARQUET", csv_to_parquet_config)
