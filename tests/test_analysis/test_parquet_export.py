@@ -1,7 +1,7 @@
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
-import pyarrow.parquet as pq
+import pandas as pd
 import pytest
 
 from tests.conftest import RESOURCE_ID
@@ -9,7 +9,6 @@ from udata_hydra.analysis.csv import (
     RESERVED_COLS,
     csv_detective_routine,
     csv_to_parquet,
-    generate_records,
 )
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
@@ -28,8 +27,13 @@ pytestmark = pytest.mark.asyncio
 async def test_save_as_parquet(file_and_count):
     filename, expected_count = file_and_count
     file_path = f"tests/data/{filename}"
-    inspection: dict | None = csv_detective_routine(
-        file_path=file_path, output_profile=True, num_rows=-1, save_results=False
+    inspection, df = csv_detective_routine(
+        file_path=file_path,
+        output_profile=True,
+        output_df=True,
+        cast_json=False,
+        num_rows=-1,
+        save_results=False,
     )
     assert inspection
     columns = inspection["columns"]
@@ -37,14 +41,14 @@ async def test_save_as_parquet(file_and_count):
         f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
         for c, v in columns.items()
     }
-    _, table = save_as_parquet(
-        records=generate_records(file_path, inspection, columns),
-        columns=columns,
+    _, bytes = save_as_parquet(
+        df=df,
         output_filename=None,
     )
+    table = pd.read_parquet(BytesIO(bytes))
     assert len(table) == expected_count
     fake_file = BytesIO()
-    pq.write_table(table, fake_file)
+    table.to_parquet(fake_file)
 
 
 @pytest.mark.parametrize(
@@ -58,12 +62,17 @@ async def test_save_as_parquet(file_and_count):
 async def test_csv_to_parquet(mocker, parquet_config):
     async def execute_csv_to_parquet() -> tuple[str, int] | None:
         file_path = "tests/data/catalog.csv"
-        inspection: dict | None = csv_detective_routine(
-            file_path=file_path, output_profile=True, num_rows=-1, save_results=False
+        inspection, df = csv_detective_routine(
+            file_path=file_path,
+            output_profile=True,
+            output_df=True,
+            cast_json=False,
+            num_rows=-1,
+            save_results=False,
         )
         assert inspection
         return await csv_to_parquet(
-            file_path=file_path, inspection=inspection, resource_id=RESOURCE_ID
+            df=df, inspection=inspection, table_name="test_table"
         )
 
     csv_to_parquet_config, min_lines_for_parquet_config, expected_conversion = parquet_config
