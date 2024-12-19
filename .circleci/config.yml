@@ -85,27 +85,37 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Build a distributable package
+          name: Set version
           command: |
-            # Set the version
             if [[ $CIRCLE_TAG ]]; then
-                export VERSION=$CIRCLE_TAG
+                export RELEASE_VERSION=$CIRCLE_TAG
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
                 # for main branches, can't add the commit hash since it's not a valid format for publishing
-                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
+                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
             else
                 # for feature branches, add the commit hash
-                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
+                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
             fi
-            # Display some debug info
-            echo "Building a wheel release with version $VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
-            # Build a wheel release
+            # Save version to a file that will be persisted
+            echo "$RELEASE_VERSION" > version.txt
+      - run:
+          name: Display build info for debugging
+          command: |
+            RELEASE_VERSION=$(cat version.txt)
+            echo "Building a wheel release with version $RELEASE_VERSION"
+            echo "Build number: $CIRCLE_BUILD_NUM"
+            echo "Commit hash: ${CIRCLE_SHA1:0:7}"
+            echo "Tag: $CIRCLE_TAG"
+      - run:
+          name: Build package
+          command: |
+            RELEASE_VERSION=$(cat version.txt)
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
                 poetry build
             else
                 # Relies on a dev version like "1.2.1.dev" by default
-                poetry version $VERSION
+                poetry version $RELEASE_VERSION
                 poetry build
             fi
       - store_artifacts:
@@ -114,6 +124,7 @@ jobs:
           root: .
           paths:
             - .
+            - version.txt
 
   publish:
     docker:
@@ -125,6 +136,35 @@ jobs:
           name: Publish on PyPI
           command: |
             poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+
+  trigger-gitlab-pipeline:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Configure the SSH deploy private key
+          command: |
+            mkdir -p ~/.ssh
+            echo "$DEPLOY_PRIVATE_KEY" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            ssh-keyscan -t rsa gitlab.com >> ~/.ssh/known_hosts
+      - run:
+          name: Configure Git
+          command: |
+            git config --global user.email "root@data.gouv.fr"
+            git config --global user.name "datagouv"
+      - run:
+          name: Clone scaffold repository
+          command: |
+            git clone --quiet --depth 1 $SCAFFOLD_REPO_SSH_URL scaffold
+      - run:
+          name: Trigger Gitlab CI/CD pipeline
+          command: |
+            RELEASE_VERSION=$(cat version.txt)
+            cd scaffold
+            ./scripts/gitlab-ci-pipeline.sh hydra $RELEASE_VERSION prod ""
 
 workflows:
   build:
@@ -164,3 +204,13 @@ workflows:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
           context: org-global
+      - trigger-gitlab-pipeline:
+          requires:
+            - publish
+          filters:
+            branches:
+              only:
+                - << pipeline.parameters.publish-branch >>
+          context:
+            - org-global
+            - gitlab-trigger
