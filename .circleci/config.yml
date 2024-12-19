@@ -107,17 +107,11 @@ jobs:
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Tag: $CIRCLE_TAG"
       - run:
-          name: Build a distributable package
+          name: Build a distributable package with Poetry
           command: |
             RELEASE_VERSION=$(cat version.txt)
-            if [[ $CIRCLE_TAG ]]; then
-                # This is a tagged release, version has been handled upstream
-                poetry build
-            else
-                # Relies on a dev version like "1.2.1.dev" by default
-                poetry version $RELEASE_VERSION
-                poetry build
-            fi
+            poetry version $RELEASE_VERSION
+            poetry build
       - store_artifacts:
           path: dist
       - persist_to_workspace:
