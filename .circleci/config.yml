@@ -34,9 +34,6 @@ jobs:
           command: |
             poetry config virtualenvs.in-project true
             poetry install
-      - run:
-          name: Save commit hash in a file
-          command: echo $CIRCLE_SHA1 > .git-commit
       - save_cache:
           key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
           paths:
@@ -88,33 +85,27 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Set the version number
-          command: |
-            if [[ $CIRCLE_TAG ]]; then
-                export PACKAGE_VERSION=$CIRCLE_TAG
-            elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
-                # for main branches, can't add the commit hash since it's not a valid format for publishing
-                export PACKAGE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
-            else
-                # for feature branches, add the commit hash
-                export PACKAGE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
-            fi
-            # Display some debug info
-            echo "Building a wheel release with version $PACKAGE_VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
-            # Save the version number in a file
-            echo "export PACKAGE_VERSION=\"$PACKAGE_VERSION\"" >> .env_vars
-      - run:
           name: Build a distributable package
           command: |
-            # Get the version number
-            source .env_vars
+            # Set the version
+            if [[ $CIRCLE_TAG ]]; then
+                export VERSION=$CIRCLE_TAG
+            elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
+                # for main branches, can't add the commit hash since it's not a valid format for publishing
+                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
+            else
+                # for feature branches, add the commit hash
+                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
+            fi
+            # Display some debug info
+            echo "Building a wheel release with version $VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
             # Build a wheel release
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
                 poetry build
             else
                 # Relies on a dev version like "1.2.1.dev" by default
-                poetry version $PACKAGE_VERSION
+                poetry version $VERSION
                 poetry build
             fi
       - store_artifacts:
@@ -134,22 +125,6 @@ jobs:
           name: Publish on PyPI
           command: |
             poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
-
-  deploy:
-    docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
-    steps:
-      - attach_workspace:
-          at: .
-      - run:
-          name: Create a GitLab CI pipeline for deploying
-          command: | # https://docs.gitlab.com/ee/api/pipeline_triggers.html
-            source .env_vars
-            echo "Create a GitLab CI pipeline for deploying Hydra version $PACKAGE_VERSION on dev with tag light..."
-            curl --request POST \
-              --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" \
-              --data '{ "ref": "main", "variables": [{"key": "SITE", "value": "dev" }, {"key": "APP", "value": "hydra"}, {"key": "TAGS", "value": "light" }, {"key": "PACKAGE_VERSION", "value": "$PACKAGE_VERSION" }] }' \
-              https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/pipeline
 
 workflows:
   build:
@@ -186,16 +161,6 @@ workflows:
                 - << pipeline.parameters.publish-branch >>
                 - /[0-9]+(\.[0-9]+)+/
                 - /rc[0-9]+/
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-          context: org-global
-      - deploy:
-          requires:
-            - publish
-          filters:
-            branches:
-              only:
-                - main
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
           context: org-global
