@@ -164,6 +164,12 @@ jobs:
           command: |
             RELEASE_VERSION=$(cat version.txt)
             cd scaffold
+            # Run the script that triggers the Gitlab CI/CD pipeline.
+            # The script args are, in order:
+            # - hydra: the name of the project to deploy (APP_NAME)
+            # - $RELEASE_VERSION: the version to deploy (RELEASE_VERSION)
+            # - env: the environment to deploy to (ENV)
+            # - "": the deploy variables (VARS)
             ./scripts/gitlab-ci-pipeline.sh hydra $RELEASE_VERSION dev ""
 
 workflows:
