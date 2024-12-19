@@ -107,7 +107,7 @@ jobs:
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Tag: $CIRCLE_TAG"
       - run:
-          name: Build package
+          name: Build a distributable package
           command: |
             RELEASE_VERSION=$(cat version.txt)
             if [[ $CIRCLE_TAG ]]; then
@@ -160,11 +160,11 @@ jobs:
           command: |
             git clone --quiet --depth 1 $SCAFFOLD_REPO_SSH_URL scaffold
       - run:
-          name: Trigger Gitlab CI/CD pipeline
+          name: Trigger Gitlab CI/CD pipeline for Hydra to deploy to dev environment
           command: |
             RELEASE_VERSION=$(cat version.txt)
             cd scaffold
-            ./scripts/gitlab-ci-pipeline.sh hydra $RELEASE_VERSION prod ""
+            ./scripts/gitlab-ci-pipeline.sh hydra $RELEASE_VERSION dev ""
 
 workflows:
   build:
