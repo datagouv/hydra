@@ -66,6 +66,7 @@ jobs:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+    parallelism: 4 # Number of executed tests in parallel
     steps:
       - attach_workspace:
           at: .
@@ -75,7 +76,20 @@ jobs:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
           command: |
-            poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes
+            # Find and split tests
+            TESTFILES=$(find tests -name "test_*.py" | circleci tests split --split-by=timings)
+            # Debug: Show what's in TESTFILES
+            echo "Files assigned to this executor:"
+            echo "$TESTFILES"
+            # Run the found tests
+            if [ -n "$TESTFILES" ]; then
+              echo "Running tests: $TESTFILES"
+              poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+            else
+              echo "No tests to run in this split"
+              find tests -name "test_*.py" | wc -l
+              exit 1
+            fi
       - store_test_results:
           path: reports/python
 
