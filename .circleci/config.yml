@@ -175,7 +175,7 @@ jobs:
             ./scripts/gitlab-ci-pipeline.sh hydra $RELEASE_VERSION dev ""
 
 workflows:
-  build:
+  build-test-deploy:
     jobs:
       - install:
           filters:
