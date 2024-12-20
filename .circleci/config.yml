@@ -90,23 +90,29 @@ jobs:
             echo "export COMMIT_HASH=${CIRCLE_SHA1:0:7}" >> $BASH_ENV
             source $BASH_ENV
       - run:
-          name: Build a distributable package
+          name: Set the version
           command: |
-            # Set the version
-            if [[ $CIRCLE_TAG ]]; then
-                export VERSION=$CIRCLE_TAG
-            else; then
-                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
-            fi
-            # Display some debug info
-            echo "Building a wheel release with version $VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
-            # Set version if this is not a tagged release
             # For tagged releases, the version is set upstream
             # Otherwise, it relies on a dev version like "1.2.1.dev" by default
-            if [[ ! $CIRCLE_TAG ]]; then
+            if [[ $CIRCLE_TAG ]]; then
+                export VERSION=$CIRCLE_TAG
+            else
+                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
                 poetry version $VERSION
             fi
-            # Build while passing the commit hash as a build-time environment variable
+      - run:
+          name: Display build info for debugging
+          command: |
+            echo "Building a wheel release with version $VERSION"
+            echo "Build number: $CIRCLE_BUILD_NUM"
+            echo "Tag: $CIRCLE_TAG"
+            echo "Commit hash: $COMMIT_HASH"
+            echo "BASH_ENV contents:"
+            cat $BASH_ENV
+      - run:
+          name: Build a distributable package
+          command: |
+            # Pass the commit hash as a build-time environment variable
             COMMIT_HASH=$COMMIT_HASH poetry build
       - store_artifacts:
           path: dist
