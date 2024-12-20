@@ -129,7 +129,7 @@ jobs:
             poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
 
 workflows:
-  build:
+  build-test-publish:
     jobs:
       - install:
           filters:
