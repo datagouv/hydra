@@ -137,6 +137,7 @@ jobs:
           name: Configure the SSH deploy private key
           command: |
             mkdir -p ~/.ssh
+            # DEPLOY_PRIVATE_KEY is the private key related to the "simple-scaffold" GitLab repository, so that it can be cloned
             # CircleCI doesn't accept multiple lines in a single environment variable, so the multiline private key must be base64 encoded, and then decoded here
             echo "$DEPLOY_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
             chmod 600 ~/.ssh/id_ed25519
@@ -152,6 +153,9 @@ jobs:
             git clone --quiet --depth 1 $SCAFFOLD_REPO_SSH_URL scaffold
       - run:
           name: Trigger Gitlab CI/CD pipeline for Hydra to deploy to dev environment
+          environment:
+            # GITLAB_API_TOKEN is the token related to the "infra" GitLab repository, so that the Gitlab CI/CD pipeline can be triggered
+            GITLAB_API_TOKEN: ${GITLAB_API_TOKEN}
           command: |
             RELEASE_VERSION=$(cat version.txt)
             cd scaffold
