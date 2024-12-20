@@ -137,7 +137,8 @@ jobs:
           name: Configure the SSH deploy private key
           command: |
             mkdir -p ~/.ssh
-            echo "$DEPLOY_PRIVATE_KEY" > ~/.ssh/id_ed25519
+            # CircleCI doesn't accept multiple lines in a single environment variable, so the multiline private key must be base64 encoded, and then decoded here
+            echo "$DEPLOY_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
             chmod 600 ~/.ssh/id_ed25519
             ssh-keyscan -t rsa gitlab.com >> ~/.ssh/known_hosts
       - run:
