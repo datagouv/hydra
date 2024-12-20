@@ -85,9 +85,8 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Build a distributable package
+          name: Set the version
           command: |
-            # Set the version
             if [[ $CIRCLE_TAG ]]; then
                 export VERSION=$CIRCLE_TAG
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
@@ -97,8 +96,17 @@ jobs:
                 # for feature branches, add the commit hash
                 export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
             fi
-            # Display some debug info
-            echo "Building a wheel release with version $VERSION, build number: $CIRCLE_BUILD_NUM, commit hash: ${CIRCLE_SHA1:0:7}, tag: $CIRCLE_TAG."
+      - run:
+          name: Display build info for debugging
+          command: |
+            echo "Building a wheel release with version $VERSION"
+            echo "Build number: $CIRCLE_BUILD_NUM"
+            echo "Tag: $CIRCLE_TAG"
+            echo "Commit hash: $COMMIT_HASH"
+            echo "Version: $VERSION"
+      - run:
+          name: Build a distributable package
+          command: |
             # Build a wheel release
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
