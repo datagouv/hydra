@@ -93,6 +93,8 @@ jobs:
                 # for feature branches, add the commit hash
                 export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
             fi
+            # Set the version in pyproject.toml
+            poetry version $RELEASE_VERSION
             # Save version to a file that will be persisted
             echo "$RELEASE_VERSION" > version.txt
       - run:
@@ -105,10 +107,7 @@ jobs:
             echo "Tag: $CIRCLE_TAG"
       - run:
           name: Build a distributable package with Poetry
-          command: |
-            RELEASE_VERSION=$(cat version.txt)
-            poetry version $RELEASE_VERSION
-            poetry build
+          command: poetry build
       - store_artifacts:
           path: dist
       - persist_to_workspace:
