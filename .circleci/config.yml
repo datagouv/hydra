@@ -134,12 +134,12 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Configure the SSH deploy private key
+          name: Configure the SSH simple-scaffold repository private key
           command: |
             mkdir -p ~/.ssh
-            # DEPLOY_PRIVATE_KEY is the private key related to the "simple-scaffold" GitLab repository, so that it can be cloned
+            # SCAFFOLD_PRIVATE_KEY is the private key related to the "simple-scaffold" GitLab repository, so that it can be cloned
             # CircleCI doesn't accept multiple lines in a single environment variable, so the multiline private key must be base64 encoded, and then decoded here
-            echo "$DEPLOY_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
+            echo "$SCAFFOLD_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
             chmod 600 ~/.ssh/id_ed25519
             ssh-keyscan -t rsa gitlab.com >> ~/.ssh/known_hosts
       - run:
@@ -148,7 +148,7 @@ jobs:
             git config --global user.email "root@data.gouv.fr"
             git config --global user.name "datagouv"
       - run:
-          name: Clone scaffold repository
+          name: Clone simple-scaffold repository
           command: |
             git clone --quiet --depth 1 $SCAFFOLD_REPO_SSH_URL scaffold
       - run:
