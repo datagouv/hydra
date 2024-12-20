@@ -89,9 +89,12 @@ jobs:
           command: |
             if [[ $CIRCLE_TAG ]]; then
                 export RELEASE_VERSION=$CIRCLE_TAG
+            elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
+                # for main branches, can't add the commit hash since it's not a valid format for publishing
+                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
             else
                 # for feature branches, add the commit hash
-                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
+                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
             fi
             # Set the version in pyproject.toml
             poetry version $RELEASE_VERSION
