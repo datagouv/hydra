@@ -42,7 +42,7 @@ async def test_exception_analysis(
     assert resource["status"] is None
 
     # Analyse the CSV
-    await analyse_csv(check_id=check["id"])
+    await analyse_csv(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_EXCEPTION_ID)

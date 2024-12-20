@@ -216,7 +216,7 @@ async def test_analyse_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
     check = await fake_check()
-    await analyse_resource(check_id=check["id"], last_check=None)
+    await analyse_resource(check=check, last_check=None)
     result: Record | None = await Check.get_by_id(check["id"])
 
     assert result["error"] is None
@@ -230,7 +230,7 @@ async def test_analyse_resource_send_udata(setup_catalog, mocker, rmock, fake_ch
     rmock.put(udata_url, status=200, repeat=True)
 
     check = await fake_check()
-    await analyse_resource(check_id=check["id"], last_check=None)
+    await analyse_resource(check=check, last_check=None)
 
     req = rmock.requests[("PUT", URL(udata_url))]
     assert len(req) == 1
@@ -250,7 +250,7 @@ async def test_analyse_resource_send_udata_no_change(
         checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
     )
     check = await fake_check()
-    await analyse_resource(check_id=check["id"], last_check=last_check)
+    await analyse_resource(check=check, last_check=last_check)
 
     # udata has not been called
     assert ("PUT", URL(udata_url)) not in rmock.requests
@@ -662,7 +662,7 @@ async def test_dont_check_resources_with_status(
 async def test_wrong_url_in_catalog(
     setup_catalog, rmock, produce_mock, url_changed, catalog_content
 ):
-    r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
+    r = await Resource.get(RESOURCE_ID)
     not_found_url = r["url"]
     new_url = "https://example.com/has-been-modified-lately"
     rmock.head(
@@ -695,7 +695,7 @@ async def test_wrong_url_in_catalog(
             body=catalog_content,
         )
     async with ClientSession() as session:
-        await check_resource(url=not_found_url, resource_id=RESOURCE_ID, session=session)
+        await check_resource(url=not_found_url, resource=r, session=session)
     if url_changed:
         r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
         assert r["url"] == new_url
