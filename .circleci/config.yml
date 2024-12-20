@@ -89,28 +89,27 @@ jobs:
           command: |
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
-                export VERSION=$CIRCLE_TAG
+                export RELEASE_VERSION=$CIRCLE_TAG
             # Otherwise, relies on a dev version like "1.2.1.dev" by default
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
                 # for main branches, can't add the commit hash since it's not a valid format for publishing
-                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
+                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
             else
                 # for feature branches, add the commit hash
-                export VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
+                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
             fi
             # Set the version in pyproject.toml
-            poetry version $VERSION
+            poetry version $RELEASE_VERSION
       - run:
           name: Display build info for debugging
           command: |
-            echo "Building a wheel release with version $VERSION"
+            echo "Building a wheel release with version $RELEASE_VERSION"
             echo "Build number: $CIRCLE_BUILD_NUM"
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Git tag: $CIRCLE_TAG"
       - run:
           name: Build a distributable package as a wheel release with Poetry
-          command: |
-            poetry build
+          command: poetry build
       - store_artifacts:
           path: dist
       - persist_to_workspace:
