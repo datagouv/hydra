@@ -85,10 +85,8 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Export commit hash to environment variable
-          command: |
-            echo "export COMMIT_HASH=${CIRCLE_SHA1:0:7}" >> $BASH_ENV
-            source $BASH_ENV
+          name: Write commit hash to version file
+          command: echo "__commit__ = \"${CIRCLE_SHA1:0:7}\"" > udata_hydra/commit.py
       - run:
           name: Set the version
           command: |
@@ -106,14 +104,13 @@ jobs:
             echo "Building a wheel release with version $VERSION"
             echo "Build number: $CIRCLE_BUILD_NUM"
             echo "Tag: $CIRCLE_TAG"
-            echo "Commit hash: $COMMIT_HASH"
-            echo "BASH_ENV contents:"
-            cat $BASH_ENV
+            echo "Commit hash: ${CIRCLE_SHA1:0:7}"
+            echo "Commit file content:"
+            cat udata_hydra/commit.py || echo "commit.py file not found"
       - run:
           name: Build a distributable package
           command: |
-            # Pass the commit hash as a build-time environment variable
-            COMMIT_HASH=$COMMIT_HASH poetry build
+            poetry build
       - store_artifacts:
           path: dist
       - persist_to_workspace:

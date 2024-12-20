@@ -5,6 +5,11 @@ from pathlib import Path
 
 import tomllib
 
+try:
+    from commit import __commit__
+except ImportError:
+    __commit__ = "unknown"
+
 log = logging.getLogger("udata-hydra")
 
 
@@ -34,8 +39,8 @@ class Configurator:
         # add project metadata to config
         self.configuration["APP_NAME"] = "udata-hydra"
         self.configuration["APP_VERSION"] = importlib.metadata.version("udata-hydra")
-        # Add commit hash from environment variable
-        self.configuration["COMMIT_HASH"] = os.environ.get("COMMIT_HASH", "unknown")
+        # Add commit hash from commit.py file
+        self.configuration["COMMIT_HASH"] = __commit__
 
     def override(self, **kwargs) -> None:
         self.configuration.update(kwargs)
