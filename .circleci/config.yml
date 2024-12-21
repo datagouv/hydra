@@ -116,6 +116,8 @@ jobs:
                 # for feature branches, add the commit hash
                 export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
             fi
+            # Save version to a file that will be persisted
+            echo "$RELEASE_VERSION" > version.txt
       - run:
           name: Display build info for debugging
           command: |
