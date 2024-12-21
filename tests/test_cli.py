@@ -161,7 +161,7 @@ async def test_insert_resource_in_catalog(rmock):
             },
         },
     )
-    run("insert_resource_into_catalog", resource_id=RESOURCE_ID)
+    run("insert_resource_into_catalog", RESOURCE_ID)
     resource = await Resource.get(RESOURCE_ID)
     assert resource["dataset_id"] == new_dataset_id
     assert resource["url"] == new_resource_url
