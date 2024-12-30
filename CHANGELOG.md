@@ -12,7 +12,8 @@
 - Add CLI util to insert or update a resource into the catalog (change since last catalog load) [#228](https://github.com/datagouv/hydra/pull/228)
 - Fix deadlocks errors when purging CSV tables by refactoring `purge_csv_tables` to use atomic transactions [#230](https://github.com/datagouv/hydra/pull/230)
 - Improve timing of checks depending on changes since last check [#163](https://github.com/datagouv/hydra/pull/163)
-
+- Trigger GitLab deployment in CI when pushing on `main` [#186](https://github.com/datagouv/hydra/pull/186)
+- Fix GitLab deployment in CI [#239](https://github.com/datagouv/hydra/pull/239)
 
 ## 2.0.5 (2024-11-08)
 
@@ -57,7 +58,6 @@
 - Add a `quiet` argument for `purge_check` and `purge_csv_table` CLIs [#184](https://github.com/datagouv/hydra/pull/184)
 - Fix wrong resource status [#187](https://github.com/datagouv/hydra/pull/187)
 - More informative error relative to check resource CLI [#188](https://github.com/datagouv/hydra/pull/188)
-- Trigger GitLab deployment in CI when pushing on `main` [#186](https://github.com/datagouv/hydra/pull/186)
 
 ## 2.0.0 (2024-09-24)
 
