@@ -82,15 +82,13 @@ jobs:
             # Find and split tests
             TESTFILES=$(find tests -name "test_*.py" | circleci tests split --split-by=timings)
             # Debug: Show what's in TESTFILES
-            echo "Files assigned to this executor:"
+            echo "Test files assigned to the executor ${CIRCLE_NODE_INDEX}/${CIRCLE_NODE_TOTAL}:"
             echo "$TESTFILES"
             # Run the found tests
             if [ -n "$TESTFILES" ]; then
-              echo "Running tests: $TESTFILES"
               poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
             else
               echo "No tests to run in this split"
-              find tests -name "test_*.py" | wc -l
               exit 1
             fi
       - store_test_results:
