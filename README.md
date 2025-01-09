@@ -108,6 +108,8 @@ RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
 poetry install
 poetry run adev runserver udata_hydra/app.py
 ```
+By default, the app will listen on `localhost:8000`.
+You can check the status of the app with `curl http://localhost:8000/api/health`.
 
 ### Routes/endpoints
 
