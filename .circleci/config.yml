@@ -32,6 +32,7 @@ jobs:
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Branch }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
+            - << pipeline.parameters.cache-prefix >>-{{ arch }}-
       - run:
           name: Install python dependencies
           command: |
@@ -68,6 +69,7 @@ jobs:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+    parallelism: 4 # Number of executed tests in parallel
     steps:
       - attach_workspace:
           at: .
@@ -77,7 +79,18 @@ jobs:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
           command: |
-            poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes
+            # Find and split tests
+            TESTFILES=$(find tests -name "test_*.py" | circleci tests split --split-by=timings)
+            # Debug: Show what's in TESTFILES
+            echo "Test files assigned to the executor ${CIRCLE_NODE_INDEX}/${CIRCLE_NODE_TOTAL}:"
+            echo "$TESTFILES"
+            # Run the found tests
+            if [ -n "$TESTFILES" ]; then
+              poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+            else
+              echo "No tests to run in this split"
+              exit 1
+            fi
       - store_test_results:
           path: reports/python
 
@@ -88,7 +101,7 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Set version
+          name: Set the version
           command: |
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
