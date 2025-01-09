@@ -59,9 +59,13 @@ A job queuing system is used to process long-running tasks. Launch the worker wi
 
 `poetry run rq worker -c udata_hydra.worker`
 
-Monitor worker status:
+To monitor worker status:
 
 `poetry run rq info -c udata_hydra.worker --interval 1`
+
+To empty all the queues:
+
+`poetry run rq empty -c udata_hydra.worker low default high`
 
 ## CSV conversion to database
 
