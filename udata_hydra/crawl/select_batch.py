@@ -17,10 +17,15 @@ async def select_rows_based_on_query(connection, q: str, *args) -> list[Record]:
     create_temp_select_table_query = (
         f"""CREATE TEMPORARY TABLE {temporary_table} AS {q} FOR UPDATE;"""
     )
+    # Update resource status to CRAWLING_URL
+    update_select_catalog_query = f"""
+        UPDATE catalog SET status = 'CRAWLING_URL' WHERE resource_id in (select resource_id from {temporary_table});
+    """
     async with connection.transaction():
         await connection.execute("BEGIN;")
         await connection.execute(create_temp_select_table_query, *args)
-        to_check = await connection.fetch(f"SELECT * FROM {temporary_table};")
+        await connection.execute(update_select_catalog_query)
+        to_check: list[Record] = await connection.fetch(f"SELECT * FROM {temporary_table};")
         await connection.execute("COMMIT;")
     await connection.execute(f"DROP TABLE {temporary_table};")
     return to_check
