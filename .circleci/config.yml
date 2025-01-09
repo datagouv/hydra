@@ -8,7 +8,7 @@ parameters:
   publish-branch:
     type: string
     default: "main"
-    description: "Branch to publish to PyPi and trigger the Gitlab CI/CD pipeline when pushed to"
+    description: "Branch to publish to PyPI and trigger the Gitlab CI/CD pipeline when pushed to"
   deploy-env:
     type: string
     default: "dev"
