@@ -14,6 +14,7 @@
 - Improve timing of checks depending on changes since last check [#163](https://github.com/datagouv/hydra/pull/163)
 - Trigger GitLab deployment in CI when pushing on `main` [#186](https://github.com/datagouv/hydra/pull/186)
 - Fix GitLab deployment in CI [#239](https://github.com/datagouv/hydra/pull/239)
+- Add indexes to improve resource filtering and batch selection [#240](https://github.com/datagouv/hydra/pull/240)
 - Parallelize tests in CI [#238](https://github.com/datagouv/hydra/pull/238)
 
 ## 2.0.5 (2024-11-08)
