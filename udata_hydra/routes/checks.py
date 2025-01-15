@@ -69,7 +69,7 @@ async def create_check(request: web.Request) -> web.Response:
 
     # Get URL from resource_id
     try:
-        resource: Record | None = await Resource.get(resource_id, "url")
+        resource: Record | None = await Resource.get(resource_id)
         url: str = resource["url"]
     except Exception:
         raise web.HTTPNotFound(text=f"Couldn't find URL for resource {resource_id}")
@@ -81,7 +81,7 @@ async def create_check(request: web.Request) -> web.Response:
     ) as session:
         status: str = await check_resource(
             url=url,
-            resource_id=resource_id,
+            resource=resource,
             force_analysis=force_analysis,
             session=session,
             worker_priority="high",

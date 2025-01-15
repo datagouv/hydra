@@ -15,6 +15,7 @@ from progressist import ProgressBar
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
+from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
@@ -158,9 +159,22 @@ async def check_resource(resource_id: str, method: str = "get", force_analysis: 
 async def analyse_csv_cli(
     check_id: str | None = None, url: str | None = None, debug_insert: bool = False
 ):
-    """Trigger a csv analysis from a check_id or an url"""
-    check_id = int(check_id) if check_id else None
-    await analyse_csv(check_id, url, debug_insert)
+    """Trigger a csv analysis from a check_id or an url
+    Try to get the check from the check ID, then from the URL
+    """
+    check: Record | None = (
+        await Check.get_by_id(int(check_id), with_deleted=True) if check_id else None
+    )
+    if not check:
+        checks: list[Record] | None = await Check.get_by_url(url) if url else None
+        if checks and len(checks) > 1:
+            log.warning(f"Multiple checks found for URL {url}, using the latest one")
+        check = checks[0] if checks else None
+    if not check:
+        log.error("No check found or URL provided")
+        return
+
+    await analyse_csv(check, debug_insert)
 
 
 @cli
@@ -350,7 +364,7 @@ async def insert_resource_into_catalog(resource_id: str):
                 dataset_id = $1,
                 url = $3,
                 deleted = FALSE;
-        """,
+            """,
             resource["dataset_id"],
             resource["resource"]["id"],
             resource["resource"]["url"],

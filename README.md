@@ -59,9 +59,13 @@ A job queuing system is used to process long-running tasks. Launch the worker wi
 
 `poetry run rq worker -c udata_hydra.worker`
 
-Monitor worker status:
+To monitor worker status:
 
 `poetry run rq info -c udata_hydra.worker --interval 1`
+
+To empty all the queues:
+
+`poetry run rq empty -c udata_hydra.worker low default high`
 
 ## CSV conversion to database
 
@@ -108,6 +112,8 @@ RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
 poetry install
 poetry run adev runserver udata_hydra/app.py
 ```
+By default, the app will listen on `localhost:8000`.
+You can check the status of the app with `curl http://localhost:8000/api/health`.
 
 ### Routes/endpoints
 

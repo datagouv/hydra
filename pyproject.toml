@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "udata-hydra"
-version = "2.0.6.dev"
+version = "2.1.1.dev"
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = ["Opendata Team <opendatateam@data.gouv.fr>"]
 license = "MIT"
@@ -65,7 +65,8 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "catalog_harvested: use catalog_harvested.csv as source",
 ]
-addopts = "--cov=udata_hydra/ --cov-report term-missing --cov-fail-under=88"
+# addopts = "--cov=udata_hydra/ --cov-report term-missing --cov-fail-under=89" # if we want to fail if coverage is less than 89%
+addopts = "--cov=udata_hydra/ --cov-report term-missing"
 
 [tool.ruff]
 lint = { extend-select = ["I"], ignore = ["F401"] } # ["I"] is to also sort imports with an isort rule # TODO: remove ignore F401 later

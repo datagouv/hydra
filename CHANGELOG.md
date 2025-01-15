@@ -2,6 +2,10 @@
 
 ## Current (in progress)
 
+- Nothing yet
+
+## 2.1.0 (2025-01-13)
+
 - Refactor ParseError to enrich Sentry with context and to inquire about Sentry errors like #4096 [#218](https://github.com/datagouv/hydra/pull/218)
 - Remove legacy routes [#203](https://github.com/datagouv/hydra/pull/203)
 - More explicit error reporting when sending to udata without raising errors for udata responding with a 404 [#213](https://github.com/datagouv/hydra/pull/213)
@@ -13,7 +17,11 @@
 - Fix deadlocks errors when purging CSV tables by refactoring `purge_csv_tables` to use atomic transactions [#230](https://github.com/datagouv/hydra/pull/230)
 - Improve timing of checks depending on changes since last check [#163](https://github.com/datagouv/hydra/pull/163)
 - Remove bad default value in CLI to insert a resource [#235](https://github.com/datagouv/hydra/pull/235)
-
+- Trigger GitLab deployment in CI when pushing on `main` [#186](https://github.com/datagouv/hydra/pull/186)
+- Fix GitLab deployment in CI [#239](https://github.com/datagouv/hydra/pull/239)
+- Add indexes to improve resource filtering and batch selection [#240](https://github.com/datagouv/hydra/pull/240)
+- Parallelize tests in CI [#238](https://github.com/datagouv/hydra/pull/238)
+- Refactor analysis logic to remove 5 non necessary queries, using the existing data in the code instead of re-querying it [#227](https://github.com/datagouv/hydra/pull/227)
 
 ## 2.0.5 (2024-11-08)
 
