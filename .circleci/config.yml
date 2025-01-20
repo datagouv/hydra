@@ -4,7 +4,7 @@ version: 2.1
 parameters:
   python-version:
     type: string
-    default: "3.11.9"
+    default: "3.11"
   publish-branch:
     type: string
     default: "main"
@@ -21,9 +21,12 @@ parameters:
 jobs:
   install:
     docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - checkout
+      - run:
+          name: Install system dependencies
+          command: apt-get update -qq && apt-get install -y cmake
       - run:
           name: Get the base reference branch
           command: export BASE_BRANCH=$(base_branch)
@@ -33,10 +36,6 @@ jobs:
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Branch }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-
-      - run:
-          name: Install uv
-          command: |
-            curl -LsSf https://astral.sh/uv/install.sh | sh
       - run:
           name: Create venv and install Python dependencies
           command: |
@@ -53,7 +52,7 @@ jobs:
 
   lint:
     docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - attach_workspace:
           at: .
@@ -67,7 +66,7 @@ jobs:
 
   tests:
     docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
       - image: cimg/postgres:11.15
         environment:
           POSTGRES_DB: postgres
@@ -77,6 +76,9 @@ jobs:
     steps:
       - attach_workspace:
           at: .
+      - run:
+          name: Install system dependencies
+          command: apt-get update -qq && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
       - run:
           name: Run tests
           environment:
@@ -100,14 +102,15 @@ jobs:
 
   build:
     docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - attach_workspace:
           at: .
       - run:
-          name: Install uv
+          name: Install system dependencies
           command: |
-            curl -LsSf https://astral.sh/uv/install.sh | sh
+            apt-get update
+            apt-get install -y cmake
       - run:
           name: Set the version
           command: |
@@ -152,7 +155,7 @@ jobs:
 
   publish:
     docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - attach_workspace:
           at: .
@@ -160,7 +163,7 @@ jobs:
           name: Publish on PyPI
           command: |
             # Install twine for publishing to PyPI
-            .venv/bin/pip install twine
+            uv pip install twine
             # Upload all distribution files
             .venv/bin/twine upload --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" dist/*
 
