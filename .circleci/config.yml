@@ -29,26 +29,23 @@ jobs:
           command: export BASE_BRANCH=$(base_branch)
       - restore_cache:
           keys:
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
+            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Branch }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-
       - run:
-          name: Install Poetry 2.0.1 locally
+          name: Install uv
           command: |
-            python3 -m venv .poetry-venv
-            .poetry-venv/bin/pip install poetry==2.0.1
-            ln -s .poetry-venv/bin/poetry poetry-binary
+            curl -LsSf https://astral.sh/uv/install.sh | sh
       - run:
-          name: Install python dependencies
+          name: Create venv and install Python dependencies
           command: |
-            ./poetry-binary config virtualenvs.in-project true
-            ./poetry-binary install --extras "dev"
+            uv venv
+            uv pip install -e ".[dev]"
       - save_cache:
-          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
+          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}
           paths:
             - .venv
-            - .poetry-venv
       - persist_to_workspace:
           root: .
           paths:
@@ -65,8 +62,8 @@ jobs:
           # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
           # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
-            ./poetry-binary run ruff check --select I .
-            ./poetry-binary run ruff format --check .
+            .venv/bin/ruff check --select I .
+            .venv/bin/ruff format --check .
 
   tests:
     docker:
@@ -93,7 +90,7 @@ jobs:
             echo "$TESTFILES"
             # Run the found tests
             if [ -n "$TESTFILES" ]; then
-              ./poetry-binary run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+              .venv/bin/pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
             else
               echo "No tests to run in this split"
               exit 1
@@ -108,20 +105,25 @@ jobs:
       - attach_workspace:
           at: .
       - run:
+          name: Install uv
+          command: |
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+      - run:
           name: Set the version
           command: |
+            # Get base version from pyproject.toml
+            BASE_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
-                export RELEASE_VERSION=$CIRCLE_TAG
-            # Otherwise, relies on a dev version like "1.2.1.dev" by default
+                RELEASE_VERSION=$CIRCLE_TAG
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
                 # for main branches, can't add the commit hash since it's not a valid format for publishing
-                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
+                RELEASE_VERSION=${BASE_VERSION}${CIRCLE_BUILD_NUM}
             else
                 # for feature branches, add the commit hash
-                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
+                RELEASE_VERSION=${BASE_VERSION}${CIRCLE_BUILD_NUM}+${CIRCLE_SHA1:0:7}
             fi
-            # Save version to a file that will be persisted
             echo "$RELEASE_VERSION" > version.txt
       - run:
           name: Display build info for debugging
@@ -132,12 +134,14 @@ jobs:
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Git tag: $CIRCLE_TAG"
       - run:
-          name: Build a distributable package as a wheel release with Poetry
+          name: Build package
           command: |
             RELEASE_VERSION=$(cat version.txt)
-            # Set the version in pyproject.toml
-            ./poetry-binary version $RELEASE_VERSION
-            ./poetry-binary build
+            # Update version in pyproject.toml
+            sed -i "s/version = \".*\"/version = \"$RELEASE_VERSION\"/" pyproject.toml
+            # Install build and build the package
+            uv pip install build
+            .venv/bin/python -m build
       - store_artifacts:
           path: dist
       - persist_to_workspace:
@@ -155,7 +159,10 @@ jobs:
       - run:
           name: Publish on PyPI
           command: |
-            ./poetry-binary publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+            # Install twine for publishing to PyPI
+            .venv/bin/pip install twine
+            # Upload all distribution files
+            .venv/bin/twine upload --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" dist/*
 
   trigger-gitlab-pipeline:
     docker:
