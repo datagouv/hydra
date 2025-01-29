@@ -116,10 +116,10 @@ jobs:
             # Otherwise, relies on a dev version like "1.2.1.dev" by default
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
                 # for main branches, can't add the commit hash since it's not a valid format for publishing
-                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM
+                export RELEASE_VERSION=$(./poetry-binary version -s)$CIRCLE_BUILD_NUM
             else
                 # for feature branches, add the commit hash
-                export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
+                export RELEASE_VERSION=$(./poetry-binary version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}
             fi
             # Save version to a file that will be persisted
             echo "$RELEASE_VERSION" > version.txt
