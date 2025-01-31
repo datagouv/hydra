@@ -19,7 +19,7 @@ parameters:
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
 
 jobs:
-  build-test:
+  lint-and-test:
     docker:
       - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
       - image: cimg/postgres:15.13
@@ -27,6 +27,7 @@ jobs:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+    parallelism: 4  # Only tests will be parallelized
     steps:
       - checkout
       - run:
@@ -49,7 +50,26 @@ jobs:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
           command: |
-            .venv/bin/pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes
+            # Find and split tests
+            TESTFILES=$(find tests -name "test_*.py" | circleci tests split --split-by=timings)
+            # Debug: Show what's in TESTFILES
+            echo "Test files assigned to the executor ${CIRCLE_NODE_INDEX}/${CIRCLE_NODE_TOTAL}:"
+            echo "$TESTFILES"
+            # Run the found tests
+            if [ -n "$TESTFILES" ]; then
+              .venv/bin/pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+            else
+              echo "No tests to run in this split"
+              exit 1
+
+  build:
+    docker:
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+    steps:
+      - checkout
+      - run:
+          name: Install Python dependencies
+          command: uv venv && uv pip install -e ".[dev]"
       - run:
           name: Set the version
           command: |
@@ -170,10 +190,10 @@ jobs:
 workflows:
   build-test-deploy:
     jobs:
-      - build-test
-      - publish:
+      - lint-and-test
+      - build:
           requires:
-            - build-test
+            - lint-and-test
           filters:
             branches:
               only:
@@ -183,6 +203,16 @@ workflows:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
           context: org-global
+      - publish:
+          requires:
+            - build
+          filters:
+            branches:
+              only:
+                - << pipeline.parameters.publish-branch >>
+          context:
+            - org-global
+            - gitlab-trigger
       - trigger-gitlab-pipeline:
           requires:
             - publish
