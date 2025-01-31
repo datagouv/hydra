@@ -19,56 +19,7 @@ parameters:
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
 
 jobs:
-  install:
-    docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
-    steps:
-      - checkout
-      - run:
-          name: Install system dependencies
-          command: |
-            apt-get update -qq && apt-get install -y \
-              cmake \
-              libgeos-dev  # Added for shapely dependency
-      - run:
-          name: Get the base reference branch
-          command: export BASE_BRANCH=$(base_branch)
-      - restore_cache:
-          keys:
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Branch }}
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-
-      - run:
-          name: Create venv and install Python dependencies
-          command: |
-            uv venv
-            uv pip install -e ".[dev]"
-      - save_cache:
-          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}
-          paths:
-            - .venv
-      - persist_to_workspace:
-          root: .
-          paths:
-            - .
-
-  lint:
-    docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
-    steps:
-      - attach_workspace:
-          at: .
-      - run:
-          name: Lint and format code and sort imports
-          # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
-          # ruff format --check . : check code formatting without fixing (to fix, remove --check)
-          command: |
-            .venv/bin/ruff --version
-            .venv/bin/ruff check --select I .
-            .venv/bin/ruff format --check .
-
-  tests:
+  build-test:
     docker:
       - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
       - image: cimg/postgres:15.13
@@ -76,45 +27,29 @@ jobs:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-    parallelism: 4 # Number of executed tests in parallel
     steps:
-      - attach_workspace:
-          at: .
+      - checkout
       - run:
           name: Install system dependencies
-          command: apt-get update -qq && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
+          command: |
+            apt-get update && apt-get install -y \
+              cmake libgeos-dev libmagic1
+      - run:
+          name: Install Python dependencies
+          command: uv venv && uv pip install -e ".[dev]"
+      - run:
+          name: Lint and format code
+          command: |
+            .venv/bin/ruff --version
+            .venv/bin/ruff check --select I .
+            .venv/bin/ruff format --check .
       - run:
           name: Run tests
           environment:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
           command: |
-            # Find and split tests
-            TESTFILES=$(find tests -name "test_*.py" | circleci tests split --split-by=timings)
-            # Debug: Show what's in TESTFILES
-            echo "Test files assigned to the executor ${CIRCLE_NODE_INDEX}/${CIRCLE_NODE_TOTAL}:"
-            echo "$TESTFILES"
-            # Run the found tests
-            if [ -n "$TESTFILES" ]; then
-              .venv/bin/pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
-            else
-              echo "No tests to run in this split"
-              exit 1
-            fi
-      - store_test_results:
-          path: reports/python
-
-  build:
-    docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
-    steps:
-      - attach_workspace:
-          at: .
-      - run:
-          name: Install system dependencies
-          command: |
-            apt-get update
-            apt-get install -y cmake
+            .venv/bin/pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes
       - run:
           name: Set the version
           command: |
@@ -235,32 +170,10 @@ jobs:
 workflows:
   build-test-deploy:
     jobs:
-      - install:
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-      - lint:
-          requires:
-            - install
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-      - tests:
-          requires:
-            - install
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-      - build:
-          requires:
-            - tests
-            - lint
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
+      - build-test
       - publish:
           requires:
-            - build
+            - build-test
           filters:
             branches:
               only:
