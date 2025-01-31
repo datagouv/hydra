@@ -23,6 +23,7 @@
 - Parallelize tests in CI [#238](https://github.com/datagouv/hydra/pull/238)
 - Refactor analysis logic to remove 5 non necessary queries, using the existing data in the code instead of re-querying it [#227](https://github.com/datagouv/hydra/pull/227)
 - Use a package-manager-agnostic pyproject.toml instead of a Poetry pyproject.toml [#170](https://github.com/datagouv/hydra/pull/170)
+- Use a bash file instead of text file to store env vars across CI jobs [#245](https://github.com/datagouv/hydra/pull/245)
 
 ## 2.0.5 (2024-11-08)
 
