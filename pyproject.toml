@@ -63,7 +63,6 @@ module = [
 ]
 ignore_missing_imports = true
 
-
 [tool.poetry.scripts]
 udata-hydra = "udata_hydra.cli:run"
 udata-hydra-crawl = "udata_hydra.crawl:run"
