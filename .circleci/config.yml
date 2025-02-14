@@ -145,28 +145,6 @@ jobs:
             - .
             - version.sh
 
-  create-sentry-release:
-    docker:
-      - image: cimg/base:stable
-    steps:
-      - attach_workspace:
-          at: .
-      - run:
-          name: Create Sentry release
-          command: |
-            source version.sh
-            # Create release
-            curl https://errors.data.gouv.fr/api/0/organizations/sentry/releases/ \
-              -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
-              -H 'Content-Type: application/json' \
-              -d "{\"version\":\"${RELEASE_VERSION}\",\"ref\":\"${CIRCLE_SHA1}\",\"projects\":[\"hydra\"]}"
-
-            # Create deployment
-            curl https://errors.data.gouv.fr/api/0/organizations/sentry/releases/${RELEASE_VERSION}/deploys/ \
-              -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
-              -H 'Content-Type: application/json' \
-              -d "{\"environment\":\"<< pipeline.parameters.deploy-env >>\"}"
-
   publish:
     docker:
       - image: cimg/python:<< pipeline.parameters.python-version >>
@@ -216,6 +194,28 @@ jobs:
             # - << pipeline.parameters.deploy-env >>: the environment to deploy to (ENV)
             # - "": the deploy variables (VARS)
             ./scripts/gitlab-ci-pipeline.sh hydra $RELEASE_VERSION << pipeline.parameters.deploy-env >> ""
+
+  create-sentry-release:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Create Sentry release
+          command: |
+            source version.sh
+            # Create release
+            curl https://errors.data.gouv.fr/api/0/organizations/sentry/releases/ \
+              -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
+              -H 'Content-Type: application/json' \
+              -d "{\"version\":\"${RELEASE_VERSION}\",\"ref\":\"${CIRCLE_SHA1}\",\"projects\":[\"hydra\"]}"
+
+            # Create deployment
+            curl https://errors.data.gouv.fr/api/0/organizations/sentry/releases/${RELEASE_VERSION}/deploys/ \
+              -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
+              -H 'Content-Type: application/json' \
+              -d "{\"environment\":\"<< pipeline.parameters.deploy-env >>\"}"
 
 workflows:
   build-test-deploy:
