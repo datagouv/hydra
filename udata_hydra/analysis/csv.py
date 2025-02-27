@@ -150,7 +150,7 @@ async def analyse_csv(
         # Launch csv-detective against given file
         try:
             csv_inspection: dict | None = csv_detective_routine(
-                csv_file_path=tmp_file.name, output_profile=True, num_rows=-1, save_results=False
+                csv_file_path=tmp_file.name, output_profile=True, num_rows=-1, save_results=False,
             )
         except Exception as e:
             raise ParseException(
