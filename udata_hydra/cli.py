@@ -179,14 +179,11 @@ async def analyse_csv_cli(
     if not check:
         if check_id:
             log.error("Could not retrieve the specified check")
-            return
         elif url:
             log.error("Could not find a check linked to the specified URL")
-            return
         elif resource_id:
             log.error("Could not find a check linked to the specified resource ID")
-            return
-
+        return
     await analyse_csv(check=check, debug_insert=debug_insert)
 
 
