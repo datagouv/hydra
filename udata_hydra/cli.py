@@ -175,7 +175,7 @@ async def analyse_csv_cli(
             log.warning(f"Multiple checks found for URL {url}, using the latest one")
         check = checks[0] if checks else None
     if not check and resource_id:
-        check: list[Record] | None = await Check.get_by_resource_id(resource_id)
+        check: Record | None = await Check.get_by_resource_id(resource_id)
     if not check:
         if check_id:
             log.error("Could not retrieve the specified check")
