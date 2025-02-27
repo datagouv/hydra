@@ -178,7 +178,7 @@ async def analyse_csv_cli(
             log.error("Could not find a check linked to the specified URL")
             return
 
-    await analyse_csv(check, debug_insert)
+    await analyse_csv(check=check, debug_insert=debug_insert)
 
 
 @cli
