@@ -147,7 +147,7 @@ async def check_resource(resource_id: str, method: str = "get", force_analysis: 
     async with aiohttp.ClientSession(timeout=None) as session:
         await crawl_check_resource(
             url=resource["url"],
-            resource_id=resource_id,
+            resource=resource,
             session=session,
             method=method,
             force_analysis=force_analysis,
