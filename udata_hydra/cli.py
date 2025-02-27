@@ -171,8 +171,12 @@ async def analyse_csv_cli(
             log.warning(f"Multiple checks found for URL {url}, using the latest one")
         check = checks[0] if checks else None
     if not check:
-        log.error("No check found or URL provided")
-        return
+        if check_id:
+            log.error("Could not retrieve the specified check")
+            return
+        elif url:
+            log.error("Could not find a check linked to the specified URL")
+            return
 
     await analyse_csv(check, debug_insert)
 
