@@ -174,7 +174,7 @@ async def analyse_csv_cli(
         if check_id:
             log.error("Could not retrieve the specified check")
             return
-        elif url:
+        else:
             log.error("Could not find a check linked to the specified URL")
             return
 
