@@ -160,7 +160,7 @@ async def analyse_csv_cli(
     check_id: str | None = None,
     url: str | None = None,
     resource_id: str | None = None,
-    debug_insert: bool = False
+    debug_insert: bool = False,
 ):
     """Trigger a csv analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
