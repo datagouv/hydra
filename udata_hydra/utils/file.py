@@ -60,7 +60,6 @@ async def download_resource(
                     if max_size_allowed is None or i * chunk_size < max_size_allowed:
                         tmp_file.write(chunk)
                     else:
-                        tmp_file.close()
                         too_large = True
                         break
                     i += 1
