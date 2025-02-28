@@ -136,7 +136,7 @@ async def analyse_csv(
         open(file_path, "rb")
         if file_path
         else await download_resource(
-            url=check["url"],
+            url=url,
             headers=headers,
             max_size_allowed=None if exception else int(config.MAX_FILESIZE_ALLOWED["csv"]),
         )
@@ -154,9 +154,8 @@ async def analyse_csv(
             )
         except Exception as e:
             raise ParseException(
-                step="csv_detective", resource_id=resource_id, url=url, check_id=check["id"]
+                step="csv_detective", resource_id=resource_id, url=url, check_id=check["id"],
             ) from e
-
         timer.mark("csv-inspection")
 
         await csv_to_db(
@@ -169,13 +168,19 @@ async def analyse_csv(
         )
         timer.mark("csv-to-db")
 
-        parquet_args: tuple[str, int] | None = await csv_to_parquet(
-            file_path=tmp_file.name,
-            inspection=csv_inspection,
-            table_name=table_name,
-            resource_id=resource_id,
-        )
-        timer.mark("csv-to-parquet")
+        try:
+            parquet_args: tuple[str, int] | None = await csv_to_parquet(
+                file_path=tmp_file.name,
+                inspection=csv_inspection,
+                table_name=table_name,
+                resource_id=resource_id,
+            )
+            timer.mark("csv-to-parquet")
+        except Exception as e:
+            raise ParseException(
+                step="parquet_export", resource_id=resource_id, url=url, check_id=check["id"],
+            ) from e
+
         check = await Check.update(
             check["id"],
             {
