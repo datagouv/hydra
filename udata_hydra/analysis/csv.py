@@ -37,8 +37,8 @@ from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
-    ParseException,
     IOException,
+    ParseException,
     Reader,
     Timer,
     download_resource,
@@ -155,7 +155,7 @@ async def analyse_csv(
             )
         except Exception as e:
             raise ParseException(
-                step="csv_detective", resource_id=resource_id, url=url, check_id=check["id"],
+                step="csv_detective", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
         timer.mark("csv-inspection")
 
@@ -179,7 +179,7 @@ async def analyse_csv(
             timer.mark("csv-to-parquet")
         except Exception as e:
             raise ParseException(
-                step="parquet_export", resource_id=resource_id, url=url, check_id=check["id"],
+                step="parquet_export", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
 
         check = await Check.update(
