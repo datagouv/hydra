@@ -63,10 +63,10 @@ async def download_resource(
                         too_large = True
                         break
                     i += 1
-                tmp_file.close()
     except aiohttp.ClientResponseError as e:
         raise IOException("Error downloading CSV", url=url) from e
     finally:
+        tmp_file.close()
         if too_large:
             raise IOException("File too large to download", url=url)
         if magic.from_file(tmp_file.name, mime=True) in [
