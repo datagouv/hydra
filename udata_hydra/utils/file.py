@@ -46,7 +46,7 @@ async def download_resource(
     )
 
     if max_size_allowed is not None and float(headers.get("content-length", -1)) > max_size_allowed:
-        raise IOException("File too large to download")
+        raise IOException("File too large to download", url=url)
 
     chunk_size = 1024
     i = 0
