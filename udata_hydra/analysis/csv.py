@@ -37,6 +37,7 @@ from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
+    IOException,
     ParseException,
     Reader,
     Timer,
@@ -131,20 +132,20 @@ async def analyse_csv(
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check["id"], url))
 
-    headers = json.loads(check.get("headers") or "{}")
-    tmp_file = (
-        open(file_path, "rb")
-        if file_path
-        else await download_resource(
-            url=check["url"],
-            headers=headers,
-            max_size_allowed=None if exception else int(config.MAX_FILESIZE_ALLOWED["csv"]),
-        )
-    )
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
-    timer.mark("download-file")
-
     try:
+        headers = json.loads(check.get("headers") or "{}")
+        tmp_file = (
+            open(file_path, "rb")
+            if file_path
+            else await download_resource(
+                url=url,
+                headers=headers,
+                max_size_allowed=None if exception else int(config.MAX_FILESIZE_ALLOWED["csv"]),
+            )
+        )
+        table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+        timer.mark("download-file")
+
         check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
 
         # Launch csv-detective against given file
@@ -159,7 +160,6 @@ async def analyse_csv(
             raise ParseException(
                 step="csv_detective", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
-
         timer.mark("csv-inspection")
 
         await csv_to_db(
@@ -172,13 +172,19 @@ async def analyse_csv(
         )
         timer.mark("csv-to-db")
 
-        parquet_args: tuple[str, int] | None = await csv_to_parquet(
-            file_path=tmp_file.name,
-            inspection=csv_inspection,
-            table_name=table_name,
-            resource_id=resource_id,
-        )
-        timer.mark("csv-to-parquet")
+        try:
+            parquet_args: tuple[str, int] | None = await csv_to_parquet(
+                file_path=tmp_file.name,
+                inspection=csv_inspection,
+                table_name=table_name,
+                resource_id=resource_id,
+            )
+            timer.mark("csv-to-parquet")
+        except Exception as e:
+            raise ParseException(
+                step="parquet_export", resource_id=resource_id, url=url, check_id=check["id"]
+            ) from e
+
         check = await Check.update(
             check["id"],
             {
@@ -190,7 +196,7 @@ async def analyse_csv(
         )
         await csv_to_db_index(table_name, csv_inspection, check)
 
-    except ParseException as e:
+    except (ParseException, IOException) as e:
         await handle_parse_exception(e, table_name, check)
     finally:
         await notify_udata(resource, check)
