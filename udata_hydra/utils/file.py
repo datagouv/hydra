@@ -50,7 +50,7 @@ async def download_resource(
 
     chunk_size = 1024
     i = 0
-    too_large = False
+    too_large, download_error = False, None
     try:
         async with aiohttp.ClientSession(
             headers={"user-agent": config.USER_AGENT}, raise_for_status=True
@@ -64,11 +64,13 @@ async def download_resource(
                         break
                     i += 1
     except aiohttp.ClientResponseError as e:
-        raise IOException("Error downloading CSV", url=url) from e
+        download_error = e
     finally:
         tmp_file.close()
         if too_large:
             raise IOException("File too large to download", url=url)
+        if download_error:
+            raise IOException("Error downloading CSV", url=url) from download_error
         if magic.from_file(tmp_file.name, mime=True) in [
             "application/x-gzip",
             "application/gzip",
