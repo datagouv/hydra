@@ -147,7 +147,7 @@ async def check_resource(resource_id: str, method: str = "get", force_analysis: 
     async with aiohttp.ClientSession(timeout=None) as session:
         await crawl_check_resource(
             url=resource["url"],
-            resource_id=resource_id,
+            resource=resource,
             session=session,
             method=method,
             force_analysis=force_analysis,
@@ -157,24 +157,34 @@ async def check_resource(resource_id: str, method: str = "get", force_analysis: 
 
 @cli(name="analyse-csv")
 async def analyse_csv_cli(
-    check_id: str | None = None, url: str | None = None, debug_insert: bool = False
+    check_id: str | None = None,
+    url: str | None = None,
+    resource_id: str | None = None,
+    debug_insert: bool = False,
 ):
-    """Trigger a csv analysis from a check_id or an url
+    """Trigger a csv analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
     """
-    check: Record | None = (
-        await Check.get_by_id(int(check_id), with_deleted=True) if check_id else None
-    )
-    if not check:
-        checks: list[Record] | None = await Check.get_by_url(url) if url else None
+    assert check_id or url or resource_id
+    check = None
+    if check_id:
+        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)
+    if not check and url:
+        checks: list[Record] | None = await Check.get_by_url(url)
         if checks and len(checks) > 1:
             log.warning(f"Multiple checks found for URL {url}, using the latest one")
         check = checks[0] if checks else None
+    if not check and resource_id:
+        check: Record | None = await Check.get_by_resource_id(resource_id)
     if not check:
-        log.error("No check found or URL provided")
+        if check_id:
+            log.error("Could not retrieve the specified check")
+        elif url:
+            log.error("Could not find a check linked to the specified URL")
+        elif resource_id:
+            log.error("Could not find a check linked to the specified resource ID")
         return
-
-    await analyse_csv(check, debug_insert)
+    await analyse_csv(check=check, debug_insert=debug_insert)
 
 
 @cli
