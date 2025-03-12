@@ -1,6 +1,6 @@
 [project]
 name = "udata-hydra"
-version = "2.1.1"
+version = "2.1.2.dev"
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = [{ name = "Opendata Team", email = "opendatateam@data.gouv.fr" }]
 dependencies = [
