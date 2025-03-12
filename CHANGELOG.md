@@ -1,6 +1,6 @@
 # Changelog
 
-## Current (in progress)
+## 2.1.1 (2025-03-12)
 
 - Fix CLI analyse-csv and allow analysis from a resource id [#248](https://github.com/datagouv/hydra/pull/248)
 - Rework handling of too large files [#248](https://github.com/datagouv/hydra/pull/248)
