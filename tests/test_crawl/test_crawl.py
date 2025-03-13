@@ -707,15 +707,14 @@ async def test_wrong_url_in_catalog(
 
 
 @pytest.mark.parametrize(
-    "duration_params",
+    "check_duration",
     [
-        (config.STUCK_THRESHOLD_SECONDS // 2, False),
-        (config.STUCK_THRESHOLD_SECONDS * 2, True),
+        config.STUCK_THRESHOLD_SECONDS // 2,
+        config.STUCK_THRESHOLD_SECONDS * 2,
     ],
 )
-async def test_reset_statuses(fake_check, db, setup_catalog, duration_params):
+async def test_reset_statuses(fake_check, db, setup_catalog, check_duration):
     """Reset the status of a resource stuck for a while"""
-    check_duration, should_reset = duration_params
     await fake_check(
         resource_id=RESOURCE_ID, created_at=datetime.now() - timedelta(seconds=check_duration)
     )
@@ -725,7 +724,7 @@ async def test_reset_statuses(fake_check, db, setup_catalog, duration_params):
     assert row["status"] == status
     await Resource.clean_up_statuses()
     row = await db.fetchrow("SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID)
-    if should_reset:
+    if check_duration > config.STUCK_THRESHOLD_SECONDS:
         assert row["status"] is None
     else:
         assert row["status"] == status
