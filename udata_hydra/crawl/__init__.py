@@ -5,9 +5,9 @@ from asyncpg import Record
 from udata_hydra import config, context
 from udata_hydra.crawl.check_resources import check_batch_resources
 from udata_hydra.crawl.select_batch import select_batch_resources_to_check
+from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils import queue  # noqa
-from udata_hydra.db.resource import Resource
 
 log = setup_logging()
 
