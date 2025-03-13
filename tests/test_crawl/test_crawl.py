@@ -704,3 +704,39 @@ async def test_wrong_url_in_catalog(
     else:
         check = await Check.get_by_resource_id(RESOURCE_ID)
         assert check["status"] == 404
+
+
+@pytest.mark.parametrize(
+    "duration_params",
+    [
+        (config.STUCK_THRESHOLD_SECONDS // 2, False),
+        (config.STUCK_THRESHOLD_SECONDS * 2, True),
+    ],
+)
+async def test_reset_statuses(
+    fake_check, db, setup_catalog, duration_params
+):
+    """Reset the status of a resource stuck for a while"""
+    check_duration, should_reset = duration_params
+    await fake_check(
+        resource_id=RESOURCE_ID, created_at=datetime.now() - timedelta(seconds=check_duration)
+    )
+    status = "ANALYSING_CSV"
+    await db.execute(
+        f"UPDATE catalog SET status = '{status}' WHERE resource_id = $1",
+        RESOURCE_ID
+    )
+    row = await db.fetchrow(
+        "SELECT status FROM catalog WHERE resource_id = $1",
+        RESOURCE_ID
+    )
+    assert row["status"] == status
+    await Resource.clean_up_statuses()
+    row = await db.fetchrow(
+        "SELECT status FROM catalog WHERE resource_id = $1",
+        RESOURCE_ID
+    )
+    if should_reset:
+        assert row["status"] is None
+    else:
+        assert row["status"] == status
