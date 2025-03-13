@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Add a status resetting mechanism for stuck resources [#251](https://github.com/datagouv/hydra/pull/251)
 
 ## 2.1.1 (2025-03-12)
 
