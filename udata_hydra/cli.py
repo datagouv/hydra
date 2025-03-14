@@ -104,7 +104,8 @@ async def load_catalog(
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,
-                        deleted = FALSE;
+                        deleted = FALSE,
+                        harvest_modified_at = $4;
                 """,
                     row["dataset.id"],
                     row["id"],
