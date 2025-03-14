@@ -1,8 +1,9 @@
+import asyncpg
 import nest_asyncio
 import pytest
 from minicli import run
 
-from tests.conftest import DATASET_ID, RESOURCE_ID, RESOURCE_URL
+from tests.conftest import DATABASE_URL, DATASET_ID, RESOURCE_ID, RESOURCE_URL
 from udata_hydra.crawl import start_checks
 
 pytestmark = pytest.mark.asyncio
@@ -55,6 +56,10 @@ async def test_catalog_deleted_with_checked_resource(
     catalog = "https://example.com/catalog"
     # feed empty catalog, should delete the previously loaded resource
     rmock.get(catalog, status=200, body=catalog_content[0])
+    # we have to mock the pool again, as it's closed in the finally clause of start_checks
+    m = mocker.patch("udata_hydra.context.pool")
+    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50, loop=event_loop)
+    m.return_value = pool
     run("load_catalog", url=catalog)
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = TRUE")
     assert len(res) == 1
