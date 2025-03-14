@@ -131,7 +131,7 @@ class Resource:
         )
 
     @staticmethod
-    async def get_stuck_resources(conn) -> list[str]:
+    async def get_stuck_resources() -> list[str]:
         """Some resources end up being stuck in a not null status forever,
         we want to get them back on track.
         This returns all resource ids of such stuck resources.
@@ -144,16 +144,13 @@ class Resource:
             JOIN catalog ca
             ON c.id = ca.last_check
             WHERE ca.status IS NOT NULL AND c.created_at < '{threshold}';"""
-        if conn is not None:
-            rows = await conn.fetch(q)
-        else:
-            pool = await context.pool()
-            async with pool.acquire() as connection:
-                rows = await connection.fetch(q)
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            rows = await connection.fetch(q)
         return [str(r["resource_id"]) for r in rows] if rows else []
 
     @classmethod
-    async def clean_up_statuses(cls, conn=None):
-        stuck_resources: list[str] = await cls.get_stuck_resources(conn)
+    async def clean_up_statuses(cls):
+        stuck_resources: list[str] = await cls.get_stuck_resources()
         for rid in stuck_resources:
             await cls.update(rid, {"status": None})
