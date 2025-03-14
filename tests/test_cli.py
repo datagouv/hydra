@@ -148,7 +148,7 @@ async def test_load_catalog_url_has_changed(setup_catalog, rmock, db, catalog_co
 
 async def test_load_catalog_harvest_modified_at_has_changed(setup_catalog, rmock, db, catalog_content):
     # the harvest_modified_at has changed in comparison to load_catalog
-    catalog_content = catalog_content[:-2] + '"2025-03-14 15:49:16.876+02"'
+    catalog_content = catalog_content[:-2] + b'"2025-03-14 15:49:16.876+02"'
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
     run("load_catalog", url=catalog)
