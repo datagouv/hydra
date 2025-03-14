@@ -5,7 +5,6 @@ from asyncpg import Record
 from udata_hydra import config, context
 from udata_hydra.crawl.check_resources import check_batch_resources
 from udata_hydra.crawl.select_batch import select_batch_resources_to_check
-from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.utils import queue  # noqa
 
@@ -26,7 +25,6 @@ async def start_checks(iterations: int = -1) -> None:
         )
 
         while iterations != 0:
-            await Resource.clean_up_statuses()
             batch: list[Record] = await select_batch_resources_to_check()
 
             if batch and len(batch):
