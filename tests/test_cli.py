@@ -146,6 +146,18 @@ async def test_load_catalog_url_has_changed(setup_catalog, rmock, db, catalog_co
     assert res[0]["url"] == "https://example.com/resource-0"
     assert res[0]["deleted"] is False
 
+async def test_load_catalog_harvest_modified_at_has_changed(setup_catalog, rmock, db, catalog_content):
+    # the harvest_modified_at has changed in comparison to load_catalog
+    catalog_content = catalog_content[:-2] + '"2025-03-14 15:49:16.876+02"'
+    catalog = "https://example.com/catalog"
+    rmock.get(catalog, status=200, body=catalog_content)
+    run("load_catalog", url=catalog)
+
+    # check that harvest metadata has been updated
+    res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", f"{RESOURCE_ID}")
+    assert len(res) == 1
+    assert res[0]["harvest_modified_at"] == "2025-03-14 15:49:16.876+02"
+
 
 async def test_insert_resource_in_catalog(rmock):
     new_dataset_id = "a" * 24
