@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Update harvest_modified_at on load catalog [#252](https://github.com/datagouv/hydra/pull/252)
 
 ## 2.1.1 (2025-03-12)
 
