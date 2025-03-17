@@ -20,6 +20,7 @@ from udata_hydra.utils import (
     download_resource,
     queue,
     send,
+    IOException,
 )
 
 
@@ -74,7 +75,7 @@ async def analyse_resource(
     if change_status != Change.HAS_NOT_CHANGED or force_analysis:
         try:
             tmp_file = await download_resource(url, headers, max_size_allowed)
-        except IOError:
+        except IOException:
             dl_analysis["analysis:error"] = "File too large to download"
         else:
             # Get file size
