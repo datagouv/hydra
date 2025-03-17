@@ -54,7 +54,9 @@ class IOException(ExceptionWithSentryDetails):
     pass
 
 
-async def handle_parse_exception(e: IOException | ParseException, table_name: str, check: Record | None) -> None:
+async def handle_parse_exception(
+    e: IOException | ParseException, table_name: str, check: Record | None
+) -> None:
     """Specific IO/ParseException handling. Store error if in a check context. Also cleanup :table_name: if needed."""
     db = await context.pool("csv")
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')

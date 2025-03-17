@@ -15,12 +15,12 @@ from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
+    IOException,
     compute_checksum_from_file,
     detect_tabular_from_headers,
     download_resource,
     queue,
     send,
-    IOException,
 )
 
 
