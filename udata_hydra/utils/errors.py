@@ -55,11 +55,12 @@ class IOException(ExceptionWithSentryDetails):
 
 
 async def handle_parse_exception(
-    e: IOException | ParseException, table_name: str, check: Record | None
+    e: IOException | ParseException, table_name: str | None, check: Record | None
 ) -> None:
     """Specific IO/ParseException handling. Store error if in a check context. Also cleanup :table_name: if needed."""
-    db = await context.pool("csv")
-    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+    if table_name is not None:
+        db = await context.pool("csv")
+        await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     if check:
         # e.__cause__ let us access the "inherited" error of the Exception (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
