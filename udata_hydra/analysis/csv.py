@@ -41,6 +41,7 @@ from udata_hydra.utils import (
     ParseException,
     Reader,
     Timer,
+    detect_tabular_from_headers,
     download_resource,
     handle_parse_exception,
     queue,
@@ -132,15 +133,19 @@ async def analyse_csv(
     timer = Timer("analyse-csv")
     assert any(_ is not None for _ in (check["id"], url))
 
+    table_name, tmp_file = None, None
     try:
         headers = json.loads(check.get("headers") or "{}")
+        _, file_format = await detect_tabular_from_headers(check)
         tmp_file = (
             open(file_path, "rb")
             if file_path
             else await download_resource(
                 url=url,
                 headers=headers,
-                max_size_allowed=None if exception else int(config.MAX_FILESIZE_ALLOWED["csv"]),
+                max_size_allowed=None
+                if exception
+                else int(config.MAX_FILESIZE_ALLOWED.get(file_format, "csv")),
             )
         )
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
@@ -201,8 +206,9 @@ async def analyse_csv(
     finally:
         await notify_udata(resource, check)
         timer.stop()
-        tmp_file.close()
-        os.remove(tmp_file.name)
+        if tmp_file is not None:
+            tmp_file.close()
+            os.remove(tmp_file.name)
 
         # Reset resource status to None
         await Resource.update(resource_id, {"status": None})
