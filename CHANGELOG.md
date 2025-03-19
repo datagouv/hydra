@@ -3,6 +3,8 @@
 ## Current (in progress)
 
 - Add a status resetting mechanism for stuck resources [#251](https://github.com/datagouv/hydra/pull/251)
+- Update harvest_modified_at on load catalog [#252](https://github.com/datagouv/hydra/pull/252)
+- Unify exceptions to prevent unhandled ones in Sentry [#253](https://github.com/datagouv/hydra/pull/253)
 
 ## 2.1.1 (2025-03-12)
 

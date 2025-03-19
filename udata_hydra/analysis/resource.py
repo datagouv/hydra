@@ -15,6 +15,7 @@ from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
+    IOException,
     compute_checksum_from_file,
     detect_tabular_from_headers,
     download_resource,
@@ -74,7 +75,7 @@ async def analyse_resource(
     if change_status != Change.HAS_NOT_CHANGED or force_analysis:
         try:
             tmp_file = await download_resource(url, headers, max_size_allowed)
-        except IOError:
+        except IOException:
             dl_analysis["analysis:error"] = "File too large to download"
         else:
             # Get file size
