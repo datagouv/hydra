@@ -34,7 +34,10 @@ log = logging.getLogger("udata-hydra")
 
 
 async def analyse_resource(
-    check: dict, last_check: dict | None, force_analysis: bool = False
+    check: dict,
+    last_check: dict | None,
+    force_analysis: bool = False,
+    worker_priority: str = "default",
 ) -> None:
     """
     Perform analysis on the resource designated by check_id:
@@ -116,12 +119,11 @@ async def analyse_resource(
             # Change status to TO_ANALYSE_CSV
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_CSV"})
             # Analyse CSV and create a table in the CSV database
-            is_priority = await Resource.get(resource_id, "priority")
             queue.enqueue(
                 analyse_csv,
                 check=check,
                 file_path=tmp_file.name,
-                _priority="high" if is_priority["priority"] else "default",
+                _priority="high" if worker_priority == "high" else "default",
             )
 
         else:

@@ -138,6 +138,7 @@ async def check_resource(
                 check=new_check,
                 last_check=last_check,
                 force_analysis=force_analysis,
+                worker_priority=worker_priority,
                 _priority=worker_priority,
             )
 
