@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Better prioritizing [#255](https://github.com/datagouv/hydra/pull/255)
 
 ## 2.1.2 (2025-03-19)
 
