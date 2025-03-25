@@ -76,7 +76,7 @@ async def select_batch_resources_to_check() -> list[Record]:
             limit = config.BATCH_SIZE - len(to_check)
             q = f"""
             SELECT * FROM (
-                SELECT catalog.url, dataset_id, catalog.resource_id, catalog.priority as priority
+                SELECT catalog.url, dataset_id, catalog.resource_id, catalog.priority
                 FROM catalog, checks
                 WHERE catalog.last_check IS NOT NULL
                 AND catalog.last_check = checks.id
