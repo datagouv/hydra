@@ -10,6 +10,22 @@ from udata_hydra.utils import IOException
 
 log = logging.getLogger("udata-hydra")
 
+HYDRA_UDATA_METADATA = {
+    "check": ["available", "date", "error", "status", "timeout"],
+    "check:headers": ["content-type", "content-length"],
+    "analysis": ["checksum", "content-length", "error", "last-modified-at", "status", "timeout"],
+    "analysis:parsing": ["error", "finished_at", "parquet_size", "parquet_url", "started_at"],
+}
+
+
+def add_missing_udata_fields(payload: dict) -> dict:
+    payload_categories = set([":".join(k.split(":")[:-1]) for k in payload.keys()])
+    for cat in payload_categories:
+        for field in HYDRA_UDATA_METADATA[cat]:
+            if f"{cat}:{field}" not in payload:
+                payload[f"{cat}:{field}"] = None
+    return payload
+
 
 def is_valid_uri(uri: str) -> bool:
     try:
@@ -47,7 +63,7 @@ async def send(dataset_id: str, resource_id: str, document: dict) -> None:
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.put(uri, json=document, headers=headers) as resp:
+        async with session.put(uri, json=add_missing_udata_fields(document), headers=headers) as resp:
             # we're raising since we should be in a worker thread
             if resp.status == 404:
                 pass
