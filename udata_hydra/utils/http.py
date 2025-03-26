@@ -63,7 +63,9 @@ async def send(dataset_id: str, resource_id: str, document: dict) -> None:
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.put(uri, json=add_missing_udata_fields(document), headers=headers) as resp:
+        async with session.put(
+            uri, json=add_missing_udata_fields(document), headers=headers
+        ) as resp:
             # we're raising since we should be in a worker thread
             if resp.status == 404:
                 pass
