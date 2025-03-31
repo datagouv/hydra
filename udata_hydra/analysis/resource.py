@@ -107,9 +107,12 @@ async def analyse_resource(
                 },
             )
 
-    if change_status == Change.HAS_CHANGED:
+    if change_status in (Change.HAS_CHANGED, Change.HAS_NOT_CHANGED):
         await update_check_with_modification_and_next_dates(
-            change_payload or {}, check["id"], last_check
+            change_analysis=change_payload or {},
+            check_id=check["id"],
+            last_check=last_check,
+            has_changed=change_status == Change.HAS_CHANGED,
         )
 
     analysis_results = {**dl_analysis, **(change_payload or {})}
@@ -143,25 +146,26 @@ async def analyse_resource(
 
 
 async def update_check_with_modification_and_next_dates(
-    change_analysis: dict, check_id: int, last_check: dict | None
+    change_analysis: dict, check_id: int, last_check: dict | None, has_changed: bool = False
 ) -> None:
-    """Update check with last_modified date and next_check date if resource has changed
+    """Update check with last_modified date and next_check date only if resource has changed
 
     Args:
         change_analysis: dict with optional "analysis:last-modified-at" key
         check_id: the ID of the current check
         last_check: the last check data, if any
+        has_changed: if the resource has changed since last check
     """
     last_modified: str | None = change_analysis.get("analysis:last-modified-at")
     if last_modified:
         last_modified_at: datetime = datetime.fromisoformat(last_modified)
-        next_check_at: datetime = calculate_next_check_date(
-            has_check_changed=True, last_check=last_check, last_modified_at=last_modified_at
-        )
-        await Check.update(
-            check_id,
-            {"detected_last_modified_at": last_modified_at, "next_check_at": next_check_at},
-        )
+        payload = {"detected_last_modified_at": last_modified_at}
+        if has_changed:
+            next_check_at: datetime = calculate_next_check_date(
+                has_check_changed=True, last_check=last_check, last_modified_at=last_modified_at
+            )
+            payload["next_check_at"] = next_check_at
+        await Check.update(check_id, payload)
 
 
 async def detect_resource_change_from_checksum(
@@ -198,13 +202,14 @@ async def detect_resource_change_from_last_modified_header(
     if len(data) == 1 or not data[0]["last_modified"]:
         return Change.NO_GUESS, None
 
+    last_modified_date = date_parser(data[0]["last_modified"])
+    payload = {
+        "analysis:last-modified-at": last_modified_date.isoformat(),
+        "analysis:last-modified-detection": "last-modified-header",
+    }
     if data[0]["last_modified"] != data[1]["last_modified"]:
-        last_modified_date = date_parser(data[0]["last_modified"])
-        return Change.HAS_CHANGED, {
-            "analysis:last-modified-at": last_modified_date.isoformat(),
-            "analysis:last-modified-detection": "last-modified-header",
-        }
-    return Change.HAS_NOT_CHANGED, None
+        return Change.HAS_CHANGED, payload
+    return Change.HAS_NOT_CHANGED, payload
 
 
 async def detect_resource_change_from_content_length_header(
@@ -213,13 +218,14 @@ async def detect_resource_change_from_content_length_header(
     # content-length variation between current and last check
     if len(data) <= 1 or not data[0]["content_length"]:
         return Change.NO_GUESS, None
+    changed_at = data[0]["created_at"]
+    payload = {
+        "analysis:last-modified-at": changed_at.isoformat(),
+        "analysis:last-modified-detection": "content-length-header",
+    }
     if data[0]["content_length"] != data[1]["content_length"]:
-        changed_at = data[0]["created_at"]
-        return Change.HAS_CHANGED, {
-            "analysis:last-modified-at": changed_at.isoformat(),
-            "analysis:last-modified-detection": "content-length-header",
-        }
-    return Change.HAS_NOT_CHANGED, None
+        return Change.HAS_CHANGED, payload
+    return Change.HAS_NOT_CHANGED, payload
 
 
 async def detect_resource_change_on_early_hints(
@@ -293,10 +299,11 @@ async def detect_resource_change_from_harvest(
     last_check = checks_data[1]
 
     if resource and resource.get("harvest_modified_at"):
-        if resource["harvest_modified_at"] == last_check["detected_last_modified_at"]:
-            return Change.HAS_NOT_CHANGED, None
-        return Change.HAS_CHANGED, {
+        payload = {
             "analysis:last-modified-at": resource["harvest_modified_at"].isoformat(),
             "analysis:last-modified-detection": "harvest-resource-metadata",
         }
+        if resource["harvest_modified_at"] == last_check["detected_last_modified_at"]:
+            return Change.HAS_NOT_CHANGED, payload
+        return Change.HAS_CHANGED, payload
     return Change.NO_GUESS, None
