@@ -21,6 +21,7 @@ from udata_hydra.utils import (
     download_resource,
     queue,
     send,
+    UdataPayload,
 )
 
 
@@ -137,7 +138,7 @@ async def analyse_resource(
             send,
             dataset_id=dataset_id,
             resource_id=resource_id,
-            document=analysis_results,
+            document=UdataPayload(analysis_results),
             _priority="high",
         )
 

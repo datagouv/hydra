@@ -41,6 +41,7 @@ from udata_hydra.utils import (
     ParseException,
     Reader,
     Timer,
+    UdataPayload,
     detect_tabular_from_headers,
     download_resource,
     handle_parse_exception,
@@ -104,6 +105,7 @@ async def notify_udata(resource: Record, check: dict) -> None:
     if config.CSV_TO_PARQUET:
         payload["document"]["analysis:parsing:parquet_url"] = check.get("parquet_url")
         payload["document"]["analysis:parsing:parquet_size"] = check.get("parquet_size")
+    payload["document"] = UdataPayload(payload["document"])
     queue.enqueue(send, _priority="high", **payload)
 
 
