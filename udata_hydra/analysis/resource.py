@@ -290,11 +290,11 @@ async def detect_resource_change_from_harvest(
 
     last_check = checks_data[1]
 
-    payload = {
-        "analysis:last-modified-at": resource["harvest_modified_at"].isoformat(),
-        "analysis:last-modified-detection": "harvest-resource-metadata",
-    }
     if resource and resource.get("harvest_modified_at"):
+        payload = {
+            "analysis:last-modified-at": resource["harvest_modified_at"].isoformat(),
+            "analysis:last-modified-detection": "harvest-resource-metadata",
+        }
         if resource["harvest_modified_at"] == last_check["detected_last_modified_at"]:
             return Change.HAS_NOT_CHANGED, payload
         return Change.HAS_CHANGED, payload
