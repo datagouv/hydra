@@ -4,6 +4,7 @@ import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
+from unittest.mock import ANY, patch
 
 import nest_asyncio
 import pytest
@@ -732,3 +733,45 @@ async def test_reset_statuses(fake_check, db, setup_catalog, check_duration):
         assert row["status"] is None
     else:
         assert row["status"] == status
+
+
+@pytest.mark.parametrize(
+    "mock_function",
+    [
+        (
+            "udata_hydra.crawl.check_resources.check_resource",
+            {"url": ANY, "resource": ANY, "session": ANY, "worker_priority": "high"},
+            "ok",
+        ),
+        (
+            "udata_hydra.analysis.resource.analyse_resource",
+            {"check": ANY, "last_check": ANY, "force_analysis": False, "worker_priority": "high"},
+            None,
+        ),
+    ],
+)
+async def test_new_resource_priority(
+    setup_catalog,
+    client,
+    udata_resource_payload,
+    event_loop,
+    db,
+    rmock,
+    produce_mock,
+    api_headers,
+    mock_function,
+):
+    func_path, kwargs, result = mock_function
+    # delete the catalog content, we only want to test the new resource
+    await db.execute("DELETE FROM catalog")
+    rurl = udata_resource_payload["document"]["url"]
+    rmock.head(rurl, headers={"content-length": "1"})
+    res = await client.post(path="/api/resources", headers=api_headers, json=udata_resource_payload)
+    assert res.status == 201
+    res = await db.fetch("SELECT * FROM catalog")
+    assert len(res) == 1 and res[0]["priority"] is True
+    # we have to mock the functions separately, because they are intricated
+    with patch(func_path) as mock_func:
+        mock_func.return_value = result
+        event_loop.run_until_complete(start_checks(iterations=1))
+        mock_func.assert_called_with(**kwargs)
