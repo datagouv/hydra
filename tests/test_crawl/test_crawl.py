@@ -359,6 +359,7 @@ async def test_change_analysis_harvested(
     res = await db.fetch("SELECT * FROM checks ORDER BY created_at DESC LIMIT 1")
     assert res[0]["detected_last_modified_at"].isoformat() == "2022-12-06T05:00:32.647000+00:00"
 
+
 @pytest.mark.catalog_harvested
 async def test_no_change_analysis_harvested(
     setup_catalog, mocker, rmock, fake_check, db, event_loop, udata_url
