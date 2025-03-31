@@ -16,8 +16,14 @@ class UdataPayload:
         "check": ["available", "date", "error", "status", "timeout"],
         "check:headers": ["content-type", "content-length"],
         "analysis": [
-            "checksum", "content-length", "error", "last-modified-at",
-            "last-modified-detection", "mime-type", "status", "timeout",
+            "checksum",
+            "content-length",
+            "error",
+            "last-modified-at",
+            "last-modified-detection",
+            "mime-type",
+            "status",
+            "timeout",
         ],
         "analysis:parsing": ["error", "finished_at", "parquet_size", "parquet_url", "started_at"],
     }
@@ -68,9 +74,7 @@ async def send(dataset_id: str, resource_id: str, document: UdataPayload) -> Non
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.put(
-            uri, json=document.payload, headers=headers
-        ) as resp:
+        async with session.put(uri, json=document.payload, headers=headers) as resp:
             # we're raising since we should be in a worker thread
             if resp.status == 404:
                 pass
