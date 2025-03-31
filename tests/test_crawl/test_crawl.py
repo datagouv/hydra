@@ -356,6 +356,8 @@ async def test_change_analysis_harvested(
     data = requests[-1].kwargs["json"]
     assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000+00:00"
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
+    res = await db.fetch("SELECT * FROM checks ORDER BY created_at DESC LIMIT 1")
+    assert res[0]["detected_last_modified_at"].isoformat() == "2022-12-06T05:00:32.647000+00:00"
 
 
 @pytest.mark.catalog_harvested
@@ -375,6 +377,8 @@ async def test_no_change_analysis_harvested(
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
     assert ("PUT", URL(udata_url)) not in rmock.requests
+    res = await db.fetch("SELECT * FROM checks ORDER BY created_at DESC LIMIT 1")
+    assert res[0]["detected_last_modified_at"] == last_modfied_at
 
 
 async def test_change_analysis_last_modified_header_twice(
