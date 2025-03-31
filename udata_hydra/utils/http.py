@@ -15,7 +15,10 @@ class UdataPayload:
     HYDRA_UDATA_METADATA = {
         "check": ["available", "date", "error", "status", "timeout"],
         "check:headers": ["content-type", "content-length"],
-        "analysis": ["checksum", "content-length", "error", "last-modified-at", "status", "timeout"],
+        "analysis": [
+            "checksum", "content-length", "error", "last-modified-at",
+            "last-modified-detection", "mime-type", "status", "timeout",
+        ],
         "analysis:parsing": ["error", "finished_at", "parquet_size", "parquet_url", "started_at"],
     }
 
