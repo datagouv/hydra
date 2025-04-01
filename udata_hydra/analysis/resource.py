@@ -16,6 +16,7 @@ from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
     IOException,
+    UdataPayload,
     compute_checksum_from_file,
     detect_tabular_from_headers,
     download_resource,
@@ -137,7 +138,7 @@ async def analyse_resource(
             send,
             dataset_id=dataset_id,
             resource_id=resource_id,
-            document=analysis_results,
+            document=UdataPayload(analysis_results),
             _priority="high",
         )
 

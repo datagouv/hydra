@@ -7,7 +7,7 @@ from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_status
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import queue, send
+from udata_hydra.utils import UdataPayload, queue, send
 
 
 async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict, dict | None]:
@@ -37,20 +37,22 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
             send,
             dataset_id=dataset_id,
             resource_id=check_data["resource_id"],
-            document={
-                "check:available": is_valid_status(check_data.get("status")),
-                "check:status": check_data.get("status"),
-                "check:timeout": check_data["timeout"],
-                "check:date": datetime.now(timezone.utc).isoformat(),
-                "check:error": check_data.get("error"),
-                "check:headers:content-type": await get_content_type_from_header(
-                    check_data.get("headers", {})
-                ),
-                "check:headers:content-length": int(
-                    check_data.get("headers", {}).get("content-length", 0)
-                )
-                or None,
-            },
+            document=UdataPayload(
+                {
+                    "check:available": is_valid_status(check_data.get("status")),
+                    "check:status": check_data.get("status"),
+                    "check:timeout": check_data["timeout"],
+                    "check:date": datetime.now(timezone.utc).isoformat(),
+                    "check:error": check_data.get("error"),
+                    "check:headers:content-type": await get_content_type_from_header(
+                        check_data.get("headers", {})
+                    ),
+                    "check:headers:content-length": int(
+                        check_data.get("headers", {}).get("content-length", 0)
+                    )
+                    or None,
+                }
+            ),
             _priority="high",
         )
 
