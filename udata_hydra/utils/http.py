@@ -22,8 +22,6 @@ class UdataPayload:
             "last-modified-at",
             "last-modified-detection",
             "mime-type",
-            "status",
-            "timeout",
         ],
         "analysis:parsing": ["error", "finished_at", "parquet_size", "parquet_url", "started_at"],
     }
