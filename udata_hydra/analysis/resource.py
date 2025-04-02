@@ -112,10 +112,7 @@ async def analyse_resource(
     if not dl_analysis and last_check:
         await Check.update(
             check["id"],
-            {
-                k: last_check.get(k)
-                for k in ["checksum", "analysis_error", "filesize", "mime_type"]
-            },
+            {k: last_check.get(k) for k in ["checksum", "analysis_error", "filesize", "mime_type"]},
         )
 
     if change_status in (Change.HAS_CHANGED, Change.HAS_NOT_CHANGED):

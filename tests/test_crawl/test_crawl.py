@@ -788,8 +788,7 @@ async def test_no_change_update_check(fake_check, setup_catalog, produce_mock, r
     }
     # we already have a check done
     _ = await fake_check(
-        resource_id=RESOURCE_ID,
-        **(kwargs | {"headers": {"last-modified": last_modified}})
+        resource_id=RESOURCE_ID, **(kwargs | {"headers": {"last-modified": last_modified}})
     )
     # the file has not changed since last check
     r = await Resource.get(resource_id=RESOURCE_ID)
