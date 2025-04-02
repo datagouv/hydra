@@ -108,6 +108,16 @@ async def analyse_resource(
                 },
             )
 
+    # if the file has not changed, update the current check with the infos of the previous one
+    if not dl_analysis and last_check:
+        await Check.update(
+            check["id"],
+            {
+                k: last_check.get(k)
+                for k in ["checksum", "analysis_error", "filesize", "mime_type"]
+            },
+        )
+
     if change_status in (Change.HAS_CHANGED, Change.HAS_NOT_CHANGED):
         await update_check_with_modification_and_next_dates(
             change_analysis=change_payload or {},
