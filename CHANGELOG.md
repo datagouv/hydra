@@ -5,6 +5,7 @@
 - Better prioritizing [#255](https://github.com/datagouv/hydra/pull/255)
 - Reset same category udata extra fields on sending [#256](https://github.com/datagouv/hydra/pull/256)
 - Make sure detected_last_modified_at is set even if HAS_NOT_CHANGED [#257](https://github.com/datagouv/hydra/pull/257)
+- Fill in new check even if no update [#258](https://github.com/datagouv/hydra/pull/258)
 
 ## 2.1.2 (2025-03-19)
 
