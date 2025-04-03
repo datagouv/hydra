@@ -775,3 +775,29 @@ async def test_new_resource_priority(
         mock_func.return_value = result
         event_loop.run_until_complete(start_checks(iterations=1))
         mock_func.assert_called_with(**kwargs)
+
+
+async def test_no_change_update_check(fake_check, setup_catalog, produce_mock, rmock):
+    """Reset the status of a resource stuck for a while"""
+    last_modified = "2000-01-01 00:00:00"
+    kwargs = {
+        "checksum": "12345",
+        "mime_type": "txt",
+        "filesize": 1024,
+        "analysis_error": "Too large",
+    }
+    # we already have a check done
+    _ = await fake_check(
+        resource_id=RESOURCE_ID, **(kwargs | {"headers": {"last-modified": last_modified}})
+    )
+    # the file has not changed since last check
+    r = await Resource.get(resource_id=RESOURCE_ID)
+    rmock.head(RESOURCE_URL, repeat=True, headers={"last-modified": last_modified})
+    async with ClientSession() as session:
+        await check_resource(url=r["url"], resource=r, session=session, force_analysis=False)
+    checks = await Check.get_all(resource_id=RESOURCE_ID)
+    assert len(checks) == 2
+    # and we have the values of the previous check in the new one
+    for k, v in kwargs.items():
+        for check in checks:
+            assert check[k] == v
