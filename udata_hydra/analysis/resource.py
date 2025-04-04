@@ -195,7 +195,11 @@ async def detect_resource_change_from_checksum(
             }
         else:
             return Change.HAS_NOT_CHANGED, {
-                "analysis:last-modified-at": last_check["last_modified"].isoformat(),
+                "analysis:last-modified-at": (
+                    last_check["last_modified"].isoformat()
+                    if last_check.get("last_modified")
+                    else None
+                ),
                 "analysis:last-modified-detection": "previous-check-detection",
             }
     return Change.NO_GUESS, None
@@ -242,7 +246,11 @@ async def detect_resource_change_from_content_length_header(
     # same content_length is not 100% certainly no change, but a good tradeoff to prevent many downloads
     return Change.HAS_NOT_CHANGED, {
         # no change, using the last-modified from the previous check (passed on from check to check)
-        "analysis:last-modified-at": data[1]["detected_last_modified_at"].isoformat(),
+        "analysis:last-modified-at": (
+            data[1]["detected_last_modified_at"].isoformat()
+            if data[1].get("detected_last_modified_at")
+            else None
+        ),
         "analysis:last-modified-detection": "previous-check-detection",
     }
 
