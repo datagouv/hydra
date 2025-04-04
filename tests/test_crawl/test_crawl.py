@@ -450,6 +450,7 @@ async def test_no_check_changed_content_length_header(
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
+        detected_last_modified_at=datetime.now() - timedelta(days=20),
     )
     rmock.head(
         RESOURCE_URL,
@@ -488,6 +489,7 @@ async def test_no_check_changed_content_type_header(
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
+        detected_last_modified_at=datetime.now() - timedelta(days=20),
     )
     rmock.head(
         RESOURCE_URL,
@@ -496,7 +498,7 @@ async def test_no_check_changed_content_type_header(
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     event_loop.run_until_complete(start_checks(iterations=1))
-    # udata has not been called: not first check, outdated check, and content-type stayed the same
+    # udata has not been called: not first check, outdated check, and content-type remained the same
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
