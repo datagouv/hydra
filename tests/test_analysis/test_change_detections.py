@@ -1,6 +1,7 @@
 import datetime
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from udata_hydra.analysis.resource import (
     Change,
@@ -50,19 +51,25 @@ def fake_check_data(
         (
             fake_check_data(content_length=100),
             fake_check_data(created_at="2025-05-02 00:00:00", content_length=200),
-            (Change.HAS_CHANGED, {
-                "analysis:last-modified-at": strp("2025-05-02 00:00:00").isoformat(),
-                "analysis:last-modified-detection": "content-length-header",
-            }),
+            (
+                Change.HAS_CHANGED,
+                {
+                    "analysis:last-modified-at": strp("2025-05-02 00:00:00").isoformat(),
+                    "analysis:last-modified-detection": "content-length-header",
+                },
+            ),
         ),
         # checks have same content-length
         (
             fake_check_data(detected_last_modified_at="2025-04-01 00:00:00"),
             fake_check_data(created_at="2025-05-02 00:00:00"),
-            (Change.HAS_NOT_CHANGED, {
-                "analysis:last-modified-at": strp("2025-04-01 00:00:00").isoformat(),
-                "analysis:last-modified-detection": "previous-check-detection",
-            }),
+            (
+                Change.HAS_NOT_CHANGED,
+                {
+                    "analysis:last-modified-at": strp("2025-04-01 00:00:00").isoformat(),
+                    "analysis:last-modified-detection": "previous-check-detection",
+                },
+            ),
         ),
     ],
 )
@@ -80,10 +87,13 @@ async def test_content_length_header(args):
         (
             None,
             fake_check_data(last_modified="2025-01-01 00:00:00"),
-            (Change.HAS_CHANGED, {
-                "analysis:last-modified-at": strp("2025-01-01 00:00:00").isoformat(),
-                "analysis:last-modified-detection": "last-modified-header",
-            }),
+            (
+                Change.HAS_CHANGED,
+                {
+                    "analysis:last-modified-at": strp("2025-01-01 00:00:00").isoformat(),
+                    "analysis:last-modified-detection": "last-modified-header",
+                },
+            ),
         ),
         # only one check which doesn't have last-modified
         (
@@ -101,19 +111,25 @@ async def test_content_length_header(args):
         (
             fake_check_data(),
             fake_check_data(created_at="2025-05-02 00:00:00"),
-            (Change.HAS_NOT_CHANGED, {
-                "analysis:last-modified-at": strp("2000-01-01 00:00:00").isoformat(),
-                "analysis:last-modified-detection": "last-modified-header",
-            }),
+            (
+                Change.HAS_NOT_CHANGED,
+                {
+                    "analysis:last-modified-at": strp("2000-01-01 00:00:00").isoformat(),
+                    "analysis:last-modified-detection": "last-modified-header",
+                },
+            ),
         ),
         # two checks, different last-modified
         (
             fake_check_data(),
             fake_check_data(created_at="2025-05-02 00:00:00", last_modified="2025-05-01 00:00:00"),
-            (Change.HAS_CHANGED, {
-                "analysis:last-modified-at": strp("2025-05-01 00:00:00").isoformat(),
-                "analysis:last-modified-detection": "last-modified-header",
-            }),
+            (
+                Change.HAS_CHANGED,
+                {
+                    "analysis:last-modified-at": strp("2025-05-01 00:00:00").isoformat(),
+                    "analysis:last-modified-detection": "last-modified-header",
+                },
+            ),
         ),
     ],
 )
@@ -153,20 +169,26 @@ async def test_last_modified_header(args):
             fake_check_data(detected_last_modified_at="2000-06-01 00:00:00"),
             fake_check_data(created_at="2025-05-02 00:00:00"),
             {"harvest_modified_at": strp("2025-05-01 00:00:00")},
-            (Change.HAS_CHANGED, {
-                "analysis:last-modified-at": strp("2025-05-01 00:00:00").isoformat(),
-                "analysis:last-modified-detection": "harvest-resource-metadata",
-            }),
+            (
+                Change.HAS_CHANGED,
+                {
+                    "analysis:last-modified-at": strp("2025-05-01 00:00:00").isoformat(),
+                    "analysis:last-modified-detection": "harvest-resource-metadata",
+                },
+            ),
         ),
         # two checks, resource harvested untouched
         (
             fake_check_data(detected_last_modified_at="2000-06-01 00:00:00"),
             fake_check_data(created_at="2025-05-02 00:00:00"),
             {"harvest_modified_at": strp("2000-06-01 00:00:00")},
-            (Change.HAS_NOT_CHANGED, {
-                "analysis:last-modified-at": strp("2000-06-01 00:00:00").isoformat(),
-                "analysis:last-modified-detection": "harvest-resource-metadata",
-            }),
+            (
+                Change.HAS_NOT_CHANGED,
+                {
+                    "analysis:last-modified-at": strp("2000-06-01 00:00:00").isoformat(),
+                    "analysis:last-modified-detection": "harvest-resource-metadata",
+                },
+            ),
         ),
     ],
 )
@@ -190,19 +212,25 @@ async def test_harvest(args):
         (
             "aaa",
             {"checksum": "bbb"},
-            (Change.HAS_CHANGED, {
-                "analysis:last-modified-at": strp("2025-01-01 00:00:00").isoformat(),
-                "analysis:last-modified-detection": "computed-checksum",
-            }),
+            (
+                Change.HAS_CHANGED,
+                {
+                    "analysis:last-modified-at": strp("2025-01-01 00:00:00").isoformat(),
+                    "analysis:last-modified-detection": "computed-checksum",
+                },
+            ),
         ),
         # previous check, checksum has changed
         (
             "aaa",
             {"checksum": "aaa", "last_modified": strp("2025-06-01 00:00:00")},
-            (Change.HAS_NOT_CHANGED, {
-                "analysis:last-modified-at": strp("2025-06-01 00:00:00").isoformat(),
-                "analysis:last-modified-detection": "previous-check-detection",
-            }),
+            (
+                Change.HAS_NOT_CHANGED,
+                {
+                    "analysis:last-modified-at": strp("2025-06-01 00:00:00").isoformat(),
+                    "analysis:last-modified-detection": "previous-check-detection",
+                },
+            ),
         ),
     ],
 )
