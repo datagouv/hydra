@@ -196,8 +196,8 @@ async def detect_resource_change_from_checksum(
         else:
             return Change.HAS_NOT_CHANGED, {
                 "analysis:last-modified-at": (
-                    last_check["last_modified"].isoformat()
-                    if last_check.get("last_modified")
+                    last_check["detected_last_modified_at"].isoformat()
+                    if last_check.get("detected_last_modified_at")
                     else None
                 ),
                 "analysis:last-modified-detection": "previous-check-detection",
