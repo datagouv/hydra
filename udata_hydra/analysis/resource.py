@@ -193,15 +193,12 @@ async def detect_resource_change_from_checksum(
                 "analysis:last-modified-at": datetime.now(timezone.utc).isoformat(),
                 "analysis:last-modified-detection": "computed-checksum",
             }
-        else:
+        elif last_check.get("detected_last_modified_at"):
             return Change.HAS_NOT_CHANGED, {
-                "analysis:last-modified-at": (
-                    last_check["detected_last_modified_at"].isoformat()
-                    if last_check.get("detected_last_modified_at")
-                    else None
-                ),
+                "analysis:last-modified-at": last_check["detected_last_modified_at"].isoformat(),
                 "analysis:last-modified-detection": "previous-check-detection",
             }
+    # if the previous check did not have the info, we investigate further
     return Change.NO_GUESS, None
 
 
@@ -243,15 +240,14 @@ async def detect_resource_change_from_content_length_header(
             "analysis:last-modified-detection": "content-length-header",
         }
     # same content_length is not 100% certainly no change, but a good tradeoff to prevent many downloads
-    return Change.HAS_NOT_CHANGED, {
-        # no change, using the last-modified from the previous check (passed on from check to check)
-        "analysis:last-modified-at": (
-            data[1]["detected_last_modified_at"].isoformat()
-            if data[1].get("detected_last_modified_at")
-            else None
-        ),
-        "analysis:last-modified-detection": "previous-check-detection",
-    }
+    elif data[1].get("detected_last_modified_at"):
+        return Change.HAS_NOT_CHANGED, {
+            # no change, using the last-modified from the previous check (passed on from check to check)
+            "analysis:last-modified-at": data[1]["detected_last_modified_at"].isoformat(),
+            "analysis:last-modified-detection": "previous-check-detection",
+        }
+    # if the previous check did not have the info, we investigate further
+    return Change.NO_GUESS, None
 
 
 async def detect_resource_change_on_early_hints(
