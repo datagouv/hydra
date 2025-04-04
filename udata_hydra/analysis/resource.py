@@ -236,11 +236,10 @@ async def detect_resource_change_from_content_length_header(
     # content-length variation between current and last check
     if len(data) <= 1 or not data[0]["content_length"]:
         return Change.NO_GUESS, None
-    changed_at = data[0]["created_at"]
     if data[0]["content_length"] != data[1]["content_length"]:
         return Change.HAS_CHANGED, {
             # if resource has changed, set last-modified to the current check's creation
-            "analysis:last-modified-at": changed_at.isoformat(),
+            "analysis:last-modified-at": data[0]["created_at"].isoformat(),
             "analysis:last-modified-detection": "content-length-header",
         }
     # same content_length is not 100% certainly no change, but a good tradeoff to prevent many downloads
