@@ -71,6 +71,12 @@ def fake_check_data(
                 },
             ),
         ),
+        # checks have same content-length, but we didn't have the last_modified info
+        (
+            fake_check_data(),
+            fake_check_data(created_at="2025-05-02 00:00:00"),
+            (Change.NO_GUESS, None),
+        ),
     ],
 )
 async def test_content_length_header(args):
@@ -231,6 +237,12 @@ async def test_harvest(args):
                     "analysis:last-modified-detection": "previous-check-detection",
                 },
             ),
+        ),
+        # previous check, checksum has not changed, but we didn't have the last_modified info
+        (
+            "aaa",
+            {"checksum": "aaa"},
+            (Change.NO_GUESS, None),
         ),
     ],
 )
