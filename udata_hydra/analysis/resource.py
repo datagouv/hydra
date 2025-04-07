@@ -187,7 +187,7 @@ async def detect_resource_change_from_checksum(
         "analysis:last-modified-detection": "computed-checksum",
     }
     """
-    if last_check:
+    if last_check and last_check.get("checksum"):
         if last_check.get("checksum") != new_checksum:
             return Change.HAS_CHANGED, {
                 "analysis:last-modified-at": datetime.now(timezone.utc).isoformat(),
@@ -231,21 +231,22 @@ async def detect_resource_change_from_content_length_header(
     data: dict,
 ) -> tuple[Change, dict | None]:
     # content-length variation between current and last check
-    if len(data) <= 1 or not data[0]["content_length"]:
+    if len(data) <= 1 or not data[0].get("content_length"):
         return Change.NO_GUESS, None
-    if data[0]["content_length"] != data[1]["content_length"]:
-        return Change.HAS_CHANGED, {
-            # if resource has changed, set last-modified to the current check's creation
-            "analysis:last-modified-at": data[0]["created_at"].isoformat(),
-            "analysis:last-modified-detection": "content-length-header",
-        }
-    # same content_length is not 100% certainly no change, but a good tradeoff to prevent many downloads
-    elif data[1].get("detected_last_modified_at"):
-        return Change.HAS_NOT_CHANGED, {
-            # no change, using the last-modified from the previous check (passed on from check to check)
-            "analysis:last-modified-at": data[1]["detected_last_modified_at"].isoformat(),
-            "analysis:last-modified-detection": "previous-check-detection",
-        }
+    if data[0].get("content_length") and data[1].get("content_length"):
+        if data[0]["content_length"] != data[1]["content_length"]:
+            return Change.HAS_CHANGED, {
+                # if resource has changed, set last-modified to the current check's creation
+                "analysis:last-modified-at": data[0]["created_at"].isoformat(),
+                "analysis:last-modified-detection": "content-length-header",
+            }
+        # same content_length is not 100% certainly no change, but a good tradeoff to prevent many downloads
+        elif data[1].get("detected_last_modified_at"):
+            return Change.HAS_NOT_CHANGED, {
+                # no change, using the last-modified from the previous check (passed on from check to check)
+                "analysis:last-modified-at": data[1]["detected_last_modified_at"].isoformat(),
+                "analysis:last-modified-detection": "previous-check-detection",
+            }
     # if the previous check did not have the info, we investigate further
     return Change.NO_GUESS, None
 
