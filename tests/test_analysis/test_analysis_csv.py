@@ -327,7 +327,8 @@ async def test_forced_analysis(
         headers={
             "content-type": "application/csv",
             "content-length": "100",
-        }
+        },
+        detected_last_modified_at=datetime(2025, 4, 4, 0, 0, 0),
     )
     url = check["url"]
     resource = await Resource.get(RESOURCE_ID)
