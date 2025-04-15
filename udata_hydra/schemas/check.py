@@ -24,6 +24,7 @@ class CheckSchema(Schema):
     parsing_table = fields.Str()
     parquet_url = fields.Str()
     parquet_size = fields.Integer()
+    pmtiles_url = fields.Str()
 
     def create(self, data):
         return self.load(data)

@@ -55,6 +55,7 @@ MAX_FILESIZE_ALLOWED.csvgz = 104857600
 MAX_FILESIZE_ALLOWED.xls = 52428800    # /2
 MAX_FILESIZE_ALLOWED.xlsx = 13107200   # /8
 MAX_FILESIZE_ALLOWED.ods = 10485760    # /10
+MAX_FILESIZE_ALLOWED.geojson = 104857600
 
 # -- CSV analysis settings -- #
 SQL_INDEXES_TYPES_SUPPORTED = ["index"]
@@ -79,3 +80,7 @@ MINIO_URL = "" # no scheme
 MINIO_BUCKET = ""
 MINIO_USER = ""
 MINIO_PWD = ""
+
+# -- GeoJSON analysis settings -- #
+GEOJSON_ANALYSIS = true
+GEOJSON_TO_PMTILES = false

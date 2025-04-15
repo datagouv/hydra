@@ -14,6 +14,7 @@ from progressist import ProgressBar
 
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.analysis.geojson import analyse_geojson
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -188,6 +189,37 @@ async def analyse_csv_cli(
             log.error("Could not find a check linked to the specified resource ID")
         return
     await analyse_csv(check=check, debug_insert=debug_insert)
+
+
+@cli(name="analyse-geojson")
+async def analyse_geojson_cli(
+    check_id: str | None = None,
+    url: str | None = None,
+    resource_id: str | None = None,
+):
+    """Trigger a GeoJSON analysis from a check_id, an url or a resource_id
+    Try to get the check from the check ID, then from the URL
+    """
+    assert check_id or url or resource_id
+    check = None
+    if check_id:
+        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)
+    if not check and url:
+        checks: list[Record] | None = await Check.get_by_url(url)
+        if checks and len(checks) > 1:
+            log.warning(f"Multiple checks found for URL {url}, using the latest one")
+        check = checks[0] if checks else None
+    if not check and resource_id:
+        check: Record | None = await Check.get_by_resource_id(resource_id)
+    if not check:
+        if check_id:
+            log.error("Could not retrieve the specified check")
+        elif url:
+            log.error("Could not find a check linked to the specified URL")
+        elif resource_id:
+            log.error("Could not find a check linked to the specified resource ID")
+        return
+    await analyse_geojson(check=check)
 
 
 @cli
