@@ -10,6 +10,7 @@ from dateparser import parse as date_parser
 
 from udata_hydra import config, context
 from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.analysis.geojson import analyse_geojson
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -71,6 +72,7 @@ async def analyse_resource(
 
     # could it be a CSV? If we get hints, we will analyse the file further depending on change status
     is_tabular, file_format = await detect_tabular_from_headers(check)
+    is_geojson = False  # TODO: add geojson detection ?
     max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
@@ -136,7 +138,14 @@ async def analyse_resource(
                 file_path=tmp_file.name,
                 _priority="high" if worker_priority == "high" else "default",
             )
-
+        elif is_geojson and tmp_file:
+            await Resource.update(resource_id, data={"status": "TO_ANALYSE_GEOJSON"})
+            queue.enqueue(
+                analyse_geojson,
+                check=check,
+                file_path=tmp_file.name,
+                _priority="high" if worker_priority == "high" else "default",
+            )
         else:
             await Resource.update(resource_id, data={"status": None})
 
