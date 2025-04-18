@@ -6,10 +6,10 @@ from datetime import datetime, timezone
 from asyncpg import Record
 
 from udata_hydra import config
+from udata_hydra.analysis import helpers
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
-from udata_hydra.analysis import helpers
 from udata_hydra.utils import (
     IOException,
     ParseException,
