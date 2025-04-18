@@ -112,7 +112,7 @@ async def analyse_csv(
     table_name, tmp_file = None, None
     try:
         _, file_format = await detect_tabular_from_headers(check)
-        tmp_file = helpers.read_or_download_file(
+        tmp_file = await helpers.read_or_download_file(
             check=check,
             file_path=file_path,
             file_format=file_format,
