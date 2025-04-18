@@ -1,12 +1,11 @@
+import json
 from datetime import date, datetime
 from typing import IO
 
+from asyncpg import Record
 from dateparser import parse as date_parser
 from dateutil.parser import ParserError
 from dateutil.parser import parse as dateutil_parser
-import json
-
-from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.utils import UdataPayload, download_resource, queue, send
@@ -35,7 +34,10 @@ def to_datetime(value: str) -> datetime | None:
 
 
 async def read_or_download_file(
-    check: dict, file_path: str, file_format: str, exception: Record | None,
+    check: dict,
+    file_path: str,
+    file_format: str,
+    exception: Record | None,
 ) -> IO[bytes]:
     return (
         open(file_path, "rb")

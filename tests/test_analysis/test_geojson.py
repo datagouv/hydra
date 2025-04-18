@@ -3,9 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from udata_hydra.analysis.geojson import analyse_geojson, geojson_to_pmtiles
-
 from tests.conftest import RESOURCE_ID
+from udata_hydra.analysis.geojson import analyse_geojson, geojson_to_pmtiles
 
 
 @pytest.mark.asyncio
@@ -56,7 +55,10 @@ async def test_geojson_analysis(setup_catalog, db, fake_check, rmock, produce_mo
     pmtiles_size = 100
     with (
         patch("udata_hydra.config.GEOJSON_ANALYSIS", True),
-        patch("udata_hydra.analysis.geojson.geojson_to_pmtiles", return_value=(pmtiles_url, pmtiles_size)),
+        patch(
+            "udata_hydra.analysis.geojson.geojson_to_pmtiles",
+            return_value=(pmtiles_url, pmtiles_size),
+        ),
     ):
         await analyse_geojson(check=check)
     res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
