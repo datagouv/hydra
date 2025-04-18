@@ -111,7 +111,7 @@ async def analyse_csv(
 
     table_name, tmp_file = None, None
     try:
-        _, file_format = await detect_tabular_from_headers(check)
+        _, file_format = detect_tabular_from_headers(check)
         tmp_file = await helpers.read_or_download_file(
             check=check,
             file_path=file_path,
@@ -218,7 +218,7 @@ def compute_create_table_query(
         for col_name, index_type in indexes.items():
             if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
                 log.error(
-                    f'Index type "{index_type}" is unknown or not supported yet! Index for colum {col_name} was not created.'
+                    f'Index type "{index_type}" is unknown or not supported yet! Index for column {col_name} was not created.'
                 )
                 continue
 

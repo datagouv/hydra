@@ -19,6 +19,7 @@ from udata_hydra.utils import (
     IOException,
     UdataPayload,
     compute_checksum_from_file,
+    detect_geojson_from_headers,
     detect_tabular_from_headers,
     download_resource,
     queue,
@@ -71,8 +72,8 @@ async def analyse_resource(
     change_status, change_payload = await detect_resource_change_on_early_hints(resource)
 
     # could it be a CSV? If we get hints, we will analyse the file further depending on change status
-    is_tabular, file_format = await detect_tabular_from_headers(check)
-    is_geojson = False  # TODO: add geojson detection ?
+    is_tabular, file_format = detect_tabular_from_headers(check)
+    is_geojson: bool = detect_geojson_from_headers(check)
     max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
@@ -98,7 +99,7 @@ async def analyse_resource(
                 )
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
-            if tmp_file and not is_tabular:
+            if tmp_file and not (is_tabular or is_geojson):
                 os.remove(tmp_file.name)
             await Check.update(
                 check["id"],
