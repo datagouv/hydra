@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import subprocess
@@ -10,40 +9,16 @@ from udata_hydra import config
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.analysis import helpers
 from udata_hydra.utils import (
     IOException,
     ParseException,
     Timer,
-    UdataPayload,
-    download_resource,
     handle_parse_exception,
-    queue,
-    send,
 )
 from udata_hydra.utils.minio import MinIOClient
 
 log = logging.getLogger("udata-hydra")
-
-
-async def notify_udata(resource: Record, check: dict) -> None:
-    """Notify udata of the result of a geojson parsing"""
-    payload = {
-        "resource_id": check["resource_id"],
-        "dataset_id": resource["dataset_id"],
-        "document": {
-            "analysis:parsing:error": check["parsing_error"],
-            "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
-            if check["parsing_started_at"]
-            else None,
-            "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
-            if check["parsing_finished_at"]
-            else None,
-        },
-    }
-    if config.GEOJSON_TO_PMTILES:
-        payload["document"]["analysis:parsing:pmtiles_url"] = check.get("pmtiles_url")
-    payload["document"] = UdataPayload(payload["document"])
-    queue.enqueue(send, _priority="high", **payload)
 
 
 async def analyse_geojson(
@@ -69,17 +44,11 @@ async def analyse_geojson(
 
     tmp_file = None
     try:
-        headers = json.loads(check.get("headers") or "{}")
-        tmp_file = (
-            open(file_path, "rb")
-            if file_path
-            else await download_resource(
-                url=url,
-                headers=headers,
-                max_size_allowed=None
-                if exception
-                else int(config.MAX_FILESIZE_ALLOWED.get("geojson", 104857600)),  # 100MB default
-            )
+        tmp_file = helpers.read_or_download_file(
+            check=check,
+            file_path=file_path,
+            file_format="geojson",
+            exception=exception,
         )
         timer.mark("download-file")
 
@@ -102,14 +71,13 @@ async def analyse_geojson(
             {
                 "parsing_finished_at": datetime.now(timezone.utc),
                 "pmtiles_url": pmtiles_url,
-                "parsing_error": None,
             },
         )
 
     except (ParseException, IOException) as e:
         await handle_parse_exception(e, None, check)
     finally:
-        await notify_udata(resource, check)
+        await helpers.notify_udata(resource, check)
         timer.stop()
         if tmp_file is not None:
             tmp_file.close()
@@ -133,9 +101,6 @@ async def geojson_to_pmtiles(
     Returns:
         pmtiles_url: URL of the PMTiles file.
     """
-    if not config.GEOJSON_TO_PMTILES:
-        log.debug("GEOJSON_TO_PMTILES turned off, skipping PMTiles export.")
-        return
 
     log.debug(f"Converting GeoJSON to PMTiles for {file_path}")
 

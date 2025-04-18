@@ -82,5 +82,4 @@ MINIO_USER = ""
 MINIO_PWD = ""
 
 # -- GeoJSON analysis settings -- #
-GEOJSON_ANALYSIS = true
-GEOJSON_TO_PMTILES = false
+GEOJSON_ANALYSIS = false
