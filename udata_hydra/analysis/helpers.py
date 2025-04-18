@@ -70,5 +70,6 @@ async def notify_udata(resource: Record, check: dict) -> None:
         payload["document"]["analysis:parsing:parquet_size"] = check.get("parquet_size")
     if config.GEOJSON_ANALYSIS and check.get("pmtiles_url"):
         payload["document"]["analysis:parsing:pmtiles_url"] = check.get("pmtiles_url")
+        payload["document"]["analysis:parsing:pmtiles_size"] = check.get("pmtiles_size")
     payload["document"] = UdataPayload(payload["document"])
     queue.enqueue(send, _priority="high", **payload)

@@ -56,7 +56,7 @@ async def analyse_geojson(
 
         # Convert to PMTiles
         try:
-            pmtiles_url = await geojson_to_pmtiles(
+            pmtiles_url, pmtiles_size = await geojson_to_pmtiles(
                 file_path=tmp_file.name,
                 resource_id=resource_id,
             )
@@ -71,6 +71,7 @@ async def analyse_geojson(
             {
                 "parsing_finished_at": datetime.now(timezone.utc),
                 "pmtiles_url": pmtiles_url,
+                "pmtiles_size": pmtiles_size,
             },
         )
 
@@ -90,7 +91,7 @@ async def analyse_geojson(
 async def geojson_to_pmtiles(
     file_path: str,
     resource_id: str | None = None,
-) -> str:
+) -> tuple[str, int]:
     """
     Convert a GeoJSON file to PMTiles format.
 
@@ -100,6 +101,7 @@ async def geojson_to_pmtiles(
 
     Returns:
         pmtiles_url: URL of the PMTiles file.
+        pmtiles_size: size of the PMTiles file.
     """
 
     log.debug(f"Converting GeoJSON to PMTiles for {file_path}")
@@ -121,6 +123,7 @@ async def geojson_to_pmtiles(
     subprocess.run(command, check=True)
     log.debug(f"Successfully converted {file_path} to {output_pmtiles}")
 
+    pmtiles_size = os.path.getsize(output_pmtiles)
     pmtiles_url: str = MinIOClient().send_file(output_pmtiles)
 
-    return pmtiles_url
+    return pmtiles_url, pmtiles_size
