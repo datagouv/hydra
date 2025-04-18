@@ -25,6 +25,7 @@ class CheckSchema(Schema):
     parquet_url = fields.Str()
     parquet_size = fields.Integer()
     pmtiles_url = fields.Str()
+    pmtiles_size = fields.Integer()
 
     def create(self, data):
         return self.load(data)

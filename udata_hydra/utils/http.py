@@ -30,6 +30,7 @@ class UdataPayload:
             "parquet_url",
             "started_at",
             "pmtiles_url",
+            "pmtiles_size",
         ],
     }
 
