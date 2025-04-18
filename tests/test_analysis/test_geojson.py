@@ -42,7 +42,8 @@ async def test_geojson_to_pmtiles_valid_geometry():
         header = f.read(7)
     assert header == b"PMTiles"
     assert url == pmtiles_url
-    assert size == 873
+    # size slightly differs depending on the env
+    assert 850 <= size <= 900
     os.remove(f"{RESOURCE_ID}.pmtiles")
 
 
