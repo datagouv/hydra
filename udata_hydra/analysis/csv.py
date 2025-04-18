@@ -41,12 +41,8 @@ from udata_hydra.utils import (
     ParseException,
     Reader,
     Timer,
-    UdataPayload,
     detect_tabular_from_headers,
-    download_resource,
     handle_parse_exception,
-    queue,
-    send,
 )
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
@@ -87,28 +83,6 @@ RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin"
 minio_client = MinIOClient()
 
 
-async def notify_udata(resource: Record, check: dict) -> None:
-    """Notify udata of the result of a parsing"""
-    payload = {
-        "resource_id": check["resource_id"],
-        "dataset_id": resource["dataset_id"],
-        "document": {
-            "analysis:parsing:error": check["parsing_error"],
-            "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
-            if check["parsing_started_at"]
-            else None,
-            "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
-            if check["parsing_finished_at"]
-            else None,
-        },
-    }
-    if config.CSV_TO_PARQUET:
-        payload["document"]["analysis:parsing:parquet_url"] = check.get("parquet_url")
-        payload["document"]["analysis:parsing:parquet_size"] = check.get("parquet_size")
-    payload["document"] = UdataPayload(payload["document"])
-    queue.enqueue(send, _priority="high", **payload)
-
-
 async def analyse_csv(
     check: dict,
     file_path: str | None = None,
@@ -137,18 +111,12 @@ async def analyse_csv(
 
     table_name, tmp_file = None, None
     try:
-        headers = json.loads(check.get("headers") or "{}")
         _, file_format = await detect_tabular_from_headers(check)
-        tmp_file = (
-            open(file_path, "rb")
-            if file_path
-            else await download_resource(
-                url=url,
-                headers=headers,
-                max_size_allowed=None
-                if exception
-                else int(config.MAX_FILESIZE_ALLOWED.get(file_format, "csv")),
-            )
+        tmp_file = helpers.read_or_download_file(
+            check=check,
+            file_path=file_path,
+            file_format=file_format,
+            exception=exception,
         )
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         timer.mark("download-file")
@@ -205,7 +173,7 @@ async def analyse_csv(
     except (ParseException, IOException) as e:
         await handle_parse_exception(e, table_name, check)
     finally:
-        await notify_udata(resource, check)
+        await helpers.notify_udata(resource, check)
         timer.stop()
         if tmp_file is not None:
             tmp_file.close()
