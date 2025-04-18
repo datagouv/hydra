@@ -226,7 +226,7 @@ async def test_harvest(args):
                 },
             ),
         ),
-        # previous check, checksum has changed
+        # previous check, checksum has not changed
         (
             "aaa",
             {"checksum": "aaa", "detected_last_modified_at": strp("2025-06-01 00:00:00")},
