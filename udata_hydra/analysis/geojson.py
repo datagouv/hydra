@@ -107,7 +107,7 @@ async def geojson_to_pmtiles(
     if resource_id:
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
 
-    output_pmtiles = os.path.splitext(file_path)[0] + ".pmtiles"
+    output_pmtiles = f"{resource_id}.pmtiles"
 
     command = [
         "tippecanoe",
