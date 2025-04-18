@@ -44,7 +44,7 @@ async def analyse_geojson(
 
     tmp_file = None
     try:
-        tmp_file = helpers.read_or_download_file(
+        tmp_file = await helpers.read_or_download_file(
             check=check,
             file_path=file_path,
             file_format="geojson",
