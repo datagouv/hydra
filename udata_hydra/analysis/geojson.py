@@ -19,7 +19,7 @@ from udata_hydra.utils import (
 from udata_hydra.utils.minio import MinIOClient
 
 log = logging.getLogger("udata-hydra")
-minio_client = MinIOClient(bucket=config.MINIO_PMTILES_BUCKET, folder=MINIO_PMTILES_FOLDER)
+minio_client = MinIOClient(bucket=config.MINIO_PMTILES_BUCKET, folder=config.MINIO_PMTILES_FOLDER)
 
 
 async def analyse_geojson(
