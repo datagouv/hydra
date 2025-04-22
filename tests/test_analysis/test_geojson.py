@@ -1,5 +1,5 @@
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -33,9 +33,7 @@ async def test_geojson_to_pmtiles_invalid_geometry():
 async def test_geojson_to_pmtiles_valid_geometry():
     """Test handling of valid geometry"""
     pmtiles_url = "http://minio/test.pmtiles"
-    mock_minio = MagicMock()
-    mock_minio.send_file.return_value = pmtiles_url
-    with patch("udata_hydra.analysis.geojson.MinIOClient", return_value=mock_minio):
+    with patch("udata_hydra.analysis.geojson.minio_client.send_file", return_value=pmtiles_url):
         url, size = await geojson_to_pmtiles("tests/data/valid.geojson", RESOURCE_ID)
     # very (too?) simple test, we could install a specific library to read the file
     with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
