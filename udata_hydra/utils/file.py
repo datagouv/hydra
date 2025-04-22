@@ -78,15 +78,3 @@ async def download_resource(
         ]:
             tmp_file = read_csv_gz(tmp_file.name)
         return tmp_file
-
-
-def get_filename_from_path(file_path: str) -> str:
-    """Get just the file name from a file path.
-
-    Args:
-        file_path: The full file path
-
-    Returns:
-        str: Just the file name without the path
-    """
-    return os.path.basename(file_path)
