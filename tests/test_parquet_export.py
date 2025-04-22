@@ -1,5 +1,6 @@
 import os
 from io import BytesIO
+from unittest.mock import patch
 
 import pyarrow.parquet as pq
 import pytest
@@ -72,8 +73,10 @@ async def test_csv_to_parquet(mocker, parquet_config):
         assert not await execute_csv_to_parquet()
 
     else:
-        # TODO: don't use the exception as the assertion, better to mock the minio client sending the file
-        with pytest.raises(ValueError, match="invalid bucket name"):
-            await execute_csv_to_parquet()
+        url = "http://minio/test.parquet"
+        with patch("udata_hydra.analysis.csv.minio_client.send_file", return_value=url):
+            parquet_url, parquet_size = await execute_csv_to_parquet()
+        assert parquet_url == url
+        assert isinstance(parquet_size, int)
         # Clean the remaining parquet file
         os.remove("test_table.parquet")
