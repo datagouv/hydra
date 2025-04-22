@@ -333,7 +333,7 @@ async def csv_to_parquet(
     parquet_file, _ = save_as_parquet(
         records=generate_records(file_path, inspection, columns),
         columns=columns,
-        output_filename=table_name,
+        output_filename=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
     parquet_url: str = minio_client.send_file(parquet_file)
