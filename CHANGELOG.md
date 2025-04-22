@@ -7,6 +7,7 @@
 - Make sure detected_last_modified_at is set even if HAS_NOT_CHANGED [#257](https://github.com/datagouv/hydra/pull/257)
 - Fill in new check even if no update [#258](https://github.com/datagouv/hydra/pull/258)
 - Better change detections and add related tests [#259](https://github.com/datagouv/hydra/pull/259)
+- Enable GeoJSON to PMTiles conversion [#260](https://github.com/datagouv/hydra/pull/260)
 - Parquet files are named after resource ids [#262](https://github.com/datagouv/hydra/pull/262)
 - Upgrade csv-detective [#263](https://github.com/datagouv/hydra/pull/263)
 
