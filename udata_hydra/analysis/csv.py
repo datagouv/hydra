@@ -80,7 +80,7 @@ PYTHON_TYPE_TO_PY = {
 }
 
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
-minio_client = MinIOClient()
+minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=MINIO_PARQUET_FOLDER)
 
 
 async def analyse_csv(

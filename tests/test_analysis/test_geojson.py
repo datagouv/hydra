@@ -11,7 +11,7 @@ from udata_hydra.analysis.geojson import analyse_geojson, geojson_to_pmtiles
 async def test_analyse_geojson_disabled(fake_check):
     """Test that the function returns None when GEOJSON_TO_PMTILES is False"""
     with (
-        patch("udata_hydra.config.GEOJSON_ANALYSIS", False),
+        patch("udata_hydra.config.GEOJSON_TO_PMTILES", False),
         patch("udata_hydra.analysis.helpers.read_or_download_file") as mock_func,
     ):
         check = await fake_check()
@@ -55,7 +55,7 @@ async def test_geojson_analysis(setup_catalog, db, fake_check, rmock, produce_mo
     pmtiles_url = "http://minio/test.pmtiles"
     pmtiles_size = 100
     with (
-        patch("udata_hydra.config.GEOJSON_ANALYSIS", True),
+        patch("udata_hydra.config.GEOJSON_TO_PMTILES", True),
         patch(
             "udata_hydra.analysis.geojson.geojson_to_pmtiles",
             return_value=(pmtiles_url, pmtiles_size),

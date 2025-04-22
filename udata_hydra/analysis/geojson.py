@@ -19,6 +19,7 @@ from udata_hydra.utils import (
 from udata_hydra.utils.minio import MinIOClient
 
 log = logging.getLogger("udata-hydra")
+minio_client = MinIOClient(bucket=config.MINIO_PMTILES_BUCKET, folder=MINIO_PMTILES_FOLDER)
 
 
 async def analyse_geojson(
@@ -26,8 +27,8 @@ async def analyse_geojson(
     file_path: str | None = None,
 ) -> None:
     """Launch GeoJSON analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
-    if not config.GEOJSON_ANALYSIS:
-        log.debug("GEOJSON_ANALYSIS turned off, skipping.")
+    if not config.GEOJSON_TO_PMTILES:
+        log.debug("GEOJSON_TO_PMTILES turned off, skipping.")
         return
 
     resource_id: str = str(check["resource_id"])
@@ -124,6 +125,6 @@ async def geojson_to_pmtiles(
     log.debug(f"Successfully converted {file_path} to {output_pmtiles}")
 
     pmtiles_size = os.path.getsize(output_pmtiles)
-    pmtiles_url: str = MinIOClient().send_file(output_pmtiles)
+    pmtiles_url: str = minio_client.send_file(output_pmtiles)
 
     return pmtiles_url, pmtiles_size
