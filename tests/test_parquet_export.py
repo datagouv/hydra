@@ -12,6 +12,7 @@ from udata_hydra.analysis.csv import (
     generate_records,
 )
 from udata_hydra.utils.parquet import save_as_parquet
+
 from .conftest import RESOURCE_ID
 
 pytestmark = pytest.mark.asyncio
