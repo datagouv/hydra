@@ -10,7 +10,6 @@
 - Parquet files are named after resource ids [#262](https://github.com/datagouv/hydra/pull/262)
 - Upgrade csv-detective [#263](https://github.com/datagouv/hydra/pull/263)
 
-
 ## 2.1.2 (2025-03-19)
 
 - Add a status resetting mechanism for stuck resources [#251](https://github.com/datagouv/hydra/pull/251)
