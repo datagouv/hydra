@@ -8,6 +8,8 @@
 - Fill in new check even if no update [#258](https://github.com/datagouv/hydra/pull/258)
 - Better change detections and add related tests [#259](https://github.com/datagouv/hydra/pull/259)
 - Parquet files are named after resource ids [#262](https://github.com/datagouv/hydra/pull/262)
+- Upgrade csv-detective [#263](https://github.com/datagouv/hydra/pull/263)
+
 
 ## 2.1.2 (2025-03-19)
 
