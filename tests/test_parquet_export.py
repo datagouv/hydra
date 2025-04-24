@@ -1,6 +1,6 @@
 import os
 from io import BytesIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pyarrow.parquet as pq
 import pytest
@@ -11,6 +11,7 @@ from udata_hydra.analysis.csv import (
     csv_to_parquet,
     generate_records,
 )
+from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
 
 from .conftest import RESOURCE_ID
@@ -75,10 +76,16 @@ async def test_csv_to_parquet(mocker, parquet_config):
         assert not await execute_csv_to_parquet()
 
     else:
-        url = "http://minio/test.parquet"
-        with patch("udata_hydra.analysis.csv.minio_client.send_file", return_value=url):
+        minio_url = "my.minio.fr"
+        bucket = "bucket"
+        folder = "folder"
+        mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
+        mocker.patch("udata_hydra.config.MINIO_FOLDER", folder)
+        mocked_minio = MinIOClient()
+        mocked_minio.bucket = bucket
+        mocked_minio.client = MagicMock()
+        mocked_minio.client.fput_object.return_value = None
+        with patch("udata_hydra.analysis.csv.minio_client", new=mocked_minio):
             parquet_url, parquet_size = await execute_csv_to_parquet()
-        assert parquet_url == url
+        assert parquet_url == f"https://{minio_url}/{bucket}/{folder}/{RESOURCE_ID}.parquet"
         assert isinstance(parquet_size, int)
-        # Clean the remaining parquet file
-        os.remove(f"{RESOURCE_ID}.parquet")
