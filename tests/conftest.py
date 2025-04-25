@@ -249,6 +249,7 @@ async def fake_check():
             "parquet_url": "https://example.org/file.parquet" if parquet_url else None,
             "parquet_size": 2048 if parquet_url else None,
             "pmtiles_url": "https://example.org/file.pmtiles" if pmtiles_url else None,
+            "pmtiles_size": 1024 if pmtiles_url else None,
         }
         check: dict = await Check.insert(data=data, returning="*")
         data["id"] = check["id"]
