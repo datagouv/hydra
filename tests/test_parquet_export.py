@@ -80,12 +80,12 @@ async def test_csv_to_parquet(mocker, parquet_config):
         bucket = "bucket"
         folder = "folder"
         mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-        mocker.patch("udata_hydra.config.MINIO_FOLDER", folder)
-        mocked_minio = MinIOClient()
-        mocked_minio.bucket = bucket
-        mocked_minio.client = MagicMock()
-        mocked_minio.client.fput_object.return_value = None
-        with patch("udata_hydra.analysis.csv.minio_client", new=mocked_minio):
+        mocked_minio = MagicMock()
+        mocked_minio.fput_object.return_value = None
+        mocked_minio.bucket_exists.return_value = True
+        with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
+            mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
+        with patch("udata_hydra.analysis.csv.minio_client", new=mocked_minio_client):
             parquet_url, parquet_size = await execute_csv_to_parquet()
         assert parquet_url == f"https://{minio_url}/{bucket}/{folder}/{RESOURCE_ID}.parquet"
         assert isinstance(parquet_size, int)
