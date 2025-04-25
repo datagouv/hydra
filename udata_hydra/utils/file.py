@@ -1,7 +1,6 @@
 import gzip
 import hashlib
 import logging
-import os
 import tempfile
 from typing import IO
 
