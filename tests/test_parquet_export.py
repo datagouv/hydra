@@ -1,5 +1,6 @@
 import os
 from io import BytesIO
+from unittest.mock import MagicMock, patch
 
 import pyarrow.parquet as pq
 import pytest
@@ -10,7 +11,10 @@ from udata_hydra.analysis.csv import (
     csv_to_parquet,
     generate_records,
 )
+from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
+
+from .conftest import RESOURCE_ID
 
 pytestmark = pytest.mark.asyncio
 
@@ -61,7 +65,7 @@ async def test_csv_to_parquet(mocker, parquet_config):
         )
         assert inspection
         return await csv_to_parquet(
-            file_path=file_path, inspection=inspection, table_name="test_table"
+            file_path=file_path, inspection=inspection, resource_id=RESOURCE_ID
         )
 
     csv_to_parquet_config, min_lines_for_parquet_config, expected_conversion = parquet_config
@@ -72,8 +76,16 @@ async def test_csv_to_parquet(mocker, parquet_config):
         assert not await execute_csv_to_parquet()
 
     else:
-        # TODO: don't use the exception as the assertion, better to mock the minio client sending the file
-        with pytest.raises(ValueError, match="invalid bucket name"):
-            await execute_csv_to_parquet()
-        # Clean the remaining parquet file
-        os.remove("test_table.parquet")
+        minio_url = "my.minio.fr"
+        bucket = "bucket"
+        folder = "folder"
+        mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
+        mocker.patch("udata_hydra.config.MINIO_FOLDER", folder)
+        mocked_minio = MinIOClient()
+        mocked_minio.bucket = bucket
+        mocked_minio.client = MagicMock()
+        mocked_minio.client.fput_object.return_value = None
+        with patch("udata_hydra.analysis.csv.minio_client", new=mocked_minio):
+            parquet_url, parquet_size = await execute_csv_to_parquet()
+        assert parquet_url == f"https://{minio_url}/{bucket}/{folder}/{RESOURCE_ID}.parquet"
+        assert isinstance(parquet_size, int)

@@ -183,7 +183,6 @@ async def analyse_csv(
             parquet_args: tuple[str, int] | None = await csv_to_parquet(
                 file_path=tmp_file.name,
                 inspection=csv_inspection,
-                table_name=table_name,
                 resource_id=resource_id,
             )
             timer.mark("csv-to-parquet")
@@ -294,7 +293,6 @@ def generate_records(file_path: str, inspection: dict, columns: dict) -> Iterato
 async def csv_to_parquet(
     file_path: str,
     inspection: dict,
-    table_name: str,
     resource_id: str | None = None,
 ) -> tuple[str, int] | None:
     """
@@ -315,13 +313,13 @@ async def csv_to_parquet(
 
     if int(inspection.get("total_lines", 0)) < config.MIN_LINES_FOR_PARQUET:
         log.debug(
-            f"Skipping parquet export for {table_name} because it has less than {config.MIN_LINES_FOR_PARQUET} lines."
+            f"Skipping parquet export for {resource_id} because it has less than {config.MIN_LINES_FOR_PARQUET} lines."
         )
         return
 
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
-        f"to parquet for {table_name} and sending to Minio."
+        f"to parquet for {resource_id} and sending to Minio."
     )
 
     if resource_id:
@@ -333,7 +331,7 @@ async def csv_to_parquet(
     parquet_file, _ = save_as_parquet(
         records=generate_records(file_path, inspection, columns),
         columns=columns,
-        output_filename=table_name,
+        output_filename=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
     parquet_url: str = minio_client.send_file(parquet_file)

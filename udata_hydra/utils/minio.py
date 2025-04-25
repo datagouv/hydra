@@ -10,12 +10,11 @@ log = logging.getLogger("udata-hydra")
 
 class MinIOClient:
     def __init__(self, bucket=config.MINIO_BUCKET):
-        self.url = config.MINIO_URL
         self.user = config.MINIO_USER
         self.password = config.MINIO_PWD
         self.bucket = bucket
         self.client = Minio(
-            self.url or "test",
+            config.MINIO_URL or "test",
             access_key=self.user or "test",
             secret_key=self.password or "test",
             secure=True,
@@ -40,6 +39,6 @@ class MinIOClient:
             )
             if delete_source:
                 os.remove(file_name)
-            return f"https://{self.url}/{self.bucket}/{config.MINIO_FOLDER}/{file_name}"
+            return f"https://{config.MINIO_URL}/{self.bucket}/{config.MINIO_FOLDER}/{file_name}"
         else:
             raise Exception(f"file '{file_name}' does not exists")
