@@ -1,10 +1,11 @@
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.geojson import analyse_geojson, geojson_to_pmtiles
+from udata_hydra.utils.minio import MinIOClient
 
 
 @pytest.mark.asyncio
@@ -30,16 +31,27 @@ async def test_geojson_to_pmtiles_invalid_geometry():
 
 
 @pytest.mark.asyncio
-async def test_geojson_to_pmtiles_valid_geometry():
+async def test_geojson_to_pmtiles_valid_geometry(mocker):
     """Test handling of valid geometry"""
-    pmtiles_url = "http://minio/test.pmtiles"
-    with patch("udata_hydra.analysis.geojson.minio_client.send_file", return_value=pmtiles_url):
+    minio_url = "my.minio.fr"
+    bucket = "bucket"
+    folder = "folder"
+    mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
+    mocked_minio = MagicMock()
+    mocked_minio.fput_object.return_value = None
+    mocked_minio.bucket_exists.return_value = True
+    with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
+        mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
+    with patch("udata_hydra.analysis.geojson.minio_client", new=mocked_minio_client):
+        mock_os = mocker.patch("udata_hydra.utils.minio.os")
+        mock_os.path = os.path
+        mock_os.remove.return_value = None
         url, size = await geojson_to_pmtiles("tests/data/valid.geojson", RESOURCE_ID)
     # very (too?) simple test, we could install a specific library to read the file
     with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
-    assert url == pmtiles_url
+    assert url == f"https://{minio_url}/{bucket}/{folder}/{RESOURCE_ID}.pmtiles"
     # size slightly differs depending on the env
     assert 850 <= size <= 900
     os.remove(f"{RESOURCE_ID}.pmtiles")
