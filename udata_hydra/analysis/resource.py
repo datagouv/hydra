@@ -71,7 +71,7 @@ async def analyse_resource(
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
     change_status, change_payload = await detect_resource_change_on_early_hints(resource)
 
-    # could it be a CSV? If we get hints, we will analyse the file further depending on change status
+    # could it be a CSV or a GeoJSON? If we get hints, we will analyse the file further depending on change status
     is_tabular, file_format = detect_tabular_from_headers(check)
     is_geojson: bool = detect_geojson_from_headers(check)
     max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
