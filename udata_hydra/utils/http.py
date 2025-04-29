@@ -25,10 +25,11 @@ class UdataPayload:
         ],
         "analysis:parsing": [
             "error",
+            "started_at",
             "finished_at",
             "parquet_size",
             "parquet_url",
-            "started_at",
+
             "pmtiles_url",
             "pmtiles_size",
         ],
