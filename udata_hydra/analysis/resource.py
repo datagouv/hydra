@@ -74,6 +74,8 @@ async def analyse_resource(
     # could it be a CSV or a GeoJSON? If we get hints, we will analyse the file further depending on change status
     is_tabular, file_format = detect_tabular_from_headers(check)
     is_geojson: bool = detect_geojson_from_headers(check)
+    if is_geojson:
+        file_format = "geojson"
     max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
