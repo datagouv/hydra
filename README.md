@@ -6,7 +6,8 @@ URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _Po
 
 Since it's called _hydra_, it also has mythical powers embedded:
 - analyse remote resource metadata over time to detect changes in the smartest way possible
-- if the remote resource is a CSV, convert it to a PostgreSQL table, ready for APIfication
+- if the remote resource is a CSV, convert it to a PostgreSQL table, ready for APIfication, and to parquet to offer another distribution of the data
+- if the remote resource is a geojson, convert it to PMTiles to offer another distribution of the data
 - send crawl and analysis info to a udata instance
 
 ## Architecture schema
@@ -134,7 +135,7 @@ The API serves the following endpoints:
 - `PUT` on `/api/resources/{resource_id}` to update a resource in the DB "catalog" table
 - `DELETE` on `/api/resources/{resource_id}` to delete a resource in the DB "catalog" table
 
-> :warning: **Warning: the following routes are deprecated and need be removed in the future:**
+> :warning: **Warning: the following routes are deprecated and will be removed in the future:**
 > - `POST` on `/api/resource/created` -> use `POST` on `/api/resources/` instead
 > - `POST` on `/api/resource/updated` -> use `PUT` on `/api/resources/` instead
 > - `POST` on `/api/resource/deleted` -> use `DELETE` on `/api/resources/` instead
