@@ -18,6 +18,9 @@ class Resource:
         "ANALYSING_CSV": "resource content currently being analysed by CSV detective",
         "INSERTING_IN_DB": "currently being inserted in DB",
         "CONVERTING_TO_PARQUET": "currently being converted to Parquet",
+        "TO_ANALYSE_GEOJSON": "geojson resource content to be analysed",
+        "ANALYSING_GEOJSON": "geojson resource content currently being analysed",
+        "CONVERTING_TO_PMTILES": "currently being converted to pmtiles",
     }
 
     @classmethod

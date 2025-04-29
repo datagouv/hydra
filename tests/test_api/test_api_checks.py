@@ -69,6 +69,8 @@ async def test_get_latest_check(setup_catalog, client, query, fake_check, fake_r
         "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest(),
         "parquet_url": "https://example.org/file.parquet",
         "parquet_size": 2048,
+        "pmtiles_url": None,
+        "pmtiles_size": None,
     }
 
     # Test deleted resource

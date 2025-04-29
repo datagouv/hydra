@@ -2628,6 +2628,28 @@ files = [
 ]
 
 [[package]]
+name = "tippecanoe"
+version = "2.72.0"
+description = "Builds vector tilesets from large (or small) collections of GeoJSON, FlatGeobuf, or CSV features"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "tippecanoe-2.72.0-py2.py3-none-macosx_10_14_x86_64.whl", hash = "sha256:2316b800fdec59d85c24726d4fe910c3f822af067a825f8d2d5579a8815627be"},
+    {file = "tippecanoe-2.72.0-py2.py3-none-macosx_11_0_arm64.whl", hash = "sha256:958b1ba08a06f416690a21714a22ca40462f1251d2d2821dea7624a9034da1f3"},
+    {file = "tippecanoe-2.72.0-py2.py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:2c27c220467df763ac75f4643d84315d9e933c76aad7c7599238cf42be713eec"},
+    {file = "tippecanoe-2.72.0-py2.py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:4d8f5c576b8cefc3f83eff679c55f6484a1d421b055e3ec1e7d340ffcf0ce3cc"},
+    {file = "tippecanoe-2.72.0-py2.py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:0dcc13af896ea7c369a09627009a7181cc36136aef29d80874469e1aac75cc94"},
+    {file = "tippecanoe-2.72.0-py2.py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cd35371d108b6a3f75517ca10b461c3c0a6110797d5b465ff504fee149136179"},
+    {file = "tippecanoe-2.72.0-py2.py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:d5edbb8021617ee4adac5e23c74c470c347697b6ced43a08ae4aeb61b76b1a89"},
+    {file = "tippecanoe-2.72.0-py2.py3-none-musllinux_1_2_i686.whl", hash = "sha256:79e1055037372f4ee55672c2fe21d6de32a6376935f9cf1154f37549dfa11cb1"},
+    {file = "tippecanoe-2.72.0-py2.py3-none-musllinux_1_2_ppc64le.whl", hash = "sha256:3fcfd34f52b55d63d3c28780288e0f9c941bdf475abe98108aadf638a9361831"},
+    {file = "tippecanoe-2.72.0-py2.py3-none-musllinux_1_2_s390x.whl", hash = "sha256:0e59dd25192407cc19f978637a0d04b2f0eae98daf4f93968f24a0883f7f18d6"},
+    {file = "tippecanoe-2.72.0-py2.py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:77b5d0606bf73b5afd378b62c11e4fbfa52ad1609bd9f1094ef4ddf231457326"},
+    {file = "tippecanoe-2.72.0.tar.gz", hash = "sha256:89a1878a368694097cf02adb66774f9f1832f438bd4791c9e37eb3d39c245c25"},
+]
+
+[[package]]
 name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
@@ -2916,4 +2938,4 @@ dev = ["aiohttp-devtools", "aioresponses", "bumpx", "gunicorn", "mypy", "nest_as
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "6cb03fb856186c3d8cec50953ac75b9bb1fab94f662235e8d2849d4701e7fe71"
+content-hash = "198cdf38ee4f8596f2bd3089a38d316a87d3c2e6cdf58fd6f581daf237d5a831"

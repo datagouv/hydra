@@ -23,7 +23,15 @@ class UdataPayload:
             "last-modified-detection",
             "mime-type",
         ],
-        "analysis:parsing": ["error", "finished_at", "parquet_size", "parquet_url", "started_at"],
+        "analysis:parsing": [
+            "error",
+            "started_at",
+            "finished_at",
+            "parquet_size",
+            "parquet_url",
+            "pmtiles_size",
+            "pmtiles_url",
+        ],
     }
 
     def __init__(self, payload: dict):

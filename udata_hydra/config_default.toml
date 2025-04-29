@@ -55,6 +55,7 @@ MAX_FILESIZE_ALLOWED.csvgz = 104857600
 MAX_FILESIZE_ALLOWED.xls = 52428800    # /2
 MAX_FILESIZE_ALLOWED.xlsx = 13107200   # /8
 MAX_FILESIZE_ALLOWED.ods = 10485760    # /10
+MAX_FILESIZE_ALLOWED.geojson = 104857600
 
 # -- CSV analysis settings -- #
 SQL_INDEXES_TYPES_SUPPORTED = ["index"]
@@ -72,10 +73,17 @@ UDATA_URI = ""
 UDATA_URI_API_KEY = ""
 
 # -- Minio / datalake settings -- #
-CSV_TO_PARQUET = false
-MIN_LINES_FOR_PARQUET = 200
-MINIO_FOLDER = "" # no trailing slash
 MINIO_URL = "" # no scheme
-MINIO_BUCKET = ""
 MINIO_USER = ""
 MINIO_PWD = ""
+
+# -- Parquet conversion settings -- #
+CSV_TO_PARQUET = false
+MIN_LINES_FOR_PARQUET = 200
+MINIO_PARQUET_BUCKET = ""
+MINIO_PARQUET_FOLDER = "" # no trailing slash
+
+# -- PMTiles conversion settings -- #
+GEOJSON_TO_PMTILES = false
+MINIO_PMTILES_BUCKET = ""
+MINIO_PMTILES_FOLDER = "" # no trailing slash

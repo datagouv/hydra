@@ -161,7 +161,7 @@ async def setup_catalog_with_resource_exception(setup_catalog):
 def produce_mock(mocker):
     mocker.patch("udata_hydra.crawl.preprocess_check_data.send", dummy())
     mocker.patch("udata_hydra.analysis.resource.send", dummy())
-    mocker.patch("udata_hydra.analysis.csv.send", dummy())
+    mocker.patch("udata_hydra.analysis.helpers.send", dummy())
 
 
 @pytest.fixture
@@ -225,6 +225,7 @@ async def fake_check():
         parsing_table=False,
         parquet_url=False,
         domain="example.com",
+        pmtiles_url=False,
     ) -> dict:
         url = f"https://example.com/resource-{resource}"
         data = {
@@ -247,6 +248,8 @@ async def fake_check():
             else None,
             "parquet_url": "https://example.org/file.parquet" if parquet_url else None,
             "parquet_size": 2048 if parquet_url else None,
+            "pmtiles_url": "https://example.org/file.pmtiles" if pmtiles_url else None,
+            "pmtiles_size": 1024 if pmtiles_url else None,
         }
         check: dict = await Check.insert(data=data, returning="*")
         data["id"] = check["id"]
