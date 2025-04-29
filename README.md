@@ -6,7 +6,7 @@ URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _Po
 
 Since it's called _hydra_, it also has mythical powers embedded:
 - analyse remote resource metadata over time to detect changes in the smartest way possible
-- if the remote resource is a CSV, convert it to a PostgreSQL table, ready for APIfication, and to parquet to offer another distribution of the data
+- if the remote resource is tabular (csv or excel-like), convert it to a PostgreSQL table, ready for APIfication, and to parquet to offer another distribution of the data
 - if the remote resource is a geojson, convert it to PMTiles to offer another distribution of the data
 - send crawl and analysis info to a udata instance
 
