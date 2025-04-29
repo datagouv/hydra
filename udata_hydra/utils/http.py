@@ -29,9 +29,8 @@ class UdataPayload:
             "finished_at",
             "parquet_size",
             "parquet_url",
-
-            "pmtiles_url",
             "pmtiles_size",
+            "pmtiles_url",
         ],
     }
 
