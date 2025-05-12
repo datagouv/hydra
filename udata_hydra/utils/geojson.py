@@ -1,7 +1,7 @@
 import json
 
 
-async def detect_geojson_from_headers(check: dict) -> bool:
+def detect_geojson_from_headers(check: dict) -> bool:
     headers: dict = json.loads(check["headers"] or "{}")
     # in some cases geojson files have the content-type `application/json`
     # but adding this in the list would not have been a restrictive enough condition
