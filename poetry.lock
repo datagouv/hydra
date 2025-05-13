@@ -744,13 +744,13 @@ toml = ["tomli ; python_full_version <= \"3.11.0a6\""]
 
 [[package]]
 name = "csv-detective"
-version = "0.7.5.dev1298"
+version = "0.7.5.dev1320"
 description = "Detect CSV column content"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "csv_detective-0.7.5.dev1298-py3-none-any.whl", hash = "sha256:8050e2a4ac0e5e712ce418a010f1b3ce035e2987fb511b218151a50903c91a3e"},
+    {file = "csv_detective-0.7.5.dev1320-py3-none-any.whl", hash = "sha256:2aa13770722a5bbf56f097442519ee2f664847fdeb0e7e2eeebefbb5c28ca149"},
 ]
 
 [package.dependencies]
@@ -2969,4 +2969,4 @@ dev = ["aiohttp-devtools", "aioresponses", "bumpx", "gunicorn", "mypy", "nest_as
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "662c9dcba3fa8c3e9b7bf670ff8c6ca282a137dfff84ea6173af845947305e85"
+content-hash = "af33cfb98781ec696eade54f17778e47fab9180dd6a65d0dd1e4bbcd450d5275"
