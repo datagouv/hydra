@@ -276,7 +276,7 @@ async def test_error_reporting_parsing(
     assert res["parsing_table"] is None
     assert (
         res["parsing_error"]
-        == "csv_detective:Number of columns is not even across the first 10 rows."
+        == "csv_detective:Number of columns is not even across the first 10 rows (detected separator: ,)."
     )
     assert res["parsing_finished_at"]
     with pytest.raises(UndefinedTableError):
