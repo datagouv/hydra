@@ -199,7 +199,7 @@ async def get_previous_analysis(resource_id: str) -> dict | None:
     db = await context.pool("csv")
     q = (
         "SELECT parsing_table, csv_detective FROM tables_index "
-        f"WHERE resource_id='{resource_id}' ORDER BY created_at DESC"
+        f"WHERE resource_id='{resource_id}' ORDER BY created_at DESC LIMIT 1"
     )
     res = await db.fetch(q)
     if not res:
