@@ -134,7 +134,6 @@ async def analyse_csv(
                     output_profile=True,
                     num_rows=-1,
                     save_results=False,
-                    verbose=True,
                 )
             else:
                 csv_inspection: dict | None = csv_detective_routine(
@@ -142,7 +141,6 @@ async def analyse_csv(
                     output_profile=True,
                     num_rows=-1,
                     save_results=False,
-                    verbose=True,
                 )
         except Exception as e:
             raise ParseException(
