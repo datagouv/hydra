@@ -253,7 +253,7 @@ async def test_error_reporting_csv_detective(
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
-    assert res["parsing_error"] == "csv_detective:list index out of range"
+    assert res["parsing_error"] == "csv_detective:Could not detect the file's encoding. Consider specifying it in the routine call."
     assert res["parsing_finished_at"]
 
 
