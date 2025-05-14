@@ -31,7 +31,7 @@ async def test_save_as_parquet(file_and_count):
     filename, expected_count = file_and_count
     file_path = f"tests/data/{filename}"
     inspection: dict | None = csv_detective_routine(
-        csv_file_path=file_path, output_profile=True, num_rows=-1, save_results=False
+        file_path=file_path, output_profile=True, num_rows=-1, save_results=False
     )
     assert inspection
     columns = inspection["columns"]
@@ -61,7 +61,7 @@ async def test_csv_to_parquet(mocker, parquet_config):
     async def execute_csv_to_parquet() -> tuple[str, int] | None:
         file_path = "tests/data/catalog.csv"
         inspection: dict | None = csv_detective_routine(
-            csv_file_path=file_path, output_profile=True, num_rows=-1, save_results=False
+            file_path=file_path, output_profile=True, num_rows=-1, save_results=False
         )
         assert inspection
         return await csv_to_parquet(
