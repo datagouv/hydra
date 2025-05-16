@@ -2,10 +2,12 @@ import hashlib
 import json
 from datetime import date, datetime
 from tempfile import NamedTemporaryFile
+from unittest.mock import patch
 
 import pytest
 from aiohttp import ClientSession
 from asyncpg.exceptions import UndefinedTableError
+from csv_detective.explore_csv import validate_then_detect
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
@@ -373,3 +375,176 @@ async def test_forced_analysis(
             assert webhook.get("analysis:parsing:error", False) is None
     else:
         assert ("PUT", URL(udata_url)) not in rmock.requests.keys()
+
+
+def create_body(
+    separator: str,
+    header: list[str],
+    rows: list[list[str]],
+    encoding: str,
+    **kwargs,
+) -> bytes:
+    return "\n".join(
+        separator.join(cell for cell in row) for row in [header] + rows
+    ).encode(encoding)
+
+
+default_kwargs = {
+    "separator": ",",
+    "header": ["a", "b"],
+    "rows": [["1", "13002526500013"], ["5", "38271817900023"]],
+    "encoding": "ASCII",
+    "columns": {
+        "a": {"score": 1.0, "format": "int", "python_type": "int"},
+        "b": {"score": 1.0, "format": "siret", "python_type": "string"},
+    },
+    "header_row_idx": 0,
+    "categorical": None,
+    "formats": {"int": ["a"], "siret": ["b"]},
+    "profile": None,
+    "columns_fields": None,
+    "columns_labels": None,
+    "profile": None,
+}
+
+python_type_to_sql = {
+    "int": "INT",
+    "string": "VARCHAR",
+    "float": "FLOAT",
+}
+
+
+def create_analysis(scan: dict) -> dict:
+    analysis = {
+        k: scan[k]
+        for k in [
+            "encoding",
+            "separator",
+            "header_row_idx",
+            "header",
+            "columns",
+            "categorical",
+            "formats",
+            "columns_fields",
+            "columns_labels",
+            "profile",
+        ]
+    }
+    analysis["total_lines"] = len(scan["rows"])
+    return analysis
+
+
+@pytest.mark.parametrize(
+    "_params",
+    (
+        # just a new row in the file, types haven't changed
+        (
+            default_kwargs,
+            default_kwargs | {"rows": default_kwargs["rows"] + [["6", "21310555400017"]]},
+            True,
+        ),
+        # separator changed
+        (default_kwargs, default_kwargs | {"separator": ";"}, False),
+        # columns changed
+        (
+            default_kwargs,
+            default_kwargs | {
+                "header": ["a", "c"],
+                "columns": {
+                    "a": {"score": 1.0, "format": "int", "python_type": "int"},
+                    "c": {"score": 1.0, "format": "siret", "python_type": "string"},
+                },
+                "formats": {"int": ["a"], "siret": ["c"]},
+            },
+            False,
+        ),
+        # format changed
+        (
+            default_kwargs,
+            default_kwargs | {
+                "rows": [["1", "2022-11-03"], ["5", "2025-11-02"]],
+                "columns": {
+                    "a": {"score": 1.0, "format": "int", "python_type": "int"},
+                    "b": {"score": 1.0, "format": "date", "python_type": "date"},
+                },
+                "formats": {"int": ["a"], "date": ["b"]},
+            },
+            False,
+        ),
+    ),
+)
+async def test_validation(
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+    udata_url,
+    _params,
+    produce_mock,
+):
+    previous_scan_kwargs, current_scan_kwargs, is_valid = _params
+    previous_analysis = create_analysis(previous_scan_kwargs)
+    current_analysis = create_analysis(current_scan_kwargs)
+
+    # set up check and url
+    check = await fake_check(
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        },
+    )
+    url = check["url"]
+    rmock.get(
+        url,
+        status=200,
+        body=create_body(**current_scan_kwargs),
+    )
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+
+    # set up previous analysis and db insertion
+    await db.execute(
+        "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)",
+        table_name,
+        json.dumps(previous_analysis),
+        check.get("resource_id"),
+        check.get("url"),
+    )
+    await db.execute(
+        f'CREATE TABLE "{table_name}"(__id serial PRIMARY KEY, '
+        + ", ".join(
+            f"{col} {python_type_to_sql[previous_analysis['columns'][col]['python_type']]}"
+            for col in previous_analysis["columns"]
+        ) + ")"
+    )
+    await db.execute(
+        f'INSERT INTO "{table_name}" ({", ".join(previous_analysis["header"])}) VALUES '
+        + ", ".join(f"({','.join(row)})" for row in previous_scan_kwargs["rows"])
+    )
+
+    # run analysis
+    with patch(
+        # wraps because we don't want to change the behaviour, just to know it's been called
+        "udata_hydra.analysis.csv.validate_then_detect", wraps=validate_then_detect
+    ) as mock_func:
+        await analyse_csv(check=check)
+        mock_func.assert_called_once()
+
+    # now we check what is inside csv_detective in tables_index
+    res = await db.fetch(
+        f"SELECT * from tables_index WHERE resource_id='{check['resource_id']}' "
+        "ORDER BY created_at DESC"
+    )
+    assert len(res) == 2
+    assert all(row["parsing_table"] == table_name for row in res)
+    assert all(str(row["resource_id"]) == check["resource_id"] for row in res)
+    assert all(row["url"] == check["url"] for row in res)
+    latest_analysis = json.loads(res[0]["csv_detective"])
+    # check that latest analysis is in line with expectation
+    for key in current_analysis.keys():
+        if current_analysis[key] is not None:
+            assert latest_analysis[key] == current_analysis[key]
+        if not is_valid:
+            # if valid, we have kept the exact same analysis, so None should remain
+            assert latest_analysis[key] is not None
+    # in all cases, profile should have been recreated
+    assert latest_analysis["profile"] is not None
