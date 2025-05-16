@@ -61,6 +61,7 @@ async def handle_parse_exception(
     if table_name is not None:
         db = await context.pool("csv")
         await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+        await db.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_name}'")
     if check:
         # e.__cause__ let us access the "inherited" error of the Exception (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
