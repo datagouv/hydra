@@ -1,6 +1,6 @@
 # Changelog
 
-## Current (in progress)
+## 2.2.0 (2025-05-16)
 
 - Better prioritizing [#255](https://github.com/datagouv/hydra/pull/255)
 - Reset same category udata extra fields on sending [#256](https://github.com/datagouv/hydra/pull/256)
