@@ -3,6 +3,7 @@ import os
 import subprocess
 from datetime import datetime, timezone
 
+import tippecanoe
 from asyncpg import Record
 
 from udata_hydra import config
@@ -113,7 +114,6 @@ async def geojson_to_pmtiles(
     output_pmtiles = f"{resource_id}.pmtiles"
 
     command = [
-        "tippecanoe",
         "--maximum-zoom=g",  # guess
         "-o",
         output_pmtiles,
@@ -121,7 +121,9 @@ async def geojson_to_pmtiles(
         "--extend-zooms-if-still-dropping",
         file_path,
     ]
-    subprocess.run(command, check=True)
+    exit_code = tippecanoe._program("tippecanoe", *command)
+    if exit_code:
+        raise ValueError(f"GeoJSON to PMTiles conversion failed for {file_path}")
     log.debug(f"Successfully converted {file_path} to {output_pmtiles}")
 
     pmtiles_size = os.path.getsize(output_pmtiles)
