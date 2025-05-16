@@ -10,6 +10,7 @@
 - Enable GeoJSON to PMTiles conversion [#260](https://github.com/datagouv/hydra/pull/260) [#267](https://github.com/datagouv/hydra/pull/267)
 - Parquet files are named after resource ids [#262](https://github.com/datagouv/hydra/pull/262)
 - Upgrade csv-detective [#263](https://github.com/datagouv/hydra/pull/263)
+- Fix call to a sync function after demo crash test [#265](https://github.com/datagouv/hydra/pull/265)
 
 ## 2.1.2 (2025-03-19)
 
