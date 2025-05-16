@@ -255,7 +255,10 @@ async def test_error_reporting_csv_detective(
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
-    assert res["parsing_error"] == "csv_detective:Could not detect the file's encoding. Consider specifying it in the routine call."
+    assert (
+        res["parsing_error"]
+        == "csv_detective:Could not detect the file's encoding. Consider specifying it in the routine call."
+    )
     assert res["parsing_finished_at"]
 
 
@@ -384,9 +387,9 @@ def create_body(
     encoding: str,
     **kwargs,
 ) -> bytes:
-    return "\n".join(
-        separator.join(cell for cell in row) for row in [header] + rows
-    ).encode(encoding)
+    return "\n".join(separator.join(cell for cell in row) for row in [header] + rows).encode(
+        encoding
+    )
 
 
 default_kwargs = {
@@ -401,7 +404,6 @@ default_kwargs = {
     "header_row_idx": 0,
     "categorical": None,
     "formats": {"int": ["a"], "siret": ["b"]},
-    "profile": None,
     "columns_fields": None,
     "columns_labels": None,
     "profile": None,
@@ -448,7 +450,8 @@ def create_analysis(scan: dict) -> dict:
         # columns changed
         (
             default_kwargs,
-            default_kwargs | {
+            default_kwargs
+            | {
                 "header": ["a", "c"],
                 "columns": {
                     "a": {"score": 1.0, "format": "int", "python_type": "int"},
@@ -461,7 +464,8 @@ def create_analysis(scan: dict) -> dict:
         # format changed
         (
             default_kwargs,
-            default_kwargs | {
+            default_kwargs
+            | {
                 "rows": [["1", "2022-11-03"], ["5", "2025-11-02"]],
                 "columns": {
                     "a": {"score": 1.0, "format": "int", "python_type": "int"},
@@ -514,7 +518,8 @@ async def test_validation(
         + ", ".join(
             f"{col} {python_type_to_sql[previous_analysis['columns'][col]['python_type']]}"
             for col in previous_analysis["columns"]
-        ) + ")"
+        )
+        + ")"
     )
     await db.execute(
         f'INSERT INTO "{table_name}" ({", ".join(previous_analysis["header"])}) VALUES '
@@ -524,7 +529,8 @@ async def test_validation(
     # run analysis
     with patch(
         # wraps because we don't want to change the behaviour, just to know it's been called
-        "udata_hydra.analysis.csv.validate_then_detect", wraps=validate_then_detect
+        "udata_hydra.analysis.csv.validate_then_detect",
+        wraps=validate_then_detect,
     ) as mock_func:
         await analyse_csv(check=check)
         mock_func.assert_called_once()

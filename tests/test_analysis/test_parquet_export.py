@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pyarrow.parquet as pq
 import pytest
 
+from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.csv import (
     RESERVED_COLS,
     csv_detective_routine,
@@ -12,8 +13,6 @@ from udata_hydra.analysis.csv import (
 )
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
-
-from tests.conftest import RESOURCE_ID
 
 pytestmark = pytest.mark.asyncio
 
