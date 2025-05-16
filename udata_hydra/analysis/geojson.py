@@ -121,8 +121,8 @@ async def geojson_to_pmtiles(
         "--extend-zooms-if-still-dropping",
         file_path,
     ]
-    code = tippecanoe._program("tippecanoe", *command)
-    if code:
+    exit_code = tippecanoe._program("tippecanoe", *command)
+    if exit_code:
         raise ValueError(f"GeoJSON to PMTiles conversion failed for {file_path}")
     log.debug(f"Successfully converted {file_path} to {output_pmtiles}")
 
