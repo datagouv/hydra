@@ -3,8 +3,8 @@ import os
 import subprocess
 from datetime import datetime, timezone
 
-from asyncpg import Record
 import tippecanoe
+from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
