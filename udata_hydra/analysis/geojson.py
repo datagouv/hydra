@@ -4,6 +4,7 @@ import subprocess
 from datetime import datetime, timezone
 
 from asyncpg import Record
+import tippecanoe
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
@@ -121,7 +122,7 @@ async def geojson_to_pmtiles(
         "--extend-zooms-if-still-dropping",
         file_path,
     ]
-    subprocess.run(command, check=True)
+    tippecanoe._program("tippecanoe", *command)
     log.debug(f"Successfully converted {file_path} to {output_pmtiles}")
 
     pmtiles_size = os.path.getsize(output_pmtiles)
