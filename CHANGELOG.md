@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Fix some CLI functions to improve local debug [#269](https://github.com/datagouv/hydra/pull/269)
 
 ## 2.2.0 (2025-05-16)
 

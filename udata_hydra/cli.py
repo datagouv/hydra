@@ -162,7 +162,7 @@ async def check_resource(resource_id: str, method: str = "get", force_analysis: 
 
 @cli(name="analyse-resource")
 async def analyse_resource_cli(resource_id: str):
-    """Trigger a resource analysis"""
+    """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
     check: Record | None = await Check.get_by_resource_id(resource_id)
     if not check:
         log.error("Could not find a check linked to the specified resource ID")
