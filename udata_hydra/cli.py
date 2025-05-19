@@ -92,26 +92,34 @@ async def load_catalog(
             reader = csv.DictReader(fd, delimiter=";")
             rows = list(reader)
             for row in iter_with_progressbar_or_quiet(rows, quiet):
-                # Skip resources belonging to an archived dataset
-                if row.get("dataset.archived") != "False":
+                if (
+                    # Skip resources belonging to an archived dataset
+                    row.get("dataset.archived") != "False"
+                    # and resources that are APIs or code repos
+                    or row.get("type") in ["api", "code"]
+                ):
                     continue
 
                 await conn.execute(
                     """
                     INSERT INTO catalog (
-                        dataset_id, resource_id, url, harvest_modified_at,
-                        deleted, priority, status
+                        dataset_id, resource_id, url, type, format,
+                        harvest_modified_at, deleted, priority, status
                     )
-                    VALUES ($1, $2, $3, $4, FALSE, FALSE, NULL)
+                    VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NULL)
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,
                         deleted = FALSE,
-                        harvest_modified_at = $4;
+                        type = $4,
+                        format = $5,
+                        harvest_modified_at = $6;
                 """,
                     row["dataset.id"],
                     row["id"],
                     row["url"],
+                    row["type"],
+                    row["format"],
                     # force timezone info to UTC (catalog data should be in UTC)
                     datetime.fromisoformat(row["harvest.modified_at"]).replace(tzinfo=timezone.utc)
                     if row["harvest.modified_at"]
