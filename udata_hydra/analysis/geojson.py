@@ -1,6 +1,5 @@
 import logging
 import os
-import subprocess
 from datetime import datetime, timezone
 
 import tippecanoe

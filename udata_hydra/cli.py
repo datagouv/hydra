@@ -15,6 +15,7 @@ from progressist import ProgressBar
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.analysis.geojson import analyse_geojson
+from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -157,6 +158,16 @@ async def check_resource(resource_id: str, method: str = "get", force_analysis: 
             force_analysis=force_analysis,
             worker_priority="high",
         )
+
+
+@cli(name="analyse-resource")
+async def analyse_resource_cli(resource_id: str):
+    """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
+    check: Record | None = await Check.get_by_resource_id(resource_id)
+    if not check:
+        log.error("Could not find a check linked to the specified resource ID")
+        return
+    await analyse_resource(check=check, last_check=None, force_analysis=True)
 
 
 @cli(name="analyse-csv")
@@ -417,7 +428,10 @@ async def insert_resource_into_catalog(resource_id: str):
             datetime.fromisoformat(resource["resource"]["harvest"]["modified_at"]).replace(
                 tzinfo=timezone.utc
             )
-            if resource["resource"].get("harvest")
+            if (
+                resource["resource"].get("harvest") is not None
+                and resource["resource"]["harvest"].get("modified_at")
+            )
             else None,
         )
         log.info(f"Resource {resource_id} successfully {action}ed into DB.")
