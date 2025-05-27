@@ -360,23 +360,25 @@ async def purge_csv_tables(quiet: bool = False) -> None:
     ON checks.parsing_table = md5(c.url)
     WHERE checks.parsing_table IS NOT NULL AND (c.id IS NULL OR c.deleted = TRUE);
     """
-    conn = await connection()
-    res: list[Record] = await conn.fetch(q)
+    conn_main = await connection()
+    res: list[Record] = await conn_main.fetch(q)
     tables_to_delete: list[str] = [r["parsing_table"] for r in res]
 
     success_count = 0
     error_count = 0
 
+    conn_csv = await connection(db_name="csv")
     for table in tables_to_delete:
         try:
-            async with conn.transaction():
-                log.debug(f'Deleting table "{table}"')
-                await conn.execute(f'DROP TABLE IF EXISTS "{table}"')
-                await conn.execute("DELETE FROM tables_index WHERE parsing_table = $1", table)
-                await conn.execute(
-                    "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-                )
-                success_count += 1
+            async with conn_main.transaction():
+                async with conn_csv.transaction():
+                    log.debug(f'Deleting table "{table}"')
+                    await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
+                    await conn_main.execute("DELETE FROM tables_index WHERE parsing_table = $1", table)
+                    await conn_main.execute(
+                        "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
+                    )
+                    success_count += 1
         except Exception as e:
             error_count += 1
             log.error(f'Failed to delete table "{table}": {str(e)}')
