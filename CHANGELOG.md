@@ -4,6 +4,7 @@
 
 - Fix some CLI functions to improve local debug [#269](https://github.com/datagouv/hydra/pull/269)
 - Upgrade csv-detective and use previous analysis to validate if available [#266](https://github.com/datagouv/hydra/pull/266)
+- Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271)
 
 ## 2.2.0 (2025-05-16)
 
