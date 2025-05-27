@@ -374,7 +374,9 @@ async def purge_csv_tables(quiet: bool = False) -> None:
                 async with conn_csv.transaction():
                     log.debug(f'Deleting table "{table}"')
                     await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
-                    await conn_main.execute("DELETE FROM tables_index WHERE parsing_table = $1", table)
+                    await conn_main.execute(
+                        "DELETE FROM tables_index WHERE parsing_table = $1", table
+                    )
                     await conn_main.execute(
                         "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
                     )
@@ -448,8 +450,8 @@ async def purge_selected_csv_tables(
     quiet: bool = False,
 ) -> None:
     """Delete converted CSV tables either:
-       - if they're more than nb_days_to_keep days old
-       - if they're not in the top nb_table_to_keep most recent
+    - if they're more than nb_days_to_keep days old
+    - if they're not in the top nb_table_to_keep most recent
     """
     if quiet:
         log.setLevel(logging.ERROR)
@@ -475,7 +477,9 @@ async def purge_selected_csv_tables(
                 async with conn_csv.transaction():
                     log.debug(f'Deleting table "{table}"')
                     await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
-                    await conn_csv.execute("DELETE FROM tables_index WHERE parsing_table = $1", table)
+                    await conn_csv.execute(
+                        "DELETE FROM tables_index WHERE parsing_table = $1", table
+                    )
                     await conn_main.execute(
                         "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
                     )
