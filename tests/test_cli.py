@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
-from asyncpg.exceptions import UndefinedTableError
 import nest_asyncio
 import pytest
+from asyncpg.exceptions import UndefinedTableError
 from minicli import run
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
@@ -202,7 +202,7 @@ async def test_purge_selected_csv_tables(setup_catalog, db, fake_check, _kwargs)
         check = await fake_check(
             resource=k,
             parsing_table=True,
-            resource_id=RESOURCE_ID[:-len(str(k))] + str(k),
+            resource_id=RESOURCE_ID[: -len(str(k))] + str(k),
         )
         md5 = check["parsing_table"]
         tables.append(md5)
@@ -217,7 +217,7 @@ async def test_purge_selected_csv_tables(setup_catalog, db, fake_check, _kwargs)
         # setting that each resource was created on a specific day from today
         await db.execute(
             f"UPDATE tables_index SET created_at = $1 WHERE parsing_table = '{md5}'",
-            datetime.now(timezone.utc) - timedelta(days=k-1)
+            datetime.now(timezone.utc) - timedelta(days=k - 1),
         )
     tb_idx = await db.fetch("SELECT * FROM tables_index")
     assert len(tb_idx) == nb
@@ -235,7 +235,7 @@ async def test_purge_selected_csv_tables(setup_catalog, db, fake_check, _kwargs)
         if idx + 1 <= expected_count:
             await db.fetch(f'SELECT * FROM "{table_name}"')
             check = await db.fetch(
-                f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID[:-len(str(idx + 1))] + str(idx + 1)}'"
+                f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID[: -len(str(idx + 1))] + str(idx + 1)}'"
             )
             assert len(check) == 1
             assert check[0]["parsing_table"] == table_name
@@ -243,7 +243,7 @@ async def test_purge_selected_csv_tables(setup_catalog, db, fake_check, _kwargs)
             with pytest.raises(UndefinedTableError):
                 await db.execute(f'SELECT * FROM "{table_name}"')
             check = await db.fetch(
-                f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID[:-len(str(idx + 1))] + str(idx + 1)}'"
+                f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID[: -len(str(idx + 1))] + str(idx + 1)}'"
             )
             assert len(check) == 1
             assert check[0]["parsing_table"] is None
