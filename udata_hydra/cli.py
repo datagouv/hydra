@@ -92,12 +92,7 @@ async def load_catalog(
             reader = csv.DictReader(fd, delimiter=";")
             rows = list(reader)
             for row in iter_with_progressbar_or_quiet(rows, quiet):
-                if (
-                    # Skip resources belonging to an archived dataset
-                    row.get("dataset.archived") != "False"
-                    # and resources that are APIs or code repos
-                    or row.get("type") in ["api", "code"]
-                ):
+                if row.get("dataset.archived") != "False":
                     continue
 
                 await conn.execute(
