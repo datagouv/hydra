@@ -148,7 +148,11 @@ async def setup_catalog_with_resource_exception(setup_catalog):
     ['__id', 'Nom', 'Prenom', 'Societe', 'Adresse', 'CP', 'Ville', 'Tel1', 'Tel2', 'email', 'Organisme', 'Org Cofrac', 'Type de certificat', 'N° de certificat', 'Date début validité', 'Date fin validité']
     """
     await Resource.insert(
-        dataset_id=DATASET_ID, resource_id=RESOURCE_EXCEPTION_ID, type="main", format="csv", url="http://example.com/"
+        dataset_id=DATASET_ID,
+        resource_id=RESOURCE_EXCEPTION_ID,
+        type="main",
+        format="csv",
+        url="http://example.com/",
     )
     await ResourceException.insert(
         resource_id=RESOURCE_EXCEPTION_ID,

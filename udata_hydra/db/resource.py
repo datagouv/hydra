@@ -59,7 +59,9 @@ class Resource:
                         status = $6,
                         priority = $7
                     RETURNING *;"""
-            await connection.fetchrow(q, dataset_id, resource_id, url, type, format, status, priority)
+            await connection.fetchrow(
+                q, dataset_id, resource_id, url, type, format, status, priority
+            )
 
     @classmethod
     async def update(cls, resource_id: str, data: dict) -> Record:
@@ -113,7 +115,9 @@ class Resource:
                             status = $6,
                             priority = $7
                         RETURNING *;"""
-            await connection.fetchrow(q, dataset_id, resource_id, url, type, format, status, priority)
+            await connection.fetchrow(
+                q, dataset_id, resource_id, url, type, format, status, priority
+            )
 
     @classmethod
     async def delete(
