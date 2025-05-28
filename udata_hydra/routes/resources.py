@@ -80,6 +80,8 @@ async def create_resource(request: web.Request) -> web.Response:
         dataset_id=dataset_id,
         resource_id=resource_id,
         url=document["url"],
+        type=document["type"],
+        format=document["format"],
         priority=True,
     )
 
@@ -106,7 +108,13 @@ async def update_resource(request: web.Request) -> web.Response:
     dataset_id: str = valid_payload["dataset_id"]
     resource_id: str = valid_payload["resource_id"]
 
-    await Resource.update_or_insert(dataset_id, resource_id, document["url"])
+    await Resource.update_or_insert(
+        dataset_id=dataset_id,
+        resource_id=resource_id,
+        url=document["url"],
+        type=document["type"],
+        format=document["format"],
+    )
 
     return web.json_response(ResourceDocumentSchema().dump(document), status=200)
 
