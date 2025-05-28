@@ -1,7 +1,7 @@
 import csv
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -360,23 +360,27 @@ async def purge_csv_tables(quiet: bool = False) -> None:
     ON checks.parsing_table = md5(c.url)
     WHERE checks.parsing_table IS NOT NULL AND (c.id IS NULL OR c.deleted = TRUE);
     """
-    conn = await connection()
-    res: list[Record] = await conn.fetch(q)
+    conn_main = await connection()
+    res: list[Record] = await conn_main.fetch(q)
     tables_to_delete: list[str] = [r["parsing_table"] for r in res]
 
     success_count = 0
     error_count = 0
 
+    conn_csv = await connection(db_name="csv")
     for table in tables_to_delete:
         try:
-            async with conn.transaction():
-                log.debug(f'Deleting table "{table}"')
-                await conn.execute(f'DROP TABLE IF EXISTS "{table}"')
-                await conn.execute("DELETE FROM tables_index WHERE parsing_table = $1", table)
-                await conn.execute(
-                    "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-                )
-                success_count += 1
+            async with conn_main.transaction():
+                async with conn_csv.transaction():
+                    log.debug(f'Deleting table "{table}"')
+                    await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
+                    await conn_main.execute(
+                        "DELETE FROM tables_index WHERE parsing_table = $1", table
+                    )
+                    await conn_main.execute(
+                        "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
+                    )
+                    success_count += 1
         except Exception as e:
             error_count += 1
             log.error(f'Failed to delete table "{table}": {str(e)}')
@@ -437,6 +441,60 @@ async def insert_resource_into_catalog(resource_id: str):
         log.info(f"Resource {resource_id} successfully {action}ed into DB.")
     except Exception as e:
         raise e
+
+
+@cli
+async def purge_selected_csv_tables(
+    nb_days_to_keep: int | None = None,
+    nb_tables_to_keep: int | None = None,
+    quiet: bool = False,
+) -> None:
+    """Delete converted CSV tables either:
+    - if they're more than nb_days_to_keep days old
+    - if they're not in the top nb_table_to_keep most recent
+    """
+    if quiet:
+        log.setLevel(logging.ERROR)
+
+    assert nb_days_to_keep is not None or nb_tables_to_keep is not None
+    conn_csv = await connection(db_name="csv")
+    if nb_days_to_keep is not None:
+        threshold = datetime.now(timezone.utc) - timedelta(days=int(nb_days_to_keep))
+        q = """SELECT parsing_table FROM tables_index WHERE created_at <= $1"""
+        res: list[Record] = await conn_csv.fetch(q, threshold)
+    elif nb_tables_to_keep is not None:
+        q = """SELECT parsing_table FROM tables_index ORDER BY created_at DESC OFFSET $1"""
+        res: list[Record] = await conn_csv.fetch(q, int(nb_tables_to_keep))
+
+    tables_to_delete: list[str] = [r["parsing_table"] for r in res]
+
+    success_count = 0
+    error_count = 0
+    conn_main = await connection()
+    for table in tables_to_delete:
+        try:
+            async with conn_main.transaction():
+                async with conn_csv.transaction():
+                    log.debug(f'Deleting table "{table}"')
+                    await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
+                    await conn_csv.execute(
+                        "DELETE FROM tables_index WHERE parsing_table = $1", table
+                    )
+                    await conn_main.execute(
+                        "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
+                    )
+                    success_count += 1
+        except Exception as e:
+            error_count += 1
+            log.error(f'Failed to delete table "{table}": {str(e)}')
+            continue
+
+    if success_count:
+        log.info(f"Successfully deleted {success_count} table(s).")
+    if error_count:
+        log.warning(f"Failed to delete {error_count} table(s). Check logs for details.")
+    if not (success_count or error_count):
+        log.info("Nothing to delete.")
 
 
 @wrap

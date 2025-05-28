@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import nest_asyncio
 import pytest
+from asyncpg.exceptions import UndefinedTableError
 from minicli import run
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
@@ -182,3 +183,67 @@ async def test_insert_resource_in_catalog(rmock):
     resource = await Resource.get(RESOURCE_ID)
     assert resource["dataset_id"] == new_dataset_id
     assert resource["url"] == new_resource_url
+
+
+@pytest.mark.parametrize(
+    "_kwargs",
+    (
+        # in both cases by construction the number of
+        # remaining tables should be the value of the kwarg
+        {"nb_days_to_keep": 6},
+        {"nb_tables_to_keep": 4},
+    ),
+)
+async def test_purge_selected_csv_tables(setup_catalog, db, fake_check, _kwargs):
+    # pretend we have a bunch of tables
+    nb = 10
+    tables = []
+    for k in range(1, nb + 1):
+        check = await fake_check(
+            resource=k,
+            parsing_table=True,
+            resource_id=RESOURCE_ID[: -len(str(k))] + str(k),
+        )
+        md5 = check["parsing_table"]
+        tables.append(md5)
+        await db.execute(f'CREATE TABLE "{md5}"(id serial)')
+        await db.execute(
+            "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)",
+            md5,
+            "{}",
+            check.get("resource_id"),
+            check.get("url"),
+        )
+        # setting that each resource was created on a specific day from today
+        await db.execute(
+            f"UPDATE tables_index SET created_at = $1 WHERE parsing_table = '{md5}'",
+            datetime.now(timezone.utc) - timedelta(days=k - 1),
+        )
+    tb_idx = await db.fetch("SELECT * FROM tables_index")
+    assert len(tb_idx) == nb
+    checks = await db.fetch("SELECT * FROM checks")
+    assert len(checks) == nb
+    assert all(check["parsing_table"] is not None for check in checks)
+
+    run("purge_selected_csv_tables", **_kwargs)
+    tb_idx = await db.fetch("SELECT * FROM tables_index")
+    expected_count = list(_kwargs.values())[0]
+    assert len(tb_idx) == expected_count
+    # by construction, the tables we keep are the X first ones we created
+    assert all(tb["parsing_table"] in tables[:expected_count] for tb in tb_idx)
+    for idx, table_name in enumerate(tables):
+        if idx + 1 <= expected_count:
+            await db.fetch(f'SELECT * FROM "{table_name}"')
+            check = await db.fetch(
+                f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID[: -len(str(idx + 1))] + str(idx + 1)}'"
+            )
+            assert len(check) == 1
+            assert check[0]["parsing_table"] == table_name
+        else:
+            with pytest.raises(UndefinedTableError):
+                await db.execute(f'SELECT * FROM "{table_name}"')
+            check = await db.fetch(
+                f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID[: -len(str(idx + 1))] + str(idx + 1)}'"
+            )
+            assert len(check) == 1
+            assert check[0]["parsing_table"] is None
