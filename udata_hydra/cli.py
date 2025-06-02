@@ -445,26 +445,26 @@ async def insert_resource_into_catalog(resource_id: str):
 
 @cli
 async def purge_selected_csv_tables(
-    nb_days_to_keep: int | None = None,
-    nb_tables_to_keep: int | None = None,
+    retention_days: int | None = None,
+    retention_tables: int | None = None,
     quiet: bool = False,
 ) -> None:
     """Delete converted CSV tables either:
-    - if they're more than nb_days_to_keep days old
-    - if they're not in the top nb_table_to_keep most recent
+    - if they're more than retention_days days old
+    - if they're not in the top retention_tables most recent
     """
     if quiet:
         log.setLevel(logging.ERROR)
 
-    assert nb_days_to_keep is not None or nb_tables_to_keep is not None
+    assert retention_days is not None or retention_tables is not None
     conn_csv = await connection(db_name="csv")
-    if nb_days_to_keep is not None:
-        threshold = datetime.now(timezone.utc) - timedelta(days=int(nb_days_to_keep))
+    if retention_days is not None:
+        threshold = datetime.now(timezone.utc) - timedelta(days=int(retention_days))
         q = """SELECT parsing_table FROM tables_index WHERE created_at <= $1"""
         res: list[Record] = await conn_csv.fetch(q, threshold)
-    elif nb_tables_to_keep is not None:
+    elif retention_tables is not None:
         q = """SELECT parsing_table FROM tables_index ORDER BY created_at DESC OFFSET $1"""
-        res: list[Record] = await conn_csv.fetch(q, int(nb_tables_to_keep))
+        res: list[Record] = await conn_csv.fetch(q, int(retention_tables))
 
     tables_to_delete: list[str] = [r["parsing_table"] for r in res]
 

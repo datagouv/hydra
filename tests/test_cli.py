@@ -190,8 +190,8 @@ async def test_insert_resource_in_catalog(rmock):
     (
         # in both cases by construction the number of
         # remaining tables should be the value of the kwarg
-        {"nb_days_to_keep": 6},
-        {"nb_tables_to_keep": 4},
+        {"retention_days": 6},
+        {"retention_tables": 4},
     ),
 )
 async def test_purge_selected_csv_tables(setup_catalog, db, fake_check, _kwargs):
