@@ -463,7 +463,7 @@ async def purge_selected_csv_tables(
         q = """SELECT DISTINCT parsing_table FROM tables_index WHERE created_at <= $1"""
         res: list[Record] = await conn_csv.fetch(q, threshold)
     elif retention_tables is not None:
-        q = """SELECT DISTINCT parsing_table FROM tables_index ORDER BY created_at DESC OFFSET $1"""
+        q = """SELECT DISTINCT ON (created_at) parsing_table FROM tables_index ORDER BY created_at DESC OFFSET $1"""
         res: list[Record] = await conn_csv.fetch(q, int(retention_tables))
 
     tables_to_delete: list[str] = [r["parsing_table"] for r in res]
