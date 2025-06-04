@@ -13,4 +13,5 @@ def enqueue(fn, *args, **kwargs):
         queue.enqueue(fn, a, b=b, _priority="low")
     """
     priority = kwargs.pop("_priority", "default")
-    return context.queue(priority).enqueue(fn, *args, **kwargs)
+    exception = kwargs.pop("_exception", False)
+    return context.queue(priority, exception).enqueue(fn, *args, **kwargs)
