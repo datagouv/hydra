@@ -101,6 +101,7 @@ async def patch_enqueue(mocker, event_loop):
 
     def _execute(fn, *args, **kwargs):
         kwargs.pop("_priority")
+        kwargs.pop("_exception", None)
         result = fn(*args, **kwargs)
         if asyncio.iscoroutine(result):
             loop = event_loop
