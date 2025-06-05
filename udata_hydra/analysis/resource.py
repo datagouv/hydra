@@ -140,6 +140,7 @@ async def analyse_resource(
                 check=check,
                 file_path=tmp_file.name,
                 _priority="high" if worker_priority == "high" else "default",
+                _exception=bool(exception),
             )
         elif is_geojson and tmp_file:
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_GEOJSON"})
@@ -148,6 +149,7 @@ async def analyse_resource(
                 check=check,
                 file_path=tmp_file.name,
                 _priority="high" if worker_priority == "high" else "default",
+                _exception=bool(exception),
             )
         else:
             await Resource.update(resource_id, data={"status": None})
