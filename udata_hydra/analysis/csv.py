@@ -10,7 +10,8 @@ from typing import Iterator
 
 import pandas as pd
 from asyncpg import Record
-from csv_detective import routine as csv_detective_routine, validate_then_detect
+from csv_detective import routine as csv_detective_routine
+from csv_detective import validate_then_detect
 from csv_detective.detection.engine import engine_to_file
 from progressist import ProgressBar
 from slugify import slugify
