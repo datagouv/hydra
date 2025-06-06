@@ -7,6 +7,7 @@
 - Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271) [#272](https://github.com/datagouv/hydra/pull/272)
 - Increase timeout for exception resources [#274](https://github.com/datagouv/hydra/pull/274)
 - Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271) [#272](https://github.com/datagouv/hydra/pull/272) [#273](https://github.com/datagouv/hydra/pull/273)
+- Update code for resources_exceptions table migration [#264](https://github.com/datagouv/hydra/pull/264)
 
 ## 2.2.0 (2025-05-16)
 
