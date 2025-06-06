@@ -8,17 +8,10 @@ from datetime import datetime, timezone
 from math import isnan
 from typing import Iterator
 
-<<<<<<< HEAD
-from asyncpg import Record
-from csv_detective.detection.engine import engine_to_file
-from csv_detective.explore_csv import routine as csv_detective_routine
-from csv_detective.explore_csv import validate_then_detect
-=======
->>>>>>> 3d65bc5 (fix: lint)
 import pandas as pd
 from asyncpg import Record
-from csv_detective import routine as csv_detective_routine
-from csv_detective.detection import engine_to_file
+from csv_detective import routine as csv_detective_routine, validate_then_detect
+from csv_detective.detection.engine import engine_to_file
 from progressist import ProgressBar
 from slugify import slugify
 from sqlalchemy import (
@@ -323,7 +316,7 @@ async def csv_to_parquet(
     # save the file as parquet and store it on Minio instance
     parquet_file, _ = save_as_parquet(
         df=df,
-        resource_id=resource_id,
+        output_filename=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
     parquet_url: str = minio_client.send_file(parquet_file)
