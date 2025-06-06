@@ -1,7 +1,7 @@
 import csv
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -15,6 +15,7 @@ from progressist import ProgressBar
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.analysis.geojson import analyse_geojson
+from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -91,26 +92,29 @@ async def load_catalog(
             reader = csv.DictReader(fd, delimiter=";")
             rows = list(reader)
             for row in iter_with_progressbar_or_quiet(rows, quiet):
-                # Skip resources belonging to an archived dataset
                 if row.get("dataset.archived") != "False":
                     continue
 
                 await conn.execute(
                     """
                     INSERT INTO catalog (
-                        dataset_id, resource_id, url, harvest_modified_at,
-                        deleted, priority, status
+                        dataset_id, resource_id, url, type, format,
+                        harvest_modified_at, deleted, priority, status
                     )
-                    VALUES ($1, $2, $3, $4, FALSE, FALSE, NULL)
+                    VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NULL)
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,
                         deleted = FALSE,
-                        harvest_modified_at = $4;
+                        type = $4,
+                        format = $5,
+                        harvest_modified_at = $6;
                 """,
                     row["dataset.id"],
                     row["id"],
                     row["url"],
+                    row["type"],
+                    row["format"],
                     # force timezone info to UTC (catalog data should be in UTC)
                     datetime.fromisoformat(row["harvest.modified_at"]).replace(tzinfo=timezone.utc)
                     if row["harvest.modified_at"]
@@ -157,6 +161,16 @@ async def check_resource(resource_id: str, method: str = "get", force_analysis: 
             force_analysis=force_analysis,
             worker_priority="high",
         )
+
+
+@cli(name="analyse-resource")
+async def analyse_resource_cli(resource_id: str):
+    """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
+    check: Record | None = await Check.get_by_resource_id(resource_id)
+    if not check:
+        log.error("Could not find a check linked to the specified resource ID")
+        return
+    await analyse_resource(check=check, last_check=None, force_analysis=True)
 
 
 @cli(name="analyse-csv")
@@ -349,23 +363,27 @@ async def purge_csv_tables(quiet: bool = False) -> None:
     ON checks.parsing_table = md5(c.url)
     WHERE checks.parsing_table IS NOT NULL AND (c.id IS NULL OR c.deleted = TRUE);
     """
-    conn = await connection()
-    res: list[Record] = await conn.fetch(q)
+    conn_main = await connection()
+    res: list[Record] = await conn_main.fetch(q)
     tables_to_delete: list[str] = [r["parsing_table"] for r in res]
 
     success_count = 0
     error_count = 0
 
+    conn_csv = await connection(db_name="csv")
     for table in tables_to_delete:
         try:
-            async with conn.transaction():
-                log.debug(f'Deleting table "{table}"')
-                await conn.execute(f'DROP TABLE IF EXISTS "{table}"')
-                await conn.execute("DELETE FROM tables_index WHERE parsing_table = $1", table)
-                await conn.execute(
-                    "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-                )
-                success_count += 1
+            async with conn_main.transaction():
+                async with conn_csv.transaction():
+                    log.debug(f'Deleting table "{table}"')
+                    await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
+                    await conn_main.execute(
+                        "DELETE FROM tables_index WHERE parsing_table = $1", table
+                    )
+                    await conn_main.execute(
+                        "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
+                    )
+                    success_count += 1
         except Exception as e:
             error_count += 1
             log.error(f'Failed to delete table "{table}": {str(e)}')
@@ -417,12 +435,69 @@ async def insert_resource_into_catalog(resource_id: str):
             datetime.fromisoformat(resource["resource"]["harvest"]["modified_at"]).replace(
                 tzinfo=timezone.utc
             )
-            if resource["resource"].get("harvest")
+            if (
+                resource["resource"].get("harvest") is not None
+                and resource["resource"]["harvest"].get("modified_at")
+            )
             else None,
         )
         log.info(f"Resource {resource_id} successfully {action}ed into DB.")
     except Exception as e:
         raise e
+
+
+@cli
+async def purge_selected_csv_tables(
+    retention_days: int | None = None,
+    retention_tables: int | None = None,
+    quiet: bool = False,
+) -> None:
+    """Delete converted CSV tables either:
+    - if they're more than retention_days days old
+    - if they're not in the top retention_tables most recent
+    """
+    if quiet:
+        log.setLevel(logging.ERROR)
+
+    assert retention_days is not None or retention_tables is not None
+    conn_csv = await connection(db_name="csv")
+    if retention_days is not None:
+        threshold = datetime.now(timezone.utc) - timedelta(days=int(retention_days))
+        q = """SELECT DISTINCT parsing_table FROM tables_index WHERE created_at <= $1"""
+        res: list[Record] = await conn_csv.fetch(q, threshold)
+    elif retention_tables is not None:
+        q = """SELECT DISTINCT ON (created_at) parsing_table FROM tables_index ORDER BY created_at DESC OFFSET $1"""
+        res: list[Record] = await conn_csv.fetch(q, int(retention_tables))
+
+    tables_to_delete: list[str] = [r["parsing_table"] for r in res]
+
+    success_count = 0
+    error_count = 0
+    conn_main = await connection()
+    for table in tables_to_delete:
+        try:
+            async with conn_main.transaction():
+                async with conn_csv.transaction():
+                    log.debug(f'Deleting table "{table}"')
+                    await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
+                    await conn_csv.execute(
+                        "DELETE FROM tables_index WHERE parsing_table = $1", table
+                    )
+                    await conn_main.execute(
+                        "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
+                    )
+                    success_count += 1
+        except Exception as e:
+            error_count += 1
+            log.error(f'Failed to delete table "{table}": {str(e)}')
+            continue
+
+    if success_count:
+        log.info(f"Successfully deleted {success_count} table(s).")
+    if error_count:
+        log.warning(f"Failed to delete {error_count} table(s). Check logs for details.")
+    if not (success_count or error_count):
+        log.info("Nothing to delete.")
 
 
 @wrap

@@ -2,15 +2,24 @@
 
 ## Current (in progress)
 
+- Fix some CLI functions to improve local debug [#269](https://github.com/datagouv/hydra/pull/269)
+- Upgrade csv-detective and use previous analysis to validate if available [#266](https://github.com/datagouv/hydra/pull/266)
+- Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271) [#272](https://github.com/datagouv/hydra/pull/272)
+- Increase timeout for exception resources [#274](https://github.com/datagouv/hydra/pull/274)
+- Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271) [#272](https://github.com/datagouv/hydra/pull/272) [#273](https://github.com/datagouv/hydra/pull/273)
+- Update code for resources_exceptions table migration [#264](https://github.com/datagouv/hydra/pull/264)
+
+## 2.2.0 (2025-05-16)
+
 - Better prioritizing [#255](https://github.com/datagouv/hydra/pull/255)
 - Reset same category udata extra fields on sending [#256](https://github.com/datagouv/hydra/pull/256)
 - Make sure detected_last_modified_at is set even if HAS_NOT_CHANGED [#257](https://github.com/datagouv/hydra/pull/257)
 - Fill in new check even if no update [#258](https://github.com/datagouv/hydra/pull/258)
 - Better change detections and add related tests [#259](https://github.com/datagouv/hydra/pull/259)
-- Enable GeoJSON to PMTiles conversion [#260](https://github.com/datagouv/hydra/pull/260)
+- Enable GeoJSON to PMTiles conversion [#260](https://github.com/datagouv/hydra/pull/260) [#267](https://github.com/datagouv/hydra/pull/267)
 - Parquet files are named after resource ids [#262](https://github.com/datagouv/hydra/pull/262)
 - Upgrade csv-detective [#263](https://github.com/datagouv/hydra/pull/263)
-- Update code for resources_exceptions table migration [#264](https://github.com/datagouv/hydra/pull/264)
+- Fix call to a sync function after demo crash test [#265](https://github.com/datagouv/hydra/pull/265)
 
 ## 2.1.2 (2025-03-19)
 

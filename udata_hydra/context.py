@@ -35,13 +35,17 @@ async def pool(db: str = "main") -> asyncpg.pool.Pool:
     return context["databases"][db]
 
 
-def queue(name: str = "default") -> Queue | None:
+def queue(name: str = "default", exception: bool = False) -> Queue | None:
     if not context["queues"].get(name):
         # we dont need a queue while testing, make sure we're not using a real Redis connection
         if config.TESTING:
             return None
         connection = redis.from_url(config.REDIS_URL)
         context["queues"][name] = Queue(
-            name, connection=connection, default_timeout=config.RQ_DEFAULT_TIMEOUT
+            name,
+            connection=connection,
+            default_timeout=(
+                config.RQ_DEFAULT_TIMEOUT * 5 if exception else config.RQ_DEFAULT_TIMEOUT
+            ),
         )
     return context["queues"][name]

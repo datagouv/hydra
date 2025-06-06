@@ -19,7 +19,7 @@ from udata_hydra.utils import (
     IOException,
     UdataPayload,
     compute_checksum_from_file,
-    detect_geojson_from_headers,
+    detect_geojson_from_headers_or_catalog,
     detect_tabular_from_headers,
     download_resource,
     queue,
@@ -73,7 +73,7 @@ async def analyse_resource(
 
     # could it be a CSV or a GeoJSON? If we get hints, we will analyse the file further depending on change status
     is_tabular, file_format = detect_tabular_from_headers(check)
-    is_geojson: bool = detect_geojson_from_headers(check)
+    is_geojson: bool = await detect_geojson_from_headers_or_catalog(check)
     if is_geojson:
         file_format = "geojson"
     max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
@@ -140,6 +140,7 @@ async def analyse_resource(
                 check=check,
                 file_path=tmp_file.name,
                 _priority="high" if worker_priority == "high" else "default",
+                _exception=bool(exception),
             )
         elif is_geojson and tmp_file:
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_GEOJSON"})
@@ -148,6 +149,7 @@ async def analyse_resource(
                 check=check,
                 file_path=tmp_file.name,
                 _priority="high" if worker_priority == "high" else "default",
+                _exception=bool(exception),
             )
         else:
             await Resource.update(resource_id, data={"status": None})
