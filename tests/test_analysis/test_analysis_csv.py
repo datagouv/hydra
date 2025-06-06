@@ -7,7 +7,8 @@ from unittest.mock import patch
 import pytest
 from aiohttp import ClientSession
 from asyncpg.exceptions import UndefinedTableError
-from csv_detective import routine as csv_detective_routine, validate_then_detect
+from csv_detective import routine as csv_detective_routine
+from csv_detective import validate_then_detect
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
