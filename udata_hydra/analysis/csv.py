@@ -275,8 +275,7 @@ def compute_create_table_query(
     # Add the index creation queries to the main query
     for index in table.indexes:
         log.debug(
-            f'Creating {indexes_labels[index.name]["type"]} '
-            f'on column "{indexes_labels[index.name]["column"]}"'
+            f'Creating {indexes_labels[index.name]["type"]} on column "{indexes_labels[index.name]["column"]}"'
         )
         query_idx = CreateIndex(index).compile(dialect=asyncpg.dialect())
         query: str = query + ";" + query_idx.string
