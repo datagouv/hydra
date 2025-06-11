@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Add a column in catalog that indicates when the status was last changed [#276](https://github.com/datagouv/hydra/pull/276)
 
 ## 2.2.1 (2025-06-11)
 

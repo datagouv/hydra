@@ -66,6 +66,8 @@ class Resource:
     @classmethod
     async def update(cls, resource_id: str, data: dict) -> Record:
         """Update a resource in DB with new data and return the updated resource in DB"""
+        if "status" in data:
+            data["status_since"] = datetime.now(timezone.utc)
         columns = data.keys()
         # $1, $2...
         placeholders = [f"${x + 1}" for x in range(len(data.values()))]
