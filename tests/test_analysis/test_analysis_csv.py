@@ -30,6 +30,7 @@ async def test_analyse_csv_on_catalog(
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource["status"] is None
+    assert resource["status_since"] is None
 
     # Analyse the CSV
     await analyse_csv(check=check)
@@ -37,6 +38,7 @@ async def test_analyse_csv_on_catalog(
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource["status"] is None
+    assert isinstance(resource["status_since"], datetime)
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table_name

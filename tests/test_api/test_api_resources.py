@@ -30,6 +30,7 @@ async def test_get_resource(setup_catalog, client):
     assert data["dataset_id"] == DATASET_ID
     assert data["resource_id"] == RESOURCE_ID
     assert data["status"] is None
+    assert data["status_since"] is None
 
 
 @pytest.mark.parametrize("resource_status,resource_status_verbose", list(Resource.STATUSES.items()))
