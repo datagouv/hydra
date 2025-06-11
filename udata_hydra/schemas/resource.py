@@ -24,4 +24,5 @@ class ResourceSchema(Schema):
     dataset_id = fields.Str(required=True)
     resource_id = fields.Str(required=True)
     status = fields.Str(required=False)
+    status_since = fields.DateTime(required=False)
     document = fields.Nested(ResourceDocumentSchema(), allow_none=True)
