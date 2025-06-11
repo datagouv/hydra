@@ -1,5 +1,9 @@
 # Changelog
 
+## Current (in progress)
+
+- Nothing yet
+
 ## 2.2.1 (2025-06-11)
 
 - ⚠️ resources_exceptions migration from main to csv db. Code is updated accordingly [#264](https://github.com/datagouv/hydra/pull/264)
