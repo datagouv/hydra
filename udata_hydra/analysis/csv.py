@@ -248,6 +248,7 @@ def compute_create_table_query(
     for col_name, col_type in columns.items():
         table.append_column(Column(col_name, PYTHON_TYPE_TO_PG.get(col_type, String)))
 
+    indexes_labels = {}
     if indexes:
         for col_name, index_type in indexes.items():
             if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
@@ -259,6 +260,7 @@ def compute_create_table_query(
             else:
                 if index_type == "index":
                     index_name = f"{table_name}_{slugify(col_name)}_idx"
+                    indexes_labels[index_name] = {"column": col_name, "type": index_type}
                     try:
                         table.append_constraint(Index(index_name, col_name))
                     except KeyError:
@@ -272,7 +274,9 @@ def compute_create_table_query(
 
     # Add the index creation queries to the main query
     for index in table.indexes:
-        log.debug(f'Creating {index_type} on column "{col_name}"')
+        log.debug(
+            f'Creating {indexes_labels[index.name]["type"]} on column "{indexes_labels[index.name]["column"]}"'
+        )
         query_idx = CreateIndex(index).compile(dialect=asyncpg.dialect())
         query: str = query + ";" + query_idx.string
 
