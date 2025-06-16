@@ -32,6 +32,7 @@ from sqlalchemy.schema import CreateIndex, CreateTable, Index
 
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
+from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -163,6 +164,18 @@ async def analyse_csv(
                 step="parquet_export", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
 
+        try:
+            geojson_args: tuple[str, int, str, int] | None = await csv_to_geojson_and_pmtiles(
+                df=df,
+                inspection=csv_inspection,
+                resource_id=resource_id,
+            )
+            timer.mark("csv-to-geojson-pmtiles")
+        except Exception as e:
+            raise ParseException(
+                step="geojson_export", resource_id=resource_id, url=url, check_id=check["id"]
+            ) from e
+
         check = await Check.update(
             check["id"],
             {
@@ -170,6 +183,10 @@ async def analyse_csv(
                 "parsing_finished_at": datetime.now(timezone.utc),
                 "parquet_url": parquet_args[0] if parquet_args else None,
                 "parquet_size": parquet_args[1] if parquet_args else None,
+                "geojson_url": geojson_args[0] if geojson_args else None,
+                "geojson_size": geojson_args[1] if geojson_args else None,
+                "pmtiles_url": geojson_args[2] if geojson_args else None,
+                "pmtiles_size": geojson_args[3] if geojson_args else None,
             },
         )
         await csv_to_db_index(table_name, csv_inspection, check)

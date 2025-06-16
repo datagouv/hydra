@@ -73,9 +73,9 @@ UDATA_URI = ""
 UDATA_URI_API_KEY = ""
 
 # -- Minio / datalake settings -- #
-MINIO_URL = "" # no scheme
-MINIO_USER = ""
-MINIO_PWD = ""
+MINIO_URL = "object.files.data.gouv.fr" # no scheme
+MINIO_USER = "dataeng"
+MINIO_PWD = "DMNRjwj6VpENYar$Y7"
 
 # -- Parquet conversion settings -- #
 CSV_TO_PARQUET = false
@@ -85,5 +85,10 @@ MINIO_PARQUET_FOLDER = "" # no trailing slash
 
 # -- PMTiles conversion settings -- #
 GEOJSON_TO_PMTILES = false
-MINIO_PMTILES_BUCKET = ""
-MINIO_PMTILES_FOLDER = "" # no trailing slash
+MINIO_PMTILES_BUCKET = "dataeng-open"
+MINIO_PMTILES_FOLDER = "hydra-pmtiles" # no trailing slash
+
+# -- Geojson conversion settings -- #
+CSV_TO_GEOJSON = true
+MINIO_GEOJSON_BUCKET = "dataeng-open"
+MINIO_GEOJSON_FOLDER = "hydra-geojson" # no trailing slash
