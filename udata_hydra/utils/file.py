@@ -42,12 +42,12 @@ async def download_resource(
     Returns the downloaded file object.
     Raises custom IOException if the resource is too large or if the URL is unreachable.
     """
+    if max_size_allowed is not None and float(headers.get("content-length", -1)) > max_size_allowed:
+        raise IOException("File too large to download", url=url)
+
     tmp_file = tempfile.NamedTemporaryFile(
         dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False
     )
-
-    if max_size_allowed is not None and float(headers.get("content-length", -1)) > max_size_allowed:
-        raise IOException("File too large to download", url=url)
 
     chunk_size = 1024
     i = 0
