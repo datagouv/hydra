@@ -1,6 +1,7 @@
 import gzip
 import hashlib
 import logging
+import os
 import tempfile
 from typing import IO
 
@@ -68,8 +69,10 @@ async def download_resource(
     finally:
         tmp_file.close()
         if too_large:
+            os.remove(tmp_file.name)
             raise IOException("File too large to download", url=url)
         if download_error:
+            os.remove(tmp_file.name)
             raise IOException("Error downloading CSV", url=url) from download_error
         if magic.from_file(tmp_file.name, mime=True) in [
             "application/x-gzip",
