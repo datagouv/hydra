@@ -285,10 +285,7 @@ def generate_records(df: pd.DataFrame) -> Iterator[list]:
     for row in df.values:
         yield tuple(
             cell
-            if not (
-                isinstance(cell, pd._libs.missing.NAType)
-                or (isinstance(cell, float) and isnan(cell))
-            )
+            if not pd.isna(cell)
             else None
             for cell in row
         )
