@@ -233,6 +233,7 @@ async def fake_check():
         parquet_url=False,
         domain="example.com",
         pmtiles_url=False,
+        geojson_url=False,
     ) -> dict:
         url = f"https://example.com/resource-{resource}"
         data = {
@@ -257,6 +258,8 @@ async def fake_check():
             "parquet_size": 2048 if parquet_url else None,
             "pmtiles_url": "https://example.org/file.pmtiles" if pmtiles_url else None,
             "pmtiles_size": 1024 if pmtiles_url else None,
+            "geojson_url": "https://example.org/file.geojson" if pmtiles_url else None,
+            "geojson_size": 1024 if geojson_url else None,
         }
         check: dict = await Check.insert(data=data, returning="*")
         data["id"] = check["id"]
