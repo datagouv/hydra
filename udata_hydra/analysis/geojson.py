@@ -140,11 +140,17 @@ async def csv_to_geojson_and_pmtiles(
     resource_id: str | None = None,
 ) -> tuple[str, int, str, int] | None:
 
-    def cast_latlon(latlon: str):
+    def cast_latlon(latlon: str) -> list[float, float]:
         # we can safely do this as the detection was successful
         lat, lon = latlon.replace(" ", "").split(",")
         # using the geojson standard: longitude before latitude
         return [float(lon), float(lat)]
+
+    def prevent_nan(value):
+        # convenience to prevent downstream crash (NaN in json or PMtiles)
+        if pd.isna(value):
+            return None
+        return value
 
     if not config.CSV_TO_GEOJSON:
         log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
@@ -191,13 +197,17 @@ async def csv_to_geojson_and_pmtiles(
                     "type": "Feature",
                     "geometry": row[geo["geometry"]],
                     "properties": {
-                        col: row[col]
+                        col: prevent_nan(row[col])
                         for col in df.columns
                         if col != geo["geometry"]
                     }
                 }
             )
         elif "latlon" in geo:
+            # ending up here means we either have the exact lat,lon format, or NaN
+            # skipping row if NaN
+            if pd.isna(row[geo["latlon"]]):
+                continue
             template["features"].append(
                 {
                     "type": "Feature",
@@ -206,13 +216,15 @@ async def csv_to_geojson_and_pmtiles(
                         "coordinates": cast_latlon(row[geo["latlon"]]),
                     },
                     "properties": {
-                        col: row[col]
+                        col: prevent_nan(row[col])
                         for col in df.columns
                         if col != geo["latlon"]
                     }
                 }
             )
         else:
+            if any(pd.isna(coord) for coord in (row[geo["lon"]], row[geo["lat"]])):
+                continue
             template["features"].append(
                 {
                     "type": "Feature",
@@ -222,7 +234,7 @@ async def csv_to_geojson_and_pmtiles(
                         "coordinates": [row[geo["lon"]], row[geo["lat"]]],
                     },
                     "properties": {
-                        col: row[col]
+                        col: prevent_nan(row[col])
                         for col in df.columns
                         if col not in [geo["lon"], geo["lat"]]
                     }
@@ -233,7 +245,7 @@ async def csv_to_geojson_and_pmtiles(
         json.dump(template, f, indent=4, ensure_ascii=False)
     geojson_size = os.path.getsize(geojson_file)
 
-    pmtiles_url, pmtiles_size = geojson_to_pmtiles(geojson_file, resource_id)
+    pmtiles_url, pmtiles_size = await geojson_to_pmtiles(geojson_file, resource_id)
 
     geojson_url: str = minio_client_geojson.send_file(geojson_file)
 
