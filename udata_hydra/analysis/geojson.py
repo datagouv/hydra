@@ -1,5 +1,5 @@
-import logging
 import json
+import logging
 import os
 from datetime import datetime, timezone
 
@@ -21,8 +21,12 @@ from udata_hydra.utils import (
 from udata_hydra.utils.minio import MinIOClient
 
 log = logging.getLogger("udata-hydra")
-minio_client_pmtiles = MinIOClient(bucket=config.MINIO_PMTILES_BUCKET, folder=config.MINIO_PMTILES_FOLDER)
-minio_client_geojson = MinIOClient(bucket=config.MINIO_GEOJSON_BUCKET, folder=config.MINIO_GEOJSON_FOLDER)
+minio_client_pmtiles = MinIOClient(
+    bucket=config.MINIO_PMTILES_BUCKET, folder=config.MINIO_PMTILES_FOLDER
+)
+minio_client_geojson = MinIOClient(
+    bucket=config.MINIO_GEOJSON_BUCKET, folder=config.MINIO_GEOJSON_FOLDER
+)
 
 
 async def analyse_geojson(
@@ -139,7 +143,6 @@ async def csv_to_geojson_and_pmtiles(
     inspection: dict,
     resource_id: str | None = None,
 ) -> tuple[str, int, str, int] | None:
-
     def cast_latlon(latlon: str) -> list[float, float]:
         # we can safely do this as the detection was successful
         lat, lon = latlon.replace(" ", "").split(",")
@@ -179,10 +182,7 @@ async def csv_to_geojson_and_pmtiles(
         geo = {"geometry": geo["geometry"]}
     if "latlon" in geo:
         geo = {"latlon": geo["latlon"]}
-    if not geo or (
-        ("lat" in geo and "lon" not in geo)
-        or ("lon" in geo and "lat" not in geo)
-    ):
+    if not geo or (("lat" in geo and "lon" not in geo) or ("lon" in geo and "lat" not in geo)):
         log.debug("No geographical columns found, skipping")
         return None
 
@@ -197,10 +197,8 @@ async def csv_to_geojson_and_pmtiles(
                     "type": "Feature",
                     "geometry": row[geo["geometry"]],
                     "properties": {
-                        col: prevent_nan(row[col])
-                        for col in df.columns
-                        if col != geo["geometry"]
-                    }
+                        col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
+                    },
                 }
             )
         elif "latlon" in geo:
@@ -216,10 +214,8 @@ async def csv_to_geojson_and_pmtiles(
                         "coordinates": cast_latlon(row[geo["latlon"]]),
                     },
                     "properties": {
-                        col: prevent_nan(row[col])
-                        for col in df.columns
-                        if col != geo["latlon"]
-                    }
+                        col: prevent_nan(row[col]) for col in df.columns if col != geo["latlon"]
+                    },
                 }
             )
         else:
@@ -237,7 +233,7 @@ async def csv_to_geojson_and_pmtiles(
                         col: prevent_nan(row[col])
                         for col in df.columns
                         if col not in [geo["lon"], geo["lat"]]
-                    }
+                    },
                 }
             )
     geojson_file = f"{resource_id}.geojson"
