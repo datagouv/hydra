@@ -167,7 +167,7 @@ async def csv_to_geojson_and_pmtiles(
     for column, detection in inspection["columns"].items():
         # see csv-detective's geo formats:
         # https://github.com/datagouv/csv-detective/tree/master/csv_detective/detect_fields/geo
-        if detection["format"] == "geojson":
+        if "geojson" in detection["format"]:
             geo["geometry"] = column
             break
         if "latlon" in detection["format"]:
@@ -195,7 +195,8 @@ async def csv_to_geojson_and_pmtiles(
             template["features"].append(
                 {
                     "type": "Feature",
-                    "geometry": row[geo["geometry"]],
+                    # json is not pre-cast by csv-detective
+                    "geometry": json.loads(row[geo["geometry"]]),
                     "properties": {
                         col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
                     },
@@ -219,6 +220,7 @@ async def csv_to_geojson_and_pmtiles(
                 }
             )
         else:
+            # skipping row if lat or lon is NaN
             if any(pd.isna(coord) for coord in (row[geo["lon"]], row[geo["lat"]])):
                 continue
             template["features"].append(
