@@ -5,7 +5,6 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from math import isnan
 from typing import Iterator
 
 import pandas as pd
