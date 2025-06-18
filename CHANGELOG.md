@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Delete tmp files if error in download [#277](https://github.com/datagouv/hydra/pull/277)
 
 ## 2.2.1 (2025-06-11)
 
@@ -10,9 +10,8 @@
    - Migration should be made manually. See migrations instructions in the migrations files.
 - Fix some CLI functions to improve local debug [#269](https://github.com/datagouv/hydra/pull/269)
 - Upgrade csv-detective and use previous analysis to validate if available [#266](https://github.com/datagouv/hydra/pull/266)
-- Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271) [#272](https://github.com/datagouv/hydra/pull/272)
-- Increase timeout for exception resources [#274](https://github.com/datagouv/hydra/pull/274)
 - Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271) [#272](https://github.com/datagouv/hydra/pull/272) [#273](https://github.com/datagouv/hydra/pull/273)
+- Increase timeout for exception resources [#274](https://github.com/datagouv/hydra/pull/274)
 - Fix logs when creating indexes [#275](https://github.com/datagouv/hydra/pull/275)
 
 ## 2.2.0 (2025-05-16)
