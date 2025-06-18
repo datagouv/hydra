@@ -66,8 +66,8 @@ jobs:
           # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
             ./poetry-binary run ruff --version
-            ./poetry-binary run ruff check --select I . -v
-            ./poetry-binary run ruff format --check . -v
+            ./poetry-binary run ruff check --select I .
+            ./poetry-binary run ruff format --check .
 
   tests:
     docker:
