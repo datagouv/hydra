@@ -562,7 +562,7 @@ async def test_validation(
         ),
         # a column contains a coordinates
         (
-            {"coords": [f"{10 * k * (-1)**k},{20 * k * (-1)**k}" for k in range(1, 6)]},
+            {"coords": [f"{10 * k * (-1) ** k},{20 * k * (-1) ** k}" for k in range(1, 6)]},
             {"coords": "latlon_wgs"},
             True,
         ),
