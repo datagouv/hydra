@@ -65,8 +65,9 @@ jobs:
           # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
           # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
-            ./poetry-binary run ruff check --select I .
-            ./poetry-binary run ruff format --check .
+            ./poetry-binary run ruff --version
+            ./poetry-binary run ruff check --select I . -v
+            ./poetry-binary run ruff format --check . -v
 
   tests:
     docker:
