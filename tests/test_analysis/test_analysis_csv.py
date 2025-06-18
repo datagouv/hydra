@@ -582,6 +582,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
         "nombre": range(1, 6),
         "score": [0.01, 1.2, 34.5, 678.9, 10],
         "est_colonne": ["oui", "non", "non", "oui", "non"],
+        "naissance": ["1996-02-13", "1995-02-06", "2000-01-28", "1998-02-20", "2015-04-23"],
     }
     geo_columns, expected_formats, patched_config = params
     sep = ";"
