@@ -240,7 +240,7 @@ async def csv_to_geojson_and_pmtiles(
             )
     geojson_file = f"{resource_id}.geojson"
     with open(geojson_file, "w") as f:
-        json.dump(template, f, indent=4, ensure_ascii=False)
+        json.dump(template, f, indent=4, ensure_ascii=False, default=str)
     geojson_size = os.path.getsize(geojson_file)
 
     pmtiles_url, pmtiles_size = await geojson_to_pmtiles(geojson_file, resource_id)
