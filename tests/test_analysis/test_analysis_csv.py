@@ -1,19 +1,23 @@
 import hashlib
 import json
+import os
 from datetime import date, datetime
 from tempfile import NamedTemporaryFile
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from aiohttp import ClientSession
 from asyncpg.exceptions import UndefinedTableError
-from csv_detective.explore_csv import validate_then_detect
+from csv_detective import routine as csv_detective_routine
+from csv_detective import validate_then_detect
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
+from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.resource import Resource
+from udata_hydra.utils.minio import MinIOClient
 
 pytestmark = pytest.mark.asyncio
 
@@ -92,33 +96,26 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     "line_expected",
     (
         # (int, float, string, bool), (__id, int, float, string, bool)
-        ("1,1 020.20,test,true", (1, 1, 1020.2, "test", True), ","),
-        ('2,"1 020,20",test,false', (1, 2, 1020.2, "test", False), ","),
-        ("1;1 020.20;test;true", (1, 1, 1020.2, "test", True), ";"),
-        ("2;1 020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
-        ("2.0;1 020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
+        ("1,1020.20,test,true", (1, 1, 1020.2, "test", True), ","),
+        ('2,"1020,20",test,false', (1, 2, 1020.2, "test", False), ","),
+        ("1;1020.20;test;true", (1, 1, 1020.2, "test", True), ";"),
+        ("2;1020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
+        ("2.0;1020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
     ),
 )
 async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
     line, expected, separator = line_expected
+    header = separator.join(["int", "float", "string", "bool"])
     with NamedTemporaryFile() as fp:
-        fp.write(f"int, float, string, bool\n\r{line}".encode("utf-8"))
+        fp.write(f"{header}\n{line}".encode("utf-8"))
         fp.seek(0)
-        columns = {
-            "int": {"python_type": "int"},
-            "float": {"python_type": "float"},
-            "string": {"python_type": "string"},
-            "bool": {"python_type": "bool"},
-        }
-        inspection = {
-            "separator": separator,
-            "encoding": "utf-8",
-            "header_row_idx": 0,
-            "total_lines": 1,
-            "header": list(columns.keys()),
-            "columns": columns,
-        }
-        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            output_df=True,
+            num_rows=-1,
+            save_results=False,
+        )
+        await csv_to_db(df=df, inspection=inspection, table_name="test_table")
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
     cols = ["__id", "int", "float", "string", "bool"]
@@ -147,23 +144,17 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
 async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     line, expected = line_expected
     with NamedTemporaryFile() as fp:
-        fp.write(f"json, date, datetime\n\r{line}".encode("utf-8"))
+        fp.write(f"json;date;datetime\n{line}".encode("utf-8"))
         fp.seek(0)
-        columns = {
-            "json": {"python_type": "json"},
-            "date": {"python_type": "date"},
-            "datetime": {"python_type": "datetime"},
-        }
-        inspection = {
-            "separator": ";",
-            "encoding": "utf-8",
-            "header_row_idx": 0,
-            "total_lines": 1,
-            "header": list(columns.keys()),
-            "columns": columns,
-        }
-        # Insert the data
-        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            encoding="utf-8",
+            output_df=True,
+            cast_json=False,
+            num_rows=-1,
+            save_results=False,
+        )
+        await csv_to_db(df=df, inspection=inspection, table_name="test_table", debug_insert=True)
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
     cols = ["__id", "json", "date", "datetime"]
@@ -175,66 +166,46 @@ async def test_basic_sql_injection(db, clean_db):
     # CREATE TABLE table_name("int" integer, "col_name" text);DROP TABLE toto;--)
     injection = 'col_name" text);DROP TABLE toto;--'
     with NamedTemporaryFile() as fp:
-        fp.write(f"int, {injection}\n\r1,test".encode("utf-8"))
+        fp.write(f"int,{injection}\n1,test".encode("utf-8"))
         fp.seek(0)
-        columns = {
-            "int": {"python_type": "int"},
-            injection: {"python_type": "string"},
-        }
-        inspection = {
-            "separator": ",",
-            "encoding": "utf-8",
-            "header_row_idx": 0,
-            "total_lines": 1,
-            "header": list(columns.keys()),
-            "columns": columns,
-        }
-        # Insert the data
-        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            sep=",",
+            output_df=True,
+            num_rows=-1,
+            save_results=False,
+        )
+        await csv_to_db(df=df, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res[injection] == "test"
 
 
 async def test_percentage_column(db, clean_db):
     with NamedTemporaryFile() as fp:
-        fp.write("int, % mon pourcent\n\r1,test".encode("utf-8"))
+        fp.write("int,% mon pourcent\n1,test".encode("utf-8"))
         fp.seek(0)
-        columns = {
-            "int": {"python_type": "int"},
-            "% mon pourcent": {"python_type": "string"},
-        }
-        inspection = {
-            "separator": ",",
-            "encoding": "utf-8",
-            "header_row_idx": 0,
-            "total_lines": 1,
-            "header": list(columns.keys()),
-            "columns": columns,
-        }
-        # Insert the data
-        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            output_df=True,
+            num_rows=-1,
+            save_results=False,
+        )
+        await csv_to_db(df=df, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["% mon pourcent"] == "test"
 
 
 async def test_reserved_column_name(db, clean_db):
     with NamedTemporaryFile() as fp:
-        fp.write("int, xmin\n\r1,test".encode("utf-8"))
+        fp.write("int,xmin\n1,test".encode("utf-8"))
         fp.seek(0)
-        columns = {
-            "int": {"python_type": "int"},
-            "xmin": {"python_type": "string"},
-        }
-        inspection = {
-            "separator": ",",
-            "encoding": "utf-8",
-            "header_row_idx": 0,
-            "total_lines": 1,
-            "header": list(columns.keys()),
-            "columns": columns,
-        }
-        # Insert the data
-        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            output_df=True,
+            num_rows=-1,
+            save_results=False,
+        )
+        await csv_to_db(df=df, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["xmin__hydra_renamed"] == "test"
 
@@ -554,3 +525,140 @@ async def test_validation(
             assert latest_analysis[key] is not None
     # in all cases, profile should have been recreated
     assert latest_analysis["profile"] is not None
+
+
+@pytest.mark.parametrize(
+    "params",
+    (
+        # csv to geojson is disabled
+        ({}, None, False),
+        # no geographical data in the file
+        ({"data": ["rouge", "vert", "bleu", "jaune", "blanc"]}, None, True),
+        # a column contains geometry
+        (
+            {
+                "polyg": [
+                    json.dumps(
+                        {"type": "Point", "coordinates": [10 * k * (-1) ** k, 20 * k * (-1) ** k]}
+                    )
+                    for k in range(1, 6)
+                ]
+            },
+            {"polyg": "geojson"},
+            True,
+        ),
+        # a column contains a coordinates
+        (
+            {"coords": [f"{10 * k * (-1) ** k},{20 * k * (-1) ** k}" for k in range(1, 6)]},
+            {"coords": "latlon_wgs"},
+            True,
+        ),
+        # the table has latitude and longitude in separate columns
+        (
+            {
+                "lat": [10 * k * (-1) ** k for k in range(1, 6)],
+                "long": [20 * k * (-1) ** k for k in range(1, 6)],
+            },
+            {"lat": "latitude_wgs", "long": "longitude_wgs"},
+            True,
+        ),
+    ),
+)
+async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
+    other_columns = {
+        "nombre": range(1, 6),
+        "score": [0.01, 1.2, 34.5, 678.9, 10],
+        "est_colonne": ["oui", "non", "non", "oui", "non"],
+        "naissance": ["1996-02-13", "1995-02-06", "2000-01-28", "1998-02-20", "2015-04-23"],
+    }
+    geo_columns, expected_formats, patched_config = params
+    sep = ";"
+    columns = other_columns | geo_columns
+    file = sep.join(columns) + "\n"
+    for _ in range(5):
+        file += sep.join(str(val) for val in [data[_] for data in columns.values()]) + "\n"
+
+    with NamedTemporaryFile() as fp:
+        fp.write(file.encode("utf-8"))
+        fp.seek(0)
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            output_profile=True,
+            output_df=True,
+            cast_json=False,
+            num_rows=-1,
+            save_results=False,
+        )
+
+    if expected_formats:
+        for col in expected_formats:
+            assert expected_formats[col] in inspection["columns"][col]["format"]
+
+    with patch("udata_hydra.config.CSV_TO_GEOJSON", patched_config):
+        if not patched_config or expected_formats is None:
+            # process is or early exit because no geo data
+            with patch("udata_hydra.analysis.geojson.geojson_to_pmtiles") as mock_func:
+                res = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID)
+                assert res is None
+                mock_func.assert_not_called()
+        else:
+            minio_url = "my.minio.fr"
+            geojson_bucket = "geojson_bucket"
+            geojson_folder = "geojson_folder"
+            pmtiles_bucket = "pmtiles_bucket"
+            pmtiles_folder = "pmtiles_folder"
+            mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
+            mocked_minio = MagicMock()
+            mocked_minio.fput_object.return_value = None
+            mocked_minio.bucket_exists.return_value = True
+            with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
+                mocked_minio_client_geojson = MinIOClient(
+                    bucket=geojson_bucket, folder=geojson_folder
+                )
+                mocked_minio_client_pmtiles = MinIOClient(
+                    bucket=pmtiles_bucket, folder=pmtiles_folder
+                )
+            with (
+                patch(
+                    "udata_hydra.analysis.geojson.minio_client_geojson",
+                    new=mocked_minio_client_geojson,
+                ),
+                patch(
+                    "udata_hydra.analysis.geojson.minio_client_pmtiles",
+                    new=mocked_minio_client_pmtiles,
+                ),
+            ):
+                mock_os = mocker.patch("udata_hydra.utils.minio.os")
+                mock_os.path = os.path
+                mock_os.remove.return_value = None
+                (
+                    geojson_url,
+                    geojson_size,
+                    pmtiles_url,
+                    pmtiles_size,
+                ) = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID)
+            # checking geojson
+            with open(f"{RESOURCE_ID}.geojson", "r") as f:
+                geojson = json.load(f)
+            assert all(key in geojson for key in ("type", "features"))
+            assert len(geojson["features"]) == 5
+            for feat in geojson["features"]:
+                assert feat["type"] == "Feature"
+                assert isinstance(feat["geometry"], dict)
+                assert all(col in feat["properties"] for col in other_columns)
+            assert (
+                geojson_url
+                == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
+            )
+            assert isinstance(geojson_size, int)
+            os.remove(f"{RESOURCE_ID}.geojson")
+            # checking PMTiles
+            with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
+                header = f.read(7)
+            assert header == b"PMTiles"
+            assert (
+                pmtiles_url
+                == f"https://{minio_url}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
+            )
+            assert isinstance(pmtiles_size, int)
+            os.remove(f"{RESOURCE_ID}.pmtiles")

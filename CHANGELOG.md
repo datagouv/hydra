@@ -13,6 +13,8 @@
 - Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271) [#272](https://github.com/datagouv/hydra/pull/272) [#273](https://github.com/datagouv/hydra/pull/273)
 - Increase timeout for exception resources [#274](https://github.com/datagouv/hydra/pull/274)
 - Fix logs when creating indexes [#275](https://github.com/datagouv/hydra/pull/275)
+- Use dataframe from csv-detective instead of re-reading the file [#236](https://github.com/datagouv/hydra/pull/236)
+- Enable csv to GeoJSON and PMTiles converion if relevant (migration needed) [#278](https://github.com/datagouv/hydra/pull/278)
 
 ## 2.2.0 (2025-05-16)
 

@@ -42,7 +42,7 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
     mocked_minio.bucket_exists.return_value = True
     with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
         mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
-    with patch("udata_hydra.analysis.geojson.minio_client", new=mocked_minio_client):
+    with patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client):
         mock_os = mocker.patch("udata_hydra.utils.minio.os")
         mock_os.path = os.path
         mock_os.remove.return_value = None
