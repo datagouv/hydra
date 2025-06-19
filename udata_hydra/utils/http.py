@@ -27,6 +27,7 @@ class UdataPayload:
             "error",
             "started_at",
             "finished_at",
+            "parsing_table",
             "parquet_size",
             "parquet_url",
             "pmtiles_size",
