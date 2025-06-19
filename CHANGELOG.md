@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Delete tmp files if error in download [#277](https://github.com/datagouv/hydra/pull/277)
+- Add parsing_table in extra analysis payload [#279](https://github.com/datagouv/hydra/pull/279)
 
 ## 2.2.1 (2025-06-11)
 
