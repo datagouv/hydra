@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Delete tmp files if error in download [#277](https://github.com/datagouv/hydra/pull/277)
+- Use pre-cast dataframe from csv-detective instead of re-reading the file [#236](https://github.com/datagouv/hydra/pull/236)
 
 ## 2.2.1 (2025-06-11)
 
