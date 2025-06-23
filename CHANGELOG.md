@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Delete tmp files if error in download [#277](https://github.com/datagouv/hydra/pull/277)
+- Use pre-cast dataframe from csv-detective instead of re-reading the file [#236](https://github.com/datagouv/hydra/pull/236)
 
 ## 2.2.1 (2025-06-11)
 
@@ -13,7 +14,6 @@
 - Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271) [#272](https://github.com/datagouv/hydra/pull/272) [#273](https://github.com/datagouv/hydra/pull/273)
 - Increase timeout for exception resources [#274](https://github.com/datagouv/hydra/pull/274)
 - Fix logs when creating indexes [#275](https://github.com/datagouv/hydra/pull/275)
-- Use dataframe from csv-detective instead of re-reading the file [#236](https://github.com/datagouv/hydra/pull/236)
 
 ## 2.2.0 (2025-05-16)
 
