@@ -377,7 +377,7 @@ async def test_forced_analysis(
         assert webhook.get("analysis:parsing:parsing_table")
         assert webhook.get("analysis:parsing:error") is None
         for k in ["parquet_size", "parquet_url"]:
-            assert webhook.get("analysis:parsing:error", False) is None
+            assert webhook.get(f"analysis:parsing:{k}", False) is None
     else:
         assert ("PUT", URL(udata_url)) not in rmock.requests.keys()
 
