@@ -306,9 +306,10 @@ async def test_analyse_csv_send_udata_webhook(
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("analysis:parsing:started_at")
     assert webhook.get("analysis:parsing:finished_at")
+    assert webhook.get("analysis:parsing:parsing_table")
     assert webhook.get("analysis:parsing:error") is None
     for k in ["parquet_size", "parquet_url"]:
-        assert webhook.get("analysis:parsing:error", False) is None
+        assert webhook.get(f"analysis:parsing:{k}", False) is None
 
 
 @pytest.mark.parametrize(
@@ -373,9 +374,10 @@ async def test_forced_analysis(
         webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
         assert webhook.get("analysis:parsing:started_at")
         assert webhook.get("analysis:parsing:finished_at")
+        assert webhook.get("analysis:parsing:parsing_table")
         assert webhook.get("analysis:parsing:error") is None
         for k in ["parquet_size", "parquet_url"]:
-            assert webhook.get("analysis:parsing:error", False) is None
+            assert webhook.get(f"analysis:parsing:{k}", False) is None
     else:
         assert ("PUT", URL(udata_url)) not in rmock.requests.keys()
 
