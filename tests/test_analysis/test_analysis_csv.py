@@ -105,10 +105,10 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
         fp.write(f"int, float, string, bool\n\r{line}".encode("utf-8"))
         fp.seek(0)
         columns = {
-            "int": {"python_type": "int"},
-            "float": {"python_type": "float"},
-            "string": {"python_type": "string"},
-            "bool": {"python_type": "bool"},
+            "int": {"python_type": "int", "format": "int"},
+            "float": {"python_type": "float", "format": "float"},
+            "string": {"python_type": "string", "format": "string"},
+            "bool": {"python_type": "bool", "format": "bool"},
         }
         inspection = {
             "separator": separator,
@@ -150,9 +150,9 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
         fp.write(f"json, date, datetime\n\r{line}".encode("utf-8"))
         fp.seek(0)
         columns = {
-            "json": {"python_type": "json"},
-            "date": {"python_type": "date"},
-            "datetime": {"python_type": "datetime"},
+            "json": {"python_type": "json", "format": "json"},
+            "date": {"python_type": "date", "format": "date"},
+            "datetime": {"python_type": "datetime", "format": "datetime"},
         }
         inspection = {
             "separator": ";",
@@ -178,8 +178,8 @@ async def test_basic_sql_injection(db, clean_db):
         fp.write(f"int, {injection}\n\r1,test".encode("utf-8"))
         fp.seek(0)
         columns = {
-            "int": {"python_type": "int"},
-            injection: {"python_type": "string"},
+            "int": {"python_type": "int", "format": "int"},
+            injection: {"python_type": "string", "format": "string"},
         }
         inspection = {
             "separator": ",",
@@ -200,8 +200,8 @@ async def test_percentage_column(db, clean_db):
         fp.write("int, % mon pourcent\n\r1,test".encode("utf-8"))
         fp.seek(0)
         columns = {
-            "int": {"python_type": "int"},
-            "% mon pourcent": {"python_type": "string"},
+            "int": {"python_type": "int", "format": "int"},
+            "% mon pourcent": {"python_type": "string", "format": "string"},
         }
         inspection = {
             "separator": ",",
@@ -222,8 +222,8 @@ async def test_reserved_column_name(db, clean_db):
         fp.write("int, xmin\n\r1,test".encode("utf-8"))
         fp.seek(0)
         columns = {
-            "int": {"python_type": "int"},
-            "xmin": {"python_type": "string"},
+            "int": {"python_type": "int", "format": "int"},
+            "xmin": {"python_type": "string", "format": "string"},
         }
         inspection = {
             "separator": ",",
