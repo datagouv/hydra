@@ -68,6 +68,7 @@ PYTHON_TYPE_TO_PG = {
     "json": JSON,
     "date": Date,
     "datetime": DateTime,
+    "datetime_aware": DateTime(timezone=True),
 }
 
 PYTHON_TYPE_TO_PY = {
@@ -78,6 +79,7 @@ PYTHON_TYPE_TO_PY = {
     "json": helpers.to_json,
     "date": helpers.to_date,
     "datetime": helpers.to_datetime,
+    "datetime_aware": helpers.to_datetime,
 }
 
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
@@ -376,7 +378,7 @@ async def csv_to_db(
 
     # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {
-        f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
+        f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: helpers.get_python_type(v)
         for c, v in inspection["columns"].items()
     }
 
