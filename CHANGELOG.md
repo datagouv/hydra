@@ -14,6 +14,7 @@
 - Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271) [#272](https://github.com/datagouv/hydra/pull/272) [#273](https://github.com/datagouv/hydra/pull/273)
 - Increase timeout for exception resources [#274](https://github.com/datagouv/hydra/pull/274)
 - Fix logs when creating indexes [#275](https://github.com/datagouv/hydra/pull/275)
+- Fix datetime insertion in db [#280](https://github.com/datagouv/hydra/pull/280)
 
 ## 2.2.0 (2025-05-16)
 
