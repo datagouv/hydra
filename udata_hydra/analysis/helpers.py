@@ -16,7 +16,7 @@ def to_json(value: str) -> str:
     return value
 
 
-def _parse_dt(value: str) -> datetime | None:
+def to_datetime(value: str) -> datetime | None:
     """For performance reasons, we try first with dateutil and fallback on dateparser"""
     try:
         return dateutil_parser(value)
@@ -25,12 +25,17 @@ def _parse_dt(value: str) -> datetime | None:
 
 
 def to_date(value: str) -> date | None:
-    parsed = _parse_dt(value)
+    parsed = to_datetime(value)
     return parsed.date() if parsed else None
 
 
-def to_datetime(value: str) -> datetime | None:
-    return _parse_dt(value)
+def get_python_type(column: dict) -> str:
+    """Outsourcing the distinction of aware datetimes"""
+    return (
+        "datetime_aware"
+        if column["format"] in {"datetime_aware", "datetime_rfc822"}
+        else column["python_type"]
+    )
 
 
 async def read_or_download_file(
