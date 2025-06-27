@@ -27,34 +27,34 @@ async def get_resource(request: web.Request) -> web.Response:
     return web.json_response(ResourceSchema().dump(dict(resource)))
 
 
-async def get_resource_status(request: web.Request) -> web.Response:
-    """Endpoint to get the current status of a resource from the DB.
-    It is the same as get_resource but only returns the status of the resource, saving bandwith and processing time.
-    Respond with a 200 status code and a JSON body with the resource status
-    If resource is not found, respond with a 404 status code
-    """
-    try:
-        resource_id = str(uuid.UUID(request.match_info["resource_id"]))
-    except Exception as e:
-        raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
+# async def get_resource_status(request: web.Request) -> web.Response:
+#     """Endpoint to get the current status of a resource from the DB.
+#     It is the same as get_resource but only returns the status of the resource, saving bandwith and processing time.
+#     Respond with a 200 status code and a JSON body with the resource status
+#     If resource is not found, respond with a 404 status code
+#     """
+#     try:
+#         resource_id = str(uuid.UUID(request.match_info["resource_id"]))
+#     except Exception as e:
+#         raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
-    resource: Record | None = await Resource.get(resource_id=resource_id, column_name="status")
-    if not resource:
-        raise web.HTTPNotFound()
+#     resource: Record | None = await Resource.get(resource_id=resource_id, column_name="status")
+#     if not resource:
+#         raise web.HTTPNotFound()
 
-    status: str | None = resource["status"]
-    status_verbose: str = Resource.STATUSES[status]
+#     status: str | None = resource["status"]
+#     status_verbose: str = Resource.STATUSES[status]
 
-    latest_check_endpoint = str(request.app.router["get-latest-check"].url_for())
+#     latest_check_endpoint = str(request.app.router["get-latest-check"].url_for())
 
-    return web.json_response(
-        {
-            "resource_id": resource_id,
-            "status": status,
-            "status_verbose": status_verbose,
-            "latest_check_url": f"{request.scheme}://{request.host}{latest_check_endpoint}?resource_id={resource_id}",
-        }
-    )
+#     return web.json_response(
+#         {
+#             "resource_id": resource_id,
+#             "status": status,
+#             "status_verbose": status_verbose,
+#             "latest_check_url": f"{request.scheme}://{request.host}{latest_check_endpoint}?resource_id={resource_id}",
+#         }
+#     )
 
 
 async def create_resource(request: web.Request) -> web.Response:
