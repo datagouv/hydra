@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
@@ -130,16 +130,23 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
     (
         # (json, date, datetime), (__id, json, date, datetime)
         (
-            '{"a": 1};31 décembre 2022;2022-31-12 12:00:00',
-            (1, json.dumps({"a": 1}), date(2022, 12, 31), datetime(2022, 12, 31, 12, 0, 0)),
+            '{"a": 1};31 décembre 2022;2022-31-12 12:00:00.92;2030-06-22 00:00:00.0028+02:00',
+            (
+                1,
+                json.dumps({"a": 1}),
+                date(2022, 12, 31),
+                datetime(2022, 12, 31, 12, 0, 0, 920000),
+                datetime(2030, 6, 22, 0, 0, 0, 2800, tzinfo=timezone(timedelta(seconds=7200))),
+            ),
         ),
         (
-            '[{"a": 1, "b": 2}];31st december 2022;12-31-2022 12:00:00',
+            '[{"a": 1, "b": 2}];31st december 2022;12/31/2022 12:00:00;1996/06/22 10:20:10 GMT',
             (
                 1,
                 json.dumps([{"a": 1, "b": 2}]),
                 date(2022, 12, 31),
                 datetime(2022, 12, 31, 12, 0, 0),
+                datetime(1996, 6, 22, 10, 20, 10, tzinfo=timezone.utc),
             ),
         ),
     ),
@@ -147,12 +154,13 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
 async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     line, expected = line_expected
     with NamedTemporaryFile() as fp:
-        fp.write(f"json, date, datetime\n\r{line}".encode("utf-8"))
+        fp.write(f"json, date, datetime, aware_datetime\n\r{line}".encode("utf-8"))
         fp.seek(0)
         columns = {
             "json": {"python_type": "json", "format": "json"},
             "date": {"python_type": "date", "format": "date"},
             "datetime": {"python_type": "datetime", "format": "datetime"},
+            "aware_datetime": {"python_type": "datetime", "format": "datetime_aware"},
         }
         inspection = {
             "separator": ";",
@@ -166,7 +174,7 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
         await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
-    cols = ["__id", "json", "date", "datetime"]
+    cols = ["__id", "json", "date", "datetime", "aware_datetime"]
     assert dict(res[0]) == {k: v for k, v in zip(cols, expected)}
 
 
