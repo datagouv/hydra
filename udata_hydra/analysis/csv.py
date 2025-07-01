@@ -5,12 +5,14 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Iterator
+from typing import Iterator
+from math import isnan
 
 from asyncpg import Record
 from csv_detective.detection.engine import engine_to_file
 from csv_detective.explore_csv import routine as csv_detective_routine
 from csv_detective.explore_csv import validate_then_detect
+import pandas as pd
 from progressist import ProgressBar
 from slugify import slugify
 from sqlalchemy import (
@@ -28,8 +30,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import asyncpg
 from sqlalchemy.schema import CreateIndex, CreateTable, Index
-from str2bool import str2bool
-from str2float import str2float
 
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
@@ -40,7 +40,6 @@ from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
     IOException,
     ParseException,
-    Reader,
     Timer,
     detect_tabular_from_headers,
     handle_parse_exception,
@@ -69,17 +68,6 @@ PYTHON_TYPE_TO_PG = {
     "date": Date,
     "datetime": DateTime,
     "datetime_aware": DateTime(timezone=True),
-}
-
-PYTHON_TYPE_TO_PY = {
-    "string": str,
-    "float": float,
-    "int": int,
-    "bool": bool,
-    "json": helpers.to_json,
-    "date": helpers.to_date,
-    "datetime": helpers.to_datetime,
-    "datetime_aware": helpers.to_datetime,
 }
 
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
@@ -130,17 +118,21 @@ async def analyse_csv(
         try:
             previous_analysis: dict | None = await get_previous_analysis(resource_id=resource_id)
             if previous_analysis:
-                csv_inspection: dict = validate_then_detect(
+                csv_inspection, df = validate_then_detect(
                     file_path=tmp_file.name,
                     previous_analysis=previous_analysis,
                     output_profile=True,
+                    output_df=True,
+                    cast_json=False,
                     num_rows=-1,
                     save_results=False,
                 )
             else:
-                csv_inspection: dict | None = csv_detective_routine(
+                csv_inspection, df = csv_detective_routine(
                     file_path=tmp_file.name,
                     output_profile=True,
+                    output_df=True,
+                    cast_json=False,
                     num_rows=-1,
                     save_results=False,
                 )
@@ -151,7 +143,7 @@ async def analyse_csv(
         timer.mark("csv-inspection")
 
         await csv_to_db(
-            file_path=tmp_file.name,
+            df=df,
             inspection=csv_inspection,
             table_name=table_name,
             table_indexes=table_indexes,
@@ -162,7 +154,7 @@ async def analyse_csv(
 
         try:
             parquet_args: tuple[str, int] | None = await csv_to_parquet(
-                file_path=tmp_file.name,
+                df=df,
                 inspection=csv_inspection,
                 resource_id=resource_id,
             )
@@ -219,26 +211,6 @@ async def get_previous_analysis(resource_id: str) -> dict | None:
     return analysis
 
 
-def smart_cast(_type: str, value, failsafe: bool = False) -> Any:
-    try:
-        if value is None or value == "":
-            return None
-        if _type == "bool":
-            return str2bool(value)
-        return PYTHON_TYPE_TO_PY[_type](value)
-    except ValueError as e:
-        if _type == "int":
-            _value = str2float(value, default=None)
-            if _value:
-                return int(_value)
-        elif _type == "float":
-            return str2float(value, default=None)
-        if not failsafe:
-            raise e
-        log.warning(f'Could not convert "{value}" to {_type}, defaulting to null')
-        return None
-
-
 def compute_create_table_query(
     table_name: str, columns: dict, indexes: dict[str, str] | None = None
 ) -> str:
@@ -255,7 +227,8 @@ def compute_create_table_query(
         for col_name, index_type in indexes.items():
             if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
                 log.error(
-                    f'Index type "{index_type}" is unknown or not supported yet! Index for column {col_name} was not created.'
+                    f'Index type "{index_type}" is unknown or not supported yet! '
+                    f'Index for column {col_name} was not created.'
                 )
                 continue
 
@@ -267,7 +240,8 @@ def compute_create_table_query(
                         table.append_constraint(Index(index_name, col_name))
                     except KeyError:
                         raise KeyError(
-                            f'Error creating index "{index_name}" on column "{col_name}". Does the column "{col_name}" exist in the table?'
+                            f'Error creating index "{index_name}" on column "{col_name}". '
+                            f'Does the column "{col_name}" exist in the table?'
                         )
                 # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
 
@@ -289,17 +263,21 @@ def compute_create_table_query(
     return query
 
 
-def generate_records(file_path: str, inspection: dict, columns: dict) -> Iterator[list]:
-    # because we need the iterator twice, not possible to
-    # handle parquet and db through the same iteration
-    with Reader(file_path, inspection) as reader:
-        for line in reader:
-            if line:
-                yield [smart_cast(t, v, failsafe=True) for t, v in zip(columns.values(), line)]
+def generate_records(df: pd.DataFrame) -> Iterator[list]:
+    # pandas cannot have None in columns typed as int so we have to cast
+    # NaN-int values to None for db insertion, and we also change NaN to None
+    for row in df.values:
+        yield tuple(
+            cell if not (
+                isinstance(cell, pd._libs.missing.NAType)
+                or (isinstance(cell, float) and isnan(cell))
+            ) else None
+            for cell in row
+        )
 
 
 async def csv_to_parquet(
-    file_path: str,
+    df: pd.DataFrame,
     inspection: dict,
     resource_id: str | None = None,
 ) -> tuple[str, int] | None:
@@ -334,12 +312,10 @@ async def csv_to_parquet(
         # Update resource status to CONVERTING_TO_PARQUET
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
 
-    columns = {c: v["python_type"] for c, v in inspection["columns"].items()}
     # save the file as parquet and store it on Minio instance
     parquet_file, _ = save_as_parquet(
-        records=generate_records(file_path, inspection, columns),
-        columns=columns,
-        output_filename=resource_id,
+        df=df,
+        resource_id=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
     parquet_url: str = minio_client.send_file(parquet_file)
@@ -347,7 +323,7 @@ async def csv_to_parquet(
 
 
 async def csv_to_db(
-    file_path: str,
+    df: pd.DataFrame,
     inspection: dict,
     table_name: str,
     table_indexes: dict[str, str] | None = None,
@@ -401,8 +377,8 @@ async def csv_to_db(
         try:
             await db.copy_records_to_table(
                 table_name,
-                records=generate_records(file_path, inspection, columns),
-                columns=columns.keys(),
+                records=generate_records(df),
+                columns=list(columns.keys()),
             )
         except Exception as e:  # I know what I'm doing, pinky swear
             raise ParseException(
@@ -411,8 +387,8 @@ async def csv_to_db(
     # this inserts rows from iterator one by one, slow but useful for debugging
     else:
         bar = ProgressBar(total=inspection["total_lines"])
-        for r in bar.iter(generate_records(file_path, inspection, columns)):
-            data = {k: v for k, v in zip(columns.keys(), r)}
+        for r in bar.iter(generate_records(df)):
+            data = {k: v for k, v in zip(df.columns, r)}
             # NB: possible sql injection here, but should not be used in prod
             q = compute_insert_query(table_name=table_name, data=data, returning="__id")
             await db.execute(q, *data.values())
