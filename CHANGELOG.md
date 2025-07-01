@@ -7,6 +7,7 @@
 - Add a column in catalog that indicates when the status was last changed and delete the status-specific endpoint [#276](https://github.com/datagouv/hydra/pull/276)
 - Remove F401 (unused import) ignore rule and clean up __init__.py files with explicit __all__ declarations [#281](https://github.com/datagouv/hydra/pull/281)
 - Update PostgreSQL version in CI to match Docker Compose (15.13) [#282](https://github.com/datagouv/hydra/pull/282)
+- Add a CI job to create a release on Sentry [#246](https://github.com/datagouv/hydra/pull/246)
 
 ## 2.2.1 (2025-06-11)
 
