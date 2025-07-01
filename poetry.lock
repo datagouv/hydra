@@ -2888,6 +2888,16 @@ propcache = ">=0.2.0"
 dev = ["aiohttp-devtools", "aioresponses", "bumpx", "gunicorn", "mypy", "nest_asyncio", "pytest", "pytest-asyncio", "pytest-cov", "pytest-mock", "ruff"]
 
 [metadata]
+<<<<<<< HEAD
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
+<<<<<<< HEAD
 content-hash = "5c4a751768a9e37d2fcb541b06bcb4b1a4f65c8ca1fc3f039c69afc085744d17"
+=======
+content-hash = "3db0d543c405ee04e7d79ed368a1581e69ce3ab94ed9b50003ec5f066b2c663b"
+=======
+lock-version = "2.0"
+python-versions = "^3.11"
+content-hash = "75f9d04d117a05623e4040417fc6e0f45752165ca77a674ce51af432231aac68"
+>>>>>>> f59f955 (fix: restore pyarrow dependency)
+>>>>>>> 2c7e9b4 (fix: restore pyarrow dependency)
