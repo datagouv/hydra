@@ -12,7 +12,7 @@ from udata_hydra.routes.resources import (
     create_resource,
     delete_resource,
     get_resource,
-    get_resource_status,
+    # get_resource_status,
     update_resource,
 )
 from udata_hydra.routes.resources_exceptions import (
