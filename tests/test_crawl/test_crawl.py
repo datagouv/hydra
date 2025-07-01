@@ -12,7 +12,6 @@ from aiohttp import ClientSession, RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
 from aioresponses import CallbackResult
 from asyncpg import Record
-from dateparser import parse as date_parser
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
@@ -404,10 +403,10 @@ async def test_change_analysis_last_modified_header_twice(
 async def test_change_analysis_last_modified_header_twice_tz(
     setup_catalog, rmock, event_loop, fake_check, udata_url
 ):
-    _date_1 = "Thu, 09 Jan 2020 09:33:37 GMT+1"
-    _date_2 = "Thu, 09 Jan 2020 09:33:37 GMT+4"
+    _date_1 = "2020-01-09T09:33:37+01:00"
+    _date_2 = "2020-01-09T09:33:37+04:00"
     await fake_check(
-        detected_last_modified_at=date_parser(_date_1),
+        detected_last_modified_at=datetime.fromisoformat(_date_1),
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json"},
     )
@@ -421,7 +420,7 @@ async def test_change_analysis_last_modified_header_twice_tz(
     # udata has been called: last-modified has changed (different timezones)
     assert ("PUT", URL(udata_url)) in rmock.requests
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
-    assert webhook.get("analysis:last-modified-at") == date_parser(_date_2).isoformat()
+    assert webhook.get("analysis:last-modified-at") == _date_2
 
 
 async def test_check_changed_content_length_header(

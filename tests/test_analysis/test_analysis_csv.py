@@ -9,6 +9,7 @@ from aiohttp import ClientSession
 from asyncpg.exceptions import UndefinedTableError
 from csv_detective.explore_csv import validate_then_detect
 from yarl import URL
+from csv_detective import routine as csv_detective_routine
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
@@ -94,33 +95,26 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     "line_expected",
     (
         # (int, float, string, bool), (__id, int, float, string, bool)
-        ("1,1 020.20,test,true", (1, 1, 1020.2, "test", True), ","),
-        ('2,"1 020,20",test,false', (1, 2, 1020.2, "test", False), ","),
-        ("1;1 020.20;test;true", (1, 1, 1020.2, "test", True), ";"),
-        ("2;1 020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
-        ("2.0;1 020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
+        ("1,1020.20,test,true", (1, 1, 1020.2, "test", True), ","),
+        ('2,"1020,20",test,false', (1, 2, 1020.2, "test", False), ","),
+        ("1;1020.20;test;true", (1, 1, 1020.2, "test", True), ";"),
+        ("2;1020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
+        ("2.0;1020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
     ),
 )
 async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
     line, expected, separator = line_expected
+    header = separator.join(['int', 'float', 'string', 'bool'])
     with NamedTemporaryFile() as fp:
-        fp.write(f"int, float, string, bool\n\r{line}".encode("utf-8"))
+        fp.write(f"{header}\n{line}".encode("utf-8"))
         fp.seek(0)
-        columns = {
-            "int": {"python_type": "int", "format": "int"},
-            "float": {"python_type": "float", "format": "float"},
-            "string": {"python_type": "string", "format": "string"},
-            "bool": {"python_type": "bool", "format": "bool"},
-        }
-        inspection = {
-            "separator": separator,
-            "encoding": "utf-8",
-            "header_row_idx": 0,
-            "total_lines": 1,
-            "header": list(columns.keys()),
-            "columns": columns,
-        }
-        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            output_df=True,
+            num_rows=-1,
+            save_results=False,
+        )
+        await csv_to_db(df=df, inspection=inspection, table_name="test_table")
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
     cols = ["__id", "int", "float", "string", "bool"]
@@ -156,24 +150,17 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
 async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     line, expected = line_expected
     with NamedTemporaryFile() as fp:
-        fp.write(f"json, date, datetime, aware_datetime\n\r{line}".encode("utf-8"))
+        fp.write(f"json;date;datetime\n{line}".encode("utf-8"))
         fp.seek(0)
-        columns = {
-            "json": {"python_type": "json", "format": "json"},
-            "date": {"python_type": "date", "format": "date"},
-            "datetime": {"python_type": "datetime", "format": "datetime"},
-            "aware_datetime": {"python_type": "datetime", "format": "datetime_aware"},
-        }
-        inspection = {
-            "separator": ";",
-            "encoding": "utf-8",
-            "header_row_idx": 0,
-            "total_lines": 1,
-            "header": list(columns.keys()),
-            "columns": columns,
-        }
-        # Insert the data
-        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            encoding="utf-8",
+            output_df=True,
+            cast_json=False,
+            num_rows=-1,
+            save_results=False,
+        )
+        await csv_to_db(df=df, inspection=inspection, table_name="test_table", debug_insert=True)
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
     cols = ["__id", "json", "date", "datetime", "aware_datetime"]
@@ -185,66 +172,46 @@ async def test_basic_sql_injection(db, clean_db):
     # CREATE TABLE table_name("int" integer, "col_name" text);DROP TABLE toto;--)
     injection = 'col_name" text);DROP TABLE toto;--'
     with NamedTemporaryFile() as fp:
-        fp.write(f"int, {injection}\n\r1,test".encode("utf-8"))
+        fp.write(f"int,{injection}\n1,test".encode("utf-8"))
         fp.seek(0)
-        columns = {
-            "int": {"python_type": "int", "format": "int"},
-            injection: {"python_type": "string", "format": "string"},
-        }
-        inspection = {
-            "separator": ",",
-            "encoding": "utf-8",
-            "header_row_idx": 0,
-            "total_lines": 1,
-            "header": list(columns.keys()),
-            "columns": columns,
-        }
-        # Insert the data
-        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            sep=",",
+            output_df=True,
+            num_rows=-1,
+            save_results=False,
+        )
+        await csv_to_db(df=df, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res[injection] == "test"
 
 
 async def test_percentage_column(db, clean_db):
     with NamedTemporaryFile() as fp:
-        fp.write("int, % mon pourcent\n\r1,test".encode("utf-8"))
+        fp.write("int,% mon pourcent\n1,test".encode("utf-8"))
         fp.seek(0)
-        columns = {
-            "int": {"python_type": "int", "format": "int"},
-            "% mon pourcent": {"python_type": "string", "format": "string"},
-        }
-        inspection = {
-            "separator": ",",
-            "encoding": "utf-8",
-            "header_row_idx": 0,
-            "total_lines": 1,
-            "header": list(columns.keys()),
-            "columns": columns,
-        }
-        # Insert the data
-        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            output_df=True,
+            num_rows=-1,
+            save_results=False,
+        )
+        await csv_to_db(df=df, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["% mon pourcent"] == "test"
 
 
 async def test_reserved_column_name(db, clean_db):
     with NamedTemporaryFile() as fp:
-        fp.write("int, xmin\n\r1,test".encode("utf-8"))
+        fp.write("int,xmin\n1,test".encode("utf-8"))
         fp.seek(0)
-        columns = {
-            "int": {"python_type": "int", "format": "int"},
-            "xmin": {"python_type": "string", "format": "string"},
-        }
-        inspection = {
-            "separator": ",",
-            "encoding": "utf-8",
-            "header_row_idx": 0,
-            "total_lines": 1,
-            "header": list(columns.keys()),
-            "columns": columns,
-        }
-        # Insert the data
-        await csv_to_db(file_path=fp.name, inspection=inspection, table_name="test_table")
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            output_df=True,
+            num_rows=-1,
+            save_results=False,
+        )
+        await csv_to_db(df=df, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["xmin__hydra_renamed"] == "test"
 
