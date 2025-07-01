@@ -4,7 +4,7 @@
 
 - Delete tmp files if error in download [#277](https://github.com/datagouv/hydra/pull/277)
 - Add parsing_table in extra analysis payload [#279](https://github.com/datagouv/hydra/pull/279)
-- Add a column in catalog that indicates when the status was last changed [#276](https://github.com/datagouv/hydra/pull/276)
+- Add a column in catalog that indicates when the status was last changed and delete the status-specific endpoint [#276](https://github.com/datagouv/hydra/pull/276)
 
 ## 2.2.1 (2025-06-11)
 
