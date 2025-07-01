@@ -5,7 +5,6 @@ from .file import compute_checksum_from_file, download_resource
 from .geojson import detect_geojson_from_headers_or_catalog
 from .http import UdataPayload, get_request_params, send
 from .queue import enqueue
-from .reader import Reader
 from .timer import Timer
 
 __all__ = [
@@ -21,6 +20,5 @@ __all__ = [
     "get_request_params",
     "send",
     "enqueue",
-    "Reader",
     "Timer",
 ]
