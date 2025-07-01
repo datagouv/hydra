@@ -71,7 +71,7 @@ jobs:
   tests:
     docker:
       - image: cimg/python:<< pipeline.parameters.python-version >>
-      - image: cimg/postgres:11.15
+      - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
