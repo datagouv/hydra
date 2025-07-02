@@ -6,7 +6,6 @@ import pytest
 from asyncpg import Record
 
 from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_EXCEPTION_TABLE_INDEXES
-from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils.db import get_columns_with_indexes
@@ -18,14 +17,13 @@ log = logging.getLogger("udata-hydra")
 
 
 async def test_exception_analysis(
-    setup_catalog_with_resource_exception, rmock, db, fake_check, produce_mock
+    setup_catalog_with_resource_exception, rmock, db, fake_check, produce_mock, mocker
 ):
     """
     Tests that exception resources (files that are too large to be normally processed) are indeed processed.
     """
     # Change config to accept large files
-    save_config = config.MAX_FILESIZE_ALLOWED
-    config.override(MAX_FILESIZE_ALLOWED={"csv": 5000})
+    mocker.patch("udata_hydra.config.MAX_FILESIZE_ALLOWED", 5000)
 
     # Create a previous fake check for the resource
     check = await fake_check(resource_id=RESOURCE_EXCEPTION_ID)
@@ -68,4 +66,3 @@ async def test_exception_analysis(
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == expected_count
-    config.override(MAX_FILESIZE_ALLOWED=save_config)
