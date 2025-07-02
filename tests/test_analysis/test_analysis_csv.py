@@ -548,11 +548,33 @@ async def test_validation(
         # no geographical data in the file
         ({"data": ["rouge", "vert", "bleu", "jaune", "blanc"]}, None, True),
         # a column contains geometry
-        ({"polyg": [json.dumps({"type": "Point", "coordinates": [10 * k * (-1)**k, 20 * k * (-1)**k]}) for k in range(1, 6)]}, {"polyg": "geojson"}, True),
+        (
+            {
+                "polyg": [
+                    json.dumps(
+                        {"type": "Point", "coordinates": [10 * k * (-1) ** k, 20 * k * (-1) ** k]}
+                    )
+                    for k in range(1, 6)
+                ]
+            },
+            {"polyg": "geojson"},
+            True,
+        ),
         # a column contains a coordinates
-        ({"coords": [f"{10 * k * (-1)**k},{20 * k * (-1)**k}" for k in range(1, 6)]}, {"coords": "latlon_wgs"}, True),
+        (
+            {"coords": [f"{10 * k * (-1)**k},{20 * k * (-1)**k}" for k in range(1, 6)]},
+            {"coords": "latlon_wgs"},
+            True,
+        ),
         # the table has latitude and longitude in separate columns
-        ({"lat": [10 * k * (-1)**k for k in range(1, 6)], "long": [20 * k * (-1)**k for k in range(1, 6)]}, {"lat": "latitude_wgs", "long": "longitude_wgs"}, True),
+        (
+            {
+                "lat": [10 * k * (-1) ** k for k in range(1, 6)],
+                "long": [20 * k * (-1) ** k for k in range(1, 6)],
+            },
+            {"lat": "latitude_wgs", "long": "longitude_wgs"},
+            True,
+        ),
     ),
 )
 async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
@@ -602,16 +624,31 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
             mocked_minio.fput_object.return_value = None
             mocked_minio.bucket_exists.return_value = True
             with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-                mocked_minio_client_geojson = MinIOClient(bucket=geojson_bucket, folder=geojson_folder)
-                mocked_minio_client_pmtiles = MinIOClient(bucket=pmtiles_bucket, folder=pmtiles_folder)
+                mocked_minio_client_geojson = MinIOClient(
+                    bucket=geojson_bucket, folder=geojson_folder
+                )
+                mocked_minio_client_pmtiles = MinIOClient(
+                    bucket=pmtiles_bucket, folder=pmtiles_folder
+                )
             with (
-                patch("udata_hydra.analysis.geojson.minio_client_geojson", new=mocked_minio_client_geojson),
-                patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client_pmtiles),
+                patch(
+                    "udata_hydra.analysis.geojson.minio_client_geojson",
+                    new=mocked_minio_client_geojson,
+                ),
+                patch(
+                    "udata_hydra.analysis.geojson.minio_client_pmtiles",
+                    new=mocked_minio_client_pmtiles,
+                ),
             ):
                 mock_os = mocker.patch("udata_hydra.utils.minio.os")
                 mock_os.path = os.path
                 mock_os.remove.return_value = None
-                geojson_url, geojson_size, pmtiles_url, pmtiles_size = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID)
+                (
+                    geojson_url,
+                    geojson_size,
+                    pmtiles_url,
+                    pmtiles_size,
+                ) = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID)
             # checking geojson
             with open(f"{RESOURCE_ID}.geojson", "r") as f:
                 geojson = json.load(f)
@@ -621,13 +658,19 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 assert feat["type"] == "Feature"
                 assert isinstance(feat["geometry"], dict)
                 assert all(col in feat["properties"] for col in other_columns)
-            assert geojson_url == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
+            assert (
+                geojson_url
+                == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
+            )
             assert isinstance(geojson_size, int)
             os.remove(f"{RESOURCE_ID}.geojson")
             # checking PMTiles
             with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
                 header = f.read(7)
             assert header == b"PMTiles"
-            assert pmtiles_url == f"https://{minio_url}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
+            assert (
+                pmtiles_url
+                == f"https://{minio_url}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
+            )
             assert isinstance(pmtiles_size, int)
             os.remove(f"{RESOURCE_ID}.pmtiles")
