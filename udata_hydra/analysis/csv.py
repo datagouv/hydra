@@ -43,6 +43,7 @@ from udata_hydra.utils import (
     Timer,
     detect_tabular_from_headers,
     handle_parse_exception,
+    remove_remainders,
 )
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
@@ -160,6 +161,7 @@ async def analyse_csv(
             )
             timer.mark("csv-to-parquet")
         except Exception as e:
+            remove_remainders(resource_id, ["parquet"])
             raise ParseException(
                 step="parquet_export", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
@@ -172,6 +174,7 @@ async def analyse_csv(
             )
             timer.mark("csv-to-geojson-pmtiles")
         except Exception as e:
+            remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
             raise ParseException(
                 step="geojson_export", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
