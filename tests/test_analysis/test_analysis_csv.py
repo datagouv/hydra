@@ -1,8 +1,9 @@
 import hashlib
 import json
 from datetime import date, datetime, timedelta, timezone
+import os
 from tempfile import NamedTemporaryFile
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from aiohttp import ClientSession
@@ -13,8 +14,10 @@ from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
+from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.resource import Resource
+from udata_hydra.utils.minio import MinIOClient
 
 pytestmark = pytest.mark.asyncio
 
@@ -535,3 +538,96 @@ async def test_validation(
             assert latest_analysis[key] is not None
     # in all cases, profile should have been recreated
     assert latest_analysis["profile"] is not None
+
+
+@pytest.mark.parametrize(
+    "params",
+    (
+        # csv to geojson is disabled
+        ({}, None, False),
+        # no geographical data in the file
+        ({"data": ["rouge", "vert", "bleu", "jaune", "blanc"]}, None, True),
+        # a column contains geometry
+        ({"polyg": [json.dumps({"type": "Point", "coordinates": [10 * k * (-1)**k, 20 * k * (-1)**k]}) for k in range(1, 6)]}, {"polyg": "geojson"}, True),
+        # a column contains a coordinates
+        ({"coords": [f"{10 * k * (-1)**k},{20 * k * (-1)**k}" for k in range(1, 6)]}, {"coords": "latlon_wgs"}, True),
+        # the table has latitude and longitude in separate columns
+        ({"lat": [10 * k * (-1)**k for k in range(1, 6)], "long": [20 * k * (-1)**k for k in range(1, 6)]}, {"lat": "latitude_wgs", "long": "longitude_wgs"}, True),
+    ),
+)
+async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
+    other_columns = {
+        "nombre": range(1, 6),
+        "score": [0.01, 1.2, 34.5, 678.9, 10],
+        "est_colonne": ["oui", "non", "non", "oui", "non"],
+    }
+    geo_columns, expected_formats, patched_config = params
+    sep = ";"
+    columns = other_columns | geo_columns
+    file = sep.join(columns) + "\n"
+    for _ in range(5):
+        file += sep.join(str(val) for val in [data[_] for data in columns.values()]) + "\n"
+
+    with NamedTemporaryFile() as fp:
+        fp.write(file.encode("utf-8"))
+        fp.seek(0)
+        inspection, df = csv_detective_routine(
+            file_path=fp.name,
+            output_profile=True,
+            output_df=True,
+            cast_json=False,
+            num_rows=-1,
+            save_results=False,
+        )
+
+    if expected_formats:
+        for col in expected_formats:
+            assert expected_formats[col] in inspection["columns"][col]["format"]
+
+    with patch("udata_hydra.config.CSV_TO_GEOJSON", patched_config):
+        if not patched_config or expected_formats is None:
+            # process is or early exit because no geo data
+            with patch("udata_hydra.analysis.geojson.geojson_to_pmtiles") as mock_func:
+                res = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID)
+                assert res is None
+                mock_func.assert_not_called()
+        else:
+            minio_url = "my.minio.fr"
+            geojson_bucket = "geojson_bucket"
+            geojson_folder = "geojson_folder"
+            pmtiles_bucket = "pmtiles_bucket"
+            pmtiles_folder = "pmtiles_folder"
+            mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
+            mocked_minio = MagicMock()
+            mocked_minio.fput_object.return_value = None
+            mocked_minio.bucket_exists.return_value = True
+            with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
+                mocked_minio_client_geojson = MinIOClient(bucket=geojson_bucket, folder=geojson_folder)
+                mocked_minio_client_pmtiles = MinIOClient(bucket=pmtiles_bucket, folder=pmtiles_folder)
+            with (
+                patch("udata_hydra.analysis.geojson.minio_client_geojson", new=mocked_minio_client_geojson),
+                patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client_pmtiles),
+            ):
+                mock_os = mocker.patch("udata_hydra.utils.minio.os")
+                mock_os.path = os.path
+                mock_os.remove.return_value = None
+                geojson_url, geojson_size, pmtiles_url, pmtiles_size = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID)
+            # checking geojson
+            with open(f"{RESOURCE_ID}.geojson", "r") as f:
+                geojson = json.load(f)
+            assert all(key in geojson for key in ("type", "features"))
+            assert len(geojson["features"]) == 5
+            for feat in geojson["features"]:
+                assert feat["type"] == "Feature"
+                assert isinstance(feat["geometry"], dict)
+                assert all(col in feat["properties"] for col in other_columns)
+            assert geojson_url == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
+            assert isinstance(geojson_size, int)
+            os.remove(f"{RESOURCE_ID}.geojson")
+            # checking PMTiles
+            with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
+                header = f.read(7)
+            assert header == b"PMTiles"
+            assert pmtiles_url == f"https://{minio_url}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
+            assert isinstance(pmtiles_size, int)
+            os.remove(f"{RESOURCE_ID}.pmtiles")
