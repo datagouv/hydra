@@ -9,6 +9,7 @@
 - Update PostgreSQL version in CI to match Docker Compose (15.13) [#282](https://github.com/datagouv/hydra/pull/282)
 - Add a CI job to create a release on Sentry [#246](https://github.com/datagouv/hydra/pull/246)
 - Use pre-cast dataframe from csv-detective instead of re-reading the file [#236](https://github.com/datagouv/hydra/pull/236)
+- Enable csv to GeoJSON and PMTiles converion if relevant [#278](https://github.com/datagouv/hydra/pull/278)
 
 ## 2.2.1 (2025-06-11)
 
