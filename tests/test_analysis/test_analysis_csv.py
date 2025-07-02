@@ -10,6 +10,7 @@ from asyncpg.exceptions import UndefinedTableError
 from csv_detective import routine as csv_detective_routine
 from csv_detective import validate_then_detect
 from yarl import URL
+from csv_detective import routine as csv_detective_routine
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
@@ -152,7 +153,11 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
 async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     line, expected = line_expected
     with NamedTemporaryFile() as fp:
+<<<<<<< HEAD
         fp.write(f"json;date;datetime;aware_datetime\n{line}".encode("utf-8"))
+=======
+        fp.write(f"json;date;datetime\n{line}".encode("utf-8"))
+>>>>>>> b39bb90 (refactor: adapt tests)
         fp.seek(0)
         inspection, df = csv_detective_routine(
             file_path=fp.name,
