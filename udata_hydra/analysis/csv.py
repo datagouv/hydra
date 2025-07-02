@@ -6,9 +6,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from typing import Iterator
-from math import isnan
 
-import pandas as pd
 from asyncpg import Record
 from csv_detective import routine as csv_detective_routine
 from csv_detective import validate_then_detect
