@@ -5,7 +5,6 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from math import isnan
 from typing import Iterator
 
 import pandas as pd
@@ -33,6 +32,7 @@ from sqlalchemy.schema import CreateIndex, CreateTable, Index
 
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
+from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -43,6 +43,7 @@ from udata_hydra.utils import (
     Timer,
     detect_tabular_from_headers,
     handle_parse_exception,
+    remove_remainders,
 )
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
@@ -160,8 +161,22 @@ async def analyse_csv(
             )
             timer.mark("csv-to-parquet")
         except Exception as e:
+            remove_remainders(resource_id, ["parquet"])
             raise ParseException(
                 step="parquet_export", resource_id=resource_id, url=url, check_id=check["id"]
+            ) from e
+
+        try:
+            geojson_args: tuple[str, int, str, int] | None = await csv_to_geojson_and_pmtiles(
+                df=df,
+                inspection=csv_inspection,
+                resource_id=resource_id,
+            )
+            timer.mark("csv-to-geojson-pmtiles")
+        except Exception as e:
+            remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
+            raise ParseException(
+                step="geojson_export", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
 
         check = await Check.update(
@@ -171,6 +186,10 @@ async def analyse_csv(
                 "parsing_finished_at": datetime.now(timezone.utc),
                 "parquet_url": parquet_args[0] if parquet_args else None,
                 "parquet_size": parquet_args[1] if parquet_args else None,
+                "geojson_url": geojson_args[0] if geojson_args else None,
+                "geojson_size": geojson_args[1] if geojson_args else None,
+                "pmtiles_url": geojson_args[2] if geojson_args else None,
+                "pmtiles_size": geojson_args[3] if geojson_args else None,
             },
         )
         await csv_to_db_index(table_name, csv_inspection, check)

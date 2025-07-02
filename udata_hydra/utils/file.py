@@ -80,3 +80,10 @@ async def download_resource(
         ]:
             tmp_file = read_csv_gz(tmp_file.name)
         return tmp_file
+
+
+def remove_remainders(resource_id: str, extensions: list[str]) -> None:
+    """Delete potential remainders from process that crashed"""
+    for ext in extensions:
+        if os.path.exists(f"{resource_id}.{ext}"):
+            os.remove(f"{resource_id}.{ext}")

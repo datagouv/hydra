@@ -87,3 +87,8 @@ MINIO_PARQUET_FOLDER = "" # no trailing slash
 GEOJSON_TO_PMTILES = false
 MINIO_PMTILES_BUCKET = ""
 MINIO_PMTILES_FOLDER = "" # no trailing slash
+
+# -- Geojson conversion settings -- #
+CSV_TO_GEOJSON = false
+MINIO_GEOJSON_BUCKET = ""
+MINIO_GEOJSON_FOLDER = "" # no trailing slash
