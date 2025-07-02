@@ -267,15 +267,7 @@ def generate_records(df: pd.DataFrame) -> Iterator[list]:
     # pandas cannot have None in columns typed as int so we have to cast
     # NaN-int values to None for db insertion, and we also change NaN to None
     for row in df.values:
-        yield tuple(
-            cell
-            if not (
-                isinstance(cell, pd._libs.missing.NAType)
-                or (isinstance(cell, float) and isnan(cell))
-            )
-            else None
-            for cell in row
-        )
+        yield tuple(cell if not pd.isna(cell) else None for cell in row)
 
 
 async def csv_to_parquet(
