@@ -100,6 +100,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
         ("1;1020.20;test;true", (1, 1, 1020.2, "test", True), ";"),
         ("2;1020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
         ("2.0;1020,20;test;false", (1, 2, 1020.2, "test", False), ";"),
+        ("2.0|1020,20|test|false", (1, 2, 1020.2, "test", False), "|"),
     ),
 )
 async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
@@ -114,6 +115,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
             num_rows=-1,
             save_results=False,
         )
+        assert inspection["separator"] == separator
         await csv_to_db(df=df, inspection=inspection, table_name="test_table")
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
