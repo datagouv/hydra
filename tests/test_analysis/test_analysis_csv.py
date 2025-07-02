@@ -124,7 +124,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
 @pytest.mark.parametrize(
     "line_expected",
     (
-        # (json, date, datetime), (__id, json, date, datetime)
+        # (json, date, datetime, aware_datetime), (__id, json, date, datetime, aware_datetime)
         (
             '{"a": 1};31 décembre 2022;2022-31-12 12:00:00.92;2030-06-22 00:00:00.0028+02:00',
             (
@@ -150,7 +150,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
 async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     line, expected = line_expected
     with NamedTemporaryFile() as fp:
-        fp.write(f"json;date;datetime\n{line}".encode("utf-8"))
+        fp.write(f"json;date;datetime;aware_datetime\n{line}".encode("utf-8"))
         fp.seek(0)
         inspection, df = csv_detective_routine(
             file_path=fp.name,
