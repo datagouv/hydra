@@ -10,7 +10,7 @@
 - Add a CI job to create a release on Sentry [#246](https://github.com/datagouv/hydra/pull/246)
 - Use pre-cast dataframe from csv-detective instead of re-reading the file [#236](https://github.com/datagouv/hydra/pull/236)
 - Enable csv to GeoJSON and PMTiles converion if relevant [#278](https://github.com/datagouv/hydra/pull/278)
-- Add conversions state to health endpoint [#283](https://github.com/datagouv/hydra/pull/283)
+- Add conversions state to health endpoint [#284](https://github.com/datagouv/hydra/pull/284)
 
 ## 2.2.1 (2025-06-11)
 
