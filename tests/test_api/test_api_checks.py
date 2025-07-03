@@ -71,6 +71,8 @@ async def test_get_latest_check(setup_catalog, client, query, fake_check, fake_r
         "parquet_size": 2048,
         "pmtiles_url": None,
         "pmtiles_size": None,
+        "geojson_url": None,
+        "geojson_size": None,
     }
 
     # Test deleted resource

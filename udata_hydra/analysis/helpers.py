@@ -58,5 +58,8 @@ async def notify_udata(resource: Record, check: dict) -> None:
     if config.GEOJSON_TO_PMTILES and check.get("pmtiles_url"):
         payload["document"]["analysis:parsing:pmtiles_url"] = check.get("pmtiles_url")
         payload["document"]["analysis:parsing:pmtiles_size"] = check.get("pmtiles_size")
+    if config.CSV_TO_GEOJSON and check.get("geojson_url"):
+        payload["document"]["analysis:parsing:geojson_url"] = check.get("geojson_url")
+        payload["document"]["analysis:parsing:geojson_size"] = check.get("geojson_size")
     payload["document"] = UdataPayload(payload["document"])
     queue.enqueue(send, _priority="high", **payload)
