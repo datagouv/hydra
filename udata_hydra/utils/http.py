@@ -32,6 +32,8 @@ class UdataPayload:
             "parquet_url",
             "pmtiles_size",
             "pmtiles_url",
+            "geojson_size",
+            "geojson_url",
         ],
     }
 

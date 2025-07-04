@@ -26,6 +26,8 @@ class CheckSchema(Schema):
     parquet_size = fields.Integer()
     pmtiles_url = fields.Str()
     pmtiles_size = fields.Integer()
+    geojson_url = fields.Str()
+    geojson_size = fields.Integer()
 
     def create(self, data):
         return self.load(data)
