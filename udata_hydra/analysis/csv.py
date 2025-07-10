@@ -139,7 +139,7 @@ async def analyse_csv(
                 )
         except Exception as e:
             raise ParseException(
-                message=e.__repr__(),
+                message=str(e),
                 step="csv_detective",
                 resource_id=resource_id,
                 url=url,
@@ -167,7 +167,7 @@ async def analyse_csv(
         except Exception as e:
             remove_remainders(resource_id, ["parquet"])
             raise ParseException(
-                message=e.__repr__(),
+                message=str(e),
                 step="parquet_export",
                 resource_id=resource_id,
                 url=url,
@@ -184,7 +184,7 @@ async def analyse_csv(
         except Exception as e:
             remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
             raise ParseException(
-                message=e.__repr__(),
+                message=str(e),
                 step="geojson_export",
                 resource_id=resource_id,
                 url=url,
@@ -393,7 +393,7 @@ async def csv_to_db(
         await db.execute(q)
     except Exception as e:
         raise ParseException(
-            message=e.__repr__(),
+            message=str(e),
             step="create_table_query",
             resource_id=resource_id,
             table_name=table_name,
@@ -410,7 +410,7 @@ async def csv_to_db(
             )
         except Exception as e:  # I know what I'm doing, pinky swear
             raise ParseException(
-                message=e.__repr__(),
+                message=str(e),
                 step="copy_records_to_table",
                 resource_id=resource_id,
                 table_name=table_name,
