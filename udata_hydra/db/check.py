@@ -104,6 +104,8 @@ class Check:
         """
         Insert a new check in DB, associate it with the resource and return the check dict, optionally associated with the resource dataset_id.
         This uses the info from the last check of the same resource.
+
+        Note: Returns dict instead of Record because this method performs additional operations beyond simple insertion (joins with catalog table, adds dataset_id).
         """
         data = convert_dict_values_to_json(data)
         q1: str = compute_insert_query(table_name="checks", data=data, returning=returning)
