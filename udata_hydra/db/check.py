@@ -69,7 +69,7 @@ class Check:
             return await connection.fetchrow(q, url or resource_id)
 
     @classmethod
-    async def get_all(cls, url: str | None = None, resource_id: str | None = None) -> list | None:
+    async def get_all(cls, url: str | None = None, resource_id: str | None = None) -> list[Record]:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -84,7 +84,9 @@ class Check:
             return await connection.fetch(q, url or resource_id)
 
     @classmethod
-    async def get_group_by_for_date(cls, column: str, date: date, page_size: int = 20):
+    async def get_group_by_for_date(
+        cls, column: str, date: date, page_size: int = 20
+    ) -> list[Record]:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = f"""
