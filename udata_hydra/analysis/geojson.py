@@ -71,7 +71,7 @@ async def analyse_geojson(
             timer.mark("geojson-to-pmtiles")
         except Exception as e:
             raise ParseException(
-                step="pmtiles_export", resource_id=resource_id, url=url, check_id=check["id"]
+                message=e.__repr__(), step="pmtiles_export", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
 
         check = await Check.update(

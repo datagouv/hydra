@@ -139,7 +139,7 @@ async def analyse_csv(
                 )
         except Exception as e:
             raise ParseException(
-                step="csv_detective", resource_id=resource_id, url=url, check_id=check["id"]
+                message=e.__repr__(), step="csv_detective", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
         timer.mark("csv-inspection")
 
@@ -163,7 +163,7 @@ async def analyse_csv(
         except Exception as e:
             remove_remainders(resource_id, ["parquet"])
             raise ParseException(
-                step="parquet_export", resource_id=resource_id, url=url, check_id=check["id"]
+                message=e.__repr__(), step="parquet_export", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
 
         try:
@@ -176,7 +176,7 @@ async def analyse_csv(
         except Exception as e:
             remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
             raise ParseException(
-                step="geojson_export", resource_id=resource_id, url=url, check_id=check["id"]
+                message=e.__repr__(), step="geojson_export", resource_id=resource_id, url=url, check_id=check["id"]
             ) from e
 
         check = await Check.update(
@@ -381,7 +381,7 @@ async def csv_to_db(
         await db.execute(q)
     except Exception as e:
         raise ParseException(
-            step="create_table_query", resource_id=resource_id, table_name=table_name
+            message=e.__repr__(), step="create_table_query", resource_id=resource_id, table_name=table_name
         ) from e
 
     # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
@@ -395,7 +395,7 @@ async def csv_to_db(
             )
         except Exception as e:  # I know what I'm doing, pinky swear
             raise ParseException(
-                step="copy_records_to_table", resource_id=resource_id, table_name=table_name
+                message=e.__repr__(), step="copy_records_to_table", resource_id=resource_id, table_name=table_name
             ) from e
     # this inserts rows from iterator one by one, slow but useful for debugging
     else:
