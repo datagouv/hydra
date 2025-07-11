@@ -12,6 +12,7 @@
 - Enable csv to GeoJSON and PMTiles converion if relevant [#278](https://github.com/datagouv/hydra/pull/278) [#285](https://github.com/datagouv/hydra/pull/285)
 - Add conversions state to health endpoint [#284](https://github.com/datagouv/hydra/pull/284)
 - Better logs in Sentry [#287](https://github.com/datagouv/hydra/pull/287)
+- Consistent return types for CRUD methods [#288](https://github.com/datagouv/hydra/pull/288)
 
 ## 2.2.1 (2025-06-11)
 
