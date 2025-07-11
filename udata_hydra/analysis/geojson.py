@@ -133,7 +133,7 @@ async def geojson_to_pmtiles(
     ]
     exit_code = tippecanoe._program("tippecanoe", *command)
     if exit_code:
-        raise ValueError(f"GeoJSON to PMTiles conversion failed for {file_path}")
+        raise ValueError(f"GeoJSON to PMTiles conversion failed with exit code {exit_code}")
     log.debug(f"Successfully converted {file_path} to {output_pmtiles}")
 
     pmtiles_size = os.path.getsize(output_pmtiles)
