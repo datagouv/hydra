@@ -40,7 +40,7 @@ class Resource:
         format: str,
         status: str | None = None,
         priority: bool = True,
-    ) -> None:
+    ) -> Record | None:
         if status and status not in cls.STATUSES.keys():
             raise ValueError(f"Invalid status: {status}")
 
@@ -59,12 +59,12 @@ class Resource:
                         status = $6,
                         priority = $7
                     RETURNING *;"""
-            await connection.fetchrow(
+            return await connection.fetchrow(
                 q, dataset_id, resource_id, url, type, format, status, priority
             )
 
     @classmethod
-    async def update(cls, resource_id: str, data: dict) -> Record:
+    async def update(cls, resource_id: str, data: dict) -> Record | None:
         """Update a resource in DB with new data and return the updated resource in DB"""
         if "status" in data:
             data["status_since"] = datetime.now(timezone.utc)
@@ -91,7 +91,7 @@ class Resource:
         format: str,
         status: str | None = None,
         priority: bool = True,  # Make resource high priority by default for crawling
-    ) -> None:
+    ) -> Record | None:
         if status and status not in cls.STATUSES.keys():
             raise ValueError(f"Invalid status: {status}")
 
@@ -117,7 +117,7 @@ class Resource:
                             status = $6,
                             priority = $7
                         RETURNING *;"""
-            await connection.fetchrow(
+            return await connection.fetchrow(
                 q, dataset_id, resource_id, url, type, format, status, priority
             )
 

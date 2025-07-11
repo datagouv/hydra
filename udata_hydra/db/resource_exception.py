@@ -37,7 +37,7 @@ class ResourceException:
         resource_id: str,
         table_indexes: dict[str, str] | None = None,
         comment: str | None = None,
-    ) -> Record:
+    ) -> Record | None:
         """
         Insert a new resource_exception
         table_indexes is a JSON object of column names and index types
@@ -46,7 +46,7 @@ class ResourceException:
         pool = await context.pool("csv")
 
         # First, check if the resource_id exists in the catalog table
-        resource: dict | None = await Resource.get(resource_id)
+        resource: Record | None = await Resource.get(resource_id)
         if not resource:
             raise ValueError("Resource not found")
 
@@ -71,7 +71,7 @@ class ResourceException:
         resource_id: str,
         table_indexes: dict[str, str] | None = None,
         comment: str | None = None,
-    ) -> Record:
+    ) -> Record | None:
         """
         Update a resource_exception
         table_indexes is a JSON object of column names and index types
@@ -80,7 +80,7 @@ class ResourceException:
         pool = await context.pool("csv")
 
         # First, check if the resource_id exists in the catalog table
-        resource: dict | None = await Resource.get(resource_id)
+        resource: Record | None = await Resource.get(resource_id)
         if not resource:
             raise ValueError("Resource not found")
 
