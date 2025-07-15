@@ -1,11 +1,13 @@
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from udata_hydra import config
 
 
 class ResourceExceptionSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     resource_id: UUID
     table_indexes: str | None = None
