@@ -12,7 +12,7 @@ class ResourceDocumentSchema(BaseModel):
     url: str
     format: str | None = None
     title: str
-    schema: str | None = None
+    schema_name: str | None = None
     description: str | None = None
     filetype: str
     type: str
