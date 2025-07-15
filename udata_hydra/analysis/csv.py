@@ -155,13 +155,15 @@ async def analyse_csv(
             resource_id=resource_id,
             debug_insert=debug_insert,
         )
+        check = await Check.update(check["id"], {"parsing_table": table_name})
         timer.mark("csv-to-db")
 
         try:
-            parquet_args: tuple[str, int] | None = await csv_to_parquet(
+            await csv_to_parquet(
                 df=df,
                 inspection=csv_inspection,
                 resource_id=resource_id,
+                check_id=check["id"],
             )
             timer.mark("csv-to-parquet")
         except Exception as e:
@@ -175,10 +177,11 @@ async def analyse_csv(
             ) from e
 
         try:
-            geojson_args: tuple[str, int, str, int] | None = await csv_to_geojson_and_pmtiles(
+            await csv_to_geojson_and_pmtiles(
                 df=df,
                 inspection=csv_inspection,
                 resource_id=resource_id,
+                check_id=check["id"],
             )
             timer.mark("csv-to-geojson-pmtiles")
         except Exception as e:
@@ -194,14 +197,7 @@ async def analyse_csv(
         check = await Check.update(
             check["id"],
             {
-                "parsing_table": table_name,
                 "parsing_finished_at": datetime.now(timezone.utc),
-                "parquet_url": parquet_args[0] if parquet_args else None,
-                "parquet_size": parquet_args[1] if parquet_args else None,
-                "geojson_url": geojson_args[0] if geojson_args else None,
-                "geojson_size": geojson_args[1] if geojson_args else None,
-                "pmtiles_url": geojson_args[2] if geojson_args else None,
-                "pmtiles_size": geojson_args[3] if geojson_args else None,
             },
         )
         await csv_to_db_index(table_name, csv_inspection, check)
@@ -305,7 +301,8 @@ async def csv_to_parquet(
     df: pd.DataFrame,
     inspection: dict,
     resource_id: str | None = None,
-) -> tuple[str, int] | None:
+    check_id: int | None = None,
+) -> None:
     """
     Convert a csv file to parquet using inspection data.
 
@@ -313,10 +310,6 @@ async def csv_to_parquet(
         file_path: CSV file path to convert.
         inspection: CSV detective report.
         table_name: used to name the parquet file.
-
-    Returns:
-        parquet_url: URL of the parquet file.
-        parquet_size: size of the parquet file.
     """
     if not config.CSV_TO_PARQUET:
         log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
@@ -342,9 +335,14 @@ async def csv_to_parquet(
         df=df,
         output_filename=resource_id,
     )
-    parquet_size: int = os.path.getsize(parquet_file)
-    parquet_url: str = minio_client.send_file(parquet_file)
-    return parquet_url, parquet_size
+    await Check.update(
+        check_id,
+        {
+            "parquet_url": minio_client.send_file(parquet_file, delete_source=False),
+            "parquet_size": os.path.getsize(parquet_file),
+        },
+    )
+    os.remove(parquet_file)
 
 
 async def csv_to_db(
