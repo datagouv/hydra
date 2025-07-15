@@ -2,6 +2,10 @@
 
 ## Current (in progress)
 
+- Nothing yet
+
+## 2.3.0 (2025-07-15)
+
 - Delete tmp files if error in download [#277](https://github.com/datagouv/hydra/pull/277)
 - Add parsing_table in extra analysis payload [#279](https://github.com/datagouv/hydra/pull/279)
 - Add a column in catalog that indicates when the status was last changed and delete the status-specific endpoint [#276](https://github.com/datagouv/hydra/pull/276)
@@ -9,7 +13,7 @@
 - Update PostgreSQL version in CI to match Docker Compose (15.13) [#282](https://github.com/datagouv/hydra/pull/282)
 - Add a CI job to create a release on Sentry [#246](https://github.com/datagouv/hydra/pull/246)
 - Use pre-cast dataframe from csv-detective instead of re-reading the file [#236](https://github.com/datagouv/hydra/pull/236)
-- Enable csv to GeoJSON and PMTiles converion if relevant [#278](https://github.com/datagouv/hydra/pull/278) [#285](https://github.com/datagouv/hydra/pull/285)
+- Enable csv to GeoJSON and PMTiles converion if relevant [#278](https://github.com/datagouv/hydra/pull/278) [#285](https://github.com/datagouv/hydra/pull/285) [#291](https://github.com/datagouv/hydra/pull/291)
 - Add conversions state to health endpoint [#284](https://github.com/datagouv/hydra/pull/284)
 - Better logs in Sentry [#287](https://github.com/datagouv/hydra/pull/287) [#289](https://github.com/datagouv/hydra/pull/289)
 - Consistent return types for CRUD methods [#288](https://github.com/datagouv/hydra/pull/288)
