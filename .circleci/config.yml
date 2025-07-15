@@ -22,7 +22,7 @@ jobs:
   lint-and-test:
     docker:
       - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
-      - image: cimg/postgres:11.15
+      - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
@@ -36,13 +36,15 @@ jobs:
             apt-get update && apt-get install -y \
               cmake libgeos-dev libmagic1
       - run:
-          name: Install Python dependencies
-          command: uv venv && uv pip install -e ".[dev]"
+          name: Install dev dependencies
+          command: uv sync --extra dev
       - run:
-          name: Lint and format code
+          name: Lint and format code and sort imports
+          # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
+          # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
-            .venv/bin/ruff check --select I .
-            .venv/bin/ruff format --check .
+            uv run ruff check --select I .
+            uv run ruff format --check .
       - run:
           name: Run tests
           environment:
@@ -56,7 +58,7 @@ jobs:
             echo "$TESTFILES"
             # Run the found tests
             if [ -n "$TESTFILES" ]; then
-              .venv/bin/pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+              uv run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
             else
               echo "No tests to run in this split"
               exit 1
