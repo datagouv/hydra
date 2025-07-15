@@ -1,38 +1,35 @@
+import datetime
 import json
+from uuid import UUID
 
-from marshmallow import Schema, fields
-
-
-class CheckSchema(Schema):
-    check_id = fields.Integer(data_key="id")
-    catalog_id = fields.Integer()
-    url = fields.Str()
-    domain = fields.Str()
-    created_at = fields.DateTime()
-    check_status = fields.Integer(data_key="status")
-    headers = fields.Function(lambda obj: json.loads(obj["headers"]) if obj["headers"] else {})
-    timeout = fields.Boolean()
-    response_time = fields.Float()
-    error = fields.Str()
-    dataset_id = fields.Str()
-    resource_id = fields.UUID()
-    next_check_at = fields.DateTime()
-    deleted = fields.Boolean()
-    parsing_started_at = fields.DateTime()
-    parsing_finished_at = fields.DateTime()
-    parsing_error = fields.Str()
-    parsing_table = fields.Str()
-    parquet_url = fields.Str()
-    parquet_size = fields.Integer()
-    pmtiles_url = fields.Str()
-    pmtiles_size = fields.Integer()
-    geojson_url = fields.Str()
-    geojson_size = fields.Integer()
-
-    def create(self, data):
-        return self.load(data)
+from pydantic import BaseModel, Field, field_validator
 
 
-class CheckGroupBy(Schema):
-    value = fields.Str()
-    count = fields.Integer()
+class CheckSchema(BaseModel):
+    check_id: int = Field(alias="id")
+    catalog_id: int | None = None
+    url: str | None = None
+    domain: str | None = None
+    created_at: datetime.datetime | None
+    check_status: int = Field(alias="status")
+    headers: dict
+    timeout: bool | None = None
+    response_time: float | None
+    error: str | None = None
+    dataset_id: str | None = None
+    resource_id: UUID | None = None
+    deleted: bool | None = None
+    parsing_started_at: datetime.datetime | None = None
+    parsing_finished_at: datetime.datetime | None = None
+    parsing_error: str | None = None
+    parsing_table: str | None = None
+
+    @field_validator("headers", mode="before")
+    @classmethod
+    def transform(cls, obj: dict) -> dict:
+        return json.loads(obj["headers"]) if obj["headers"] else {}
+
+
+class CheckGroupBy(BaseModel):
+    value: str
+    count: int
