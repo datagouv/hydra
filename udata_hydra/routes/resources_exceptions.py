@@ -21,7 +21,10 @@ async def get_all_resources_exceptions(request: web.Request) -> web.Response:
     resources_exceptions: list[Record] = await ResourceException.get_all()
 
     return web.json_response(
-        [ResourceExceptionSchema.model_validate(r).model_dump() for r in resources_exceptions]
+        [
+            ResourceExceptionSchema.model_validate(dict(r)).model_dump(mode="json")
+            for r in resources_exceptions
+        ]
     )
 
 
@@ -49,7 +52,8 @@ async def create_resource_exception(request: web.Request) -> web.Response:
         raise web.HTTPBadRequest(text="Resource exception already exists")
 
     return web.json_response(
-        ResourceExceptionSchema.model_validate(resource_exception).model_dump(), status=201
+        ResourceExceptionSchema.model_validate(dict(resource_exception)).model_dump(mode="json"),
+        status=201,
     )
 
 
@@ -85,7 +89,7 @@ async def update_resource_exception(request: web.Request) -> web.Response:
         raise web.HTTPNotFound(text="Resource exception not found")
 
     return web.json_response(
-        ResourceExceptionSchema.model_validate(resource_exception).model_dump()
+        ResourceExceptionSchema.model_validate(dict(resource_exception)).model_dump(mode="json")
     )
 
 

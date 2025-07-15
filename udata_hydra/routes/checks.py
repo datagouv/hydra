@@ -24,7 +24,9 @@ async def get_latest_check(request: web.Request) -> web.Response:
     if data["deleted"]:
         raise web.HTTPGone()
 
-    return web.json_response(CheckSchema.model_validate(data).model_dump())
+    return web.json_response(
+        CheckSchema.model_validate(dict(data)).model_dump(by_alias=True, mode="json")
+    )
 
 
 async def get_all_checks(request: web.Request) -> web.Response:
@@ -35,7 +37,9 @@ async def get_all_checks(request: web.Request) -> web.Response:
     if not data:
         raise web.HTTPNotFound()
 
-    return web.json_response([CheckSchema.model_validate(r).model_dump() for r in data])
+    return web.json_response(
+        [CheckSchema.model_validate(dict(r)).model_dump(by_alias=True, mode="json") for r in data]
+    )
 
 
 async def get_checks_aggregate(request: web.Request) -> web.Response:
@@ -57,7 +61,9 @@ async def get_checks_aggregate(request: web.Request) -> web.Response:
     if not data:
         raise web.HTTPNotFound()
 
-    return web.json_response([CheckGroupBy.model_validate(r).model_dump() for r in data])
+    return web.json_response(
+        [CheckGroupBy.model_validate(dict(r)).model_dump(mode="json") for r in data]
+    )
 
 
 async def create_check(request: web.Request) -> web.Response:
@@ -96,4 +102,6 @@ async def create_check(request: web.Request) -> web.Response:
     if not check:
         raise web.HTTPBadRequest(text=f"Check not created, status: {status}")
 
-    return web.json_response(CheckSchema.model_validate(check).model_dump(), status=201)
+    return web.json_response(
+        CheckSchema.model_validate(dict(check)).model_dump(by_alias=True, mode="json"), status=201
+    )

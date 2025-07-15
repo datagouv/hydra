@@ -23,7 +23,7 @@ async def get_resource(request: web.Request) -> web.Response:
     if not resource:
         raise web.HTTPNotFound()
 
-    return web.json_response(ResourceSchema.model_validate(resource).model_dump())
+    return web.json_response(ResourceSchema.model_validate(dict(resource)).model_dump(mode="json"))
 
 
 async def create_resource(request: web.Request) -> web.Response:
@@ -50,7 +50,7 @@ async def create_resource(request: web.Request) -> web.Response:
         priority=True,
     )
 
-    return web.json_response(document.model_dump(), status=201)
+    return web.json_response(document.model_dump(mode="json"), status=201)
 
 
 async def update_resource(request: web.Request) -> web.Response:
@@ -77,7 +77,7 @@ async def update_resource(request: web.Request) -> web.Response:
         format=document.format or "",
     )
 
-    return web.json_response(document.model_dump(), status=200)
+    return web.json_response(document.model_dump(mode="json"), status=200)
 
 
 async def delete_resource(request: web.Request) -> web.Response:

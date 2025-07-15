@@ -1,10 +1,13 @@
 import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ResourceDocumentSchema(BaseModel):
+    # Allow creation from ORM objects (like asyncpg Record) by enabling from_attributes
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     url: str
     format: str | None = None
@@ -24,6 +27,9 @@ class ResourceDocumentSchema(BaseModel):
 
 
 class ResourceSchema(BaseModel):
+    # Allow creation from ORM objects (like asyncpg Record) by enabling from_attributes
+    model_config = ConfigDict(from_attributes=True)
+
     dataset_id: str
     resource_id: UUID
     status: str | None = None
