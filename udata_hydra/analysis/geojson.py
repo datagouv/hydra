@@ -147,7 +147,7 @@ async def csv_to_geojson_and_pmtiles(
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
-) -> None:
+) -> tuple[str, int, str, int] | None:
     def cast_latlon(latlon: str) -> list[float, float]:
         # we can safely do this as the detection was successful
         lat, lon = latlon.replace(" ", "").split(",")
@@ -246,6 +246,7 @@ async def csv_to_geojson_and_pmtiles(
     geojson_file = f"{resource_id}.geojson"
     with open(geojson_file, "w") as f:
         json.dump(template, f, indent=4, ensure_ascii=False, default=str)
+    geojson_size = os.path.getsize(geojson_file)
 
     geojson_url: str = minio_client_geojson.send_file(geojson_file, delete_source=False)
 
@@ -253,7 +254,7 @@ async def csv_to_geojson_and_pmtiles(
         check_id,
         {
             "geojson_url": geojson_url,
-            "geojson_size": os.path.getsize(geojson_file),
+            "geojson_size": geojson_size,
         },
     )
 
@@ -266,4 +267,7 @@ async def csv_to_geojson_and_pmtiles(
             "pmtiles_size": pmtiles_size,
         },
     )
+
     os.remove(geojson_file)
+    # returning only for tests purposes
+    return geojson_url, geojson_size, pmtiles_url, pmtiles_size
