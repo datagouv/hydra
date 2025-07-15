@@ -23,7 +23,7 @@ async def get_resource(request: web.Request) -> web.Response:
     if not resource:
         raise web.HTTPNotFound()
 
-    return web.json_response(ResourceSchema().dump(dict(resource)))
+    return web.json_response(ResourceSchema.model_validate(resource).model_dump())
 
 
 async def create_resource(request: web.Request) -> web.Response:
@@ -33,28 +33,24 @@ async def create_resource(request: web.Request) -> web.Response:
     If error, respond with a 400 status code
     """
     try:
-        payload = await request.json()
-        valid_payload: dict = ResourceSchema().load(payload)
+        payload = ResourceSchema.model_validate(await request.json())
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
-    document: dict | None = valid_payload["document"]
+    document: ResourceDocumentSchema | None = payload.document
     if not document:
         raise web.HTTPBadRequest(text="Missing document body")
 
-    dataset_id = valid_payload["dataset_id"]
-    resource_id = valid_payload["resource_id"]
-
     await Resource.insert(
-        dataset_id=dataset_id,
-        resource_id=resource_id,
-        url=document["url"],
-        type=document["type"],
-        format=document["format"],
+        dataset_id=payload.dataset_id,
+        resource_id=str(payload.resource_id),
+        url=document.url,
+        type=document.type,
+        format=document.format or "",
         priority=True,
     )
 
-    return web.json_response(ResourceDocumentSchema().dump(dict(document)), status=201)
+    return web.json_response(document.model_dump(), status=201)
 
 
 async def update_resource(request: web.Request) -> web.Response:
@@ -65,27 +61,23 @@ async def update_resource(request: web.Request) -> web.Response:
     """
 
     try:
-        payload = await request.json()
-        valid_payload: dict = ResourceSchema().load(payload)
+        payload = ResourceSchema.model_validate(await request.json())
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
-    document: dict | None = valid_payload["document"]
+    document: ResourceDocumentSchema | None = payload.document
     if not document:
         raise web.HTTPBadRequest(text="Missing document body")
 
-    dataset_id: str = valid_payload["dataset_id"]
-    resource_id: str = valid_payload["resource_id"]
-
     await Resource.update_or_insert(
-        dataset_id=dataset_id,
-        resource_id=resource_id,
-        url=document["url"],
-        type=document["type"],
-        format=document["format"],
+        dataset_id=payload.dataset_id,
+        resource_id=str(payload.resource_id),
+        url=document.url,
+        type=document.type,
+        format=document.format or "",
     )
 
-    return web.json_response(ResourceDocumentSchema().dump(document), status=200)
+    return web.json_response(document.model_dump(), status=200)
 
 
 async def delete_resource(request: web.Request) -> web.Response:
