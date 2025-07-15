@@ -1,5 +1,9 @@
 # Changelog
 
+## Current (in progress)
+
+- Nothing yet
+
 ## 2.3.0 (2025-07-15)
 
 - Delete tmp files if error in download [#277](https://github.com/datagouv/hydra/pull/277)
