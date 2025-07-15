@@ -302,7 +302,7 @@ async def csv_to_parquet(
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
-) -> None:
+) -> tuple[str, int] | None:
     """
     Convert a csv file to parquet using inspection data.
 
@@ -310,6 +310,10 @@ async def csv_to_parquet(
         file_path: CSV file path to convert.
         inspection: CSV detective report.
         table_name: used to name the parquet file.
+
+    Returns:
+        parquet_url: URL of the parquet file.
+        parquet_size: size of the parquet file.
     """
     if not config.CSV_TO_PARQUET:
         log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
@@ -335,14 +339,17 @@ async def csv_to_parquet(
         df=df,
         output_filename=resource_id,
     )
+    parquet_size: int = os.path.getsize(parquet_file)
+    parquet_url: str = minio_client.send_file(parquet_file)
     await Check.update(
         check_id,
         {
-            "parquet_url": minio_client.send_file(parquet_file, delete_source=False),
-            "parquet_size": os.path.getsize(parquet_file),
+            "parquet_url": parquet_url,
+            "parquet_size": parquet_size,
         },
     )
-    os.remove(parquet_file)
+    # returning only for tests purposes
+    return parquet_url, parquet_size
 
 
 async def csv_to_db(
