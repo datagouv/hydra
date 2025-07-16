@@ -4,7 +4,7 @@ version: 2.1
 parameters:
   python-version:
     type: string
-    default: "3.11.2"
+    default: "3.11"
   publish-branch:
     type: string
     default: "main"
@@ -21,7 +21,7 @@ parameters:
 jobs:
   install:
     docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
+      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
     steps:
       - checkout
       - run:
@@ -34,21 +34,14 @@ jobs:
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-
       - run:
-          name: Install Poetry 2.0.1 locally
+          name: Install Python dependencies with Poetry 2
           command: |
-            python3 -m venv .poetry-venv
-            .poetry-venv/bin/pip install poetry==2.0.1
-            ln -s .poetry-venv/bin/poetry poetry-binary
-      - run:
-          name: Install python dependencies
-          command: |
-            ./poetry-binary config virtualenvs.in-project true
-            ./poetry-binary install --extras "dev"
+            poetry config virtualenvs.in-project true
+            poetry install --extras "dev"
       - save_cache:
           key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
           paths:
             - .venv
-            - .poetry-venv
       - persist_to_workspace:
           root: .
           paths:
@@ -56,7 +49,7 @@ jobs:
 
   lint:
     docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
+      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
     steps:
       - attach_workspace:
           at: .
@@ -65,13 +58,14 @@ jobs:
           # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
           # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
-            ./poetry-binary run ruff --version
-            ./poetry-binary run ruff check --select I .
-            ./poetry-binary run ruff format --check .
+            poetry run ruff --version
+            poetry run ruff check --select I .
+            poetry run ruff format --check .
 
   tests:
     docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
+      # Can't use a slim or slim image here ad we need libmagik to run the tests
+      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>
       - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres
@@ -94,7 +88,7 @@ jobs:
             echo "$TESTFILES"
             # Run the found tests
             if [ -n "$TESTFILES" ]; then
-              ./poetry-binary run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+              poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
             else
               echo "No tests to run in this split"
               exit 1
@@ -104,7 +98,7 @@ jobs:
 
   build:
     docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
+      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
     steps:
       - attach_workspace:
           at: .
@@ -117,10 +111,10 @@ jobs:
             # Otherwise, relies on a dev version like "1.2.1.dev" by default
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
                 # for main branches, can't add the commit hash since it's not a valid format for publishing
-                echo "export RELEASE_VERSION=$(./poetry-binary version -s)$CIRCLE_BUILD_NUM" > version.sh
+                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM" > version.sh
             else
                 # for feature branches, add the commit hash
-                echo "export RELEASE_VERSION=$(./poetry-binary version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}" > version.sh
+                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}" > version.sh
             fi
             chmod +x version.sh
       - run:
@@ -136,8 +130,8 @@ jobs:
           command: |
             source version.sh
             # Set the version in pyproject.toml
-            ./poetry-binary version $RELEASE_VERSION
-            ./poetry-binary build
+            poetry version $RELEASE_VERSION
+            poetry build
       - store_artifacts:
           path: dist
       - persist_to_workspace:
@@ -148,14 +142,14 @@ jobs:
 
   publish:
     docker:
-      - image: cimg/python:<< pipeline.parameters.python-version >>
+      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
     steps:
       - attach_workspace:
           at: .
       - run:
           name: Publish on PyPI
           command: |
-            ./poetry-binary publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+            poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
 
   trigger-gitlab-pipeline:
     docker:

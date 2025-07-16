@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Fill in check throughout the process to send previous steps infos in case of late crash [#293](https://github.com/datagouv/hydra/pull/293)
+- Simplify CI configuration [#290](https://github.com/datagouv/hydra/pull/290)
 
 ## 2.3.0 (2025-07-15)
 
