@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Fill in check throughout the process to have previous steps infos in case of late crash [#293](https://github.com/datagouv/hydra/pull/293)
 
 ## 2.3.0 (2025-07-15)
 
