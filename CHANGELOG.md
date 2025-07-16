@@ -4,6 +4,7 @@
 
 - Simplify CI configuration [#290](https://github.com/datagouv/hydra/pull/290)
 - Remove unused dependencies [#292](https://github.com/datagouv/hydra/pull/292)
+- Use [Pydantic](https://docs.pydantic.dev/) instead of [Marshmallow](https://marshmallow.readthedocs.io/en/stable/) for API validation [#149](https://github.com/datagouv/hydra/pull/149)
 
 ## 2.3.0 (2025-07-15)
 

@@ -10,11 +10,11 @@ dependencies = [
     "csv-detective==0.8.1.dev1549",
     "dateparser>=1.1.7",
     "humanfriendly>=10.0",
-    "marshmallow>=3.14.1",
     "minicli>=0.5.3",
     "minio>=7.2.8",
     "progressist>=0.1.0",
     "pyarrow>=16.1.0",
+    "pydantic>=2.11.7",
     "python-magic>=0.4.25",
     "python-slugify>=8.0.4",
     "redis>=4.1.4",
@@ -71,6 +71,10 @@ markers = [
 ]
 # addopts = "--cov=udata_hydra/ --cov-report term-missing --cov-fail-under=89" # if we want to fail if coverage is less than 89%
 addopts = "--cov=udata_hydra/ --cov-report term-missing"
+# filterwarnings = [
+#     "ignore::DeprecationWarning:progressist.*",
+#     "ignore::DeprecationWarning:pkg_resources.*",
+# ]
 
 [tool.ruff]
 lint = { extend-select = ["I"] } # ["I"] is to also sort imports with an isort rule
