@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Simplify CI configuration [#290](https://github.com/datagouv/hydra/pull/290)
+- Remove useless `toml` libray [#292](https://github.com/datagouv/hydra/pull/292)
 
 ## 2.3.0 (2025-07-15)
 
