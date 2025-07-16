@@ -4,6 +4,7 @@
 
 - Simplify CI configuration [#290](https://github.com/datagouv/hydra/pull/290)
 - Fill in check throughout the process to send previous steps infos in case of late crash [#293](https://github.com/datagouv/hydra/pull/293)
+- Remove unused dependencies [#292](https://github.com/datagouv/hydra/pull/292)
 
 ## 2.3.0 (2025-07-15)
 
