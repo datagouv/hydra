@@ -4,7 +4,6 @@ version = "2.3.1.dev"
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = [{ name = "Opendata Team", email = "opendatateam@data.gouv.fr" }]
 dependencies = [
-    "aiocontextvars>=0.2.2",
     "aiohttp>=3.10.3",
     "asyncpg>=0.29.0",
     "coloredlogs>=15.0.1",
@@ -16,16 +15,12 @@ dependencies = [
     "minio>=7.2.8",
     "progressist>=0.1.0",
     "pyarrow>=16.1.0",
-    "python-dateutil>=2.8.2",
     "python-magic>=0.4.25",
     "python-slugify>=8.0.4",
     "redis>=4.1.4",
     "rq>=1.11.1",
     "sentry-sdk>=2.10.0",
-    "setuptools>=70.3.0",
     "sqlalchemy>=1.4.46",
-    "str2bool>=1.1",
-    "str2float>=0.0.9",
     "tippecanoe>=2.72.0",
 ]
 requires-python = ">=3.11,<3.13"
