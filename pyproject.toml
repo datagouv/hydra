@@ -26,7 +26,6 @@ dependencies = [
     "sqlalchemy>=1.4.46",
     "str2bool>=1.1",
     "str2float>=0.0.9",
-    "toml>=0.10.2",
     "tippecanoe>=2.72.0",
 ]
 requires-python = ">=3.11,<3.13"
