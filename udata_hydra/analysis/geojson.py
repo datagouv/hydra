@@ -146,6 +146,7 @@ async def csv_to_geojson_and_pmtiles(
     df: pd.DataFrame,
     inspection: dict,
     resource_id: str | None = None,
+    check_id: int | None = None,
 ) -> tuple[str, int, str, int] | None:
     def cast_latlon(latlon: str) -> list[float, float]:
         # we can safely do this as the detection was successful
@@ -247,8 +248,26 @@ async def csv_to_geojson_and_pmtiles(
         json.dump(template, f, indent=4, ensure_ascii=False, default=str)
     geojson_size = os.path.getsize(geojson_file)
 
+    geojson_url: str = minio_client_geojson.send_file(geojson_file, delete_source=False)
+
+    await Check.update(
+        check_id,
+        {
+            "geojson_url": geojson_url,
+            "geojson_size": geojson_size,
+        },
+    )
+
     pmtiles_url, pmtiles_size = await geojson_to_pmtiles(geojson_file, resource_id)
 
-    geojson_url: str = minio_client_geojson.send_file(geojson_file)
+    await Check.update(
+        check_id,
+        {
+            "pmtiles_url": pmtiles_url,
+            "pmtiles_size": pmtiles_size,
+        },
+    )
 
+    os.remove(geojson_file)
+    # returning only for tests purposes
     return geojson_url, geojson_size, pmtiles_url, pmtiles_size

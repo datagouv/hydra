@@ -609,7 +609,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
 
     with patch("udata_hydra.config.CSV_TO_GEOJSON", patched_config):
         if not patched_config or expected_formats is None:
-            # process is or early exit because no geo data
+            # process is disabled or early exit because no geo data
             with patch("udata_hydra.analysis.geojson.geojson_to_pmtiles") as mock_func:
                 res = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID)
                 assert res is None
@@ -641,9 +641,12 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                     new=mocked_minio_client_pmtiles,
                 ),
             ):
-                mock_os = mocker.patch("udata_hydra.utils.minio.os")
-                mock_os.path = os.path
-                mock_os.remove.return_value = None
+                # patching os.remove where is should be used, we want to keep the files to open them
+                _mocks = {}
+                for _func in ["udata_hydra.utils.minio.os", "udata_hydra.analysis.geojson.os"]:
+                    _mocks[_func] = mocker.patch(_func)
+                    _mocks[_func].path = os.path
+                    _mocks[_func].remove.return_value = None
                 (
                     geojson_url,
                     geojson_size,
