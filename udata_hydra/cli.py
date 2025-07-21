@@ -371,6 +371,7 @@ async def purge_csv_tables(quiet: bool = False) -> None:
     error_count = 0
 
     conn_csv = await connection(db_name="csv")
+    log.debug(f"{len(tables_to_delete)} tables to delete")
     for table in tables_to_delete:
         try:
             async with conn_main.transaction():
