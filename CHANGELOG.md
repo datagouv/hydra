@@ -5,6 +5,7 @@
 - Simplify CI configuration [#290](https://github.com/datagouv/hydra/pull/290)
 - Remove unused dependencies [#292](https://github.com/datagouv/hydra/pull/292)
 - Fill in check throughout the process to send previous steps infos in case of late crash [#293](https://github.com/datagouv/hydra/pull/293)
+- Fix purge csv tables CLI by using the csv db connection [#294](https://github.com/datagouv/hydra/pull/294)
 
 ## 2.3.0 (2025-07-15)
 
