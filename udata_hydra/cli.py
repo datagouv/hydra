@@ -371,13 +371,14 @@ async def purge_csv_tables(quiet: bool = False) -> None:
     error_count = 0
 
     conn_csv = await connection(db_name="csv")
+    log.debug(f"{len(tables_to_delete)} tables to delete")
     for table in tables_to_delete:
         try:
             async with conn_main.transaction():
                 async with conn_csv.transaction():
                     log.debug(f'Deleting table "{table}"')
                     await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
-                    await conn_main.execute(
+                    await conn_csv.execute(
                         "DELETE FROM tables_index WHERE parsing_table = $1", table
                     )
                     await conn_main.execute(
