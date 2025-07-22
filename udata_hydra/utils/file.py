@@ -25,7 +25,7 @@ def compute_checksum_from_file(filename: str) -> str:
     return sha1sum.hexdigest()
 
 
-def read_csv_gz(file_path: str) -> IO[bytes]:
+def extract_gzip(file_path: str) -> IO[bytes]:
     with gzip.open(file_path, "rb") as gz_file:
         with tempfile.NamedTemporaryFile(mode="wb", delete=False) as temp_file:
             temp_file.write(gz_file.read())
@@ -78,7 +78,7 @@ async def download_resource(
             "application/x-gzip",
             "application/gzip",
         ]:
-            tmp_file = read_csv_gz(tmp_file.name)
+            tmp_file = extract_gzip(tmp_file.name)
         return tmp_file
 
 
