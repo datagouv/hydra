@@ -1,4 +1,9 @@
+![udata-hydra](banner.png)
+
 # udata-hydra 🦀
+
+[![CircleCI](https://circleci.com/gh/datagouv/hydra.svg?style=svg)](https://circleci.com/gh/datagouv/hydra)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 `udata-hydra` is an async metadata crawler for [data.gouv.fr](https://www.data.gouv.fr).
 
