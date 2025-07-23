@@ -11,6 +11,7 @@ from udata_hydra import config, context
 from udata_hydra.crawl.helpers import (
     convert_headers,
     fix_surrogates,
+    has_cors_headers,
     has_nice_head,
     is_domain_backoff,
 )
@@ -113,6 +114,13 @@ async def check_resource(
                 )
             resp.raise_for_status()
 
+            # Convert headers and detect CORS support
+            converted_headers = convert_headers(resp.headers)
+            has_cors: bool = has_cors_headers(converted_headers)
+
+            # Add CORS support flag to the headers structure
+            converted_headers["_has_cors"] = has_cors
+
             # Preprocess the check data. If it has changed, it will be sent to udata
             new_check, last_check = await preprocess_check_data(
                 dataset_id=resource["dataset_id"],
@@ -121,7 +129,7 @@ async def check_resource(
                     "url": url,
                     "domain": domain,
                     "status": resp.status,
-                    "headers": convert_headers(resp.headers),
+                    "headers": converted_headers,
                     "timeout": False,
                     "response_time": end - start,
                 },
@@ -185,6 +193,11 @@ async def check_resource(
                 return handled
 
         error = getattr(e, "message", None) or str(e)
+        # Convert headers and detect CORS support even for errors
+        error_headers = convert_headers(getattr(e, "headers", {}))
+        has_cors = has_cors_headers(error_headers)
+        error_headers["_has_cors"] = has_cors
+
         # Process the check data. If it has changed, it will be sent to udata
         await preprocess_check_data(
             dataset_id=resource["dataset_id"],
@@ -194,7 +207,7 @@ async def check_resource(
                 "domain": domain,
                 "timeout": False,
                 "error": fix_surrogates(error),
-                "headers": convert_headers(getattr(e, "headers", {})),
+                "headers": error_headers,
                 "status": getattr(e, "status", None),
             },
         )
