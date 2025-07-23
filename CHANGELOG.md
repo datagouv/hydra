@@ -7,6 +7,7 @@
 - Fill in check throughout the process to send previous steps infos in case of late crash [#293](https://github.com/datagouv/hydra/pull/293)
 - Fix purge csv tables CLI by using the csv db connection [#294](https://github.com/datagouv/hydra/pull/294)
 - Better gz files extraction function name [#295](https://github.com/datagouv/hydra/pull/295)
+- Add more detailed statuses [#297](https://github.com/datagouv/hydra/pull/297)
 
 ## 2.3.0 (2025-07-15)
 
