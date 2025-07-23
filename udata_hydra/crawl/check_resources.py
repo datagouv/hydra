@@ -193,10 +193,6 @@ async def check_resource(
                 return handled
 
         error = getattr(e, "message", None) or str(e)
-        # Convert headers and detect CORS support even for errors
-        error_headers = convert_headers(getattr(e, "headers", {}))
-        has_cors = has_cors_headers(error_headers)
-        error_headers["_has_cors"] = has_cors
 
         # Process the check data. If it has changed, it will be sent to udata
         await preprocess_check_data(
@@ -207,7 +203,7 @@ async def check_resource(
                 "domain": domain,
                 "timeout": False,
                 "error": fix_surrogates(error),
-                "headers": error_headers,
+                "headers": convert_headers(getattr(e, "headers", {})),
                 "status": getattr(e, "status", None),
             },
         )
