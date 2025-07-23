@@ -83,16 +83,12 @@ async def analyse_resource(
     tmp_file = None
     if change_status != Change.HAS_NOT_CHANGED or force_analysis:
         try:
-            await Resource.update(
-                resource_id, data={"status": "DOWNLOADING_RESOURCE"}
-            )
+            await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
             tmp_file = await download_resource(url, headers, max_size_allowed)
         except IOException:
             dl_analysis["analysis:error"] = "File too large to download"
         else:
-            await Resource.update(
-                resource_id, data={"status": "ANALYSING_DOWNLOADED_RESOURCE"}
-            )
+            await Resource.update(resource_id, data={"status": "ANALYSING_DOWNLOADED_RESOURCE"})
             # Get file size
             dl_analysis["analysis:content-length"] = os.path.getsize(tmp_file.name)
             # Get checksum
