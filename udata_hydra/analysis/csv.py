@@ -252,7 +252,9 @@ async def get_previous_analysis(resource_id: str) -> dict | None:
     matching = match_columns(table_columns, list(analysis["columns"].keys()))
     if matching is None:
         return None
-    analysis["columns"] = {matching[col]: analysis["columns"][matching[col]] for col in table_columns}
+    analysis["columns"] = {
+        matching[col]: analysis["columns"][matching[col]] for col in table_columns
+    }
     return analysis
 
 
