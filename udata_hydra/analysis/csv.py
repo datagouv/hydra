@@ -220,10 +220,7 @@ async def get_previous_analysis(resource_id: str) -> dict | None:
     def match_columns(row: dict, analysis_columns: dict) -> dict | None:
         """If a column name is too long for postgres (>60 characters) it gets truncated in the table"""
         # retrieving the columns that match exactly between table and analysis
-        matching = {
-            col: col for col in row
-            if col in analysis_columns
-        }
+        matching = {col: col for col in row if col in analysis_columns}
         # early stop if all columns match perfectly
         if len(matching) == len(row):
             return matching
@@ -255,10 +252,7 @@ async def get_previous_analysis(resource_id: str) -> dict | None:
     matching = match_columns(first_row, analysis["columns"])
     if matching is None:
         return None
-    analysis["columns"] = {
-        matching[col]: analysis["columns"][matching[col]]
-        for col in first_row
-    }
+    analysis["columns"] = {matching[col]: analysis["columns"][matching[col]] for col in first_row}
     return analysis
 
 
