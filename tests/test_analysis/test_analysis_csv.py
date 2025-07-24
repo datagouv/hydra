@@ -459,7 +459,7 @@ def create_analysis(scan: dict) -> dict:
             },
             False,
         ),
-        # column names get truncated in db, but validation works
+        # column names get truncated in db, but validation works (file content and analysis are unchanged)
         (
             default_kwargs
             | {
