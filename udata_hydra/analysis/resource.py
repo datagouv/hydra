@@ -65,7 +65,7 @@ async def analyse_resource(
 
     # Update resource status to ANALYSING_RESOURCE
     resource: Record | None = await Resource.update(
-        resource_id, data={"status": "ANALYSING_RESOURCE"}
+        resource_id, data={"status": "ANALYSING_RESOURCE_HEAD"}
     )
 
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
@@ -83,10 +83,12 @@ async def analyse_resource(
     tmp_file = None
     if change_status != Change.HAS_NOT_CHANGED or force_analysis:
         try:
+            await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
             tmp_file = await download_resource(url, headers, max_size_allowed)
         except IOException:
             dl_analysis["analysis:error"] = "File too large to download"
         else:
+            await Resource.update(resource_id, data={"status": "ANALYSING_DOWNLOADED_RESOURCE"})
             # Get file size
             dl_analysis["analysis:content-length"] = os.path.getsize(tmp_file.name)
             # Get checksum

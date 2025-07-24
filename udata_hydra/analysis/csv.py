@@ -119,6 +119,7 @@ async def analyse_csv(
         try:
             previous_analysis: dict | None = await get_previous_analysis(resource_id=resource_id)
             if previous_analysis:
+                await Resource.update(resource_id, {"status": "VALIDATING_CSV"})
                 csv_inspection, df = validate_then_detect(
                     file_path=tmp_file.name,
                     previous_analysis=previous_analysis,
