@@ -11,8 +11,8 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     # Count resources with no check and resources with a check
     q = f"""
         SELECT
-            SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END) AS count_never_checked,
-            SUM(CASE WHEN last_check IS NOT NULL THEN 1 ELSE 0 END) AS count_checked
+            COALESCE(SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END), 0) AS count_never_checked,
+            COALESCE(SUM(CASE WHEN last_check IS NOT NULL THEN 1 ELSE 0 END), 0) AS count_checked
         FROM catalog
         WHERE {Resource.get_excluded_clause()}
         AND catalog.deleted = False
@@ -22,8 +22,7 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     now = datetime.now(timezone.utc)
     q = f"""
         SELECT
-            SUM(CASE WHEN checks.next_check_at <= $1 THEN 1 ELSE 0 END) AS count_outdated
-            --, SUM(CASE WHEN checks.next_check_at > $1 THEN 1 ELSE 0 END) AS count_fresh
+            COALESCE(SUM(CASE WHEN checks.next_check_at <= $1 THEN 1 ELSE 0 END), 0) AS count_outdated
         FROM catalog, checks
         WHERE {Resource.get_excluded_clause()}
         AND catalog.last_check = checks.id
@@ -31,13 +30,11 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     """
     stats_checks: dict = await request.app["pool"].fetchrow(q, now)
 
-    count_pending_checks: int = stats_resources["count_never_checked"] + (
-        stats_checks["count_outdated"] or 0
+    count_pending_checks: int = (
+        stats_resources["count_never_checked"] + stats_checks["count_outdated"]
     )
     # all w/ a check, minus those with an outdated checked
-    count_fresh_checks: int = stats_resources["count_checked"] - (
-        stats_checks["count_outdated"] or 0
-    )
+    count_fresh_checks: int = stats_resources["count_checked"] - stats_checks["count_outdated"]
     total: int = stats_resources["count_never_checked"] + stats_resources["count_checked"]
     rate_checked: float = round(stats_resources["count_checked"] / total * 100, 1)
     rate_checked_fresh: float = round(count_fresh_checks / total * 100, 1)
