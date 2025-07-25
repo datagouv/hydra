@@ -25,7 +25,7 @@ async def get_latest_check(request: web.Request) -> web.Response:
         raise web.HTTPGone()
 
     return web.json_response(
-        CheckSchema.model_validate(dict(data)).model_dump(by_alias=True, mode="json")
+        CheckSchema.model_validate(dict(data)).model_dump(by_alias=False, mode="json")
     )
 
 
@@ -38,7 +38,7 @@ async def get_all_checks(request: web.Request) -> web.Response:
         raise web.HTTPNotFound()
 
     return web.json_response(
-        [CheckSchema.model_validate(dict(r)).model_dump(by_alias=True, mode="json") for r in data]
+        [CheckSchema.model_validate(dict(r)).model_dump(by_alias=False, mode="json") for r in data]
     )
 
 
@@ -103,5 +103,5 @@ async def create_check(request: web.Request) -> web.Response:
         raise web.HTTPBadRequest(text=f"Check not created, status: {status}")
 
     return web.json_response(
-        CheckSchema.model_validate(dict(check)).model_dump(by_alias=True, mode="json"), status=201
+        CheckSchema.model_validate(dict(check)).model_dump(by_alias=False, mode="json"), status=201
     )
