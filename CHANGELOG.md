@@ -9,6 +9,7 @@
 - Better gz files extraction function name [#295](https://github.com/datagouv/hydra/pull/295)
 - Add more detailed statuses [#297](https://github.com/datagouv/hydra/pull/297)
 - Handle cases of too long columns labels for postgres [#298](https://github.com/datagouv/hydra/pull/298)
+- Fix rare issue in `/status/crawler/` endpoint [#299](https://github.com/datagouv/hydra/pull/299)
 
 ## 2.3.0 (2025-07-15)
 
