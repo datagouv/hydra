@@ -459,6 +459,24 @@ def create_analysis(scan: dict) -> dict:
             },
             False,
         ),
+        # some column names get truncated in db, but validation works (file content and analysis are unchanged)
+        (
+            *(
+                default_kwargs
+                | {
+                    "header": ["a" * 70, "b" * 70, "a" * 30],
+                    "rows": [["1", "13002526500013", "1.2"], ["5", "38271817900023", "2.3"]],
+                    "columns": {
+                        "a" * 70: {"score": 1.0, "format": "int", "python_type": "int"},
+                        "b" * 70: {"score": 1.0, "format": "siret", "python_type": "string"},
+                        "a" * 30: {"score": 1.0, "format": "float", "python_type": "float"},
+                    },
+                    "formats": {"int": ["a" * 70], "siret": ["b" * 70], "float": ["a" * 30]},
+                },
+            )
+            * 2,
+            True,
+        ),
     ),
 )
 async def test_validation(
