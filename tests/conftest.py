@@ -82,17 +82,17 @@ def setup():
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def mock_pool(mocker, event_loop):
+async def mock_pool(mocker):
     """This avoids having different pools attached to different event loops"""
     m = mocker.patch("udata_hydra.context.pool")
-    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50, loop=event_loop)
+    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50)
     m.return_value = pool
     yield
     await pool.close()
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def patch_enqueue(mocker, event_loop):
+async def patch_enqueue(mocker):
     """
     Patch our enqueue helper
     This bypasses rq totally by executing the function in the same event loop
@@ -104,7 +104,7 @@ async def patch_enqueue(mocker, event_loop):
         kwargs.pop("_exception", None)
         result = fn(*args, **kwargs)
         if asyncio.iscoroutine(result):
-            loop = event_loop
+            loop = asyncio.get_running_loop()
             coro_result = loop.run_until_complete(result)
             return coro_result
         return result

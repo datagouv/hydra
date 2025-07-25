@@ -182,7 +182,6 @@ async def test_create_check(
     setup_catalog,
     client,
     rmock,
-    event_loop,
     db,
     resource,
     analysis_mock,
