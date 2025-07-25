@@ -150,7 +150,8 @@ async def csv_to_geojson_and_pmtiles(
 ) -> tuple[str, int, str, int] | None:
     def cast_latlon(latlon: str) -> list[float, float]:
         # we can safely do this as the detection was successful
-        lat, lon = latlon.replace(" ", "").split(",")
+        # removing potential blank and brackets
+        lat, lon = latlon.replace(" ", "").replace("[", "").replace("]", "").split(",")
         # using the geojson standard: longitude before latitude
         return [float(lon), float(lat)]
 
@@ -178,6 +179,9 @@ async def csv_to_geojson_and_pmtiles(
         if "latlon" in detection["format"]:
             geo["latlon"] = column
             break
+        if "lonlat" in detection["format"]:
+            geo["lonlat"] = column
+            break
         if "latitude" in detection["format"]:
             geo["lat"] = column
         if "longitude" in detection["format"]:
@@ -187,6 +191,8 @@ async def csv_to_geojson_and_pmtiles(
         geo = {"geometry": geo["geometry"]}
     if "latlon" in geo:
         geo = {"latlon": geo["latlon"]}
+    if "lonlat" in geo:
+        geo = {"lonlat": geo["lonlat"]}
     if not geo or (("lat" in geo and "lon" not in geo) or ("lon" in geo and "lat" not in geo)):
         log.debug("No geographical columns found, skipping")
         return None
@@ -221,6 +227,24 @@ async def csv_to_geojson_and_pmtiles(
                     },
                     "properties": {
                         col: prevent_nan(row[col]) for col in df.columns if col != geo["latlon"]
+                    },
+                }
+            )
+        elif "lonlat" in geo:
+            # ending up here means we either have the exact lon,lat format, or NaN
+            # skipping row if NaN
+            if pd.isna(row[geo["lonlat"]]):
+                continue
+            template["features"].append(
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        # inverting lon and lat to match the standard
+                        "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
+                    },
+                    "properties": {
+                        col: prevent_nan(row[col]) for col in df.columns if col != geo["lonlat"]
                     },
                 }
             )
