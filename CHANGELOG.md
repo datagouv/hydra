@@ -7,9 +7,9 @@
 - Fill in check throughout the process to send previous steps infos in case of late crash [#293](https://github.com/datagouv/hydra/pull/293)
 - Fix purge csv tables CLI by using the csv db connection [#294](https://github.com/datagouv/hydra/pull/294)
 - Better gz files extraction function name [#295](https://github.com/datagouv/hydra/pull/295)
-- Add more detailed statuses [#297](https://github.com/datagouv/hydra/pull/297)
-- Handle cases of too long columns labels for postgres [#298](https://github.com/datagouv/hydra/pull/298)
-- Fix rare issue in `/status/crawler/` endpoint [#299](https://github.com/datagouv/hydra/pull/299)
+- Add more detailed statuses [#298](https://github.com/datagouv/hydra/pull/298)
+- Handle cases of too long columns labels for postgres [#299](https://github.com/datagouv/hydra/pull/299)
+- Fix rare issue in `/status/crawler/` endpoint [#301](https://github.com/datagouv/hydra/pull/301) [#302](https://github.com/datagouv/hydra/pull/302)
 
 ## 2.3.0 (2025-07-15)
 
