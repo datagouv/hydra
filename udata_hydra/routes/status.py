@@ -30,7 +30,9 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     """
     stats_checks: dict = await request.app["pool"].fetchrow(q, now)
 
-    count_pending_checks: int = stats_resources["count_never_checked"] + stats_checks["count_outdated"]
+    count_pending_checks: int = (
+        stats_resources["count_never_checked"] + stats_checks["count_outdated"]
+    )
     # all w/ a check, minus those with an outdated checked
     count_fresh_checks: int = stats_resources["count_checked"] - stats_checks["count_outdated"]
     total: int = stats_resources["count_never_checked"] + stats_resources["count_checked"]
