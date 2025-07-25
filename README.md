@@ -1,6 +1,6 @@
 ![udata-hydra](banner.png)
 
-# udata-hydra 🦀
+# udata-hydra
 
 [![CircleCI](https://circleci.com/gh/datagouv/hydra.svg?style=svg)](https://circleci.com/gh/datagouv/hydra)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -15,7 +15,7 @@ Since it's called _hydra_, it also has mythical powers embedded:
 - if the remote resource is a geojson, convert it to PMTiles to offer another distribution of the data
 - send crawl and analysis info to a udata instance
 
-## Architecture schema
+## 🏗️ Architecture schema
 
 The architecture for the full workflow is the following:
 
@@ -26,7 +26,7 @@ The hydra crawler is one of the components of the architecture. It will check if
 
 ![Crawler architecture](docs/hydra.drawio.png)
 
-## Dependencies
+## 📦 Dependencies
 
 This project uses `libmagic`, which needs to be installed on your system, eg:
 
@@ -34,7 +34,7 @@ This project uses `libmagic`, which needs to be installed on your system, eg:
 
 This project uses Python >=3.11 and [Poetry](https://python-poetry.org) >= 2.0.0 to manage dependencies.
 
-## CLI
+## 🖥️ CLI
 
 ### Create database structure
 
@@ -47,7 +47,7 @@ Install udata-hydra dependencies and cli.
 
 `poetry run udata-hydra load-catalog`
 
-## Crawler
+## 🕷️ Crawler
 
 `poetry run udata-hydra-crawl`
 
@@ -61,7 +61,7 @@ There's a by-domain backoff mecanism. The crawler will wait when, for a given do
 
 If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
-## Worker
+## ⚙️ Worker
 
 A job queuing system is used to process long-running tasks. Launch the worker with the following command:
 
@@ -75,11 +75,11 @@ To empty all the queues:
 
 `poetry run rq empty -c udata_hydra.worker low default high`
 
-## CSV conversion to database
+## 📊 CSV conversion to database
 
 Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
 
-## Tests
+## 🧪 Tests
 
 To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
 
@@ -93,13 +93,13 @@ To run a specific test function, you can pass the path to the file and the name 
 
 If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
 
-### Tests coverage
+### 📈 Tests coverage
 
 Pytest automatically uses the `coverage` package to generate a coverage report, which is displayed at the end of the test run in the terminal.
 The coverage is configured in the `pypoject.toml` file, in the `[tool.pytest.ini_options]` section.
 You can also override the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
 
-## API
+## 🔌 API
 
 The API will need a Bearer token for each request on protected endpoints (any endpoint that isn't a `GET`).
 The token is configured in the `config.toml` file as `API_KEY`, and has a default value set in the `udata_hydra/config_default.toml` file.
@@ -116,7 +116,7 @@ RESOURCES_ANALYSER_URI = "http://localhost:8000"
 RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
 ```
 
-### Run
+### 🚀 Run
 
 ```bash
 poetry install
@@ -125,7 +125,7 @@ poetry run adev runserver udata_hydra/app.py
 By default, the app will listen on `localhost:8000`.
 You can check the status of the app with `curl http://localhost:8000/api/health`.
 
-### Routes/endpoints
+### 🛣️ Routes/endpoints
 
 The API serves the following endpoints:
 
@@ -411,7 +411,7 @@ $ curl -s "http://localhost:8000/api/stats" | json_pp
 }
 ```
 
-## Using Webhook integration
+## 🔗 Using Webhook integration
 
 ** Set the config values**
 
@@ -442,9 +442,9 @@ The payload should look something like:
 }
 ```
 
-## Development
+## 🛠️ Development
 
-### docker compose
+### 🐳 docker compose
 
 Multiple docker-compose files are provided:
 - a minimal `docker-compose.yml` with two PostgreSQL containers (one for catalog and metadata, the other for converted CSV to database)
@@ -453,17 +453,17 @@ Multiple docker-compose files are provided:
 
 NB: you can launch compose from multiple files like this: `docker compose -f docker-compose.yml -f docker-compose.test.yml up`
 
-### Logging & Debugging
+### 📝 Logging & Debugging
 
 The log level can be adjusted using the environment variable LOG_LEVEL.
 For example, to set the log level to `DEBUG` when initializing the database, use `LOG_LEVEL="DEBUG" udata-hydra init_db `.
 
-### Writing a migration
+### 📋 Writing a migration
 
 1. Add a file named `migrations/{YYYYMMDD}_{description}.sql` and write the SQL you need to perform migration.
 2. `udata-hydra migrate` will migrate the database as needeed.
 
-## Deployment
+## 🚀 Deployment
 
 3 services need to be deployed for the full stack to run:
 - worker
@@ -474,7 +474,7 @@ Refer to each section to learn how to launch them. The only differences from dev
 - use `HYDRA_SETTINGS` env var to point to your custom `config.toml`
 - use `HYDRA_APP_SOCKET_PATH` to configure where aiohttp should listen to a [reverse proxy connection (eg nginx)](https://docs.aiohttp.org/en/stable/deployment.html#nginx-configuration) and use `udata-hydra-app` to launch the app server
 
-## Contributing
+## 🤝 Contributing
 
 Before contributing to the repository and making any PR, it is necessary to initialize the pre-commit hooks:
 ```bash
@@ -487,6 +487,6 @@ If you cannot use pre-commit, it is necessary to format, lint, and sort imports 
 poetry run ruff check --fix . && poetry run ruff format .
 ```
 
-### Releases
+### 🏷️ Releases
 
 The release process uses [bump'X](https://github.com/datagouv/bumpx).
