@@ -8,7 +8,7 @@ from udata_hydra import config
 class ResourceExceptionSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: int  # In DB, this is SERIAL PRIMARY KEY (which is an integer), but it was a str in the schema before
     resource_id: UUID
     table_indexes: str | None = None
     comment: str | None = None
