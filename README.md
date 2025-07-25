@@ -57,7 +57,7 @@ It will crawl (forever) the catalog according to the config set in `config.toml`
 
 The crawler will start with URLs never checked and then proceed with URLs crawled before `CHECK_DELAYS` interval. It will then wait until something changes (catalog or time).
 
-There's a by-domain backoff mecanism. The crawler will wait when, for a given domain in a given batch, `BACKOFF_NB_REQ` is exceeded in a period of `BACKOFF_PERIOD` seconds. It will retry until the backoff is lifted.
+There's a by-domain backoff mechanism. The crawler will wait when, for a given domain in a given batch, `BACKOFF_NB_REQ` is exceeded in a period of `BACKOFF_PERIOD` seconds. It will retry until the backoff is lifted.
 
 If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
@@ -77,13 +77,13 @@ To empty all the queues:
 
 ## 📊 CSV conversion to database
 
-Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
+Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's the same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
 
 ## 🧪 Tests
 
 To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
 
-Make sure the dev dependecies are installed with `poetry install --extras dev`.
+Make sure the dev dependencies are installed with `poetry install --extras dev`.
 
 Then you can run the tests with `poetry run pytest`.
 
@@ -96,7 +96,7 @@ If you would like to see print statements as they are executed, you can pass the
 ### 📈 Tests coverage
 
 Pytest automatically uses the `coverage` package to generate a coverage report, which is displayed at the end of the test run in the terminal.
-The coverage is configured in the `pypoject.toml` file, in the `[tool.pytest.ini_options]` section.
+The coverage is configured in the `pyproject.toml` file, in the `[tool.pytest.ini_options]` section.
 You can also override the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
 
 ## 🔌 API
@@ -108,7 +108,7 @@ If you're using hydra as an external service to receive resource events from [ud
 API key in its `udata.cfg` file:
 
 ```python
-# Wether udata should publish the resource events
+# Whether udata should publish the resource events
 PUBLISH_ON_RESOURCE_EVENTS = True
 # Where to publish the events
 RESOURCES_ANALYSER_URI = "http://localhost:8000"
@@ -132,7 +132,7 @@ The API serves the following endpoints:
 *Related to checks:*
 - `GET` on `/api/checks/latest?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
 - `GET` on `/api/checks/all?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
-- `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurences grouped by a `column` for a specific `date`
+- `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurrences grouped by a `column` for a specific `date`
 
 *Related to resources:*
 - `GET` on `/api/resources/{resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
@@ -146,7 +146,7 @@ The API serves the following endpoints:
 > - `POST` on `/api/resource/deleted` -> use `DELETE` on `/api/resources/` instead
 
 *Related to resources exceptions:*
-- `GET` on `/api/resources-exceptions` to get the list all resources exceptions
+- `GET` on `/api/resources-exceptions` to get the list of all resources exceptions
 - `POST` on `/api/resources-exceptions` to create a new resource exception in the DB
 - `PUT` on `/api/resources-exceptions/{resource_id}` to update a resource exception in the DB
 - `DELETE` on `/api/resources-exceptions/{resource_id}` to delete a resource exception from the DB
@@ -157,8 +157,8 @@ The API serves the following endpoints:
 - `GET` on `/api/stats` to get the crawling stats
 - `GET` on `/api/health` to get the API version number and environment
 
-You may want to you a helper such as [Bruno](https://www.usebruno.com/) to handle API calls, in which case all the endpoints are ready to use [here](https://github.com/datagouv/api-calls).
-More details about some enpoints are provided below with examples, but not for all of them:
+You may want to use a helper such as [Bruno](https://www.usebruno.com/) to handle API calls, in which case all the endpoints are ready to use [here](https://github.com/datagouv/api-calls).
+More details about some endpoints are provided below with examples, but not for all of them:
 
 #### Get latest check
 
@@ -237,7 +237,7 @@ $ curl -s "http://localhost:8000/api/checks/all?url=http://www.drees.sante.gouv.
 ]
 ```
 
-#### Get checks occurences grouped by a column for a specific date
+#### Get checks occurrences grouped by a column for a specific date
 
 Works with `?group_by={column}` and `?created_at={date}`.
 `date` should be a date in format `YYYY-MM-DD` or the default keyword `today`.
@@ -425,7 +425,7 @@ SENTRY_DSN = "https://{my-sentry-dsn}"
 
 The webhook integration sends HTTP messages to `udata` when resources are analysed or checked to fill resources extras.
 
-Regarding analysis, there is a phase called "change detection". It will try to guess if a resource has been modified based on different criterions:
+Regarding analysis, there is a phase called "change detection". It will try to guess if a resource has been modified based on different criteria:
 - harvest modified date in catalog
 - content-length and last-modified headers
 - checksum comparison over time
@@ -461,7 +461,7 @@ For example, to set the log level to `DEBUG` when initializing the database, use
 ### 📋 Writing a migration
 
 1. Add a file named `migrations/{YYYYMMDD}_{description}.sql` and write the SQL you need to perform migration.
-2. `udata-hydra migrate` will migrate the database as needeed.
+2. `udata-hydra migrate` will migrate the database as needed.
 
 ## 🚀 Deployment
 
