@@ -82,18 +82,17 @@ def setup():
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def mock_pool(mocker):
+async def mock_pool(mocker, event_loop):
     """This avoids having different pools attached to different event loops"""
     m = mocker.patch("udata_hydra.context.pool")
-    loop = asyncio.get_running_loop()
-    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50, loop=loop)
+    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50, loop=event_loop)
     m.return_value = pool
     yield
     await pool.close()
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def patch_enqueue(mocker):
+async def patch_enqueue(mocker, event_loop):
     """
     Patch our enqueue helper
     This bypasses rq totally by executing the function in the same event loop
@@ -105,7 +104,7 @@ async def patch_enqueue(mocker):
         kwargs.pop("_exception", None)
         result = fn(*args, **kwargs)
         if asyncio.iscoroutine(result):
-            loop = asyncio.get_running_loop()
+            loop = event_loop
             coro_result = loop.run_until_complete(result)
             return coro_result
         return result
@@ -293,7 +292,7 @@ def udata_resource_payload():
             "type": "documentation",
             "format": "pdf",
             "mime": "text/plain",
-            "schema_name": None,
+            "schema": None,
             "filesize": 1024,
             "checksum_type": "sha1",
             "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
