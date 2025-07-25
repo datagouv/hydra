@@ -87,9 +87,9 @@ Make sure the dev dependecies are installed with `poetry install --extras dev`.
 
 Then you can run the tests with `poetry run pytest`.
 
-To run a specific test file, you can pass the path to the file to pytest, like this: `poetry run pytest tests/test_app.py`.
+To run a specific test file, you can pass the path to the file to pytest, like this: `poetry run pytest tests/test_file.py`.
 
-To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `poetry run pytest tests/test_app.py::test_get_latest_check`.
+To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `poetry run pytest tests/test_api/test_api_checks.py::test_get_latest_check`.
 
 If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
 
