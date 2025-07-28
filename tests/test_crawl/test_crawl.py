@@ -62,7 +62,7 @@ async def mock_download_resource(url, headers, max_size_allowed):
         ),
     ],
 )
-async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mock, udata_url):
+async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_url):
     status, timeout, exception = resource
     rurl = RESOURCE_URL
     params = {
@@ -74,7 +74,7 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mo
     # mock for head fallback
     rmock.get(rurl, **params)
     rmock.put(udata_url)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
 
     # test check results in DB
@@ -117,12 +117,12 @@ async def test_crawl(setup_catalog, rmock, event_loop, db, resource, analysis_mo
         assert webhook.get("check:timeout") is False
 
 
-async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock, produce_mock):
+async def test_excluded_clause(setup_catalog, mocker, rmock, produce_mock):
     mocker.patch("udata_hydra.config.SLEEP_BETWEEN_BATCHES", 0)
     mocker.patch("udata_hydra.config.EXCLUDED_PATTERNS", ["http%example%"])
     rurl = RESOURCE_URL
     rmock.get(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # url has not been called due to excluded clause
     assert ("GET", URL(rurl)) not in rmock.requests
 
@@ -137,9 +137,7 @@ async def test_excluded_clause(setup_catalog, mocker, event_loop, rmock, produce
         (True, datetime.now() + timedelta(hours=1), False),
     ],
 )
-async def test_next_check(
-    setup_catalog, db, rmock, fake_check, event_loop, produce_mock, last_check_params
-):
+async def test_next_check(setup_catalog, db, rmock, fake_check, produce_mock, last_check_params):
     last_check, next_check_at, new_check_expected = last_check_params
     if last_check:
         await fake_check(
@@ -147,7 +145,7 @@ async def test_next_check(
         )
     rurl = RESOURCE_URL
     rmock.get(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     checks: list[Record] = await db.fetch(
         f"SELECT * FROM checks WHERE url = '{rurl}' ORDER BY created_at DESC"
     )
@@ -165,7 +163,7 @@ async def test_next_check(
         assert len(checks) == [0, 1][last_check]
 
 
-async def test_deleted_check(setup_catalog, rmock, fake_check, event_loop, produce_mock):
+async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
     check = await fake_check(created_at=datetime.now() - timedelta(hours=24))
     # associate check with a resource
     await Resource.update(resource_id=RESOURCE_ID, data={"last_check": check["id"]})
@@ -179,33 +177,33 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, event_loop, produ
     # Test crawl is triggered
     rurl = RESOURCE_URL
     rmock.head(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # Assert url has been called because check is deleted
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
-async def test_switch_head_to_get(setup_catalog, event_loop, rmock, produce_mock):
+async def test_switch_head_to_get(setup_catalog, rmock, produce_mock):
     rurl = RESOURCE_URL
     rmock.head(rurl, status=501)
     rmock.get(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
     assert ("GET", URL(rurl)) in rmock.requests
 
 
-async def test_switch_head_to_get_headers(setup_catalog, event_loop, rmock, produce_mock):
+async def test_switch_head_to_get_headers(setup_catalog, rmock, produce_mock):
     rurl = RESOURCE_URL
     rmock.head(rurl, status=200, headers={})
     rmock.get(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
     assert ("GET", URL(rurl)) in rmock.requests
 
 
-async def test_no_switch_head_to_get(setup_catalog, event_loop, rmock, produce_mock, analysis_mock):
+async def test_no_switch_head_to_get(setup_catalog, rmock, produce_mock, analysis_mock):
     rurl = RESOURCE_URL
     rmock.head(rurl, status=200, headers={"content-length": "1"})
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
     assert ("GET", URL(rurl)) not in rmock.requests
 
@@ -256,7 +254,7 @@ async def test_analyse_resource_send_udata_no_change(
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
-async def test_analyse_resource_from_crawl(setup_catalog, rmock, event_loop, db, udata_url):
+async def test_analyse_resource_from_crawl(setup_catalog, rmock, db, udata_url):
     """
     Looks a lot like an E2E test:
     - process catalog
@@ -274,7 +272,7 @@ async def test_analyse_resource_from_crawl(setup_catalog, rmock, event_loop, db,
     # mock for check and analysis results
     rmock.put(udata_url, status=200, repeat=True)
 
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
 
     assert len(rmock.requests[("PUT", URL(udata_url))]) == 2
     res = await db.fetch("SELECT * FROM checks")
@@ -284,11 +282,11 @@ async def test_analyse_resource_from_crawl(setup_catalog, rmock, event_loop, db,
     assert res[0]["status"] is not None
 
 
-async def test_change_analysis_last_modified_header(setup_catalog, rmock, event_loop, udata_url):
+async def test_change_analysis_last_modified_header(setup_catalog, rmock, udata_url):
     rmock.head(RESOURCE_URL, headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"})
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
@@ -297,7 +295,7 @@ async def test_change_analysis_last_modified_header(setup_catalog, rmock, event_
 
 
 async def test_change_analysis_content_length_header(
-    setup_catalog, rmock, event_loop, fake_check, db, udata_url
+    setup_catalog, rmock, fake_check, db, udata_url
 ):
     # different content-length than mock response
     await fake_check(headers={"content-length": "1"})
@@ -306,7 +304,7 @@ async def test_change_analysis_content_length_header(
     rmock.head(RESOURCE_URL, headers={"content-length": "2"})
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
@@ -317,9 +315,7 @@ async def test_change_analysis_content_length_header(
     assert data["analysis:last-modified-detection"] == "content-length-header"
 
 
-async def test_change_analysis_checksum(
-    setup_catalog, mocker, fake_check, db, rmock, event_loop, udata_url
-):
+async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, rmock, udata_url):
     # different checksum than mock file
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
@@ -329,7 +325,7 @@ async def test_change_analysis_checksum(
     rmock.head(RESOURCE_URL)
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
@@ -341,16 +337,14 @@ async def test_change_analysis_checksum(
 
 
 @pytest.mark.catalog_harvested
-async def test_change_analysis_harvested(
-    setup_catalog, mocker, rmock, fake_check, db, event_loop, udata_url
-):
+async def test_change_analysis_harvested(setup_catalog, mocker, rmock, fake_check, db, udata_url):
     await fake_check(detected_last_modified_at=datetime.now() - timedelta(days=10))
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", RESOURCE_ID)
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.head("https://example.com/harvested", headers={"content-length": "2"}, repeat=True)
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
@@ -362,7 +356,7 @@ async def test_change_analysis_harvested(
 
 @pytest.mark.catalog_harvested
 async def test_no_change_analysis_harvested(
-    setup_catalog, mocker, rmock, fake_check, db, event_loop, udata_url
+    setup_catalog, mocker, rmock, fake_check, db, udata_url
 ):
     last_modfied_at = datetime.fromisoformat("2022-12-06T05:00:32.647000").replace(
         tzinfo=timezone.utc
@@ -375,14 +369,14 @@ async def test_no_change_analysis_harvested(
     rmock.head("https://example.com/harvested", headers={"content-type": "application/json"})
     rmock.get("https://example.com/harvested")
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     assert ("PUT", URL(udata_url)) not in rmock.requests
     res = await db.fetch("SELECT * FROM checks ORDER BY created_at DESC LIMIT 1")
     assert res[0]["detected_last_modified_at"] == last_modfied_at
 
 
 async def test_change_analysis_last_modified_header_twice(
-    setup_catalog, rmock, event_loop, fake_check, udata_url
+    setup_catalog, rmock, fake_check, udata_url
 ):
     _date = "Thu, 09 Jan 2020 09:33:37 GMT"
     await fake_check(
@@ -395,13 +389,13 @@ async def test_change_analysis_last_modified_header_twice(
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # udata has not been called: not first check, outdated check, and last-modified stayed the same
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
 async def test_change_analysis_last_modified_header_twice_tz(
-    setup_catalog, rmock, event_loop, fake_check, udata_url
+    setup_catalog, rmock, fake_check, udata_url
 ):
     _date_1 = "2020-01-09T09:33:37+01:00"
     _date_2 = "2020-01-09T09:33:37+04:00"
@@ -416,16 +410,14 @@ async def test_change_analysis_last_modified_header_twice_tz(
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # udata has been called: last-modified has changed (different timezones)
     assert ("PUT", URL(udata_url)) in rmock.requests
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("analysis:last-modified-at") == _date_2
 
 
-async def test_check_changed_content_length_header(
-    setup_catalog, rmock, event_loop, fake_check, udata_url
-):
+async def test_check_changed_content_length_header(setup_catalog, rmock, fake_check, udata_url):
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
@@ -436,16 +428,14 @@ async def test_check_changed_content_length_header(
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # udata has been called in compute_check_has_changed: content-length has changed
     assert ("PUT", URL(udata_url)) in rmock.requests
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("check:headers:content-length") == 15
 
 
-async def test_no_check_changed_content_length_header(
-    setup_catalog, rmock, event_loop, fake_check, udata_url
-):
+async def test_no_check_changed_content_length_header(setup_catalog, rmock, fake_check, udata_url):
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
@@ -457,14 +447,12 @@ async def test_no_check_changed_content_length_header(
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # udata has not been called: not first check, outdated check, and content-length stayed the same
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
-async def test_check_changed_content_type_header(
-    setup_catalog, rmock, event_loop, fake_check, udata_url
-):
+async def test_check_changed_content_type_header(setup_catalog, rmock, fake_check, udata_url):
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
@@ -475,16 +463,14 @@ async def test_check_changed_content_type_header(
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # udata has been called in compute_check_has_changed: content-type has changed
     assert ("PUT", URL(udata_url)) in rmock.requests
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("check:headers:content-type") == "text/csv"
 
 
-async def test_no_check_changed_content_type_header(
-    setup_catalog, rmock, event_loop, fake_check, udata_url
-):
+async def test_no_check_changed_content_type_header(setup_catalog, rmock, fake_check, udata_url):
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
@@ -496,12 +482,12 @@ async def test_no_check_changed_content_type_header(
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # udata has not been called: not first check, outdated check, and content-type remained the same
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
-async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, produce_mock):
+async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, produce_mock):
     # very complicated stuff, thanks https://github.com/pnuckowski/aioresponses/issues/111#issuecomment-896585061
     def callback(url, **kwargs):
         assert config.USER_AGENT == sys._getframe(3).f_locals["orig_self"].headers["user-agent"]
@@ -511,13 +497,12 @@ async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, event_loop, p
     rurl = RESOURCE_URL
     rmock.head(rurl, callback=callback)
     rmock.get(rurl, callback=callback)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
 
 
 async def test_check_triggered_by_udata_entrypoint_clean_catalog(
     client,
     udata_resource_payload,
-    event_loop,
     db,
     rmock,
     analysis_mock,
@@ -531,7 +516,7 @@ async def test_check_triggered_by_udata_entrypoint_clean_catalog(
     assert res.status == 201
     res = await db.fetch("SELECT * FROM catalog")
     assert len(res) == 1
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 1
@@ -541,7 +526,6 @@ async def test_check_triggered_by_udata_entrypoint_existing_catalog(
     setup_catalog,
     client,
     udata_resource_payload,
-    event_loop,
     db,
     rmock,
     analysis_mock,
@@ -554,13 +538,13 @@ async def test_check_triggered_by_udata_entrypoint_existing_catalog(
     assert res.status == 201
     res = await db.fetch("SELECT * FROM catalog")
     assert len(res) == 2
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 2
 
 
-async def test_check_triggers_csv_analysis(rmock, event_loop, db, produce_mock, setup_catalog):
+async def test_check_triggers_csv_analysis(rmock, db, produce_mock, setup_catalog):
     """Crawl a CSV file, analyse and apify it, downloads only once"""
     rurl = RESOURCE_URL
     # mock for check
@@ -572,7 +556,7 @@ async def test_check_triggers_csv_analysis(rmock, event_loop, db, produce_mock, 
         headers={"content-type": "application/csv"},
         body=SIMPLE_CSV_CONTENT.encode("utf-8"),
     )
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # GET called only once: HEAD is ok (no need for crawl) and analysis steps share the downloaded file
     assert len(rmock.requests[("GET", URL(rurl))]) == 1
     res = await db.fetch("SELECT * FROM checks")
@@ -582,9 +566,7 @@ async def test_check_triggers_csv_analysis(rmock, event_loop, db, produce_mock, 
     assert len(res) == 2
 
 
-async def test_recheck_download_only_once(
-    rmock, fake_check, event_loop, db, produce_mock, setup_catalog
-):
+async def test_recheck_download_only_once(rmock, fake_check, db, produce_mock, setup_catalog):
     """On recheck of a (CSV) file, if it hasn't change, downloads only once"""
     await fake_check(
         resource_id=RESOURCE_ID, headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"}
@@ -600,7 +582,7 @@ async def test_recheck_download_only_once(
         },
     )
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", RESOURCE_ID)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
 
     # HEAD should have been called
     assert len(rmock.requests[("HEAD", URL(rurl))]) == 1
@@ -627,11 +609,11 @@ async def test_content_type_from_header(content_type):
 
 @pytest.mark.parametrize("resource_status", list(Resource.STATUSES.keys()) + [None])
 async def test_dont_check_resources_with_status(
-    rmock, event_loop, db, produce_mock, setup_catalog, resource_status
+    rmock, db, produce_mock, setup_catalog, resource_status
 ):
     await Resource.update(resource_id=RESOURCE_ID, data={"status": resource_status})
     rurl = RESOURCE_URL
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
 
     if resource_status == "BACKOFF" or resource_status is None:
         # HEAD should have been called
@@ -755,7 +737,6 @@ async def test_new_resource_priority(
     setup_catalog,
     client,
     udata_resource_payload,
-    event_loop,
     db,
     rmock,
     produce_mock,
@@ -774,7 +755,7 @@ async def test_new_resource_priority(
     # we have to mock the functions separately, because they are intricated
     with patch(func_path) as mock_func:
         mock_func.return_value = result
-        event_loop.run_until_complete(start_checks(iterations=1))
+        await start_checks(iterations=1)
         mock_func.assert_called_with(**kwargs)
 
 

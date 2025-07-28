@@ -47,7 +47,7 @@ def run() -> None:
     :iterations: for testing purposes (break infinite loop)
     """
     try:
-        asyncio.get_event_loop().run_until_complete(start_checks())
+        asyncio.run(start_checks())
     except KeyboardInterrupt:
         pass
     finally:

@@ -22,13 +22,13 @@ pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
 
-async def test_backoff_nb_req(setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock):
+async def test_backoff_nb_req(setup_catalog, rmock, mocker, fake_check, produce_mock):
     await fake_check(resource=2, resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe")
     mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
     mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
     rurl = RESOURCE_URL
     rmock.head(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # verify that we actually backed-off
     assert ("HEAD", URL(rurl)) not in rmock.requests
 
@@ -44,9 +44,7 @@ async def test_backoff_nb_req(setup_catalog, event_loop, rmock, mocker, fake_che
         (0, -1, False),
     ],
 )
-async def test_backoff_rate_limiting(
-    setup_catalog, event_loop, rmock, fake_check, produce_mock, ratelimit
-):
+async def test_backoff_rate_limiting(setup_catalog, rmock, fake_check, produce_mock, ratelimit):
     remain, limit, should_backoff = ratelimit
     await fake_check(
         resource=2,
@@ -59,7 +57,7 @@ async def test_backoff_rate_limiting(
     rurl = RESOURCE_URL
     rmock.head(rurl, status=200)
     rmock.get(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # verify that we actually backed-off
     if should_backoff:
         assert ("HEAD", URL(rurl)) not in rmock.requests
@@ -68,7 +66,7 @@ async def test_backoff_rate_limiting(
 
 
 async def test_backoff_rate_limiting_lifted(
-    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock, db
+    setup_catalog, rmock, mocker, fake_check, produce_mock, db
 ):
     await fake_check(
         resource=2,
@@ -97,7 +95,7 @@ async def test_backoff_rate_limiting_lifted(
 
 
 async def test_backoff_rate_limiting_cooled_off(
-    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock, db
+    setup_catalog, rmock, mocker, fake_check, produce_mock, db
 ):
     await fake_check(
         resource=2,
@@ -133,9 +131,7 @@ async def test_backoff_rate_limiting_cooled_off(
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
-async def test_backoff_nb_req_lifted(
-    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock, db
-):
+async def test_backoff_nb_req_lifted(setup_catalog, rmock, mocker, fake_check, produce_mock, db):
     await fake_check(resource=2, resource_id="c5187912-24a5-49ea-a725-5e1e3d472efe")
     mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
     mocker.patch("udata_hydra.config.BACKOFF_PERIOD", 0.25)
@@ -155,7 +151,7 @@ async def test_backoff_nb_req_lifted(
 
 
 async def test_backoff_on_429_status_code(
-    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock, db
+    setup_catalog, rmock, mocker, fake_check, produce_mock, db
 ):
     resource_id = "c5187912-24a5-49ea-a725-5e1e3d472efe"
     await fake_check(resource=2, resource_id=resource_id)
@@ -186,9 +182,7 @@ async def test_backoff_on_429_status_code(
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
-async def test_no_backoff_domains(
-    setup_catalog, event_loop, rmock, mocker, fake_check, produce_mock
-):
+async def test_no_backoff_domains(setup_catalog, rmock, mocker, fake_check, produce_mock):
     await fake_check(resource=2)
     mocker.patch("udata_hydra.config.BACKOFF_NB_REQ", 1)
     mocker.patch("udata_hydra.config.NO_BACKOFF_DOMAINS", ["example.com"])
@@ -196,6 +190,6 @@ async def test_no_backoff_domains(
     mocker.patch("udata_hydra.context.monitor").return_value = magic
     rurl = RESOURCE_URL
     rmock.get(rurl, status=200)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
     # verify that we actually did not back-off
     assert not magic.add_backoff.called
