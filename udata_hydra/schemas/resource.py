@@ -33,4 +33,5 @@ class ResourceSchema(BaseModel):
     dataset_id: str
     resource_id: UUID
     status: str | None = None
+    status_since: datetime.datetime | None = None
     document: ResourceDocumentSchema | None = None
