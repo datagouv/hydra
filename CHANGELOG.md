@@ -11,6 +11,7 @@
 - Handle cases of too long columns labels for postgres [#299](https://github.com/datagouv/hydra/pull/299)
 - Fix rare issue in `/status/crawler/` endpoint [#301](https://github.com/datagouv/hydra/pull/301) [#302](https://github.com/datagouv/hydra/pull/302)
 - Fix typos, deprecated examples and add emojis in README [#304](https://github.com/datagouv/hydra/pull/304)
+- Upgrade dependencies and fix pytest-asyncio deprecated code [#305](https://github.com/datagouv/hydra/pull/305)
 
 ## 2.3.0 (2025-07-15)
 
