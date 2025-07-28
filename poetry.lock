@@ -3007,4 +3007,4 @@ dev = ["aiohttp-devtools", "aioresponses", "bumpx", "gunicorn", "mypy", "nest_as
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "8d258a8c3ce6f37afa55f03baeebb02054e21ca75c05bafd829a09a43e9d5da8"
+content-hash = "f6455517f91f32808765aa3a8f7eb0be55e96e1eb41c0a91d1635813a0796377"
