@@ -36,8 +36,8 @@ async def create_resource(request: web.Request) -> web.Response:
     try:
         request_data: dict = await request.json()
         payload: ResourceSchema = ResourceSchema.model_validate(request_data)
-    except Exception as err:
-        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
+    except Exception as e:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
     document: ResourceDocumentSchema | None = payload.document
     if not document:

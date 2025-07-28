@@ -75,8 +75,8 @@ async def create_check(request: web.Request) -> web.Response:
     try:
         request_data: dict = await request.json()
         payload: CreateCheckRequest = CreateCheckRequest.model_validate(request_data)
-    except Exception as err:
-        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
+    except Exception as e:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
     # Get URL from resource_id
     try:
