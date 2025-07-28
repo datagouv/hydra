@@ -12,7 +12,7 @@
 - Fix rare issue in `/status/crawler/` endpoint [#301](https://github.com/datagouv/hydra/pull/301) [#302](https://github.com/datagouv/hydra/pull/302)
 - Fix typos, deprecated examples and add emojis in README [#304](https://github.com/datagouv/hydra/pull/304)
 - Upgrade dependencies and fix pytest-asyncio deprecated code [#305](https://github.com/datagouv/hydra/pull/305)
-- Use [Pydantic](https://docs.pydantic.dev/) instead of [Marshmallow](https://marshmallow.readthedocs.io/en/stable/) for API validation [#149](https://github.com/datagouv/hydra/pull/149)
+- Replace [Marshmallow](https://marshmallow.readthedocs.io/en/stable/) with [Pydantic](https://docs.pydantic.dev/) [#149](https://github.com/datagouv/hydra/pull/149)
 
 ## 2.3.0 (2025-07-15)
 
