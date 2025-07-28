@@ -67,15 +67,18 @@ async def update_resource_exception(request: web.Request) -> web.Response:
     Respond with a 200 status code with the updated resource exception
     """
 
+    # Extract and validate resource_id from URL path parameter
     try:
         resource_id = str(uuid.UUID(request.match_info["resource_exception_id"]))
     except Exception as e:
         raise web.HTTPBadRequest(text=f"error: {str(e)}")
 
+    # Get resource from the DB
     resource: Record | None = await Resource.get(resource_id)
     if not resource:
         raise web.HTTPNotFound()
 
+    # Parse and validate the request payload
     try:
         request_data: dict = await request.json()
         payload: UpdateResourceExceptionRequest = UpdateResourceExceptionRequest.model_validate(
@@ -107,6 +110,7 @@ async def delete_resource_exception(request: web.Request) -> web.Response:
     Respond with a 204 status code
     """
 
+    # Extract and validate resource_id from URL path parameter
     try:
         resource_id = str(uuid.UUID(request.match_info["resource_exception_id"]))
     except Exception as e:
