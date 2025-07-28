@@ -15,9 +15,11 @@ from udata_hydra.utils import get_request_params
 
 async def get_latest_check(request: web.Request) -> web.Response:
     """Get the latest check for a given URL or resource_id"""
+
     url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
     if not url and not resource_id:
         raise web.HTTPBadRequest()
+
     data: Record | None = await Check.get_latest(url, resource_id)
     if not data:
         raise web.HTTPNotFound()
@@ -33,6 +35,7 @@ async def get_all_checks(request: web.Request) -> web.Response:
     url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
     if not url and not resource_id:
         raise web.HTTPBadRequest()
+
     data: list | None = await Check.get_all(url, resource_id)
     if not data:
         raise web.HTTPNotFound()
@@ -69,9 +72,9 @@ async def get_checks_aggregate(request: web.Request) -> web.Response:
 async def create_check(request: web.Request) -> web.Response:
     """Create a new check"""
 
-    # Get resource_id from request
     try:
-        payload = CreateCheckRequest.model_validate(await request.json())
+        request_data = await request.json()
+        payload: CreateCheckRequest = CreateCheckRequest.model_validate(request_data)
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 

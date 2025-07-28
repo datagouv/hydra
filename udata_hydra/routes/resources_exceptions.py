@@ -18,6 +18,7 @@ async def get_all_resources_exceptions(request: web.Request) -> web.Response:
     """Endpoint to get all resource exceptions from the DB
     Respond with a 200 status code with a list of resource exceptions
     """
+
     resources_exceptions: list[Record] = await ResourceException.get_all()
 
     return web.json_response(
@@ -33,8 +34,12 @@ async def create_resource_exception(request: web.Request) -> web.Response:
     Will create a new exception in the DB "resources_exceptions" table.
     Respond with a 201 status code with the created resource exception
     """
+
     try:
-        payload = CreateResourceExceptionRequest.model_validate(await request.json())
+        request_data = await request.json()
+        payload: CreateResourceExceptionRequest = CreateResourceExceptionRequest.model_validate(
+            request_data
+        )
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
@@ -61,6 +66,7 @@ async def update_resource_exception(request: web.Request) -> web.Response:
     """Endpoint to update a resource exception in the DB
     Respond with a 200 status code with the updated resource exception
     """
+
     try:
         resource_id = str(uuid.UUID(request.match_info["resource_exception_id"]))
     except Exception as e:
@@ -71,7 +77,10 @@ async def update_resource_exception(request: web.Request) -> web.Response:
         raise web.HTTPNotFound()
 
     try:
-        payload = UpdateResourceExceptionRequest.model_validate(await request.json())
+        request_data = await request.json()
+        payload: UpdateResourceExceptionRequest = UpdateResourceExceptionRequest.model_validate(
+            request_data
+        )
         if payload.table_indexes:
             valid, error = ResourceExceptionSchema.are_table_indexes_valid(payload.table_indexes)
             if not valid:
@@ -97,6 +106,7 @@ async def delete_resource_exception(request: web.Request) -> web.Response:
     """Endpoint to delete a resource exception from the DB
     Respond with a 204 status code
     """
+
     try:
         resource_id = str(uuid.UUID(request.match_info["resource_exception_id"]))
     except Exception as e:

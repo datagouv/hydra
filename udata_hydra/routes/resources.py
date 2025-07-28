@@ -32,8 +32,10 @@ async def create_resource(request: web.Request) -> web.Response:
     Respond with a 200 status code and a JSON body with a message key set to "created"
     If error, respond with a 400 status code
     """
+
     try:
-        payload = ResourceSchema.model_validate(await request.json())
+        request_data = await request.json()
+        payload: ResourceSchema = ResourceSchema.model_validate(request_data)
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
@@ -61,7 +63,8 @@ async def update_resource(request: web.Request) -> web.Response:
     """
 
     try:
-        payload = ResourceSchema.model_validate(await request.json())
+        request_data = await request.json()
+        payload: ResourceSchema = ResourceSchema.model_validate(request_data)
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
