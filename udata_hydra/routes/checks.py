@@ -73,7 +73,7 @@ async def create_check(request: web.Request) -> web.Response:
     """Create a new check"""
 
     try:
-        request_data = await request.json()
+        request_data: dict = await request.json()
         payload: CreateCheckRequest = CreateCheckRequest.model_validate(request_data)
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))

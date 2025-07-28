@@ -36,7 +36,7 @@ async def create_resource_exception(request: web.Request) -> web.Response:
     """
 
     try:
-        request_data = await request.json()
+        request_data: dict = await request.json()
         payload: CreateResourceExceptionRequest = CreateResourceExceptionRequest.model_validate(
             request_data
         )
@@ -77,7 +77,7 @@ async def update_resource_exception(request: web.Request) -> web.Response:
         raise web.HTTPNotFound()
 
     try:
-        request_data = await request.json()
+        request_data: dict = await request.json()
         payload: UpdateResourceExceptionRequest = UpdateResourceExceptionRequest.model_validate(
             request_data
         )
