@@ -3007,4 +3007,8 @@ dev = ["aiohttp-devtools", "aioresponses", "bumpx", "gunicorn", "mypy", "nest_as
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
+<<<<<<< HEAD
 content-hash = "821a60d6e6049da38e6290c6e739b269dacfb037201a0e661028f614816881b2"
+=======
+content-hash = "048fcd46bad978b05beb87355933f3e59e5f099330e6c032dbe19126348fd946"
+>>>>>>> 811f3b0 (chore: merge requirements)
