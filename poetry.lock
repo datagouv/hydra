@@ -763,19 +763,19 @@ toml = ["tomli ; python_full_version <= \"3.11.0a6\""]
 
 [[package]]
 name = "csv-detective"
-version = "0.8.1.dev1578"
+version = "0.9.0"
 description = "Detect tabular files column content"
 optional = false
-python-versions = ">=3.9"
+python-versions = "<3.14,>=3.9"
 groups = ["main"]
 files = [
-    {file = "csv_detective-0.8.1.dev1578-py3-none-any.whl", hash = "sha256:e91245e0325f6e30cc826e6e67315d48f0f24952e71fe10bb16ca9077a227e32"},
+    {file = "csv_detective-0.9.0-py3-none-any.whl", hash = "sha256:d4692ae2f01b23d1f9adf9fadda4489eddd3c8710ed5e50f6cd9e2398f71958a"},
 ]
 
 [package.dependencies]
 boto3 = ">=1.34.0,<2"
 dateparser = ">=1.2.0,<2"
-faker = ">=33.0.0"
+Faker = ">=33.0.0"
 faust-cchardet = "2.1.19"
 frformat = "0.4.0"
 odfpy = "1.4.1"
@@ -789,7 +789,7 @@ Unidecode = ">=1.3.6,<2"
 xlrd = "2.0.1"
 
 [package.extras]
-dev = ["pytest (==8.3.0)", "responses (==0.25.0)"]
+dev = ["bumpx (>=0.3.10)", "pytest (>=8.3.0)", "responses (>=0.25.0)", "ruff (>=0.9.3)"]
 
 [[package]]
 name = "dateparser"
@@ -3008,7 +3008,11 @@ dev = ["aiohttp-devtools", "aioresponses", "bumpx", "gunicorn", "mypy", "nest_as
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
 <<<<<<< HEAD
+<<<<<<< HEAD
 content-hash = "821a60d6e6049da38e6290c6e739b269dacfb037201a0e661028f614816881b2"
 =======
 content-hash = "048fcd46bad978b05beb87355933f3e59e5f099330e6c032dbe19126348fd946"
 >>>>>>> 811f3b0 (chore: merge requirements)
+=======
+content-hash = "0d91509bd3c043cb561b687a2f5157726cc8bd64bf6b058f972d42fac118732a"
+>>>>>>> 91aaf0a (chore: upgrade csv-detective to an official version)
