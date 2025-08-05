@@ -82,39 +82,34 @@ jobs:
           command: |
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
-                echo "export RELEASE_VERSION=$CIRCLE_TAG" > version.sh
+                uv version $CIRCLE_TAG
             # Otherwise, relies on a dev version like "1.2.1.dev" by default
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
                 # for main branches, can't add the commit hash since it's not a valid format for publishing
-                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM" > version.sh
+                CURRENT_VERSION=$(uv version | awk '{print $2}')
+                uv version "${CURRENT_VERSION}${CIRCLE_BUILD_NUM}"
             else
                 # for feature branches, add the commit hash
-                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}" > version.sh
+                CURRENT_VERSION=$(uv version | awk '{print $2}')
+                uv version "${CURRENT_VERSION}${CIRCLE_BUILD_NUM}+${CIRCLE_SHA1:0:7}"
             fi
-            chmod +x version.sh
       - run:
           name: Display build info for debugging
           command: |
-            source version.sh
-            echo "Building a wheel release with version $RELEASE_VERSION"
+            echo "Building a wheel release with version"
+            uv version
             echo "Build number: $CIRCLE_BUILD_NUM"
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Git tag: $CIRCLE_TAG"
       - run:
           name: Build package
-          command: |
-            source version.sh
-            # Update version in pyproject.toml
-            sed -i "s/version = \".*\"/version = \"$RELEASE_VERSION\"/" pyproject.toml
-            # Build the package
-            uv build
+          command: uv build
       - store_artifacts:
           path: dist
       - persist_to_workspace:
           root: .
           paths:
             - .
-            - version.sh
 
   publish:
     docker:
@@ -124,11 +119,7 @@ jobs:
           at: .
       - run:
           name: Publish on PyPI
-          command: |
-            # Install twine for publishing to PyPI
-            uv pip install twine
-            # Upload all distribution files
-            .venv/bin/twine upload --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" dist/*
+          command: uv publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" dist/*
 
   trigger-gitlab-pipeline:
     docker:
