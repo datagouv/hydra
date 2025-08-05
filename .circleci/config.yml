@@ -19,7 +19,50 @@ parameters:
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
 
 jobs:
-  lint-and-test:
+  install:
+    docker:
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "uv.lock" }}
+            - v1-dependencies-
+      - run:
+          name: Install Python dependencies
+          command: uv sync --extra dev
+      - save_cache:
+          paths:
+            - .venv
+            - uv.lock
+          key: v1-dependencies-{{ checksum "uv.lock" }}
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .venv
+            - uv.lock
+
+  lint:
+    docker:
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "uv.lock" }}
+            - v1-dependencies-
+      - run:
+          name: Lint and format code and sort imports
+          # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
+          # ruff format --check . : check code formatting without fixing (to fix, remove --check)
+          command: |
+            uv run ruff --version
+            uv run ruff check --select I .
+            uv run ruff format --check .
+
+  test:
     docker:
       - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
       - image: cimg/postgres:15.13
@@ -35,17 +78,12 @@ jobs:
           command: |
             apt-get update && apt-get install -y \
               cmake libgeos-dev libmagic1
-      - run:
-          name: Install Python dependencies
-          command: uv sync --extra dev
-      - run:
-          name: Lint and format code and sort imports
-          # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
-          # ruff format --check . : check code formatting without fixing (to fix, remove --check)
-          command: |
-            uv run ruff --version
-            uv run ruff check --select I .
-            uv run ruff format --check .
+      - attach_workspace:
+          at: .
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "uv.lock" }}
+            - v1-dependencies-
       - run:
           name: Run tests
           environment:
@@ -74,6 +112,11 @@ jobs:
       - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - checkout
+      - run:
+          name: Install system dependencies
+          command: |
+            apt-get update && apt-get install -y \
+              cmake libgeos-dev libmagic1
       - run:
           name: Install Python dependencies
           command: uv sync --extra dev
@@ -185,10 +228,17 @@ jobs:
 workflows:
   build-test-deploy:
     jobs:
-      - lint-and-test
+      - install
+      - lint:
+          requires:
+            - install
+      - test:
+          requires:
+            - install
       - build:
           requires:
-            - lint-and-test
+            - lint
+            - test
           filters:
             branches:
               only:
