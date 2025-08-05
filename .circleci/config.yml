@@ -106,9 +106,8 @@ jobs:
             source version.sh
             # Update version in pyproject.toml
             sed -i "s/version = \".*\"/version = \"$RELEASE_VERSION\"/" pyproject.toml
-            # Install build and build the package
-            uv pip install build
-            .venv/bin/python -m build
+            # Build the package
+            uv build
       - store_artifacts:
           path: dist
       - persist_to_workspace:
