@@ -26,21 +26,21 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "uv.lock" }}
+            - v1-dependencies-{{ checksum "pylock.toml" }}
             - v1-dependencies-
       - run:
-          name: Install Python dependencies
-          command: uv sync --extra dev
+          name: Install Python dependencies from lock file
+          command: uv pip install -r pylock.toml
       - save_cache:
           paths:
             - .venv
-            - uv.lock
-          key: v1-dependencies-{{ checksum "uv.lock" }}
+            - pylock.toml
+          key: v1-dependencies-{{ checksum "pylock.toml" }}
       - persist_to_workspace:
           root: .
           paths:
             - .venv
-            - uv.lock
+            - pylock.toml
 
   lint:
     docker:
@@ -51,7 +51,7 @@ jobs:
           at: .
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "uv.lock" }}
+            - v1-dependencies-{{ checksum "pylock.toml" }}
             - v1-dependencies-
       - run:
           name: Lint and format code and sort imports
@@ -82,7 +82,7 @@ jobs:
           at: .
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "uv.lock" }}
+            - v1-dependencies-{{ checksum "pylock.toml" }}
             - v1-dependencies-
       - run:
           name: Run tests
