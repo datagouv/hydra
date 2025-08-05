@@ -36,7 +36,7 @@ jobs:
             apt-get update && apt-get install -y \
               cmake libgeos-dev libmagic1
       - run:
-          name: Install dev dependencies
+          name: Install Python dependencies
           command: uv sync --extra dev
       - run:
           name: Lint and format code and sort imports
@@ -76,7 +76,7 @@ jobs:
       - checkout
       - run:
           name: Install Python dependencies
-          command: uv venv && uv pip install -e ".[dev]"
+          command: uv sync --extra dev
       - run:
           name: Set the version
           command: |
