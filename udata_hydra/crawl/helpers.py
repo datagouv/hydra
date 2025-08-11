@@ -63,6 +63,21 @@ def is_valid_status(status: str) -> bool | None:
     return status_nb >= 200 and status_nb < 400
 
 
+def has_cors_headers(headers: dict) -> bool:
+    """Check if CORS headers are present in response headers"""
+    # Common CORS headers to check for
+    cors_header_names = [
+        "access-control-allow-origin",
+        "access-control-allow-methods",
+        "access-control-allow-headers",
+        "access-control-allow-credentials",
+        "access-control-expose-headers",
+        "access-control-max-age",
+    ]
+
+    return any(header_name in headers for header_name in cors_header_names)
+
+
 async def is_domain_backoff(domain: str) -> tuple[bool, str]:
     """Check if we should not crawl on this domain, in order to avoid 429 errors/bans as much as we can. We backoff if:
     - we have hit a 429
