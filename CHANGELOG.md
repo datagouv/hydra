@@ -13,6 +13,7 @@
 - Fix typos, deprecated examples and add emojis in README [#304](https://github.com/datagouv/hydra/pull/304)
 - Upgrade dependencies and fix pytest-asyncio deprecated code [#305](https://github.com/datagouv/hydra/pull/305)
 - Handle new cases of geo columns from csv-detective [#303](https://github.com/datagouv/hydra/pull/303)
+- Add check id in udata extras to facilitate debug [#307](https://github.com/datagouv/hydra/pull/307)
 
 ## 2.3.0 (2025-07-15)
 
