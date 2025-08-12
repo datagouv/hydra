@@ -130,7 +130,7 @@ async def analyse_resource(
             has_changed=change_status == Change.HAS_CHANGED,
         )
 
-    analysis_results = {**dl_analysis, **(change_payload or {})}
+    analysis_results = {"analysis:check_id": check["id"]} | dl_analysis | (change_payload or {})
 
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
         if is_tabular and tmp_file:
