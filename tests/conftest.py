@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import uuid
@@ -240,7 +241,7 @@ async def fake_check():
             "url": url,
             "domain": domain,
             "status": status,
-            "headers": headers,
+            "headers": json.dumps(headers),
             "timeout": timeout,
             "response_time": 0.1,
             "resource_id": resource_id,

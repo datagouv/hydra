@@ -13,12 +13,13 @@ log = logging.getLogger("udata-hydra")
 
 class UdataPayload:
     HYDRA_UDATA_METADATA = {
-        "check": ["available", "date", "error", "status", "timeout"],
+        "check": ["available", "date", "error", "id", "status", "timeout"],
         "check:headers": ["content-type", "content-length"],
         "analysis": [
             "checksum",
             "content-length",
             "error",
+            "check_id",
             "last-modified-at",
             "last-modified-detection",
             "mime-type",

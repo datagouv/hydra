@@ -107,17 +107,17 @@ class Check:
 
         Note: Returns dict instead of Record because this method performs additional operations beyond simple insertion (joins with catalog table, adds dataset_id).
         """
-        data = convert_dict_values_to_json(data)
-        q1: str = compute_insert_query(table_name="checks", data=data, returning=returning)
+        json_data = convert_dict_values_to_json(data)
+        q1: str = compute_insert_query(table_name="checks", data=json_data, returning=returning)
         pool = await context.pool()
         async with pool.acquire() as connection:
-            last_check: Record = await connection.fetchrow(q1, *data.values())
+            last_check: Record = await connection.fetchrow(q1, *json_data.values())
             last_check_dict = dict(last_check)
             q2 = (
                 """UPDATE catalog SET last_check = $1 WHERE resource_id = $2 RETURNING dataset_id"""
             )
             updated_resource: Record | None = await connection.fetchrow(
-                q2, last_check["id"], data["resource_id"]
+                q2, last_check["id"], json_data["resource_id"]
             )
             # Add the dataset_id arg to the check response, if we can, and if it's asked
             if returning in ["*", "dataset_id"] and updated_resource:
