@@ -11,10 +11,7 @@ def convert_dict_values_to_json(data: dict) -> dict:
     TODO: this is suboptimal from asyncpg, dig into this
     https://magicstack.github.io/asyncpg/current/usage.html#example-automatic-json-conversion
     """
-    return {
-        k: json.dumps(v) if type(v) is dict else v
-        for k, v in data.items()
-    }
+    return {k: json.dumps(v) if type(v) is dict else v for k, v in data.items()}
 
 
 def compute_insert_query(table_name: str, data: dict, returning: str = "id") -> str:
