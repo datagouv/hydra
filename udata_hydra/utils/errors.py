@@ -36,9 +36,21 @@ class ExceptionWithSentryDetails(Exception):
                         "url": url or "unknown",
                         "check_id": check_id or "unknown",
                         "table_name": table_name or "unknown",
+                        "step": step or "unknown",
+                        "exception_type": self.__class__.__name__,
                     }
                 )
-                sentry_sdk.capture_exception(self)
+                # Automatically retrieve the original exception from exception chaining
+                # __cause__ is set with 'raise ... from e', __context__ is set automatically
+                original_exception = getattr(self, "__cause__", None) or getattr(
+                    self, "__context__", None
+                )
+                if original_exception:
+                    # Capture the ORIGINAL exception with its full stack trace
+                    sentry_sdk.capture_exception(original_exception)
+                else:
+                    # Fallback: capture self if no original exception
+                    sentry_sdk.capture_exception(self)
         super().__init__(message, *args)
 
 
