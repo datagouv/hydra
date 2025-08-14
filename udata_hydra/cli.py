@@ -233,7 +233,7 @@ async def analyse_geojson_cli(
         elif resource_id:
             log.error("Could not find a check linked to the specified resource ID")
         return
-    await analyse_geojson(check=check)
+    await analyse_geojson(check=dict(check))
 
 
 @cli
