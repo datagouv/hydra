@@ -253,6 +253,67 @@ async def analyse_geojson_cli(
     await analyse_geojson(check=dict(check))
 
 
+@cli(name="analyse-external-csv")
+async def analyse_external_csv_cli(
+    url: str,
+    debug_insert: bool = False,
+    cleanup: bool = True,
+):
+    """Analyze an external CSV URL for testing purposes (not stored in catalog)
+
+    :url: URL of the CSV file to analyze
+    :debug_insert: Enable debug mode for database insertion
+    :cleanup: Clean up temporary data after analysis (default: True)
+    """
+    # Create a temporary check-like structure
+    import uuid
+    from datetime import datetime, timezone
+
+    temp_check = {
+        "resource_id": str(uuid.uuid4()),  # Generate a valid UUID
+        "url": url,
+        "dataset_id": "temp_external",
+        "headers": {},
+        "created_at": datetime.now(timezone.utc),
+        "id": None,  # No check ID in external mode
+    }
+
+    try:
+        await analyse_csv(check=temp_check, debug_insert=debug_insert, external_mode=True)
+        log.info(f"External CSV analysis completed for {url}")
+    except Exception as e:
+        log.error(f"External CSV analysis failed for {url}: {e}")
+        # Always clean up on error
+        await cleanup_external_analysis(url)
+        raise
+    else:
+        # Only clean up on success if cleanup is enabled
+        if cleanup:
+            await cleanup_external_analysis(url)
+
+
+async def cleanup_external_analysis(url: str):
+    """Clean up temporary data from external analysis"""
+    try:
+        # Clean up CSV database tables
+        import hashlib
+
+        from udata_hydra import context
+
+        csv_pool = await context.pool("csv")
+        table_hash = hashlib.md5(url.encode()).hexdigest()
+
+        await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_hash}"')
+        await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_hash}'")
+
+        # Clean up MinIO files if any (parquet, etc.)
+        # Note: This would require additional MinIO cleanup logic
+
+        log.info(f"Cleaned up external analysis data for {url}")
+    except Exception as e:
+        log.warning(f"Failed to clean up external analysis data for {url}: {e}")
+
+
 @cli
 async def csv_sample(size: int = 1000, download: bool = False, max_size: str = "100M"):
     """Get a csv sample from latest checks
