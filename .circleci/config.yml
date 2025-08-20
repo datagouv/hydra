@@ -21,60 +21,69 @@ parameters:
 jobs:
   install:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - checkout
-      - run:
-          name: Get the base reference branch
-          command: export BASE_BRANCH=$(base_branch)
       - restore_cache:
           keys:
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Branch }}
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-
+            - v1-dependencies-{{ checksum "pylock.toml" }}
+            - v1-dependencies-
       - run:
-          name: Install Python dependencies with Poetry 2
-          command: |
-            poetry config virtualenvs.in-project true
-            poetry install --extras "dev"
+          name: Install Python dependencies from lock file
+          command: uv pip install -r pylock.toml
       - save_cache:
-          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
           paths:
             - .venv
+            - pylock.toml
+          key: v1-dependencies-{{ checksum "pylock.toml" }}
       - persist_to_workspace:
           root: .
           paths:
-            - .
+            - .venv
+            - pylock.toml
 
   lint:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
+      - checkout
       - attach_workspace:
           at: .
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "pylock.toml" }}
+            - v1-dependencies-
       - run:
           name: Lint and format code and sort imports
           # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
           # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
-            poetry run ruff --version
-            poetry run ruff check --select I .
-            poetry run ruff format --check .
+            uv run ruff --version
+            uv run ruff check --select I .
+            uv run ruff format --check .
 
-  tests:
+  test:
     docker:
-      # Can't use a slim or slim image here ad we need libmagik to run the tests
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
       - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-    parallelism: 4 # Number of executed tests in parallel
+    parallelism: 4  # Only tests will be parallelized
     steps:
+      - checkout
+      - run:
+          name: Install system dependencies
+          command: |
+            apt-get update && apt-get install -y \
+              cmake libgeos-dev libmagic1
       - attach_workspace:
           at: .
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "pylock.toml" }}
+            - v1-dependencies-
       - run:
           name: Run tests
           environment:
@@ -88,7 +97,9 @@ jobs:
             echo "$TESTFILES"
             # Run the found tests
             if [ -n "$TESTFILES" ]; then
-              poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+              # Convert newline-separated files to space-separated arguments
+              TESTFILES_ARGS=$(echo "$TESTFILES" | tr '\n' ' ')
+              uv run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES_ARGS
             else
               echo "No tests to run in this split"
               exit 1
@@ -98,58 +109,60 @@ jobs:
 
   build:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
-      - attach_workspace:
-          at: .
+      - checkout
+      - run:
+          name: Install system dependencies
+          command: |
+            apt-get update && apt-get install -y \
+              cmake libgeos-dev libmagic1
+      - run:
+          name: Install Python dependencies
+          command: uv sync --extra dev
       - run:
           name: Set the version
           command: |
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
-                echo "export RELEASE_VERSION=$CIRCLE_TAG" > version.sh
+                uv version $CIRCLE_TAG
             # Otherwise, relies on a dev version like "1.2.1.dev" by default
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
                 # for main branches, can't add the commit hash since it's not a valid format for publishing
-                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM" > version.sh
+                CURRENT_VERSION=$(uv version | awk '{print $2}')
+                uv version "${CURRENT_VERSION}${CIRCLE_BUILD_NUM}"
             else
                 # for feature branches, add the commit hash
-                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}" > version.sh
+                CURRENT_VERSION=$(uv version | awk '{print $2}')
+                uv version "${CURRENT_VERSION}${CIRCLE_BUILD_NUM}+${CIRCLE_SHA1:0:7}"
             fi
-            chmod +x version.sh
       - run:
           name: Display build info for debugging
           command: |
-            source version.sh
-            echo "Building a wheel release with version $RELEASE_VERSION"
+            echo "Building a wheel release with version"
+            uv version
             echo "Build number: $CIRCLE_BUILD_NUM"
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Git tag: $CIRCLE_TAG"
       - run:
-          name: Build a distributable package as a wheel release with Poetry
-          command: |
-            source version.sh
-            # Set the version in pyproject.toml
-            poetry version $RELEASE_VERSION
-            poetry build
+          name: Build package
+          command: uv build
       - store_artifacts:
           path: dist
       - persist_to_workspace:
           root: .
           paths:
             - .
-            - version.sh
 
   publish:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - attach_workspace:
           at: .
       - run:
           name: Publish on PyPI
-          command: |
-            poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+          command: uv publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" dist/*
 
   trigger-gitlab-pipeline:
     docker:
@@ -215,32 +228,17 @@ jobs:
 workflows:
   build-test-deploy:
     jobs:
-      - install:
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
+      - install
       - lint:
           requires:
             - install
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-      - tests:
+      - test:
           requires:
             - install
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
       - build:
           requires:
-            - tests
             - lint
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-      - publish:
-          requires:
-            - build
+            - test
           filters:
             branches:
               only:
@@ -250,6 +248,16 @@ workflows:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
           context: org-global
+      - publish:
+          requires:
+            - build
+          filters:
+            branches:
+              only:
+                - << pipeline.parameters.publish-branch >>
+          context:
+            - org-global
+            - gitlab-trigger
       - trigger-gitlab-pipeline:
           requires:
             - publish
