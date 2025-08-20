@@ -723,12 +723,17 @@ async def test_reset_statuses(fake_check, db, setup_catalog, check_duration):
     [
         (
             "udata_hydra.crawl.check_resources.check_resource",
-            {"url": ANY, "resource": ANY, "session": ANY, "worker_priority": "high"},
+            {"url": ANY, "resource": ANY, "session": ANY, "worker_priority": "default"},
             "ok",
         ),
         (
             "udata_hydra.analysis.resource.analyse_resource",
-            {"check": ANY, "last_check": ANY, "force_analysis": False, "worker_priority": "high"},
+            {
+                "check": ANY,
+                "last_check": ANY,
+                "force_analysis": False,
+                "worker_priority": "default",
+            },
             None,
         ),
     ],
