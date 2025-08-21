@@ -16,6 +16,7 @@
 - Fix custom Sentry error by capturing original exception stack trace and add test [#308](https://github.com/datagouv/hydra/pull/308)
 - Optimize queue priorities for resource processing [#311](https://github.com/datagouv/hydra/pull/311)
 - Add `resource_id` info in timer logs and add timer for analysing resource [#313](https://github.com/datagouv/hydra/pull/313)
+- Fix custom exception `ExceptionWithSentryDetails` to include Python stack trace [#315](https://github.com/datagouv/hydra/pull/315)
 
 ## 2.3.0 (2025-07-15)
 
