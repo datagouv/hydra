@@ -68,7 +68,7 @@ class ExceptionWithSentryDetails(Exception):
         This happens when it's raised and caught, ensuring full stack trace.
         """
         # Only capture if we have a traceback (exception is being raised)
-        if hasattr(self, "__traceback__") and self.__traceback__ is not None:
+        if getattr(self, "__traceback__", None) is not None:
             if sentry_sdk.Hub.current.client:
                 with sentry_sdk.new_scope() as scope:
                     scope.set_tags(
