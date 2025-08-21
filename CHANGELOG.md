@@ -15,6 +15,7 @@
 - Handle new cases of geo columns from csv-detective [#303](https://github.com/datagouv/hydra/pull/303)
 - Fix custom Sentry error by capturing original exception stack trace and add test [#308](https://github.com/datagouv/hydra/pull/308)
 - Optimize queue priorities for resource processing [#311](https://github.com/datagouv/hydra/pull/311)
+- Add `resource_id` info in timer logs and add timer for analysing resource [#313](https://github.com/datagouv/hydra/pull/313)
 - Replace [Marshmallow](https://marshmallow.readthedocs.io/en/stable/) with [Pydantic](https://docs.pydantic.dev/) [#149](https://github.com/datagouv/hydra/pull/149)
 
 ## 2.3.0 (2025-07-15)
