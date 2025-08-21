@@ -44,7 +44,7 @@ async def check_batch_resources(to_parse: list[Record]) -> None:
                     url=row["url"],
                     resource=row,
                     session=session,
-                    worker_priority="high" if row["priority"] else "low",
+                    worker_priority="default" if row["priority"] else "low",
                 )
             )
         for task in asyncio.as_completed(tasks):

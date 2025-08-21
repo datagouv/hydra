@@ -98,7 +98,7 @@ async def analyse_csv(
     if exception and exception.get("table_indexes"):
         table_indexes = json.loads(exception["table_indexes"])
 
-    timer = Timer("analyse-csv")
+    timer = Timer("analyse-csv", resource_id)
     assert any(_ is not None for _ in (check["id"], url))
 
     table_name, tmp_file = None, None

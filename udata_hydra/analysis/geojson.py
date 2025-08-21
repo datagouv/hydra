@@ -47,7 +47,7 @@ async def analyse_geojson(
     # Check if the resource is in the exceptions table
     exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
 
-    timer = Timer("analyse-geojson")
+    timer = Timer("analyse-geojson", resource_id)
     assert any(_ is not None for _ in (check["id"], url))
 
     tmp_file = None
