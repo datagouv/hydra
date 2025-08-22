@@ -17,6 +17,7 @@ from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
     IOException,
+    Timer,
     UdataPayload,
     compute_checksum_from_file,
     detect_geojson_from_headers_or_catalog,
@@ -61,6 +62,8 @@ async def analyse_resource(
     url = check["url"]
     headers = json.loads(check["headers"] or "{}")
 
+    timer = Timer("analyse-resource", resource_id)
+
     log.debug(f"Analysis for resource {resource_id} in dataset {dataset_id}")
 
     # Update resource status to ANALYSING_RESOURCE
@@ -85,6 +88,7 @@ async def analyse_resource(
         try:
             await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
             tmp_file = await download_resource(url, headers, max_size_allowed)
+            timer.mark("download-resource")
         except IOException:
             dl_analysis["analysis:error"] = "File too large to download"
         else:
@@ -131,6 +135,8 @@ async def analyse_resource(
         )
 
     analysis_results = {"analysis:check_id": check["id"]} | dl_analysis | (change_payload or {})
+
+    timer.stop()
 
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
         if is_tabular and tmp_file:
