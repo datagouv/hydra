@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 import tippecanoe
@@ -65,7 +66,7 @@ async def analyse_geojson(
         # Convert to PMTiles
         try:
             pmtiles_url, pmtiles_size = await geojson_to_pmtiles(
-                file_path=tmp_file.name,
+                file_path=Path(tmp_file.name),
                 resource_id=resource_id,
             )
             timer.mark("geojson-to-pmtiles")
@@ -250,7 +251,7 @@ async def csv_to_geojson(
 
 
 async def geojson_to_pmtiles(
-    file_path: str,
+    file_path: Path,
     resource_id: str | None = None,
 ) -> tuple[str, int]:
     """
@@ -278,7 +279,7 @@ async def geojson_to_pmtiles(
         output_pmtiles,
         "--coalesce-densest-as-needed",
         "--extend-zooms-if-still-dropping",
-        file_path,
+        str(file_path),
     ]
     exit_code = tippecanoe._program("tippecanoe", *command)
     if exit_code:
@@ -311,7 +312,7 @@ async def csv_to_geojson_and_pmtiles(
         return None
 
     geojson_url, geojson_size = result
-    geojson_file = f"{resource_id}.geojson"
+    geojson_file = Path(f"{resource_id}.geojson")
 
     await Check.update(
         check_id,
@@ -331,7 +332,7 @@ async def csv_to_geojson_and_pmtiles(
         },
     )
 
-    os.remove(geojson_file)
+    geojson_file.unlink()
 
     # returning only for tests purposes
     return geojson_url, geojson_size, pmtiles_url, pmtiles_size
