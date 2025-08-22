@@ -1,4 +1,3 @@
----
 version: 2.1
 
 parameters:
@@ -9,6 +8,10 @@ parameters:
     type: string
     default: "main"
     description: "Branch to publish to PyPI and trigger the Gitlab CI/CD pipeline when pushed to"
+  benchmark-branch:
+    type: string
+    default: "benchmarks"
+    description: "Branch name that triggers the benchmark workflow on push"
   deploy-env:
     type: string
     default: "dev"
@@ -17,6 +20,9 @@ parameters:
     type: string
     default: "py-cache-v2"
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
+  test_file_url:
+    type: string
+    default: "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz"
 
 jobs:
   install:
@@ -212,6 +218,113 @@ jobs:
               -H 'Content-Type: application/json' \
               -d "{\"environment\":\"<< pipeline.parameters.deploy-env >>\"}"
 
+  benchmark:
+    docker:
+      # Can't use a slim or slim image here ad we need libmagik to run the tests
+      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>
+      - image: cimg/postgres:15.13
+        environment:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+    resource_class: large
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Install required tools
+          command: |
+            apt-get update && apt-get install -y bc
+      - run:
+          name: Download and extract test data
+          command: |
+            mkdir -p data
+            curl -L "<< pipeline.parameters.test_file_url >>" -o data/MN_36_latest-2024-2025.csv.gz
+            gunzip data/MN_36_latest-2024-2025.csv.gz
+            ls -la data/
+      - run:
+          name: Create .benchmarks/benchmarks.csv file if it doesn't exist
+          command: |
+            mkdir -p .benchmarks
+            if [ ! -f .benchmarks/benchmarks.csv ]; then
+              echo "datetime,test_name,python_version,branch,execution_time_seconds,runner_class,runner_cpu,runner_memory,runner_os" > .benchmarks/benchmarks.csv
+            fi
+      - run:
+          name: Run CSV analysis on big file benchmark
+          environment:
+            DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+            UDATA_INSTANCE_NAME: udata
+          command: |
+            start_time=$(date +%s.%N)
+            poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v --durations=0
+            end_time=$(date +%s.%N)
+            execution_time=$(echo "$end_time - $start_time" | bc -l)
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,{{ parameters.python-version }},$CIRCLE_BRANCH,$execution_time" >> .benchmarks/benchmarks.csv
+      - run:
+          name: Run CSV to GeoJSON benchmark
+          environment:
+            DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+            UDATA_INSTANCE_NAME: udata
+          command: |
+            start_time=$(date +%s.%N)
+            poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v --durations=0
+            end_time=$(date +%s.%N)
+            execution_time=$(echo "$end_time - $start_time" | bc -l)
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,{{ parameters.python-version }},$CIRCLE_BRANCH,$execution_time" >> .benchmarks/benchmarks.csv
+      - run:
+          name: Run GeoJSON to PMTiles benchmark
+          environment:
+            DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+            UDATA_INSTANCE_NAME: udata
+          command: |
+            start_time=$(date +%s.%N)
+            poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v --durations=0
+            end_time=$(date +%s.%N)
+            execution_time=$(echo "$end_time - $start_time" | bc -l)
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,{{ parameters.python-version }},$CIRCLE_BRANCH,$execution_time" >> .benchmarks/benchmarks.csv
+      - run:
+          name: Display benchmark results
+          command: |
+            echo "=== Benchmark Results ==="
+            cat .benchmarks/benchmarks.csv
+            echo "========================="
+      - run:
+          name: Store benchmark results
+          command: |
+            mkdir -p /tmp/artifacts
+            cp .benchmarks/benchmarks.csv /tmp/artifacts/
+          when: always
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+            - artifacts
+
+  commit-benchmarks:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Configure Git
+          command: |
+            git config --global user.email "opendatateam@data.gouv.fr"
+            git config --global user.name "datagouv"
+      - run:
+          name: Check if benchmarks file changed
+          command: |
+            if git diff --quiet .benchmarks/benchmarks.csv; then
+              echo "No changes to benchmarks, skipping commit"
+              exit 0
+            fi
+      - run:
+          name: Commit and push benchmark results
+          command: |
+            git add .benchmarks/benchmarks.csv
+            git commit -m "perf: update benchmark results from CI run #$CIRCLE_BUILD_NUM"
+            git push origin << pipeline.parameters.benchmark-branch >>
+
 workflows:
   build-test-deploy:
     jobs:
@@ -220,19 +333,23 @@ workflows:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
             branches:
-              ignore: benchmark
+              ignore: << pipeline.parameters.benchmark-branch >>
       - lint:
           requires:
             - install
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: << pipeline.parameters.benchmark-branch >>
       - tests:
           requires:
             - install
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: << pipeline.parameters.benchmark-branch >>
       - build:
           requires:
             - tests
@@ -240,6 +357,8 @@ workflows:
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: << pipeline.parameters.benchmark-branch >>
       - publish:
           requires:
             - build
@@ -273,3 +392,45 @@ workflows:
               only: /v[0-9]+(\.[0-9]+)*/
           context:
             - org-global
+
+  benchmark_workflow:
+    jobs:
+      - install:
+          filters:
+            branches:
+              only: << pipeline.parameters.benchmark-branch >>
+      - benchmark:
+          requires:
+            - install
+          filters:
+            branches:
+              only: << pipeline.parameters.benchmark-branch >>
+          context: benchmark-context
+      - commit-benchmarks:
+          requires:
+            - benchmark
+          filters:
+            branches:
+              only: << pipeline.parameters.benchmark-branch >>
+          context: benchmark-context
+
+  manual_benchmark:
+    jobs:
+      - install:
+          filters:
+            branches:
+              ignore: /.*/
+      - benchmark:
+          requires:
+            - install
+          filters:
+            branches:
+              ignore: /.*/
+          context: benchmark-context
+      - commit-benchmarks:
+          requires:
+            - benchmark
+          filters:
+            branches:
+              ignore: /.*/
+          context: benchmark-context
