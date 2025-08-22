@@ -323,7 +323,7 @@ jobs:
           command: |
             cp artifacts/benchmarks.csv .benchmarks/benchmarks.csv
             git add .benchmarks/benchmarks.csv
-            git commit -m "perf: update benchmark results from CI run #$CIRCLE_BUILD_NUM"
+            git commit -m "perf: update benchmark results from CI run #$CIRCLE_BUILD_NUM [skip ci]"
             git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
             git push origin << pipeline.parameters.benchmark-branch >>
 
