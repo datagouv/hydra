@@ -304,7 +304,8 @@ async def csv_to_geojson_and_pmtiles(
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
-) -> tuple[str, int, str | None, int] | None:
+    cleanup: bool = True,
+) -> tuple[Path, int, str | None, Path, int, str | None] | None:
     if not config.CSV_TO_GEOJSON:
         log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
         return None
@@ -340,8 +341,9 @@ async def csv_to_geojson_and_pmtiles(
         },
     )
 
-    geojson_filepath.unlink()
-    pmtiles_filepath.unlink()
+    if cleanup:
+        geojson_filepath.unlink()
+        pmtiles_filepath.unlink()
 
     # returning only for tests purposes
-    return geojson_url, geojson_size, pmtiles_url, pmtiles_size
+    return geojson_filepath, geojson_size, geojson_url, pmtiles_filepath, pmtiles_size, pmtiles_url
