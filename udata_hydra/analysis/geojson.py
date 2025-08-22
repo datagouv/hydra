@@ -100,6 +100,155 @@ async def analyse_geojson(
         await Resource.update(resource_id, {"status": None})
 
 
+async def csv_to_geojson(
+    df: pd.DataFrame,
+    inspection: dict,
+    resource_id: str | None = None,
+    upload_to_minio: bool = True,
+) -> tuple[str, int] | None:
+    """
+    Convert a CSV DataFrame to GeoJSON format and optionally upload to MinIO.
+
+    Detects geographical columns (geometry, latlon, lonlat, or lat/lon) and converts
+    CSV data to GeoJSON features. Rows with NaN values in geographical columns are skipped.
+
+    Args:
+        df: Pandas DataFrame containing the CSV data.
+        inspection: CSV detective analysis results with column format detection.
+        resource_id: Optional resource ID for status updates and file naming.
+        upload_to_minio: Whether to upload to MinIO (default: True).
+
+    Returns:
+        tuple[str, int] | None: (geojson_url, geojson_size) if successful, None otherwise.
+        geojson_url is empty string if upload_to_minio=False.
+    """
+
+    def cast_latlon(latlon: str) -> list[float]:
+        # we can safely do this as the detection was successful
+        # removing potential blank and brackets
+        lat, lon = latlon.replace(" ", "").replace("[", "").replace("]", "").split(",")
+        # using the geojson standard: longitude before latitude
+        return [float(lon), float(lat)]
+
+    def prevent_nan(value):
+        # convenience to prevent downstream crash (NaN in json or PMtiles)
+        if pd.isna(value):
+            return None
+        return value
+
+    log.debug(f"Converting to geojson for {resource_id} and sending to Minio.")
+
+    geo = {}
+    for column, detection in inspection["columns"].items():
+        # see csv-detective's geo formats:
+        # https://github.com/datagouv/csv-detective/tree/master/csv_detective/detect_fields/geo
+        if "geojson" in detection["format"]:
+            geo["geometry"] = column
+            break
+        if "latlon" in detection["format"]:
+            geo["latlon"] = column
+            break
+        if "lonlat" in detection["format"]:
+            geo["lonlat"] = column
+            break
+        if "latitude" in detection["format"]:
+            geo["lat"] = column
+        if "longitude" in detection["format"]:
+            geo["lon"] = column
+    # priority is given to geometry, then latlon, then latitude + longitude
+    if "geometry" in geo:
+        geo = {"geometry": geo["geometry"]}
+    if "latlon" in geo:
+        geo = {"latlon": geo["latlon"]}
+    if "lonlat" in geo:
+        geo = {"lonlat": geo["lonlat"]}
+    if not geo or (("lat" in geo and "lon" not in geo) or ("lon" in geo and "lat" not in geo)):
+        log.debug("No geographical columns found, skipping")
+        return None
+
+    if resource_id:
+        await Resource.update(resource_id, {"status": "CONVERTING_TO_GEOJSON"})
+
+    template = {"type": "FeatureCollection", "features": []}
+    for _, row in df.iterrows():
+        if "geometry" in geo:
+            template["features"].append(
+                {
+                    "type": "Feature",
+                    # json is not pre-cast by csv-detective
+                    "geometry": json.loads(str(row[geo["geometry"]])),
+                    "properties": {
+                        col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
+                    },
+                }
+            )
+        elif "latlon" in geo:
+            # ending up here means we either have the exact lat,lon format, or NaN
+            # skipping row if NaN
+            if pd.isna(row[geo["latlon"]]):
+                continue
+            template["features"].append(
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": cast_latlon(str(row[geo["latlon"]])),
+                    },
+                    "properties": {
+                        col: prevent_nan(row[col]) for col in df.columns if col != geo["latlon"]
+                    },
+                }
+            )
+        elif "lonlat" in geo:
+            # ending up here means we either have the exact lon,lat format, or NaN
+            # skipping row if NaN
+            if pd.isna(row[geo["lonlat"]]):
+                continue
+            template["features"].append(
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        # inverting lon and lat to match the standard
+                        "coordinates": cast_latlon(str(row[geo["lonlat"]]))[::-1],
+                    },
+                    "properties": {
+                        col: prevent_nan(row[col]) for col in df.columns if col != geo["lonlat"]
+                    },
+                }
+            )
+        else:
+            # skipping row if lat or lon is NaN
+            if any(pd.isna(coord) for coord in (row[geo["lon"]], row[geo["lat"]])):
+                continue
+            template["features"].append(
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        # these columns are precast by csv-detective
+                        "coordinates": [row[geo["lon"]], row[geo["lat"]]],
+                    },
+                    "properties": {
+                        col: prevent_nan(row[col])
+                        for col in df.columns
+                        if col not in [geo["lon"], geo["lat"]]
+                    },
+                }
+            )
+    geojson_file = f"{resource_id}.geojson"
+    with open(geojson_file, "w") as f:
+        json.dump(template, f, indent=4, ensure_ascii=False, default=str)
+    geojson_size = os.path.getsize(geojson_file)
+
+    if upload_to_minio:
+        geojson_url: str = minio_client_geojson.send_file(geojson_file, delete_source=False)
+    else:
+        geojson_url = ""
+
+    return geojson_url, geojson_size
+
+
 async def geojson_to_pmtiles(
     file_path: str,
     resource_id: str | None = None,
@@ -148,131 +297,21 @@ async def csv_to_geojson_and_pmtiles(
     resource_id: str | None = None,
     check_id: int | None = None,
 ) -> tuple[str, int, str, int] | None:
-    def cast_latlon(latlon: str) -> list[float, float]:
-        # we can safely do this as the detection was successful
-        # removing potential blank and brackets
-        lat, lon = latlon.replace(" ", "").replace("[", "").replace("]", "").split(",")
-        # using the geojson standard: longitude before latitude
-        return [float(lon), float(lat)]
-
-    def prevent_nan(value):
-        # convenience to prevent downstream crash (NaN in json or PMtiles)
-        if pd.isna(value):
-            return None
-        return value
-
     if not config.CSV_TO_GEOJSON:
         log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
-        return
+        return None
 
     log.debug(
         f"Converting to geojson and PMtiles if relevant for {resource_id} and sending to Minio."
     )
 
-    geo = {}
-    for column, detection in inspection["columns"].items():
-        # see csv-detective's geo formats:
-        # https://github.com/datagouv/csv-detective/tree/master/csv_detective/detect_fields/geo
-        if "geojson" in detection["format"]:
-            geo["geometry"] = column
-            break
-        if "latlon" in detection["format"]:
-            geo["latlon"] = column
-            break
-        if "lonlat" in detection["format"]:
-            geo["lonlat"] = column
-            break
-        if "latitude" in detection["format"]:
-            geo["lat"] = column
-        if "longitude" in detection["format"]:
-            geo["lon"] = column
-    # priority is given to geometry, then latlon, then latitude + longitude
-    if "geometry" in geo:
-        geo = {"geometry": geo["geometry"]}
-    if "latlon" in geo:
-        geo = {"latlon": geo["latlon"]}
-    if "lonlat" in geo:
-        geo = {"lonlat": geo["lonlat"]}
-    if not geo or (("lat" in geo and "lon" not in geo) or ("lon" in geo and "lat" not in geo)):
-        log.debug("No geographical columns found, skipping")
+    # Convert CSV to GeoJSON
+    result = await csv_to_geojson(df, inspection, resource_id, upload_to_minio=True)
+    if result is None:
         return None
 
-    if resource_id:
-        await Resource.update(resource_id, {"status": "CONVERTING_TO_GEOJSON"})
-
-    template = {"type": "FeatureCollection", "features": []}
-    for _, row in df.iterrows():
-        if "geometry" in geo:
-            template["features"].append(
-                {
-                    "type": "Feature",
-                    # json is not pre-cast by csv-detective
-                    "geometry": json.loads(row[geo["geometry"]]),
-                    "properties": {
-                        col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
-                    },
-                }
-            )
-        elif "latlon" in geo:
-            # ending up here means we either have the exact lat,lon format, or NaN
-            # skipping row if NaN
-            if pd.isna(row[geo["latlon"]]):
-                continue
-            template["features"].append(
-                {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": cast_latlon(row[geo["latlon"]]),
-                    },
-                    "properties": {
-                        col: prevent_nan(row[col]) for col in df.columns if col != geo["latlon"]
-                    },
-                }
-            )
-        elif "lonlat" in geo:
-            # ending up here means we either have the exact lon,lat format, or NaN
-            # skipping row if NaN
-            if pd.isna(row[geo["lonlat"]]):
-                continue
-            template["features"].append(
-                {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        # inverting lon and lat to match the standard
-                        "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
-                    },
-                    "properties": {
-                        col: prevent_nan(row[col]) for col in df.columns if col != geo["lonlat"]
-                    },
-                }
-            )
-        else:
-            # skipping row if lat or lon is NaN
-            if any(pd.isna(coord) for coord in (row[geo["lon"]], row[geo["lat"]])):
-                continue
-            template["features"].append(
-                {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        # these columns are precast by csv-detective
-                        "coordinates": [row[geo["lon"]], row[geo["lat"]]],
-                    },
-                    "properties": {
-                        col: prevent_nan(row[col])
-                        for col in df.columns
-                        if col not in [geo["lon"], geo["lat"]]
-                    },
-                }
-            )
+    geojson_url, geojson_size = result
     geojson_file = f"{resource_id}.geojson"
-    with open(geojson_file, "w") as f:
-        json.dump(template, f, indent=4, ensure_ascii=False, default=str)
-    geojson_size = os.path.getsize(geojson_file)
-
-    geojson_url: str = minio_client_geojson.send_file(geojson_file, delete_source=False)
 
     await Check.update(
         check_id,
@@ -293,5 +332,6 @@ async def csv_to_geojson_and_pmtiles(
     )
 
     os.remove(geojson_file)
+
     # returning only for tests purposes
     return geojson_url, geojson_size, pmtiles_url, pmtiles_size
