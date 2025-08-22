@@ -233,3 +233,6 @@ datetime,test_name,execution_time_seconds,commit_author,commit_id,runner_class,r
 2025-08-22T21:20:42Z,test_analyse_csv_big_file,139.485080939,bolinocroustibat,0c19e15,large,36,8192,3.11
 2025-08-22T21:20:48Z,test_csv_to_geojson_big_file,5.824778787,bolinocroustibat,0c19e15,large,36,8192,3.11
 2025-08-22T21:20:54Z,test_geojson_to_pmtiles_big_file,5.513843246,bolinocroustibat,0c19e15,large,36,8192,3.11
+2025-08-22T21:36:48Z,test_analyse_csv_big_file,155.566490255,bolinocroustibat,6c5161b,large,36,8192,3.11
+2025-08-22T21:36:53Z,test_csv_to_geojson_big_file,5.102527444,bolinocroustibat,6c5161b,large,36,8192,3.11
+2025-08-22T21:36:59Z,test_geojson_to_pmtiles_big_file,5.266241696,bolinocroustibat,6c5161b,large,36,8192,3.11
