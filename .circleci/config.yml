@@ -267,7 +267,7 @@ jobs:
             UDATA_INSTANCE_NAME: udata
           command: |
             start_time=$(date +%s.%N)
-            poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v --durations=0
+            poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v --durations=0 --keep-result-file
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
