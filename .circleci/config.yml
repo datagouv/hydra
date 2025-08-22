@@ -238,10 +238,10 @@ jobs:
       - run:
           name: Download and extract test data
           command: |
-            mkdir -p data
-            curl -L "<< pipeline.parameters.test_file_url >>" -o data/MN_36_latest-2024-2025.csv.gz
-            gunzip data/MN_36_latest-2024-2025.csv.gz
-            ls -la data/
+            mkdir -p tests/data
+            curl -L "<< pipeline.parameters.test_file_url >>" -o tests/data/.MN_36_latest-2024-2025.csv.gz
+            gunzip tests/data/.MN_36_latest-2024-2025.csv.gz
+            ls -la tests/data/
       - run:
           name: Create .benchmarks/benchmarks.csv file if it doesn't exist
           command: |
