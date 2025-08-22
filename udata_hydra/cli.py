@@ -323,7 +323,6 @@ async def convert_csv_to_geojson_cli(csv_filepath: str):
                 log.info("Conversion successful!")
                 log.info(f"GeoJSON file: {geojson_filepath}")
                 log.info(f"File size: {geojson_size} bytes")
-                log.info(f"GeoJSON file saved at: {geojson_filepath.absolute()}")
 
             else:
                 log.warning("Conversion returned None - no geographical data found")
@@ -336,6 +335,49 @@ async def convert_csv_to_geojson_cli(csv_filepath: str):
 
     except Exception as e:
         log.error(f"Error during CSV analysis: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
+@cli(name="convert-geojson-to-pmtiles")
+async def convert_geojson_to_pmtiles_cli(geojson_filepath: str):
+    """Convert a GeoJSON file to PMTiles format using udata-hydra analysis functions.
+
+    :geojson_filepath: Path to the GeoJSON file to convert
+    """
+    from udata_hydra.analysis.geojson import geojson_to_pmtiles
+
+    geojson_path = Path(geojson_filepath)
+
+    if not geojson_path.exists():
+        log.error(f"GeoJSON file not found: {geojson_path}")
+        return
+
+    file_size = geojson_path.stat().st_size
+    log.info(f"Processing GeoJSON file: {geojson_path}")
+    log.info(f"File size: {file_size} bytes")
+
+    # Convert to PMTiles
+    log.info("Converting to PMTiles...")
+
+    try:
+        # Convert to PMTiles (no MinIO upload, no database updates)
+        result = await geojson_to_pmtiles(
+            file_path=geojson_path, resource_id=None, upload_to_minio=False
+        )
+
+        if result:
+            pmtiles_filepath, pmtiles_size, _ = result
+            log.info("Conversion successful!")
+            log.info(f"PMTiles file: {pmtiles_filepath}")
+            log.info(f"File size: {pmtiles_size} bytes")
+
+        else:
+            log.warning("Conversion returned None - conversion failed")
+
+    except Exception as e:
+        log.error(f"Error during PMTiles conversion: {e}")
         import traceback
 
         traceback.print_exc()
