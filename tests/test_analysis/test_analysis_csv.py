@@ -1,6 +1,5 @@
 import hashlib
 import json
-import os
 from datetime import date, datetime, timedelta, timezone
 from tempfile import NamedTemporaryFile
 from unittest.mock import MagicMock, patch
@@ -665,18 +664,14 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                     new=mocked_minio_client_pmtiles,
                 ),
             ):
-                # patching os.remove where is should be used, we want to keep the files to open them
-                _mocks = {}
-                for _func in ["udata_hydra.utils.minio.os", "udata_hydra.analysis.geojson.os"]:
-                    _mocks[_func] = mocker.patch(_func)
-                    _mocks[_func].path = os.path
-                    _mocks[_func].remove.return_value = None
                 (
-                    geojson_url,
+                    geojson_filepath,
                     geojson_size,
-                    pmtiles_url,
+                    geojson_url,
+                    pmtiles_filepath,
                     pmtiles_size,
-                ) = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID)
+                    pmtiles_url,
+                ) = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID, cleanup=False)
             # checking geojson
             with open(f"{RESOURCE_ID}.geojson", "r") as f:
                 geojson = json.load(f)
@@ -691,7 +686,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
             )
             assert isinstance(geojson_size, int)
-            os.remove(f"{RESOURCE_ID}.geojson")
+
             # checking PMTiles
             with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
                 header = f.read(7)
@@ -701,4 +696,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 == f"https://{minio_url}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
             )
             assert isinstance(pmtiles_size, int)
-            os.remove(f"{RESOURCE_ID}.pmtiles")
+
+            # Clean up files after tests
+            geojson_filepath.unlink()
+            pmtiles_filepath.unlink()
