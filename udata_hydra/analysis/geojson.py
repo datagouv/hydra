@@ -138,7 +138,7 @@ async def csv_to_geojson(
             return None
         return value
 
-    log.debug(f"Converting to geojson for {resource_id} and sending to Minio.")
+    log.debug(f"Converting to geojson for {resource_id}")
 
     geo = {}
     for column, detection in inspection["columns"].items():
@@ -244,6 +244,7 @@ async def csv_to_geojson(
     geojson_size: int = os.path.getsize(geojson_filepath)
 
     if upload_to_minio:
+        log.debug(f"Sending GeoJSON file {geojson_filepath} to MinIO")
         geojson_url = minio_client_geojson.send_file(str(geojson_filepath), delete_source=False)
     else:
         geojson_url = None
@@ -292,6 +293,7 @@ async def geojson_to_pmtiles(
     pmtiles_size: int = os.path.getsize(pmtiles_filepath)
 
     if upload_to_minio:
+        log.debug(f"Sending PMTiles file {pmtiles_filepath} to MinIO")
         pmtiles_url = minio_client_pmtiles.send_file(str(pmtiles_filepath), delete_source=False)
     else:
         pmtiles_url = None
@@ -311,7 +313,7 @@ async def csv_to_geojson_and_pmtiles(
         return None
 
     log.debug(
-        f"Converting to geojson and PMtiles if relevant for {resource_id} and sending to Minio."
+        f"Converting to geojson and PMtiles if relevant for {resource_id} and sending to MinIO."
     )
 
     # Convert CSV to GeoJSON
