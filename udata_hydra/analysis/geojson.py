@@ -21,7 +21,10 @@ from udata_hydra.utils import (
 )
 from udata_hydra.utils.minio import MinIOClient
 
+DEFAULT_GEOJSON_FILEPATH = Path("converted_from_csv.geojson")
+
 log = logging.getLogger("udata-hydra")
+
 minio_client_pmtiles = MinIOClient(
     bucket=config.MINIO_PMTILES_BUCKET, folder=config.MINIO_PMTILES_FOLDER
 )
@@ -238,7 +241,11 @@ async def csv_to_geojson(
                     },
                 }
             )
-    geojson_filepath = Path(f"{resource_id}.geojson")
+
+    if resource_id:
+        geojson_filepath = Path(f"{resource_id}.geojson")
+    else:
+        geojson_filepath = DEFAULT_GEOJSON_FILEPATH
     with open(geojson_filepath, "w") as f:
         json.dump(template, f, indent=4, ensure_ascii=False, default=str)
     geojson_size: int = os.path.getsize(geojson_filepath)
@@ -275,7 +282,10 @@ async def geojson_to_pmtiles(
     if resource_id:
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
 
-    pmtiles_filepath = Path(f"{resource_id}.pmtiles")
+    if resource_id:
+        pmtiles_filepath = Path(f"{resource_id}.pmtiles")
+    else:
+        pmtiles_filepath = Path(f"{file_path.stem}.pmtiles")
 
     command = [
         "--maximum-zoom=g",  # guess

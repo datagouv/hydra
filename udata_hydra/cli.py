@@ -13,8 +13,8 @@ from minicli import cli, run, wrap
 from progressist import ProgressBar
 
 from udata_hydra import config
-from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.analysis.geojson import analyse_geojson
+from udata_hydra.analysis.csv import analyse_csv, csv_detective_routine
+from udata_hydra.analysis.geojson import analyse_geojson, csv_to_geojson
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.check import Check
@@ -251,6 +251,94 @@ async def analyse_geojson_cli(
             log.error("Could not find a check linked to the specified resource ID")
         return
     await analyse_geojson(check=dict(check))
+
+
+@cli(name="convert-csv-to-geojson")
+async def convert_csv_to_geojson_cli(csv_filepath: str):
+    """Convert a CSV file to GeoJSON format using udata-hydra analysis functions.
+
+    :csv_filepath: Path to the CSV file to convert
+    """
+
+    csv_path = Path(csv_filepath)
+
+    if not csv_path.exists():
+        log.error(f"CSV file not found: {csv_path}")
+        return
+
+    file_size = csv_path.stat().st_size
+    log.info(f"Processing CSV file: {csv_path}")
+    log.info(f"File size: {file_size} bytes")
+
+    # Analyze the CSV with csv_detective
+    log.info("Analyzing CSV structure...")
+    try:
+        # Try with different encodings if the default fails
+        encodings_to_try = ["utf-8", "latin-1", "iso-8859-1", "cp1252"]
+
+        inspection = None
+        df = None
+
+        for encoding in encodings_to_try:
+            try:
+                log.info(f"Trying encoding: {encoding}")
+                inspection, df = csv_detective_routine(
+                    file_path=str(csv_path),
+                    output_profile=True,
+                    output_df=True,
+                    cast_json=False,
+                    num_rows=-1,
+                    save_results=False,
+                    encoding=encoding,
+                )
+                log.info(f"Successfully read CSV with encoding: {encoding}")
+                break
+            except Exception as e:
+                log.warning(f"Failed with encoding {encoding}: {e}")
+                continue
+
+        if inspection is None or df is None:
+            log.error("Failed to read CSV with any encoding")
+            return
+
+        log.info(f"CSV analysis complete. Found {len(df)} rows and {len(df.columns)} columns")
+        log.info(f"Columns: {list(df.columns)}")
+
+        # Show column formats for debugging
+        log.info("Column formats detected:")
+        for column, detection in inspection["columns"].items():
+            log.info(f"  {column}: {detection['format']}")
+
+        # Convert to GeoJSON
+        log.info("Converting to GeoJSON...")
+
+        try:
+            # Convert to GeoJSON (no MinIO upload, no database updates)
+            result = await csv_to_geojson(
+                df=df, inspection=inspection, resource_id=None, upload_to_minio=False
+            )
+
+            if result:
+                geojson_filepath, geojson_size, _ = result
+                log.info("Conversion successful!")
+                log.info(f"GeoJSON file: {geojson_filepath}")
+                log.info(f"File size: {geojson_size} bytes")
+                log.info(f"GeoJSON file saved at: {geojson_filepath.absolute()}")
+
+            else:
+                log.warning("Conversion returned None - no geographical data found")
+
+        except Exception as e:
+            log.error(f"Error during GeoJSON conversion: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+    except Exception as e:
+        log.error(f"Error during CSV analysis: {e}")
+        import traceback
+
+        traceback.print_exc()
 
 
 @cli
