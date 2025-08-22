@@ -236,13 +236,6 @@ jobs:
           command: |
             apt-get update && apt-get install -y bc
       - run:
-          name: Download and extract test data
-          command: |
-            mkdir -p tests/data
-            curl -L "<< pipeline.parameters.test_file_url >>" -o tests/data/.MN_36_latest-2024-2025.csv.gz
-            gunzip tests/data/.MN_36_latest-2024-2025.csv.gz
-            ls -la tests/data/
-      - run:
           name: Create .benchmarks/benchmarks.csv file if it doesn't exist
           command: |
             mkdir -p .benchmarks
@@ -261,7 +254,14 @@ jobs:
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
       - run:
-          name: Run benchmark for CSV to GeoJSON
+          name: Download and extract test data for CSV with geo data to GeoJSON benchmark
+          command: |
+            mkdir -p tests/data
+            curl -L "<< pipeline.parameters.test_file_url >>" -o tests/data/.MN_36_latest-2024-2025.csv.gz
+            gunzip tests/data/.MN_36_latest-2024-2025.csv.gz
+            ls -la tests/data/
+      - run:
+          name: Run benchmark for big CSV with geo data to GeoJSON
           environment:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
@@ -272,7 +272,7 @@ jobs:
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
       - run:
-          name: Run benchmark for GeoJSON to PMTiles
+          name: Run benchmark for big GeoJSON to PMTiles
           environment:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
