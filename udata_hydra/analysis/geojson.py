@@ -106,7 +106,7 @@ async def csv_to_geojson(
     inspection: dict,
     resource_id: str | None = None,
     upload_to_minio: bool = True,
-) -> tuple[Path, int, str | None]:
+) -> tuple[Path, int, str | None] | None:
     """
     Convert a CSV DataFrame to GeoJSON format and optionally upload to MinIO.
 
@@ -238,17 +238,17 @@ async def csv_to_geojson(
                     },
                 }
             )
-    geojson_file = Path(f"{resource_id}.geojson")
-    with open(geojson_file, "w") as f:
+    geojson_filepath = Path(f"{resource_id}.geojson")
+    with open(geojson_filepath, "w") as f:
         json.dump(template, f, indent=4, ensure_ascii=False, default=str)
-    geojson_size: int = os.path.getsize(geojson_file)
+    geojson_size: int = os.path.getsize(geojson_filepath)
 
     if upload_to_minio:
-        geojson_url = minio_client_geojson.send_file(str(geojson_file), delete_source=False)
+        geojson_url = minio_client_geojson.send_file(str(geojson_filepath), delete_source=False)
     else:
         geojson_url = None
 
-    return geojson_file, geojson_size, geojson_url
+    return geojson_filepath, geojson_size, geojson_url
 
 
 async def geojson_to_pmtiles(
@@ -314,11 +314,10 @@ async def csv_to_geojson_and_pmtiles(
     )
 
     # Convert CSV to GeoJSON
-    geojson_filepath, geojson_size, geojson_url = await csv_to_geojson(
-        df, inspection, resource_id, upload_to_minio=True
-    )
-    if geojson_url is None:
+    result = await csv_to_geojson(df, inspection, resource_id, upload_to_minio=True)
+    if result is None:
         return None
+    geojson_filepath, geojson_size, geojson_url = result
 
     await Check.update(
         check_id,
