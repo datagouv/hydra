@@ -310,19 +310,21 @@ jobs:
           name: Configure Git
           command: |
             git config --global user.email "opendatateam@data.gouv.fr"
-            git config --global user.name "datagouv"
+            git config --global user.name "data.gouv.fr"
       - run:
           name: Check if benchmarks file changed
           command: |
-            if git diff --quiet .benchmarks/benchmarks.csv; then
+            if git diff --quiet artifacts/benchmarks.csv; then
               echo "No changes to benchmarks, skipping commit"
               exit 0
             fi
       - run:
           name: Commit and push benchmark results
           command: |
+            cp artifacts/benchmarks.csv .benchmarks/benchmarks.csv
             git add .benchmarks/benchmarks.csv
             git commit -m "perf: update benchmark results from CI run #$CIRCLE_BUILD_NUM"
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
             git push origin << pipeline.parameters.benchmark-branch >>
 
 workflows:
