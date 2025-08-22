@@ -134,7 +134,7 @@ async def analyse_resource(
             has_changed=change_status == Change.HAS_CHANGED,
         )
 
-    analysis_results = {**dl_analysis, **(change_payload or {})}
+    analysis_results = {"analysis:check_id": check["id"]} | dl_analysis | (change_payload or {})
 
     timer.stop()
 
