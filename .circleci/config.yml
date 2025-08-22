@@ -258,7 +258,7 @@ jobs:
             start_time=$(date +%s.%N)
             poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v --durations=0
             end_time=$(date +%s.%N)
-            execution_time=$(echo "$end_time - $start_time" | bc -l)
+            execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
       - run:
           name: Run benchmark for CSV to GeoJSON
@@ -269,7 +269,7 @@ jobs:
             start_time=$(date +%s.%N)
             poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v --durations=0
             end_time=$(date +%s.%N)
-            execution_time=$(echo "$end_time - $start_time" | bc -l)
+            execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
       - run:
           name: Run benchmark for GeoJSON to PMTiles
@@ -280,7 +280,7 @@ jobs:
             start_time=$(date +%s.%N)
             poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v --durations=0
             end_time=$(date +%s.%N)
-            execution_time=$(echo "$end_time - $start_time" | bc -l)
+            execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
       - run:
           name: Display benchmark results
