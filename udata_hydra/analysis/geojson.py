@@ -2,7 +2,6 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pandas as pd
 import tippecanoe
@@ -65,8 +64,8 @@ async def analyse_geojson(
 
         # Convert to PMTiles
         try:
-            pmtiles_filepath, pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
-                file_path=Path(tmp_file.name),
+            pmtiles_url, pmtiles_size = await geojson_to_pmtiles(
+                file_path=tmp_file.name,
                 resource_id=resource_id,
             )
             timer.mark("geojson-to-pmtiles")
@@ -106,7 +105,7 @@ async def csv_to_geojson(
     inspection: dict,
     resource_id: str | None = None,
     upload_to_minio: bool = True,
-) -> tuple[Path, int, str | None] | None:
+) -> tuple[str, int] | None:
     """
     Convert a CSV DataFrame to GeoJSON format and optionally upload to MinIO.
 
@@ -120,9 +119,8 @@ async def csv_to_geojson(
         upload_to_minio: Whether to upload to MinIO (default: True).
 
     Returns:
-        geojson_filepath: GeoJSON file path.
-        geojson_size: Size of the GeoJSON file in bytes.
-        geojson_url: URL of the GeoJSON file on MinIO. None if it was not uploaded to MinIO.
+        tuple[str, int] | None: (geojson_url, geojson_size) if successful, None otherwise.
+        geojson_url is empty string if upload_to_minio=False.
     """
 
     def cast_latlon(latlon: str) -> list[float]:
@@ -138,7 +136,7 @@ async def csv_to_geojson(
             return None
         return value
 
-    log.debug(f"Converting to geojson for {resource_id}")
+    log.debug(f"Converting to geojson for {resource_id} and sending to Minio.")
 
     geo = {}
     for column, detection in inspection["columns"].items():
@@ -178,7 +176,7 @@ async def csv_to_geojson(
                 {
                     "type": "Feature",
                     # json is not pre-cast by csv-detective
-                    "geometry": json.loads(row[geo["geometry"]]),
+                    "geometry": json.loads(str(row[geo["geometry"]])),
                     "properties": {
                         col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
                     },
@@ -194,7 +192,7 @@ async def csv_to_geojson(
                     "type": "Feature",
                     "geometry": {
                         "type": "Point",
-                        "coordinates": cast_latlon(row[geo["latlon"]]),
+                        "coordinates": cast_latlon(str(row[geo["latlon"]])),
                     },
                     "properties": {
                         col: prevent_nan(row[col]) for col in df.columns if col != geo["latlon"]
@@ -212,7 +210,7 @@ async def csv_to_geojson(
                     "geometry": {
                         "type": "Point",
                         # inverting lon and lat to match the standard
-                        "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
+                        "coordinates": cast_latlon(str(row[geo["lonlat"]]))[::-1],
                     },
                     "properties": {
                         col: prevent_nan(row[col]) for col in df.columns if col != geo["lonlat"]
@@ -238,25 +236,23 @@ async def csv_to_geojson(
                     },
                 }
             )
-    geojson_filepath = Path(f"{resource_id}.geojson")
-    with open(geojson_filepath, "w") as f:
+    geojson_file = f"{resource_id}.geojson"
+    with open(geojson_file, "w") as f:
         json.dump(template, f, indent=4, ensure_ascii=False, default=str)
-    geojson_size: int = os.path.getsize(geojson_filepath)
+    geojson_size = os.path.getsize(geojson_file)
 
     if upload_to_minio:
-        log.debug(f"Sending GeoJSON file {geojson_filepath} to MinIO")
-        geojson_url = minio_client_geojson.send_file(str(geojson_filepath), delete_source=False)
+        geojson_url: str = minio_client_geojson.send_file(geojson_file, delete_source=False)
     else:
-        geojson_url = None
+        geojson_url = ""
 
-    return geojson_filepath, geojson_size, geojson_url
+    return geojson_url, geojson_size
 
 
 async def geojson_to_pmtiles(
-    file_path: Path,
+    file_path: str,
     resource_id: str | None = None,
-    upload_to_minio: bool = True,
-) -> tuple[Path, int, str | None]:
+) -> tuple[str, int]:
     """
     Convert a GeoJSON file to PMTiles format.
 
@@ -265,9 +261,8 @@ async def geojson_to_pmtiles(
         resource_id: Optional resource ID for status updates.
 
     Returns:
-        pmtiles_filepath: PMTiles file path.
+        pmtiles_url: URL of the PMTiles file.
         pmtiles_size: size of the PMTiles file.
-        pmtiles_url: URL of the PMTiles file on MinIO. None if it was not uploaded to MinIO.
     """
 
     log.debug(f"Converting GeoJSON to PMTiles for {file_path}")
@@ -275,30 +270,25 @@ async def geojson_to_pmtiles(
     if resource_id:
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
 
-    pmtiles_filepath = Path(f"{resource_id}.pmtiles")
+    output_pmtiles = f"{resource_id}.pmtiles"
 
     command = [
         "--maximum-zoom=g",  # guess
         "-o",
-        str(pmtiles_filepath),
+        output_pmtiles,
         "--coalesce-densest-as-needed",
         "--extend-zooms-if-still-dropping",
-        str(file_path),
+        file_path,
     ]
     exit_code = tippecanoe._program("tippecanoe", *command)
     if exit_code:
         raise ValueError(f"GeoJSON to PMTiles conversion failed with exit code {exit_code}")
-    log.debug(f"Successfully converted {file_path} to {pmtiles_filepath}")
+    log.debug(f"Successfully converted {file_path} to {output_pmtiles}")
 
-    pmtiles_size: int = os.path.getsize(pmtiles_filepath)
+    pmtiles_size = os.path.getsize(output_pmtiles)
+    pmtiles_url: str = minio_client_pmtiles.send_file(output_pmtiles)
 
-    if upload_to_minio:
-        log.debug(f"Sending PMTiles file {pmtiles_filepath} to MinIO")
-        pmtiles_url = minio_client_pmtiles.send_file(str(pmtiles_filepath), delete_source=False)
-    else:
-        pmtiles_url = None
-
-    return pmtiles_filepath, pmtiles_size, pmtiles_url
+    return pmtiles_url, pmtiles_size
 
 
 async def csv_to_geojson_and_pmtiles(
@@ -306,21 +296,22 @@ async def csv_to_geojson_and_pmtiles(
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
-    cleanup: bool = True,
-) -> tuple[Path, int, str | None, Path, int, str | None] | None:
+) -> tuple[str, int, str, int] | None:
     if not config.CSV_TO_GEOJSON:
         log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
         return None
 
     log.debug(
-        f"Converting to geojson and PMtiles if relevant for {resource_id} and sending to MinIO."
+        f"Converting to geojson and PMtiles if relevant for {resource_id} and sending to Minio."
     )
 
     # Convert CSV to GeoJSON
     result = await csv_to_geojson(df, inspection, resource_id, upload_to_minio=True)
     if result is None:
         return None
-    geojson_filepath, geojson_size, geojson_url = result
+
+    geojson_url, geojson_size = result
+    geojson_file = f"{resource_id}.geojson"
 
     await Check.update(
         check_id,
@@ -330,10 +321,7 @@ async def csv_to_geojson_and_pmtiles(
         },
     )
 
-    # Convert GeoJSON to PMTiles
-    pmtiles_filepath, pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
-        geojson_filepath, resource_id
-    )
+    pmtiles_url, pmtiles_size = await geojson_to_pmtiles(geojson_file, resource_id)
 
     await Check.update(
         check_id,
@@ -343,9 +331,7 @@ async def csv_to_geojson_and_pmtiles(
         },
     )
 
-    if cleanup:
-        geojson_filepath.unlink()
-        pmtiles_filepath.unlink()
+    os.remove(geojson_file)
 
     # returning only for tests purposes
-    return geojson_filepath, geojson_size, geojson_url, pmtiles_filepath, pmtiles_size, pmtiles_url
+    return geojson_url, geojson_size, pmtiles_url, pmtiles_size
