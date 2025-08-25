@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import sentry_sdk
 from asyncpg import Record
 
-from udata_hydra import config, context
+from udata_hydra import context
 from udata_hydra.db.check import Check
 
 log = logging.getLogger("udata-hydra")
@@ -59,6 +59,7 @@ class ExceptionWithSentryDetails(Exception):
         self.url = url
         self.check_id = check_id
         self.table_name = table_name
+        self.sentry_event_id = None
         # NO auto-capture here - let the exception be raised normally
         super().__init__(message, *args)
 
@@ -82,7 +83,8 @@ class ExceptionWithSentryDetails(Exception):
                         }
                     )
 
-                    sentry_sdk.capture_exception(self)
+                    event_id = sentry_sdk.capture_exception(self)
+                    self.sentry_event_id = event_id  # Store the event ID, so it can be used by handle_parse_exception to be stored in check
 
                     # # If we want also to display the chained exception performance stack trace we could check for chained exceptions (__cause__ or __context__)
                     # # But we would have both original and chained exception appear in Sentry
@@ -111,7 +113,7 @@ class IOException(ExceptionWithSentryDetails):
 async def handle_parse_exception(
     e: IOException | ParseException, table_name: str | None, check: Record | None
 ) -> None:
-    """Specific IO/ParseException handling. Store error if in a check context. Also cleanup :table_name: if needed."""
+    """Specific IO/ParseException handling. Store error in :check: if in a check context. Also cleanup :table_name: if needed."""
     if table_name is not None:
         db = await context.pool("csv")
         await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
@@ -120,10 +122,8 @@ async def handle_parse_exception(
         # e.__cause__ let us access the "inherited" error of the Exception (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:{str(e.__cause__)}"
-        if config.SENTRY_DSN:
-            with sentry_sdk.new_scope():
-                event_id = sentry_sdk.capture_exception(e)
-                err = f"{e.step}:sentry:{event_id}"
+        if e.sentry_event_id:
+            err = f"{e.step}:sentry:{e.sentry_event_id}"
         await Check.update(
             check["id"],
             {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
