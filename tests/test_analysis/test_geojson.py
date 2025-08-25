@@ -9,8 +9,6 @@ import pytest
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.csv import csv_detective_routine
 from udata_hydra.analysis.geojson import (
-    DEFAULT_GEOJSON_FILEPATH,
-    DEFAULT_PMTILES_FILEPATH,
     analyse_geojson,
     csv_to_geojson,
     geojson_to_pmtiles,
@@ -40,9 +38,10 @@ async def test_analyse_geojson_disabled(fake_check):
 async def test_geojson_to_pmtiles_invalid_geometry():
     """Test handling of invalid geometry"""
     # Mock data with invalid geometry
+    test_pmtiles_path = Path(f"{RESOURCE_ID}.pmtiles")
     with pytest.raises(Exception):
-        await geojson_to_pmtiles(Path("tests/data/invalid.geojson"), Path(f"{RESOURCE_ID}.pmtiles"))
-    os.remove(f"{RESOURCE_ID}.pmtiles")
+        await geojson_to_pmtiles(Path("tests/data/invalid.geojson"), test_pmtiles_path)
+    test_pmtiles_path.unlink(missing_ok=True)
 
 
 @pytest.mark.asyncio
@@ -110,7 +109,7 @@ async def test_csv_to_geojson_big_file(
     # Create timer for performance measurement
     timer = Timer("csv-to-geojson-performance-test")
 
-    test_geojson_path: Path = DEFAULT_GEOJSON_FILEPATH
+    test_geojson_path = Path(f"{RESOURCE_ID}.geojson")
 
     # Mock MinIO for the test
     minio_url = "my.minio.fr"
@@ -196,7 +195,7 @@ async def test_geojson_to_pmtiles_big_file(mocker, geojson_file_path: str):
     # Create timer for performance measurement
     timer = Timer("geojson-to-pmtiles-performance-test")
 
-    test_pmtiles_path: Path = DEFAULT_PMTILES_FILEPATH
+    test_pmtiles_path = Path(f"{RESOURCE_ID}.pmtiles")
 
     # Mock MinIO for the test
     minio_url = "my.minio.fr"
