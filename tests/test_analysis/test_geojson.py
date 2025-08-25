@@ -147,7 +147,7 @@ async def test_csv_to_geojson_big_file(mocker, keep_result_file=False):
                 assert len(geojson_data["features"]) > 0
 
             # The size should be significant
-            assert geojson_size > 1000  # Should be much larger than small files
+            assert geojson_size > 1e6  # Should be much larger than small files
 
             # Get file sizes before cleanup
             csv_size = BIG_CSV_GEO_TEST_FILE.stat().st_size
@@ -203,6 +203,6 @@ async def test_geojson_to_pmtiles_big_file(mocker):
     assert pmtiles_url == f"https://{minio_url}/{bucket}/{folder}/{RESOURCE_ID}.pmtiles"
 
     # The size should be significantly larger than the small test file
-    assert pmtiles_size > 1000  # Should be much larger than the 850-900 range of small file
+    assert pmtiles_size > 5000  # Should be much larger than the 850-900 range of small file
     # Clean up using pathlib
     pmtiles_filepath.unlink(missing_ok=True)
