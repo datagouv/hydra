@@ -17,6 +17,7 @@
 - Optimize queue priorities for resource processing [#311](https://github.com/datagouv/hydra/pull/311)
 - Add `resource_id` info in timer logs and add timer for analysing resource [#313](https://github.com/datagouv/hydra/pull/313)
 - Add check id in udata extras to facilitate debug [#307](https://github.com/datagouv/hydra/pull/307)
+- Split `csv_to geojson_and_pmtiles` function into a new intermediary function `csv_to_geojson` for better unit testing/benchmarking [#317](https://github.com/datagouv/hydra/pull/317)
 
 ## 2.3.0 (2025-07-15)
 

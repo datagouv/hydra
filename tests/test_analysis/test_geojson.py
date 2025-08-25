@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -26,7 +27,7 @@ async def test_geojson_to_pmtiles_invalid_geometry():
     """Test handling of invalid geometry"""
     # Mock data with invalid geometry
     with pytest.raises(Exception):
-        await geojson_to_pmtiles("tests/data/invalid.geojson", RESOURCE_ID)
+        await geojson_to_pmtiles(Path("tests/data/invalid.geojson"), RESOURCE_ID)
     os.remove(f"{RESOURCE_ID}.pmtiles")
 
 
@@ -46,7 +47,9 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
         mock_os = mocker.patch("udata_hydra.utils.minio.os")
         mock_os.path = os.path
         mock_os.remove.return_value = None
-        url, size = await geojson_to_pmtiles("tests/data/valid.geojson", RESOURCE_ID)
+        filepath, size, url = await geojson_to_pmtiles(
+            Path("tests/data/valid.geojson"), RESOURCE_ID
+        )
     # very (too?) simple test, we could install a specific library to read the file
     with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
         header = f.read(7)
@@ -62,17 +65,18 @@ async def test_geojson_analysis(setup_catalog, db, fake_check, rmock, produce_mo
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=b"{pretend this is a geojson}")
-    pmtiles_url = "http://minio/test.pmtiles"
+    pmtiles_filepath = Path("tests/data/valid.pmtiles")
     pmtiles_size = 100
+    pmtiles_url = "http://minio/test.pmtiles"
     with (
         patch("udata_hydra.config.GEOJSON_TO_PMTILES", True),
         patch(
             "udata_hydra.analysis.geojson.geojson_to_pmtiles",
-            return_value=(pmtiles_url, pmtiles_size),
+            return_value=(pmtiles_filepath, pmtiles_size, pmtiles_url),
         ),
     ):
         await analyse_geojson(check=check)
     res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
     assert res["parsing_finished_at"] is not None
-    assert res["pmtiles_url"] == pmtiles_url
     assert res["pmtiles_size"] == pmtiles_size
+    assert res["pmtiles_url"] == pmtiles_url
