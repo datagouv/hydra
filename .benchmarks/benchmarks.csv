@@ -1,4 +1,4 @@
-datetime,test_name,input_file,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version
+datetime,test_name,test_resource_id,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version
 2025-08-22T16:11:06Z,test_analyse_csv_big_file,,137.13,bolinocroustibat,e9d563a,large,36,8192,3.11
 2025-08-22T16:16:08Z,test_analyse_csv_big_file,,140.53,bolinocroustibat,4d58bab,large,36,8192,3.11
 2025-08-22T16:19:52Z,test_analyse_csv_big_file,,143.16,bolinocroustibat,934d738,large,36,8192,3.11
@@ -80,4 +80,4 @@ datetime,test_name,input_file,execution_time_seconds,commit_author,commit_id,run
 2025-08-22T21:36:48Z,test_analyse_csv_big_file,,155.57,bolinocroustibat,6c5161b,large,36,8192,3.11
 2025-08-22T21:43:26Z,test_analyse_csv_big_file,,141.34,bolinocroustibat,9063ff2,large,36,8192,3.11
 2025-08-22T22:25:34Z,test_analyse_csv_big_file,,137.11,bolinocroustibat,7eda36d,large,36,8192,3.11
-2025-08-22T22:41:56Z,test_csv_to_geojson_big_file,https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz,980.6,bolinocroustibat,7eda36d,large,36,8192,3.11
+2025-08-22T22:41:56Z,test_csv_to_geojson_big_file,af0cc2eb-b78a-471b-baad-80c29e3ee6e6,980.6,bolinocroustibat,7eda36d,large,36,8192,3.11
