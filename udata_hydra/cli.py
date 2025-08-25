@@ -273,33 +273,15 @@ async def convert_csv_to_geojson_cli(csv_filepath: str):
     # Analyze the CSV with csv_detective
     log.info("Analyzing CSV structure...")
     try:
-        # Try with different encodings if the default fails
-        encodings_to_try = ["utf-8", "latin-1", "iso-8859-1", "cp1252"]
-
-        inspection = None
-        df = None
-
-        for encoding in encodings_to_try:
-            try:
-                log.info(f"Trying encoding: {encoding}")
-                inspection, df = csv_detective_routine(
-                    file_path=str(csv_path),
-                    output_profile=True,
-                    output_df=True,
-                    cast_json=False,
-                    num_rows=-1,
-                    save_results=False,
-                    encoding=encoding,
-                )
-                log.info(f"Successfully read CSV with encoding: {encoding}")
-                break
-            except Exception as e:
-                log.warning(f"Failed with encoding {encoding}: {e}")
-                continue
-
-        if inspection is None or df is None:
-            log.error("Failed to read CSV with any encoding")
-            return
+        # csv_detective handles encoding detection automatically
+        inspection, df = csv_detective_routine(
+            file_path=str(csv_path),
+            output_profile=True,
+            output_df=True,
+            cast_json=False,
+            num_rows=-1,
+            save_results=False,
+        )
 
         log.info(f"CSV analysis complete. Found {len(df)} rows and {len(df.columns)} columns")
         log.info(f"Columns: {list(df.columns)}")
