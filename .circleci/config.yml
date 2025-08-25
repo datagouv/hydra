@@ -240,7 +240,7 @@ jobs:
           command: |
             mkdir -p .benchmarks
             if [ ! -f .benchmarks/benchmarks.csv ]; then
-              echo "datetime,test_name,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version" > .benchmarks/benchmarks.csv
+              echo "datetime,test_name,input_file,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version" > .benchmarks/benchmarks.csv
             fi
       - run:
           name: Run benchmark for CSV analysis on big file
@@ -252,7 +252,7 @@ jobs:
             poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v --durations=0
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
       - run:
           name: Download and extract test data for CSV with geo data to GeoJSON benchmark
           command: |
@@ -270,7 +270,7 @@ jobs:
             poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v --durations=0 --keep-result-file
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,<< pipeline.parameters.test_file_url >>,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
           no_output_timeout: 20m
       - run:
           name: Run benchmark for big GeoJSON to PMTiles
@@ -282,7 +282,7 @@ jobs:
             poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v --durations=0
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
           no_output_timeout: 20m
       - run:
           name: Display benchmark results
