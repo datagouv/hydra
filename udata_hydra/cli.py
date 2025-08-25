@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from urllib.parse import ParseResult, urlparse
 
 import aiohttp
 import asyncpg
@@ -21,19 +22,10 @@ from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
+from udata_hydra.utils import download_file
 
 context = {}
 log = setup_logging()
-
-
-async def download_file(url: str, fd):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            while True:
-                chunk = await resp.content.read(1024)
-                if not chunk:
-                    break
-                fd.write(chunk)
 
 
 async def connection(db_name: str = "main"):
@@ -143,6 +135,25 @@ async def crawl_url(url: str, method: str = "get"):
                 print("Headers:", resp.headers)
         except Exception as e:
             log.error(e)
+
+
+@cli(name="download-resource")
+async def download_resource_cli(resource_id: str):
+    """Download a resource from the catalog"""
+    resource: asyncpg.Record | None = await Resource.get(resource_id)
+    if not resource:
+        log.error(f"Resource {resource_id} not found in catalog")
+        return
+
+    parsed_url: ParseResult = urlparse(resource["url"])
+    path: str = parsed_url.path
+    extension: str = Path(path).suffix if path else ""
+    output_path = Path(config.TEMPORARY_DOWNLOAD_FOLDER or ".") / f"{resource_id}{extension}"
+
+    with open(output_path, "wb") as fd:
+        await download_file(resource["url"], fd)
+
+    log.info(f"Successfully downloaded resource {resource_id} to {output_path}")
 
 
 @cli

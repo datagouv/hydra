@@ -82,6 +82,17 @@ async def download_resource(
         return tmp_file
 
 
+async def download_file(url: str, fd):
+    """Download a file from URL to a file descriptor"""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            while True:
+                chunk = await resp.content.read(1024)
+                if not chunk:
+                    break
+                fd.write(chunk)
+
+
 def remove_remainders(resource_id: str, extensions: list[str]) -> None:
     """Delete potential remainders from process that crashed"""
     for ext in extensions:
