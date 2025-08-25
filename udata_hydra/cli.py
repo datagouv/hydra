@@ -281,6 +281,7 @@ async def convert_csv_to_geojson_cli(csv_filepath: str):
             cast_json=False,
             num_rows=-1,
             save_results=False,
+            verbose=True,
         )
 
         log.info(f"CSV analysis complete. Found {len(df)} rows and {len(df.columns)} columns")
