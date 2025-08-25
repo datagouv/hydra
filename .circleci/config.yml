@@ -400,7 +400,14 @@ workflows:
 
   benchmark-workflow:
     jobs:
+      - hold:
+          type: approval
+          filters:
+            branches:
+              only: << pipeline.parameters.benchmark-branch >>
       - install:
+          requires:
+            - hold
           filters:
             branches:
               only: << pipeline.parameters.benchmark-branch >>
