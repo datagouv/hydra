@@ -22,17 +22,17 @@ async def read_or_download_file(
     file_format: str,
     exception: Record | None,
 ) -> IO[bytes]:
-    return (
-        open(file_path, "rb")
-        if file_path
-        else await download_resource(
+    if file_path:
+        return open(file_path, "rb")
+    else:
+        tmp_file, _ = await download_resource(
             url=check["url"],
             headers=json.loads(check.get("headers") or "{}"),
             max_size_allowed=None
             if exception
             else int(config.MAX_FILESIZE_ALLOWED.get(file_format, "csv")),
         )
-    )
+        return tmp_file
 
 
 async def notify_udata(resource: Record, check: dict) -> None:
@@ -41,12 +41,12 @@ async def notify_udata(resource: Record, check: dict) -> None:
         "resource_id": check["resource_id"],
         "dataset_id": resource["dataset_id"],
         "document": {
-            "analysis:parsing:error": check["parsing_error"],
+            "analysis:parsing:error": check.get("parsing_error"),
             "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
-            if check["parsing_started_at"]
+            if check.get("parsing_started_at")
             else None,
             "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
-            if check["parsing_finished_at"]
+            if check.get("parsing_finished_at")
             else None,
         },
     }

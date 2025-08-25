@@ -21,19 +21,10 @@ from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
+from udata_hydra.utils import download_file, download_resource
 
 context = {}
 log = setup_logging()
-
-
-async def download_file(url: str, fd):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            while True:
-                chunk = await resp.content.read(1024)
-                if not chunk:
-                    break
-                fd.write(chunk)
 
 
 async def connection(db_name: str = "main"):
@@ -143,6 +134,32 @@ async def crawl_url(url: str, method: str = "get"):
                 print("Headers:", resp.headers)
         except Exception as e:
             log.error(e)
+
+
+@cli(name="download-resource")
+async def download_resource_cli(resource_id: str, output_dir: str | None = None):
+    """Download a resource from the catalog
+
+    :resource_id: ID of the resource to download
+    :output_dir: Custom output directory (defaults to TEMPORARY_DOWNLOAD_FOLDER)
+    """
+    resource: asyncpg.Record | None = await Resource.get(resource_id)
+    if not resource:
+        log.error(f"Resource {resource_id} not found in catalog")
+        return
+
+    try:
+        tmp_file, file_extension = await download_resource(resource["url"])
+        output_path = (
+            Path(output_dir or config.TEMPORARY_DOWNLOAD_FOLDER or ".")
+            / f"{resource_id}{file_extension}"
+        )
+        # Move the temporary file to the desired output location
+        Path(tmp_file.name).rename(output_path)
+        log.info(f"Successfully downloaded resource {resource_id} to {output_path}")
+    except Exception as e:
+        log.error(f"Failed to download resource {resource_id}: {e}")
+        raise
 
 
 @cli
