@@ -10,6 +10,7 @@ from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.csv import csv_detective_routine
 from udata_hydra.analysis.geojson import (
     DEFAULT_GEOJSON_FILEPATH,
+    DEFAULT_PMTILES_FILEPATH,
     analyse_geojson,
     csv_to_geojson,
     geojson_to_pmtiles,
@@ -17,8 +18,7 @@ from udata_hydra.analysis.geojson import (
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.timer import Timer
 
-BIG_CSV_GEO_TEST_FILE = Path("tests/data/.MN_36_latest-2024-2025.csv")
-BIG_GEOJSON_TEST_FILE = DEFAULT_GEOJSON_FILEPATH
+CSV_GEO_TEST_FILEPATH = Path("tests/data/.MN_36_latest-2024-2025.csv")
 
 log = logging.getLogger("udata-hydra")
 
@@ -99,7 +99,7 @@ async def test_geojson_analysis(setup_catalog, db, fake_check, rmock, produce_mo
 @pytest.mark.asyncio
 @pytest.mark.slow
 async def test_csv_to_geojson_big_file(
-    mocker, csv_file_path: str = str(BIG_CSV_GEO_TEST_FILE), keep_result_file: bool = False
+    mocker, csv_file_path: str = str(CSV_GEO_TEST_FILEPATH), keep_result_file: bool = False
 ):
     """Test performance with a CSV file containing geographical data"""
 
@@ -109,6 +109,8 @@ async def test_csv_to_geojson_big_file(
 
     # Create timer for performance measurement
     timer = Timer("csv-to-geojson-performance-test")
+
+    test_geojson_path: Path = DEFAULT_GEOJSON_FILEPATH
 
     # Mock MinIO for the test
     minio_url = "my.minio.fr"
@@ -151,7 +153,6 @@ async def test_csv_to_geojson_big_file(
             geojson_size, geojson_url = result
 
             # Verify the GeoJSON file was created correctly
-            test_geojson_path = Path("test_output.geojson")
             with test_geojson_path.open("r") as f:
                 geojson_data = json.load(f)
                 assert geojson_data["type"] == "FeatureCollection"
@@ -195,6 +196,8 @@ async def test_geojson_to_pmtiles_big_file(mocker, geojson_file_path: str):
     # Create timer for performance measurement
     timer = Timer("geojson-to-pmtiles-performance-test")
 
+    test_pmtiles_path: Path = DEFAULT_PMTILES_FILEPATH
+
     # Mock MinIO for the test
     minio_url = "my.minio.fr"
     bucket = "bucket"
@@ -213,12 +216,11 @@ async def test_geojson_to_pmtiles_big_file(mocker, geojson_file_path: str):
         mock_os.remove.return_value = None
 
         # Test the performance of geojson_to_pmtiles with the real file
-        result = await geojson_to_pmtiles(geojson_path, Path(f"{RESOURCE_ID}.pmtiles"))
+        result = await geojson_to_pmtiles(geojson_path, test_pmtiles_path)
         timer.mark("pmtiles-conversion")
         pmtiles_size, pmtiles_url = result
 
     # Verify the PMTiles file was created correctly
-    test_pmtiles_path = Path(f"{RESOURCE_ID}.pmtiles")
     with test_pmtiles_path.open("rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
