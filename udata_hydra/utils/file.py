@@ -34,15 +34,19 @@ def extract_gzip(file_path: str) -> IO[bytes]:
 
 async def download_resource(
     url: str,
-    headers: dict,
-    max_size_allowed: int | None,
+    headers: dict | None = None,
+    max_size_allowed: int | None = None,
 ) -> IO[bytes]:
     """
     Attempts downloading a resource from a given url.
     Returns the downloaded file object.
     Raises custom IOException if the resource is too large or if the URL is unreachable.
     """
-    if max_size_allowed is not None and float(headers.get("content-length", -1)) > max_size_allowed:
+    if (
+        headers
+        and max_size_allowed is not None
+        and float(headers.get("content-length", -1)) > max_size_allowed
+    ):
         raise IOException("File too large to download", url=url)
 
     tmp_file = tempfile.NamedTemporaryFile(
@@ -54,7 +58,8 @@ async def download_resource(
     too_large, download_error = False, None
     try:
         async with aiohttp.ClientSession(
-            headers={"user-agent": config.USER_AGENT}, raise_for_status=True
+            headers={"user-agent": config.USER_AGENT} if config.USER_AGENT else None,
+            raise_for_status=True,
         ) as session:
             async with session.get(url, allow_redirects=True) as response:
                 async for chunk in response.content.iter_chunked(chunk_size):
