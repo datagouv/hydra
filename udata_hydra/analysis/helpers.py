@@ -22,17 +22,17 @@ async def read_or_download_file(
     file_format: str,
     exception: Record | None,
 ) -> IO[bytes]:
-    return (
-        open(file_path, "rb")
-        if file_path
-        else await download_resource(
+    if file_path:
+        return open(file_path, "rb")
+    else:
+        tmp_file, _ = await download_resource(
             url=check["url"],
             headers=json.loads(check.get("headers") or "{}"),
             max_size_allowed=None
             if exception
             else int(config.MAX_FILESIZE_ALLOWED.get(file_format, "csv")),
         )
-    )
+        return tmp_file
 
 
 async def notify_udata(resource: Record, check: dict) -> None:
