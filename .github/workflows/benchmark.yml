@@ -20,6 +20,8 @@ on:
 #         type: string
 
 env:
+  TEST_RESOURCE_ID: "af0cc2eb-b78a-471b-baad-80c29e3ee6e6"
+  BENCHMARK_BRANCH: "benchmarks"
   PYTHON_VERSION: "3.11"
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
   UDATA_INSTANCE_NAME: udata
@@ -96,7 +98,7 @@ jobs:
       - name: Download CSV data file for CSV to GeoJSON and GeoJSON to PMTiles benchmarks
         run: |
           mkdir -p tests/data
-          poetry run udata-hydra download-resource ${{ github.event.inputs.test_resource_id }} --output-dir tests/data
+          poetry run udata-hydra download-resource ${{ env.TEST_RESOURCE_ID }} --output-dir tests/data
           ls -la tests/data/
 
       - name: Run CSV to GeoJSON benchmark
@@ -106,7 +108,7 @@ jobs:
           poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v --durations=0 --keep-result-file
           end_time=$(date +%s.%N)
           execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ github.event.inputs.test_resource_id }},$execution_time,${{ github.actor }},${{ github.sha }},${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ env.TEST_RESOURCE_ID }},$execution_time,${{ github.actor }},${{ github.sha }},${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
       - name: Run GeoJSON to PMTiles benchmark
         timeout-minutes: 20
@@ -138,8 +140,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ env.BENCHMARK_BRANCH }}
 
       - name: Download benchmark results
         uses: actions/download-artifact@v4
@@ -167,4 +168,4 @@ jobs:
         run: |
           git add .benchmarks/benchmarks.csv
           git commit -m "perf: update benchmark results from CI run #${{ github.run_number }} [skip ci]"
-          git push origin ${{ github.event.inputs.branch }}
+          git push origin ${{env.BENCHMARK_BRANCH }}
