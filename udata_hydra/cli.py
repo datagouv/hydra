@@ -150,13 +150,12 @@ async def download_resource_cli(resource_id: str, output_dir: str | None = None)
 
     try:
         tmp_file, file_extension = await download_resource(resource["url"])
-        file_path = Path(tmp_file.name)
         output_path = (
             Path(output_dir or config.TEMPORARY_DOWNLOAD_FOLDER or ".")
             / f"{resource_id}{file_extension}"
         )
         # Move the temporary file to the desired output location
-        file_path.rename(output_path)
+        Path(tmp_file.name).rename(output_path)
         log.info(f"Successfully downloaded resource {resource_id} to {output_path}")
     except Exception as e:
         log.error(f"Failed to download resource {resource_id}: {e}")
