@@ -254,7 +254,7 @@ jobs:
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
       - run:
-          name: Download and extract test data for CSV with geo data to GeoJSON benchmark
+          name: Download and extract CSV data file for CSV to GeoJSON and GeoJSON to PMTiles benchmarks
           command: |
             mkdir -p tests/data
             poetry run udata-hydra download-resource << pipeline.parameters.test-resource-id >> --output-dir tests/data
