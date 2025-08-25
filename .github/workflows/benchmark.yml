@@ -1,0 +1,201 @@
+name: Run Performance Benchmarks and Commit Results
+run-name: Run performance benchmarks on ${{ github.ref_name }} branch and commit results
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to run benchmarks on (should always be "benchmarks")'
+        required: true
+        default: 'benchmarks'
+        type: string
+      test_resource_id:
+        description: 'Resource ID to use for GeoJSON benchmark tests'
+        required: false
+        default: 'af0cc2eb-b78a-471b-baad-80c29e3ee6e6'
+        type: string
+
+env:
+  PYTHON_VERSION: "3.11"
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+  UDATA_INSTANCE_NAME: udata
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --extras "dev"
+
+      - name: Upload workspace
+        uses: actions/upload-artifact@v3
+        with:
+          name: workspace
+          path: |
+            .
+            .venv
+          retention-days: 1
+
+  benchmark:
+    runs-on: ubuntu-latest
+    needs: install
+    strategy:
+      matrix:
+        resource-class: [large]
+    services:
+      postgres:
+        image: postgres:15.13
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --extras "dev"
+
+      - name: Download workspace
+        uses: actions/download-artifact@v3
+        with:
+          name: workspace
+          path: .
+
+      - name: Install required tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc
+
+      - name: Create benchmarks directory
+        run: |
+          mkdir -p .benchmarks
+          if [ ! -f .benchmarks/benchmarks.csv ]; then
+            echo "datetime,test_name,test_resource_id,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version" > .benchmarks/benchmarks.csv
+          fi
+
+      - name: Run CSV analysis benchmark
+        run: |
+          start_time=$(date +%s.%N)
+          poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v --durations=0
+          end_time=$(date +%s.%N)
+          execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,$execution_time,${{ github.actor }},${{ github.sha }},${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+
+      - name: Download test data for GeoJSON benchmark
+        run: |
+          mkdir -p tests/data
+          poetry run udata-hydra download-resource ${{ github.event.inputs.test_resource_id }} --output-dir tests/data
+          ls -la tests/data/
+
+      - name: Run CSV to GeoJSON benchmark
+        timeout-minutes: 20
+        run: |
+          start_time=$(date +%s.%N)
+          poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v --durations=0 --keep-result-file
+          end_time=$(date +%s.%N)
+          execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ github.event.inputs.test_resource_id }},$execution_time,${{ github.actor }},${{ github.sha }},${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+
+      - name: Run GeoJSON to PMTiles benchmark
+        timeout-minutes: 20
+        run: |
+          start_time=$(date +%s.%N)
+          poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v --durations=0
+          end_time=$(date +%s.%N)
+          execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,,$execution_time,${{ github.actor }},${{ github.sha }},${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+
+      - name: Display benchmark results
+        run: |
+          echo "=== Benchmark Results ==="
+          cat .benchmarks/benchmarks.csv
+          echo "========================="
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: .benchmarks/benchmarks.csv
+          retention-days: 1
+
+  commit-benchmarks:
+    runs-on: ubuntu-latest
+    needs: benchmark
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Download benchmark results
+        uses: actions/download-artifact@v3
+        with:
+          name: benchmark-results
+          path: .benchmarks/
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "opendatateam@data.gouv.fr"
+          git config --global user.name "data.gouv.fr"
+
+      - name: Check if benchmarks changed
+        id: check-changes
+        run: |
+          if git diff --quiet .benchmarks/benchmarks.csv; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes to benchmarks, skipping commit"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push benchmark results
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          git add .benchmarks/benchmarks.csv
+          git commit -m "perf: update benchmark results from CI run #${{ github.run_number }} [skip ci]"
+          git push origin ${{ github.event.inputs.branch }}
