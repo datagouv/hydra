@@ -19,7 +19,7 @@
 - Add check id in udata extras to facilitate debug [#307](https://github.com/datagouv/hydra/pull/307)
 - Split `csv_to geojson_and_pmtiles` function into a new intermediary function `csv_to_geojson` for better unit testing/benchmarking [#317](https://github.com/datagouv/hydra/pull/317)
 - Add download resource CLI command [#320](https://github.com/datagouv/hydra/pull/320)
-- Add csv to geojson and geojson to pmtiles performance tests on geographical big data, and CLI commands to convert geograhical files locally [#319](https://github.com/datagouv/hydra/pull/319)
+- Add performance tests for csv to geojson and geojson to pmtiles conversion on geographical big data, and CLI commands to convert geographical files locally [#319](https://github.com/datagouv/hydra/pull/319)
 
 ## 2.3.0 (2025-07-15)
 
