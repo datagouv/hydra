@@ -285,7 +285,7 @@ async def geojson_to_pmtiles(
     if resource_id:
         pmtiles_filepath = Path(f"{resource_id}.pmtiles")
     else:
-        pmtiles_filepath = Path(f"{file_path.stem}.pmtiles")
+        pmtiles_filepath = file_path
 
     command = [
         "--maximum-zoom=g",  # guess
