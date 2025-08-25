@@ -178,7 +178,7 @@ async def csv_to_geojson(
                 {
                     "type": "Feature",
                     # json is not pre-cast by csv-detective
-                    "geometry": json.loads(str(row[geo["geometry"]])),
+                    "geometry": json.loads(row[geo["geometry"]]),
                     "properties": {
                         col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
                     },
@@ -194,7 +194,7 @@ async def csv_to_geojson(
                     "type": "Feature",
                     "geometry": {
                         "type": "Point",
-                        "coordinates": cast_latlon(str(row[geo["latlon"]])),
+                        "coordinates": cast_latlon(row[geo["latlon"]]),
                     },
                     "properties": {
                         col: prevent_nan(row[col]) for col in df.columns if col != geo["latlon"]
@@ -212,7 +212,7 @@ async def csv_to_geojson(
                     "geometry": {
                         "type": "Point",
                         # inverting lon and lat to match the standard
-                        "coordinates": cast_latlon(str(row[geo["lonlat"]]))[::-1],
+                        "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
                     },
                     "properties": {
                         col: prevent_nan(row[col]) for col in df.columns if col != geo["lonlat"]
