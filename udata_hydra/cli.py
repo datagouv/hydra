@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import IO
 
 import aiohttp
 import asyncpg
@@ -137,18 +138,23 @@ async def crawl_url(url: str, method: str = "get"):
 
 
 @cli(name="download-resource")
-async def download_resource_cli(resource_id: str):
-    """Download a resource from the catalog"""
+async def download_resource_cli(resource_id: str, output_dir: str | None = None):
+    """Download a resource from the catalog
+
+    :resource_id: ID of the resource to download
+    :output_dir: Custom output directory (defaults to TEMPORARY_DOWNLOAD_FOLDER)
+    """
     resource: asyncpg.Record | None = await Resource.get(resource_id)
     if not resource:
         log.error(f"Resource {resource_id} not found in catalog")
         return
 
     try:
-        tmp_file = await download_resource(resource["url"])
+        tmp_file: IO[bytes] = await download_resource(resource["url"])
         file_path = Path(tmp_file.name)
         output_path = (
-            Path(config.TEMPORARY_DOWNLOAD_FOLDER or ".") / f"{resource_id}{file_path.suffix}"
+            Path(output_dir or config.TEMPORARY_DOWNLOAD_FOLDER or ".")
+            / f"{resource_id}{file_path.suffix}"
         )
         # Move the temporary file to the desired output location
         file_path.rename(output_path)
