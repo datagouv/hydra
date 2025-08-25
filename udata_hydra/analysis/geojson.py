@@ -272,7 +272,7 @@ async def geojson_to_pmtiles(
         pmtiles_url: URL of the PMTiles file on MinIO. None if it was not uploaded to MinIO.
     """
 
-    log.debug(f"Converting GeoJSON to PMTiles for {input_file_path}")
+    log.debug(f"Converting GeoJSON file '{input_file_path}' to PMTiles file '{output_file_path}'")
 
     command = [
         "--maximum-zoom=g",  # guess

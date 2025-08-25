@@ -16,8 +16,6 @@ from udata_hydra.analysis.geojson import (
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.timer import Timer
 
-CSV_GEO_TEST_FILEPATH = Path("tests/data/.MN_36_latest-2024-2025.csv")
-
 log = logging.getLogger("udata-hydra")
 
 
@@ -78,14 +76,13 @@ async def test_geojson_analysis(setup_catalog, db, fake_check, rmock, produce_mo
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=b"{pretend this is a geojson}")
-    pmtiles_filepath = Path("tests/data/valid.pmtiles")
     pmtiles_size = 100
     pmtiles_url = "http://minio/test.pmtiles"
     with (
         patch("udata_hydra.config.GEOJSON_TO_PMTILES", True),
         patch(
             "udata_hydra.analysis.geojson.geojson_to_pmtiles",
-            return_value=(pmtiles_filepath, pmtiles_size, pmtiles_url),
+            return_value=(pmtiles_size, pmtiles_url),
         ),
     ):
         await analyse_geojson(check=check)
@@ -98,18 +95,18 @@ async def test_geojson_analysis(setup_catalog, db, fake_check, rmock, produce_mo
 @pytest.mark.asyncio
 @pytest.mark.slow
 async def test_csv_to_geojson_big_file(
-    mocker, csv_file_path: str = str(CSV_GEO_TEST_FILEPATH), keep_result_file: bool = False
+    mocker, csv_filepath: str | None = None, keep_result_file: bool = False
 ):
     """Test performance with a CSV file containing geographical data"""
 
-    csv_path = Path(csv_file_path)
-    if not csv_path.exists():
-        pytest.skip(f"CSV file not found: {csv_path}, skipping performance test")
+    if not csv_filepath:
+        pytest.skip("No csv_filepath provided, skipping performance test")
+
+    csv_path = Path(csv_filepath)
+    test_geojson_path = Path(f"{RESOURCE_ID}.geojson")
 
     # Create timer for performance measurement
     timer = Timer("csv-to-geojson-performance-test")
-
-    test_geojson_path = Path(f"{RESOURCE_ID}.geojson")
 
     # Mock MinIO for the test
     minio_url = "my.minio.fr"
@@ -183,19 +180,19 @@ async def test_csv_to_geojson_big_file(
 
 @pytest.mark.asyncio
 @pytest.mark.slow
-async def test_geojson_to_pmtiles_big_file(mocker, geojson_file_path: str):
+async def test_geojson_to_pmtiles_big_file(mocker, geojson_filepath: str | None = None):
     """Test performance with a GeoJSON file
 
-    :geojson_file_path: Path to the GeoJSON file to test (mandatory)
+    :geojson_filepath: Path to the GeoJSON file to test (mandatory)
     """
-    geojson_path = Path(geojson_file_path)
-    if not geojson_path.exists():
-        pytest.skip(f"GeoJSON file not found: {geojson_path}, skipping performance test")
+    if not geojson_filepath:
+        pytest.skip("No geojson_filepath provided, skipping performance test")
+
+    geojson_path = Path(geojson_filepath)
+    test_pmtiles_path = Path(f"{RESOURCE_ID}.pmtiles")
 
     # Create timer for performance measurement
     timer = Timer("geojson-to-pmtiles-performance-test")
-
-    test_pmtiles_path = Path(f"{RESOURCE_ID}.pmtiles")
 
     # Mock MinIO for the test
     minio_url = "my.minio.fr"
