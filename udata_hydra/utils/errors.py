@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import sentry_sdk
 from asyncpg import Record
 
-from udata_hydra import config, context
+from udata_hydra import context
 from udata_hydra.db.check import Check
 
 log = logging.getLogger("udata-hydra")
@@ -120,10 +120,6 @@ async def handle_parse_exception(
         # e.__cause__ let us access the "inherited" error of the Exception (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
         err = f"{e.step}:{str(e.__cause__)}"
-        if config.SENTRY_DSN:
-            with sentry_sdk.new_scope():
-                event_id = sentry_sdk.capture_exception(e)
-                err = f"{e.step}:sentry:{event_id}"
         await Check.update(
             check["id"],
             {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
