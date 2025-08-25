@@ -4,7 +4,6 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import IO
 
 import aiohttp
 import asyncpg
@@ -150,11 +149,11 @@ async def download_resource_cli(resource_id: str, output_dir: str | None = None)
         return
 
     try:
-        tmp_file: IO[bytes] = await download_resource(resource["url"])
+        tmp_file, file_extension = await download_resource(resource["url"])
         file_path = Path(tmp_file.name)
         output_path = (
             Path(output_dir or config.TEMPORARY_DOWNLOAD_FOLDER or ".")
-            / f"{resource_id}{file_path.suffix}"
+            / f"{resource_id}{file_extension}"
         )
         # Move the temporary file to the desired output location
         file_path.rename(output_path)

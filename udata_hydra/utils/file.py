@@ -1,7 +1,9 @@
 import gzip
 import hashlib
 import logging
+import mimetypes
 import os
+import re
 import tempfile
 from typing import IO
 
@@ -36,10 +38,10 @@ async def download_resource(
     url: str,
     headers: dict | None = None,
     max_size_allowed: int | None = None,
-) -> IO[bytes]:
+) -> tuple[IO[bytes], str]:
     """
     Attempts downloading a resource from a given url.
-    Returns the downloaded file object.
+    Returns a tuple of (downloaded_file_object, detected_extension).
     Raises custom IOException if the resource is too large or if the URL is unreachable.
     """
     if (
@@ -79,12 +81,28 @@ async def download_resource(
         if download_error:
             os.remove(tmp_file.name)
             raise IOException("Error downloading CSV", url=url) from download_error
-        if magic.from_file(tmp_file.name, mime=True) in [
-            "application/x-gzip",
-            "application/gzip",
-        ]:
-            tmp_file = extract_gzip(tmp_file.name)
-        return tmp_file
+
+    detected_extension = ""
+
+    if magic.from_file(tmp_file.name, mime=True) in [
+        "application/x-gzip",
+        "application/gzip",
+    ]:
+        # It's compressed - extract and determine extension from URL
+        tmp_file = extract_gzip(tmp_file.name)
+
+        # Extract any extension before .gz using regex
+        match = re.search(r"\.([^.]+)\.gz$", url)
+        if match:
+            detected_extension = f".{match.group(1)}"
+        else:
+            detected_extension = ""
+    else:
+        # Not compressed - use magic to detect type
+        mime_type = magic.from_file(tmp_file.name, mime=True)
+        detected_extension = mimetypes.guess_extension(mime_type) or ""
+
+    return tmp_file, detected_extension
 
 
 async def download_file(url: str, fd):
