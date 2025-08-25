@@ -398,7 +398,7 @@ workflows:
           context:
             - org-global
 
-  benchmark_workflow:
+  benchmark-workflow:
     jobs:
       - install:
           filters:
@@ -417,25 +417,4 @@ workflows:
           filters:
             branches:
               only: << pipeline.parameters.benchmark-branch >>
-          context: benchmark-context
-
-  manual_benchmark:
-    jobs:
-      - install:
-          filters:
-            branches:
-              ignore: /.*/
-      - benchmark:
-          requires:
-            - install
-          filters:
-            branches:
-              ignore: /.*/
-          context: benchmark-context
-      - commit-benchmarks:
-          requires:
-            - benchmark
-          filters:
-            branches:
-              ignore: /.*/
           context: benchmark-context
