@@ -20,7 +20,7 @@ on:
 #         type: string
 
 env:
-  TEST_GEOCSV_URL: "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz"
+  TEST_GEOCSV_URL: "https://static.data.gouv.fr/resources/fichier-consolide-des-bornes-de-recharge-pour-vehicules-electriques/20250826-043911/consolidation-etalab-schema-irve-statique-v-2.3.1-20250826.csv"
   BENCHMARK_BRANCH: "benchmarks"
   PYTHON_VERSION: "3.11"
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
@@ -98,8 +98,12 @@ jobs:
       - name: Download ${{ env.TEST_GEOCSV_URL }}
         run: |
           mkdir -p tests/data
-          wget -O tests/data/test_geodata.csv.gz "${{ env.TEST_GEOCSV_URL }}"
-          gunzip tests/data/test_geodata.csv.gz
+          if [[ "${{ env.TEST_GEOCSV_URL }}" == *.gz ]]; then
+            wget -O tests/data/test_geodata.csv.gz "${{ env.TEST_GEOCSV_URL }}"
+            gunzip tests/data/test_geodata.csv.gz
+          else
+            wget -O tests/data/test_geodata.csv "${{ env.TEST_GEOCSV_URL }}"
+          fi
           echo "TEST_GEOCSV_PATH=tests/data/test_geodata.csv" >> $GITHUB_ENV
           ls -la tests/data/
 
