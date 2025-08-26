@@ -97,6 +97,16 @@ jobs:
           SHORT_SHA="${COMMIT_SHA:0:7}"
           echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
+      - name: Commit CSV analysis benchmark results
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          git config --global user.email "opendatateam@data.gouv.fr"
+          git config --global user.name "data.gouv.fr"
+          git add .benchmarks/benchmarks.csv
+          git commit -m "perf: add CSV analysis benchmark results for commit $SHORT_SHA from GitHub Actions run #${{ github.run_number }} [skip ci]"
+          git push origin ${{env.BENCHMARK_BRANCH }}
+
       - name: Download ${{ env.TEST_GEOCSV_URL }}
         run: |
           mkdir -p tests/data
@@ -119,6 +129,16 @@ jobs:
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
           echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+
+      - name: Commit CSV to GeoJSON benchmark results
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          git config --global user.email "opendatateam@data.gouv.fr"
+          git config --global user.name "data.gouv.fr"
+          git add .benchmarks/benchmarks.csv
+          git commit -m "perf: add CSV to GeoJSON benchmark results for commit $SHORT_SHA from GitHub Actions run #${{ github.run_number }} [skip ci]"
+          git push origin ${{env.BENCHMARK_BRANCH }}
 
       - name: Set GeoJSON file path for PMTiles benchmark
         run: |
@@ -149,6 +169,16 @@ jobs:
           SHORT_SHA="${COMMIT_SHA:0:7}"
           echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
+      - name: Commit GeoJSON to PMTiles benchmark results
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          git config --global user.email "opendatateam@data.gouv.fr"
+          git config --global user.name "data.gouv.fr"
+          git add .benchmarks/benchmarks.csv
+          git commit -m "perf: add GeoJSON to PMTiles benchmark results for commit $SHORT_SHA from GitHub Actions run #${{ github.run_number }} [skip ci]"
+          git push origin ${{env.BENCHMARK_BRANCH }}
+
       - name: Display benchmark results
         run: |
           echo "=== Benchmark Results ==="
@@ -161,43 +191,3 @@ jobs:
           name: benchmark-results
           path: .benchmarks/benchmarks.csv
           retention-days: 1
-
-  commit-benchmarks:
-    name: Commit benchmark results to repository
-    runs-on: ubuntu-latest
-    needs: benchmark
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.BENCHMARK_BRANCH }}
-
-      - name: Download benchmark results
-        uses: actions/download-artifact@v4
-        with:
-          name: benchmark-results
-          path: .benchmarks/
-
-      - name: Configure Git
-        run: |
-          git config --global user.email "opendatateam@data.gouv.fr"
-          git config --global user.name "data.gouv.fr"
-
-      - name: Check if benchmarks changed
-        id: check-changes
-        run: |
-          if git diff --quiet .benchmarks/benchmarks.csv; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "No changes to benchmarks, skipping commit"
-          else
-            echo "changed=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Commit and push benchmark results
-        if: steps.check-changes.outputs.changed == 'true'
-        run: |
-          COMMIT_SHA="${{ github.sha }}"
-          SHORT_SHA="${COMMIT_SHA:0:7}"
-          git add .benchmarks/benchmarks.csv
-          git commit -m "perf: update benchmark results for commit $SHORT_SHA from GitHub Actions run #${{ github.run_number }} [skip ci]"
-          git push origin ${{env.BENCHMARK_BRANCH }}

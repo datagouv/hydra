@@ -258,6 +258,17 @@ jobs:
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+
+      - run:
+          name: Commit CSV analysis benchmark results
+          command: |
+            git config --global user.email "opendatateam@data.gouv.fr"
+            git config --global user.name "data.gouv.fr"
+            git add .benchmarks/benchmarks.csv
+            git commit -m "perf: add CSV analysis benchmark results for commit ${CIRCLE_SHA1:0:7} from CircleCI run #$CIRCLE_BUILD_NUM [skip ci]"
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
+            git push origin << pipeline.parameters.benchmark-branch >>
+
       - run:
           name: Download << pipeline.parameters.test-geocsv-url >>
           command: |
@@ -270,6 +281,7 @@ jobs:
             fi
             echo "CSV_FILE_PATH=tests/data/test_geodata.csv" >> $BASH_ENV
             ls -la tests/data/
+
       - run:
           name: Run CSV to GeoJSON benchmark
           environment:
@@ -282,6 +294,17 @@ jobs:
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,<< pipeline.parameters.test-geocsv-url >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
           no_output_timeout: 20m
+
+      - run:
+          name: Commit CSV to GeoJSON benchmark results
+          command: |
+            git config --global user.email "opendatateam@data.gouv.fr"
+            git config --global user.name "data.gouv.fr"
+            git add .benchmarks/benchmarks.csv
+            git commit -m "perf: add CSV to GeoJSON benchmark results for commit ${CIRCLE_SHA1:0:7} from CircleCI run #$CIRCLE_BUILD_NUM [skip ci]"
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
+            git push origin << pipeline.parameters.benchmark-branch >>
+
       - run:
           name: Set GeoJSON file path for PMTiles benchmark
           command: |
@@ -299,6 +322,7 @@ jobs:
               ls -la tests/data/
               exit 1
             fi
+
       - run:
           name: Run GeoJSON to PMTiles benchmark
           environment:
@@ -311,6 +335,17 @@ jobs:
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,<< pipeline.parameters.test-geocsv-url >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
           no_output_timeout: 20m
+
+      - run:
+          name: Commit GeoJSON to PMTiles benchmark results
+          command: |
+            git config --global user.email "opendatateam@data.gouv.fr"
+            git config --global user.name "data.gouv.fr"
+            git add .benchmarks/benchmarks.csv
+            git commit -m "perf: add GeoJSON to PMTiles benchmark results for commit ${CIRCLE_SHA1:0:7} from CircleCI run #$CIRCLE_BUILD_NUM [skip ci]"
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
+            git push origin << pipeline.parameters.benchmark-branch >>
+
       - run:
           name: Display benchmark results
           command: |
@@ -327,34 +362,6 @@ jobs:
           root: /tmp
           paths:
             - artifacts
-
-  commit-benchmarks:
-    docker:
-      - image: cimg/base:stable
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - run:
-          name: Configure Git
-          command: |
-            git config --global user.email "opendatateam@data.gouv.fr"
-            git config --global user.name "data.gouv.fr"
-      - run:
-          name: Check if benchmarks file changed
-          command: |
-            if git diff --quiet artifacts/benchmarks.csv; then
-              echo "No changes to benchmarks, skipping commit"
-              exit 0
-            fi
-      - run:
-          name: Commit and push benchmark results
-          command: |
-            cp artifacts/benchmarks.csv .benchmarks/benchmarks.csv
-            git add .benchmarks/benchmarks.csv
-            git commit -m "perf: update benchmark results for commit $CIRCLE_SHA1 from CircleCI run #$CIRCLE_BUILD_NUM [skip ci]"
-            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
-            git push origin << pipeline.parameters.benchmark-branch >>
 
 workflows:
   build-test-deploy:
@@ -440,13 +447,6 @@ workflows:
       - benchmark:
           requires:
             - install
-          filters:
-            branches:
-              only: << pipeline.parameters.benchmark-branch >>
-          context: benchmark-context
-      - commit-benchmarks:
-          requires:
-            - benchmark
           filters:
             branches:
               only: << pipeline.parameters.benchmark-branch >>
