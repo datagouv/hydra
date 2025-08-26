@@ -20,6 +20,7 @@
 - Split `csv_to geojson_and_pmtiles` function into a new intermediary function `csv_to_geojson` for better unit testing/benchmarking [#317](https://github.com/datagouv/hydra/pull/317)
 - Add download resource CLI command [#320](https://github.com/datagouv/hydra/pull/320)
 - Fix custom exception `ExceptionWithSentryDetails` to include Python stack trace [#315](https://github.com/datagouv/hydra/pull/315)
+- Fix deprecated Sentry method [#323](https://github.com/datagouv/hydra/pull/323)
 
 ## 2.3.0 (2025-07-15)
 
