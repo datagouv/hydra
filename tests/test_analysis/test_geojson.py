@@ -95,15 +95,15 @@ async def test_geojson_analysis(setup_catalog, db, fake_check, rmock, produce_mo
 @pytest.mark.asyncio
 @pytest.mark.slow
 async def test_csv_to_geojson_big_file(
-    mocker, csv_filepath: str | None = None, keep_result_file: bool = False
+    mocker, input_file: str | None, output_cleanup: bool = False
 ):
     """Test performance with a CSV file containing geographical data"""
 
-    if not csv_filepath:
-        pytest.skip("No csv_filepath provided, skipping performance test")
+    if not input_file:
+        pytest.skip("No input_file provided, skipping performance test")
 
-    csv_path = Path(csv_filepath)
-    test_geojson_path = Path(f"{RESOURCE_ID}.geojson")
+    csv_path = Path(input_file)
+    test_geojson_path = csv_path.parent / f"{csv_path.stem}.geojson"
 
     # Create timer for performance measurement
     timer = Timer("csv-to-geojson-performance-test")
@@ -140,7 +140,7 @@ async def test_csv_to_geojson_big_file(
         result = await csv_to_geojson(
             df=df,
             inspection=inspection,
-            output_file_path=Path("test_output.geojson"),
+            output_file_path=test_geojson_path,
             upload_to_minio=False,
         )
         timer.mark("geojson-conversion")
@@ -158,15 +158,15 @@ async def test_csv_to_geojson_big_file(
             # The size should be significant
             assert geojson_size > 1e6  # Should be much larger than small files
 
-            # Get file sizes before cleanup
+            # Get output file size before cleanup
             csv_size = csv_path.stat().st_size
 
-            # Clean up using pathlib (only if keep_result_file is False)
-            if not keep_result_file:
+            # Clean up
+            if output_cleanup:
                 test_geojson_path.unlink(missing_ok=True)
-                log.info(f"GeoJSON file removed: {test_geojson_path}")
+                log.info(f"Output GeoJSON file removed: {test_geojson_path}")
             else:
-                log.info(f"GeoJSON file kept: {test_geojson_path}")
+                log.info(f"Output GeoJSON file kept: {test_geojson_path}")
 
             # Stop timer and log performance results
             timer.stop()
@@ -180,16 +180,16 @@ async def test_csv_to_geojson_big_file(
 
 @pytest.mark.asyncio
 @pytest.mark.slow
-async def test_geojson_to_pmtiles_big_file(mocker, geojson_filepath: str | None = None):
+async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     """Test performance with a GeoJSON file
 
-    :geojson_filepath: Path to the GeoJSON file to test (mandatory)
+    :input_file: Path to the GeoJSON file to test (mandatory)
     """
-    if not geojson_filepath:
-        pytest.skip("No geojson_filepath provided, skipping performance test")
+    if not input_file:
+        pytest.skip("No input_file provided, skipping performance test")
 
-    geojson_path = Path(geojson_filepath)
-    test_pmtiles_path = Path(f"{RESOURCE_ID}.pmtiles")
+    geojson_path = Path(input_file)
+    test_pmtiles_path = geojson_path.parent / f"{geojson_path.stem}.pmtiles"
 
     # Create timer for performance measurement
     timer = Timer("geojson-to-pmtiles-performance-test")
@@ -220,7 +220,7 @@ async def test_geojson_to_pmtiles_big_file(mocker, geojson_filepath: str | None 
     with test_pmtiles_path.open("rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
-    assert pmtiles_url == f"https://{minio_url}/{bucket}/{folder}/{RESOURCE_ID}.pmtiles"
+    assert pmtiles_url == f"https://{minio_url}/{bucket}/{folder}/{geojson_path.stem}.pmtiles"
 
     # The size should be significantly larger than the small test file
     assert pmtiles_size > 5000  # Should be much larger than the 850-900 range of small file
