@@ -8,14 +8,14 @@ parameters:
     type: string
     default: "main"
     description: "Branch to publish to PyPI and trigger the Gitlab CI/CD pipeline when pushed to"
-  benchmark-branch:
-    type: string
-    default: "benchmarks"
-    description: "Branch name that triggers the benchmark workflow on push"
   deploy-env:
     type: string
     default: "dev"
     description: "Environment to deploy to"
+  benchmark-branch:
+    type: string
+    default: "benchmarks"
+    description: "Branch name that triggers the benchmark workflow on push"
   cache-prefix:
     type: string
     default: "py-cache-v2"
