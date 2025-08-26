@@ -104,7 +104,7 @@ jobs:
           git config --global user.email "opendatateam@data.gouv.fr"
           git config --global user.name "data.gouv.fr"
           git add .benchmarks/benchmarks.csv
-          git commit -m "perf: add CSV analysis benchmark results for commit $SHORT_SHA from GitHub Actions run #${{ github.run_number }} [skip ci]"
+          git commit -m "perf: add CSV analysis benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
           git push origin ${{env.BENCHMARK_BRANCH }}
 
       - name: Download ${{ env.TEST_GEOCSV_URL }}
@@ -137,7 +137,7 @@ jobs:
           git config --global user.email "opendatateam@data.gouv.fr"
           git config --global user.name "data.gouv.fr"
           git add .benchmarks/benchmarks.csv
-          git commit -m "perf: add CSV to GeoJSON benchmark results for commit $SHORT_SHA from GitHub Actions run #${{ github.run_number }} [skip ci]"
+          git commit -m "perf: add CSV to GeoJSON benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
           git push origin ${{env.BENCHMARK_BRANCH }}
 
       - name: Set GeoJSON file path for PMTiles benchmark
@@ -176,7 +176,7 @@ jobs:
           git config --global user.email "opendatateam@data.gouv.fr"
           git config --global user.name "data.gouv.fr"
           git add .benchmarks/benchmarks.csv
-          git commit -m "perf: add GeoJSON to PMTiles benchmark results for commit $SHORT_SHA from GitHub Actions run #${{ github.run_number }} [skip ci]"
+          git commit -m "perf: add GeoJSON to PMTiles benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
           git push origin ${{env.BENCHMARK_BRANCH }}
 
       - name: Display benchmark results
