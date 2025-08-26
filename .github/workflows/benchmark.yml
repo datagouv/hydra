@@ -190,6 +190,8 @@ jobs:
       - name: Commit and push benchmark results
         if: steps.check-changes.outputs.changed == 'true'
         run: |
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
           git add .benchmarks/benchmarks.csv
-          git commit -m "perf: update benchmark results from CI run #${{ github.run_number }} [skip ci]"
+          git commit -m "perf: update benchmark results for commit $SHORT_SHA from GitHub Actions run #${{ github.run_number }} [skip ci]"
           git push origin ${{env.BENCHMARK_BRANCH }}
