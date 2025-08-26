@@ -20,9 +20,10 @@ parameters:
     type: string
     default: "py-cache-v2"
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
-  test-resource-id:
+  test-geocsv-url:
     type: string
-    default: "af0cc2eb-b78a-471b-baad-80c29e3ee6e6"
+    default: "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz"
+    description: "URL of the CSV file to download for GeoJSON and PMTiles benchmarks"
 
 jobs:
   install:
@@ -240,7 +241,7 @@ jobs:
           command: |
             mkdir -p .benchmarks
             if [ ! -f .benchmarks/benchmarks.csv ]; then
-              echo "datetime,test_name,test_resource_id,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version" > .benchmarks/benchmarks.csv
+              echo "datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version" > .benchmarks/benchmarks.csv
             fi
       - run:
           name: Run benchmark for CSV analysis on big file
@@ -249,18 +250,22 @@ jobs:
             UDATA_INSTANCE_NAME: udata
           command: |
             start_time=$(date +%s.%N)
-            poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v --durations=0
+            poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v -s --durations=0
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
       - run:
-          name: Download and extract CSV data file for CSV to GeoJSON and GeoJSON to PMTiles benchmarks
+          name: Download << pipeline.parameters.test-geocsv-url >>
           command: |
             mkdir -p tests/data
-            poetry run udata-hydra download-resource << pipeline.parameters.test-resource-id >> --output-dir tests/data
+            if [[ "<< pipeline.parameters.test-geocsv-url >>" == *.gz ]]; then
+              wget -O tests/data/test_geodata.csv.gz "<< pipeline.parameters.test-geocsv-url >>"
+              gunzip tests/data/test_geodata.csv.gz
+            else
+              wget -O tests/data/test_geodata.csv "<< pipeline.parameters.test-geocsv-url >>"
+            fi
+            echo "CSV_FILE_PATH=tests/data/test_geodata.csv" >> $BASH_ENV
             ls -la tests/data/
-            # Store the CSV file path for use in subsequent steps
-            echo "CSV_FILE_PATH=tests/data/$(ls tests/data/*.csv | head -1)" >> $BASH_ENV
       - run:
           name: Run benchmark for big CSV with geo data to GeoJSON
           environment:
@@ -268,11 +273,23 @@ jobs:
             UDATA_INSTANCE_NAME: udata
           command: |
             start_time=$(date +%s.%N)
-            poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v --durations=0 --csv_filepath="$CSV_FILE_PATH" --keep_result_file=False
+            poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$CSV_FILE_PATH"
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,<< pipeline.parameters.test-resource-id >>,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,<< pipeline.parameters.test-geocsv-url >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
           no_output_timeout: 20m
+      - run:
+          name: Set GeoJSON file path for PMTiles benchmark
+          command: |
+            # Find the generated GeoJSON file from the previous test
+            GEOJSON_FILE=$(find tests/data -name "*.geojson" -type f | head -1)
+            if [ -n "$GEOJSON_FILE" ]; then
+              echo "TEST_GEOJSON_PATH=$GEOJSON_FILE" >> $BASH_ENV
+              echo "Found GeoJSON file: $GEOJSON_FILE"
+            else
+              echo "ERROR: No GeoJSON file found from CSV to GeoJSON benchmark test"
+              exit 1
+            fi
       - run:
           name: Run benchmark for big GeoJSON to PMTiles
           environment:
@@ -280,10 +297,10 @@ jobs:
             UDATA_INSTANCE_NAME: udata
           command: |
             start_time=$(date +%s.%N)
-            poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v --durations=0
+            poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v -s --durations=0 --input_file="$TEST_GEOJSON_PATH" -k "test_geojson_to_pmtiles_big_file"
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; $end_time - $start_time" | bc -l)
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,<< pipeline.parameters.test-geocsv-url >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},large,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
           no_output_timeout: 20m
       - run:
           name: Display benchmark results
