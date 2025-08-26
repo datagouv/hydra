@@ -87,7 +87,7 @@ jobs:
             echo "datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version" > .benchmarks/benchmarks.csv
           fi
 
-      - name: Run CSV analysis benchmark
+      - name: Run CSV analysis on big file benchmark
         run: |
           start_time=$(date +%s.%N)
           poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v -s --durations=0
