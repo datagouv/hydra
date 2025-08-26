@@ -81,3 +81,5 @@ datetime,test_name,test_resource_id,execution_time_seconds,commit_author,commit_
 2025-08-22T21:43:26Z,test_analyse_csv_big_file,,141.34,bolinocroustibat,9063ff2,large,36,8192,3.11
 2025-08-22T22:25:34Z,test_analyse_csv_big_file,,137.11,bolinocroustibat,7eda36d,large,36,8192,3.11
 2025-08-22T22:41:56Z,test_csv_to_geojson_big_file,af0cc2eb-b78a-471b-baad-80c29e3ee6e6,980.6,bolinocroustibat,7eda36d,large,36,8192,3.11
+2025-08-26T14:28:43Z,test_csv_to_geojson_big_file,https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz,748.852019290,bolinocroustibat,cb227a9e666049cfec326bcaa942dddb112a3aff,large,4,15995,3.11
+2025-08-26T14:33:47Z,test_geojson_to_pmtiles_big_file,,304.233426608,bolinocroustibat,cb227a9e666049cfec326bcaa942dddb112a3aff,large,4,15995,3.11
