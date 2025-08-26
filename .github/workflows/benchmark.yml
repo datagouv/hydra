@@ -93,7 +93,9 @@ jobs:
           poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v -s --durations=0
           end_time=$(date +%s.%N)
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,github,$execution_time,${{ github.actor }},${{ github.sha }},${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
       - name: Download ${{ env.TEST_GEOCSV_URL }}
         run: |
@@ -114,7 +116,9 @@ jobs:
           poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$TEST_GEOCSV_PATH"
           end_time=$(date +%s.%N)
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},${{ github.sha }},${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
       - name: Set GeoJSON file path for PMTiles benchmark
         run: |
@@ -135,7 +139,9 @@ jobs:
           poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v -s --durations=0 --input_file="$TEST_GEOJSON_PATH" -k "test_geojson_to_pmtiles_big_file"
           end_time=$(date +%s.%N)
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},${{ github.sha }},${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
       - name: Display benchmark results
         run: |
