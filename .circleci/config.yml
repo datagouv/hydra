@@ -285,13 +285,18 @@ jobs:
       - run:
           name: Set GeoJSON file path for PMTiles benchmark
           command: |
-            # Find the generated GeoJSON file from the previous test
-            GEOJSON_FILE=$(find tests/data -name "*.geojson" -type f | head -1)
-            if [ -n "$GEOJSON_FILE" ]; then
-              echo "TEST_GEOJSON_PATH=$GEOJSON_FILE" >> $BASH_ENV
-              echo "Found GeoJSON file: $GEOJSON_FILE"
+            # Construct the expected GeoJSON filename based on CSV_FILE_PATH
+            # CSV_FILE_PATH is set to "tests/data/test_geodata.csv"
+            # So we expect "tests/data/test_geodata.geojson"
+            CSV_BASENAME=$(basename "$CSV_FILE_PATH" .csv)
+            EXPECTED_GEOJSON="tests/data/${CSV_BASENAME}.geojson"
+            if [ -f "$EXPECTED_GEOJSON" ]; then
+              echo "TEST_GEOJSON_PATH=$EXPECTED_GEOJSON" >> $BASH_ENV
+              echo "Found expected GeoJSON file: $EXPECTED_GEOJSON"
             else
-              echo "ERROR: No GeoJSON file found from CSV to GeoJSON benchmark test"
+              echo "ERROR: Expected GeoJSON file not found: $EXPECTED_GEOJSON"
+              echo "Available files in tests/data:"
+              ls -la tests/data/
               exit 1
             fi
       - run:
