@@ -5,20 +5,6 @@ on:
     branches:
       - "benchmarks"
 
-# on:
-#   workflow_dispatch:
-#     inputs:
-#       branch:
-#         description: 'Branch to run benchmarks on (should always be "benchmarks")'
-#         required: true
-#         default: 'benchmarks'
-#         type: string
-#       test_resource_id:
-#         description: 'Resource ID to use for GeoJSON benchmark tests'
-#         required: false
-#         default: 'af0cc2eb-b78a-471b-baad-80c29e3ee6e6'
-#         type: string
-
 env:
   TEST_GEOCSV_URL: "https://static.data.gouv.fr/resources/fichier-consolide-des-bornes-de-recharge-pour-vehicules-electriques/20250826-043911/consolidation-etalab-schema-irve-statique-v-2.3.1-20250826.csv"
   BENCHMARK_BRANCH: "benchmarks"
@@ -27,8 +13,8 @@ env:
   UDATA_INSTANCE_NAME: udata
 
 jobs:
-  benchmark:
-    name: Run performance benchmark tests
+  install-and-prepare-benchmark:
+    name: Install environment and prepare CSV
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -76,16 +62,59 @@ jobs:
           echo "PostgreSQL is ready!"
 
       - name: Install required tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bc
+        run: sudo apt-get install -y bc
 
-      - name: Create benchmarks directory
+  csv-analysis-benchmark:
+    name: CSV analysis on big file benchmark
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        resource-class: [large]
+    needs: install-and-prepare-benchmark
+    services:
+      postgres:
+        image: postgres:15.13
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install Python dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --extras "dev"
+
+      - name: Wait for PostgreSQL to be ready
         run: |
-          mkdir -p .benchmarks
-          if [ ! -f .benchmarks/benchmarks.csv ]; then
-            echo "datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version" > .benchmarks/benchmarks.csv
-          fi
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+
+      - name: Install required tools
+        run: sudo apt-get install -y bc
 
       - name: Run CSV analysis on big file benchmark
         run: |
@@ -95,17 +124,78 @@ jobs:
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
-      - name: Commit CSV analysis benchmark results
+          echo "=== CSV Analysis Benchmark Results ==="
+          echo "Test: test_analyse_csv_big_file"
+          echo "Execution time: ${execution_time} seconds"
+          echo "Commit: $SHORT_SHA"
+          echo "Runner: ${{ matrix.resource-class }}"
+          echo "CPU cores: $(nproc)"
+          echo "Memory: $(free -m | awk 'NR==2{printf "%.0f MB", $2}')"
+          echo "Python: ${{ env.PYTHON_VERSION }}"
+          echo "====================================="
+
+          # Create result line for CSV
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" > csv_analysis_result.csv
+
+      - name: Upload CSV analysis result
+        uses: actions/upload-artifact@v4
+        with:
+          name: csv-analysis-result
+          path: csv_analysis_result.csv
+          retention-days: 1
+
+  csv-to-geojson-benchmark:
+    name: CSV to GeoJSON benchmark
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        resource-class: [large]
+    needs: install-and-prepare-benchmark
+    services:
+      postgres:
+        image: postgres:15.13
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install Python dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --extras "dev"
+
+      - name: Wait for PostgreSQL to be ready
         run: |
-          COMMIT_SHA="${{ github.sha }}"
-          SHORT_SHA="${COMMIT_SHA:0:7}"
-          git config --global user.email "opendatateam@data.gouv.fr"
-          git config --global user.name "data.gouv.fr"
-          git add .benchmarks/benchmarks.csv
-          git commit -m "perf: add CSV analysis benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
-          git push origin ${{env.BENCHMARK_BRANCH }}
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+
+      - name: Install required tools
+        run: sudo apt-get install -y bc
 
       - name: Download ${{ env.TEST_GEOCSV_URL }}
         run: |
@@ -123,29 +213,99 @@ jobs:
         timeout-minutes: 20
         run: |
           start_time=$(date +%s.%N)
-          poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$TEST_GEOCSV_PATH"
+          poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="tests/data/test_geodata.csv"
           end_time=$(date +%s.%N)
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
-      - name: Commit CSV to GeoJSON benchmark results
+          echo "=== CSV to GeoJSON Benchmark Results ==="
+          echo "Test: test_csv_to_geojson_big_file"
+          echo "Input file: ${{ env.TEST_GEOCSV_URL }}"
+          echo "Execution time: ${execution_time} seconds"
+          echo "Commit: $SHORT_SHA"
+          echo "Runner: ${{ matrix.resource-class }}"
+          echo "CPU cores: $(nproc)"
+          echo "Memory: $(free -m | awk 'NR==2{printf "%.0f MB", $2}')"
+          echo "Python: ${{ env.PYTHON_VERSION }}"
+          echo "========================================="
+
+          # Create result line for CSV
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" > csv_to_geojson_result.csv
+
+      - name: Upload CSV to GeoJSON result and GeoJSON data
+        uses: actions/upload-artifact@v4
+        with:
+          name: csv-to-geojson-results
+          path: |
+            csv_to_geojson_result.csv
+            tests/data/*.geojson
+          retention-days: 1
+
+  geojson-to-pmtiles-benchmark:
+    name: GeoJSON to PMTiles benchmark
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        resource-class: [large]
+    needs: csv-to-geojson-benchmark
+    services:
+      postgres:
+        image: postgres:15.13
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install Python dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --extras "dev"
+
+      - name: Wait for PostgreSQL to be ready
         run: |
-          COMMIT_SHA="${{ github.sha }}"
-          SHORT_SHA="${COMMIT_SHA:0:7}"
-          git config --global user.email "opendatateam@data.gouv.fr"
-          git config --global user.name "data.gouv.fr"
-          git add .benchmarks/benchmarks.csv
-          git commit -m "perf: add CSV to GeoJSON benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
-          git push origin ${{env.BENCHMARK_BRANCH }}
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+
+      - name: Install required tools
+        run: sudo apt-get install -y bc
+
+      - name: Download GeoJSON data
+        uses: actions/download-artifact@v4
+        with:
+          name: csv-to-geojson-results
+          path: tests/data/
 
       - name: Set GeoJSON file path for PMTiles benchmark
         run: |
           # Construct the expected GeoJSON filename based on TEST_GEOCSV_PATH
           # TEST_GEOCSV_PATH is set to "tests/data/test_geodata.csv"
           # So we expect "tests/data/test_geodata.geojson"
-          CSV_BASENAME=$(basename "$TEST_GEOCSV_PATH" .csv)
+          CSV_BASENAME=$(basename "tests/data/test_geodata.csv" .csv)
           EXPECTED_GEOJSON="tests/data/${CSV_BASENAME}.geojson"
 
           if [ -f "$EXPECTED_GEOJSON" ]; then
@@ -167,27 +327,83 @@ jobs:
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
-      - name: Commit GeoJSON to PMTiles benchmark results
+          echo "=== GeoJSON to PMTiles Benchmark Results ==="
+          echo "Test: test_geojson_to_pmtiles_big_file"
+          echo "Input file: ${{ env.TEST_GEOCSV_URL }}"
+          echo "Execution time: ${execution_time} seconds"
+          echo "Commit: $SHORT_SHA"
+          echo "Runner: ${{ matrix.resource-class }}"
+          echo "CPU cores: $(nproc)"
+          echo "Memory: $(free -m | awk 'NR==2{printf "%.0f MB", $2}')"
+          echo "Python: ${{ env.PYTHON_VERSION }}"
+          echo "============================================="
+
+          # Create result line for CSV
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" > geojson_to_pmtiles_result.csv
+
+      - name: Upload GeoJSON to PMTiles result
+        uses: actions/upload-artifact@v4
+        with:
+          name: geojson-to-pmtiles-result
+          path: geojson_to_pmtiles_result.csv
+          retention-days: 1
+
+  collect-and-commit-results:
+    name: Collect and commit all benchmark results
+    runs-on: ubuntu-latest
+    needs: [csv-analysis-benchmark, csv-to-geojson-benchmark, geojson-to-pmtiles-benchmark]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download all benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: csv-analysis-result
+          path: results/
+
+      - name: Download CSV to GeoJSON results
+        uses: actions/download-artifact@v4
+        with:
+          name: csv-to-geojson-results
+          path: results/
+
+      - name: Download GeoJSON to PMTiles results
+        uses: actions/download-artifact@v4
+        with:
+          name: geojson-to-pmtiles-result
+          path: results/
+
+      - name: Create combined benchmarks CSV
+        run: |
+          mkdir -p .benchmarks
+
+          # Create header
+          echo "datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version" > .benchmarks/benchmarks.csv
+
+          # Append all results
+          cat results/csv_analysis_result.csv >> .benchmarks/benchmarks.csv
+          cat results/csv_to_geojson_result.csv >> .benchmarks/benchmarks.csv
+          cat results/geojson_to_pmtiles_result.csv >> .benchmarks/benchmarks.csv
+
+          echo "=== Combined Benchmark Results ==="
+          cat .benchmarks/benchmarks.csv
+          echo "================================="
+
+      - name: Commit all benchmark results
         run: |
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
           git config --global user.email "opendatateam@data.gouv.fr"
           git config --global user.name "data.gouv.fr"
           git add .benchmarks/benchmarks.csv
-          git commit -m "perf: add GeoJSON to PMTiles benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
+          git commit -m "perf: add all benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
           git push origin ${{env.BENCHMARK_BRANCH }}
 
-      - name: Display benchmark results
-        run: |
-          echo "=== Benchmark Results ==="
-          cat .benchmarks/benchmarks.csv
-          echo "========================="
-
-      - name: Upload benchmark results
+      - name: Upload final combined results
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-results
+          name: final-benchmark-results
           path: .benchmarks/benchmarks.csv
           retention-days: 1
