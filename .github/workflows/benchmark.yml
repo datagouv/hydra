@@ -6,7 +6,7 @@ on:
       - "benchmarks"
 
 env:
-  TEST_GEOCSV_URL: "https://static.data.gouv.fr/resources/fichier-consolide-des-bornes-de-recharge-pour-vehicules-electriques/20250826-043911/consolidation-etalab-schema-irve-statique-v-2.3.1-20250826.csv"
+  TEST_GEOCSV_URL: "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz"
   BENCHMARK_BRANCH: "benchmarks"
   PYTHON_VERSION: "3.11"
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
