@@ -22,7 +22,7 @@ parameters:
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
   test-geocsv-url:
     type: string
-    default: "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz"
+    default: "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/HOR/H_01_1990-1999.csv.gz"
     description: "URL of the CSV file to download for GeoJSON and PMTiles benchmarks"
   resource-class:
     type: string

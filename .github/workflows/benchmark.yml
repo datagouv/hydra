@@ -20,7 +20,7 @@ on:
 #         type: string
 
 env:
-  TEST_GEOCSV_URL: "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz"
+  TEST_GEOCSV_URL: "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/HOR/H_01_1990-1999.csv.gz"
   BENCHMARK_BRANCH: "benchmarks"
   PYTHON_VERSION: "3.11"
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
