@@ -22,6 +22,7 @@
 - Fix custom exception `ExceptionWithSentryDetails` to include Python stack trace [#315](https://github.com/datagouv/hydra/pull/315)
 - Fix deprecated Sentry method [#323](https://github.com/datagouv/hydra/pull/323)
 - Upgrade csv-detective [#322](https://github.com/datagouv/hydra/pull/322) [#324](https://github.com/datagouv/hydra/pull/324)
+- Reuse HTTP connexions between sessions [#325](https://github.com/datagouv/hydra/pull/325)
 
 ## 2.3.0 (2025-07-15)
 
