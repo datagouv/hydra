@@ -99,3 +99,4 @@ datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,
 2025-08-27T15:25:31Z,test_csv_to_geojson_big_file,https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz,github,654.08,bolinocroustibat,8a7ac12,large,4,15995,3.11
 2025-08-27T15:30:35Z,test_geojson_to_pmtiles_big_file,https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz,github,302.98,bolinocroustibat,8a7ac12,large,4,15995,3.11
 2025-08-29T13:52:33Z,test_analyse_csv_big_file,,github,37.50,bolinocroustibat,d1a63fa,large,4,15995,3.11
+2025-08-29T14:03:28Z,test_csv_to_geojson_big_file,https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/MIN/MN_36_latest-2024-2025.csv.gz,github,650.75,bolinocroustibat,d1a63fa,large,4,15995,3.11
