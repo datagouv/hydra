@@ -8,13 +8,14 @@ from tempfile import NamedTemporaryFile
 import aiohttp
 import asyncpg
 from asyncpg import Record
+from csv_detective import routine as csv_detective_routine
 from humanfriendly import parse_size
 from minicli import cli, run, wrap
 from progressist import ProgressBar
 
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.analysis.geojson import analyse_geojson
+from udata_hydra.analysis.geojson import analyse_geojson, csv_to_geojson
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.check import Check
@@ -220,6 +221,26 @@ async def analyse_csv_cli(
             log.error("Could not find a check linked to the specified resource ID")
         return
     await analyse_csv(check=check, debug_insert=debug_insert)
+
+
+@cli(name="csv-to-geojson")
+async def csv_to_geojson_cli(file_name: str):
+    """Trigger a conversion from a csv to geojson.
+    If file name is an URL, download it first
+    """
+    if file_name.startswith("http://") or file_name.startswith("https://"):
+        file_name, _ = await download_resource(file_name)
+
+    csv_inspection, df = csv_detective_routine(
+        file_path=file_name,
+        output_profile=True,
+        output_df=True,
+        cast_json=False,
+        num_rows=-1,
+        save_results=False,
+    )
+
+    await csv_to_geojson(df, csv_inspection, resource_id=None, upload_to_minio=False)
 
 
 @cli(name="analyse-geojson")
