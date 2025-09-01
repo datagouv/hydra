@@ -78,7 +78,7 @@ async def create_check(request: web.Request) -> web.Response:
 
     async with aiohttp.ClientSession(
         timeout=None,
-        headers={"user-agent": config.USER_AGENT_FULL} if config.USER_AGENT_FULL else None,
+        headers={"user-agent": config.USER_AGENT_FULL},
     ) as session:
         status: str = await check_resource(
             url=url,

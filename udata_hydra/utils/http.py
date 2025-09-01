@@ -79,7 +79,7 @@ async def send(dataset_id: str, resource_id: str, document: UdataPayload) -> Non
 
     uri = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
     headers = {
-        "user-agent": config.USER_AGENT_FULL if config.USER_AGENT_FULL else None,
+        "user-agent": config.USER_AGENT_FULL,
         "content-type": "application/json",
         "X-API-KEY": config.UDATA_URI_API_KEY,
     }
