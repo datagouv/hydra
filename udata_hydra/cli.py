@@ -278,7 +278,7 @@ async def analyse_external_csv_cli(
         "created_at": datetime.now(timezone.utc),
         "id": None,  # No check ID in external mode
     }
-    await insert_resource_into_catalog(url=url, resource_id=temp_resource_id)
+    await insert_url_into_catalog(url=url, resource_id=temp_resource_id)
     try:
         await analyse_csv(check=temp_check, debug_insert=debug_insert)
         log.info(f"External CSV analysis completed for {url}")
@@ -480,15 +480,15 @@ async def purge_csv_tables(quiet: bool = False) -> None:
 
 
 @cli
-async def insert_resource_into_catalog(resource_id: str, url: str | None = None):
+async def insert_resource_into_catalog(resource_id: str):
     """Insert a resource into the catalog
     Useful for local tests, instead of having to resync the whole catalog for one new resource
 
     :resource_id: id of the resource to insert
     """
-    resource: asyncpg.Record | None = await Resource.get(resource_id)
+    existing_resource: asyncpg.Record | None = await Resource.get(resource_id)
     action = "insert"
-    if resource:
+    if existing_resource:
         logging.warning("Resource already exists in catalog, updating...")
         action = "updat"
     url = f"https://www.data.gouv.fr/api/2/datasets/resources/{resource_id}/"
@@ -512,7 +512,7 @@ async def insert_resource_into_catalog(resource_id: str, url: str | None = None)
             """,
             resource["dataset_id"],
             resource["resource"]["id"],
-            resource["resource"]["url"] if not url else url,
+            resource["resource"]["url"],
             # force timezone info to UTC (catalog data should be in UTC)
             datetime.fromisoformat(resource["resource"]["harvest"]["modified_at"]).replace(
                 tzinfo=timezone.utc
@@ -524,6 +524,49 @@ async def insert_resource_into_catalog(resource_id: str, url: str | None = None)
             else None,
         )
         log.info(f"Resource {resource_id} successfully {action}ed into DB.")
+    except Exception as e:
+        raise e
+
+
+@cli
+async def insert_url_into_catalog(url: str, resource_id: str):
+    """Insert a URL into the catalog
+    Useful for local tests, instead of having to resync the whole catalog for one new URL
+
+    :url: URL of the resource to insert
+    :resource_id: resource ID (mandatory)
+    """
+    # Check if resource already exists
+    existing_resource: asyncpg.Record | None = await Resource.get(resource_id)
+    action = "insert"
+    if existing_resource:
+        logging.warning("Resource already exists in catalog, updating...")
+        action = "updat"
+    try:
+        conn = await connection()
+        await conn.execute(
+            """
+            INSERT INTO catalog (
+                dataset_id, resource_id, url, type, format,
+                harvest_modified_at, deleted, priority, status
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NULL)
+            ON CONFLICT (resource_id) DO UPDATE SET
+                dataset_id = $1,
+                url = $3,
+                deleted = FALSE,
+                type = $4,
+                format = $5,
+                harvest_modified_at = $6;
+            """,
+            "temp_external",  # fixed dataset_id for external analysis
+            resource_id,
+            url,
+            "main",  # default type
+            "csv",  # default format, can be overridden later
+            datetime.now(timezone.utc),  # current timestamp as harvest_modified_at
+        )
+        log.info(f"URL {url} successfully {action}ed into DB with resource_id {resource_id}.")
     except Exception as e:
         raise e
 
