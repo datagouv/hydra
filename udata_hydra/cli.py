@@ -1,6 +1,7 @@
 import csv
 import logging
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -266,9 +267,6 @@ async def analyse_external_csv_cli(
     :cleanup: Clean up temporary data after analysis (default: True)
     """
     # Create a temporary check-like structure
-    import uuid
-    from datetime import datetime, timezone
-
     temp_check = {
         "resource_id": str(uuid.uuid4()),  # Generate a valid UUID
         "url": url,
@@ -477,7 +475,7 @@ async def purge_csv_tables(quiet: bool = False) -> None:
 
 
 @cli
-async def insert_resource_into_catalog(resource_id: str):
+async def insert_resource_into_catalog(resource_id: str, url: str | None = None):
     """Insert a resource into the catalog
     Useful for local tests, instead of having to resync the whole catalog for one new resource
 
@@ -509,7 +507,7 @@ async def insert_resource_into_catalog(resource_id: str):
             """,
             resource["dataset_id"],
             resource["resource"]["id"],
-            resource["resource"]["url"],
+            resource["resource"]["url"] if not url else url,
             # force timezone info to UTC (catalog data should be in UTC)
             datetime.fromisoformat(resource["resource"]["harvest"]["modified_at"]).replace(
                 tzinfo=timezone.utc
