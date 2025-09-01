@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import logging
 import os
 import uuid
@@ -266,43 +267,47 @@ async def analyse_external_csv_cli(
     :debug_insert: Enable debug mode for database insertion
     :cleanup: Clean up temporary data after analysis (default: True)
     """
+
+    temp_resource_id = str(uuid.uuid4())  # Generate a valid UUID
     # Create a temporary check-like structure
     temp_check = {
-        "resource_id": str(uuid.uuid4()),  # Generate a valid UUID
+        "resource_id": temp_resource_id,
         "url": url,
         "dataset_id": "temp_external",
         "headers": {},
         "created_at": datetime.now(timezone.utc),
         "id": None,  # No check ID in external mode
     }
-
+    await insert_resource_into_catalog(url=url, resource_id=temp_resource_id)
     try:
-        await analyse_csv(check=temp_check, debug_insert=debug_insert, external_mode=True)
+        await analyse_csv(check=temp_check, debug_insert=debug_insert)
         log.info(f"External CSV analysis completed for {url}")
     except Exception as e:
         log.error(f"External CSV analysis failed for {url}: {e}")
         # Always clean up on error
-        await cleanup_external_analysis(url)
+        await cleanup_external_analysis(url=url, resource_id=temp_resource_id)
         raise
     else:
         # Only clean up on success if cleanup is enabled
         if cleanup:
-            await cleanup_external_analysis(url)
+            await cleanup_external_analysis(url=url, resource_id=temp_resource_id)
 
 
-async def cleanup_external_analysis(url: str):
+async def cleanup_external_analysis(url: str, resource_id: str):
     """Clean up temporary data from external analysis"""
     try:
         # Clean up CSV database tables
-        import hashlib
-
-        from udata_hydra import context
-
         csv_pool = await context.pool("csv")
         table_hash = hashlib.md5(url.encode()).hexdigest()
 
         await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_hash}"')
         await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_hash}'")
+
+        # Clean up the temporary resource and temporary check from catalog
+        check = await Check.get_by_resource_id(resource_id)
+        if check:
+            await Check.delete(check["id"])
+        await Resource.delete(resource_id, hard_delete=True)
 
         # Clean up MinIO files if any (parquet, etc.)
         # Note: This would require additional MinIO cleanup logic
