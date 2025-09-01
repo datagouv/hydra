@@ -291,7 +291,7 @@ jobs:
               cd ../..
             fi
             # Build the path based on the actual file (without .gz extension)
-            echo "CSV_FILE_FILENAME=$(basename "<< pipeline.parameters.test-geocsv-file >>" .gz)" >> $BASH_ENV
+            echo "TEST_GEOCSV_FILENAME=$(basename "<< pipeline.parameters.test-geocsv-file >>" .gz)" >> $BASH_ENV
             ls -la tests/data/
 
       - run:
@@ -301,7 +301,7 @@ jobs:
             UDATA_INSTANCE_NAME: udata
           command: |
             start_time=$(date +%s.%N)
-            poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$CSV_FILE_FILENAME"
+            poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$TEST_GEOCSV_FILENAME"
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,<< pipeline.parameters.test-geocsv-file >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
