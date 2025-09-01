@@ -1,7 +1,6 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from asyncpg import Record
-from humanfriendly import parse_timespan
 
 from udata_hydra import config, context
 from udata_hydra.db.resource import Resource
@@ -18,10 +17,15 @@ async def select_rows_based_on_query(connection, q: str, *args) -> list[Record]:
     create_temp_select_table_query = (
         f"""CREATE TEMPORARY TABLE {temporary_table} AS {q} FOR UPDATE;"""
     )
+    # Update resource status to CRAWLING_URL
+    update_select_catalog_query = f"""
+        UPDATE catalog SET status = 'CRAWLING_URL' WHERE resource_id in (select resource_id from {temporary_table});
+    """
     async with connection.transaction():
         await connection.execute("BEGIN;")
         await connection.execute(create_temp_select_table_query, *args)
-        to_check = await connection.fetch(f"SELECT * FROM {temporary_table};")
+        await connection.execute(update_select_catalog_query)
+        to_check: list[Record] = await connection.fetch(f"SELECT * FROM {temporary_table};")
         await connection.execute("COMMIT;")
     await connection.execute(f"DROP TABLE {temporary_table};")
     return to_check
@@ -42,7 +46,7 @@ async def select_batch_resources_to_check() -> list[Record]:
         # first resources that are prioritised
         q = f"""
             SELECT * FROM (
-                SELECT catalog.url, dataset_id, resource_id
+                SELECT catalog.url, dataset_id, resource_id, priority
                 FROM catalog
                 WHERE {excluded}
                 AND priority = True
@@ -56,7 +60,7 @@ async def select_batch_resources_to_check() -> list[Record]:
         if len(to_check) < config.BATCH_SIZE:
             q = f"""
                 SELECT * FROM (
-                    SELECT catalog.url, dataset_id, resource_id
+                    SELECT catalog.url, dataset_id, resource_id, priority
                     FROM catalog
                     WHERE catalog.last_check IS NULL
                     AND {excluded}
@@ -66,23 +70,22 @@ async def select_batch_resources_to_check() -> list[Record]:
             """
             to_check += await select_rows_based_on_query(connection, q)
 
-        # if not enough for our batch size, handle resources with outdated last check
+        # if not enough for our batch size, handle resources with planned new check
         if len(to_check) < config.BATCH_SIZE:
-            since = parse_timespan(config.SINCE)  # in seconds
-            since = datetime.now(timezone.utc) - timedelta(seconds=since)
+            now = datetime.now(timezone.utc)
             limit = config.BATCH_SIZE - len(to_check)
             q = f"""
             SELECT * FROM (
-                SELECT catalog.url, dataset_id, catalog.resource_id
+                SELECT catalog.url, dataset_id, catalog.resource_id, catalog.priority
                 FROM catalog, checks
                 WHERE catalog.last_check IS NOT NULL
-                AND {excluded}
                 AND catalog.last_check = checks.id
-                AND checks.created_at <= $1
+                AND (checks.next_check_at <= $1 OR checks.next_check_at IS NULL)
+                AND {excluded}
                 AND catalog.priority = False
             ) s
             ORDER BY random() LIMIT {limit}
             """
-            to_check += await select_rows_based_on_query(connection, q, since)
+            to_check += await select_rows_based_on_query(connection, q, now)
 
     return to_check

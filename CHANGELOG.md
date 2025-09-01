@@ -2,6 +2,79 @@
 
 ## Current (in progress)
 
+- Simplify CI configuration [#290](https://github.com/datagouv/hydra/pull/290)
+- Remove unused dependencies [#292](https://github.com/datagouv/hydra/pull/292)
+- Fill in check throughout the process to send previous steps infos in case of late crash [#293](https://github.com/datagouv/hydra/pull/293)
+- Fix purge csv tables CLI by using the csv db connection [#294](https://github.com/datagouv/hydra/pull/294)
+- Better gz files extraction function name [#295](https://github.com/datagouv/hydra/pull/295)
+- Add more detailed statuses [#298](https://github.com/datagouv/hydra/pull/298)
+- Handle cases of too long columns labels for postgres [#299](https://github.com/datagouv/hydra/pull/299)
+- Fix rare issue in `/status/crawler/` endpoint [#301](https://github.com/datagouv/hydra/pull/301) [#302](https://github.com/datagouv/hydra/pull/302)
+- Fix typos, deprecated examples and add emojis in README [#304](https://github.com/datagouv/hydra/pull/304)
+- Upgrade dependencies and fix pytest-asyncio deprecated code [#305](https://github.com/datagouv/hydra/pull/305)
+- Handle new cases of geo columns from csv-detective [#303](https://github.com/datagouv/hydra/pull/303)
+- Fix custom Sentry error by capturing original exception stack trace and add test [#308](https://github.com/datagouv/hydra/pull/308)
+- Optimize queue priorities for resource processing [#311](https://github.com/datagouv/hydra/pull/311)
+- Add `resource_id` info in timer logs and add timer for analysing resource [#313](https://github.com/datagouv/hydra/pull/313)
+- Add check id in udata extras to facilitate debug [#307](https://github.com/datagouv/hydra/pull/307)
+- Split `csv_to geojson_and_pmtiles` function into a new intermediary function `csv_to_geojson` for better unit testing/benchmarking [#317](https://github.com/datagouv/hydra/pull/317)
+- Add download resource CLI command [#320](https://github.com/datagouv/hydra/pull/320)
+- Fix custom exception `ExceptionWithSentryDetails` to include Python stack trace [#315](https://github.com/datagouv/hydra/pull/315)
+- Fix deprecated Sentry method [#323](https://github.com/datagouv/hydra/pull/323)
+- Upgrade csv-detective [#322](https://github.com/datagouv/hydra/pull/322) [#324](https://github.com/datagouv/hydra/pull/324) [#327](https://github.com/datagouv/hydra/pull/327)
+- Stream geojson conversion to prevent RAM consumption [#326](https://github.com/datagouv/hydra/pull/326)
+
+## 2.3.0 (2025-07-15)
+
+- Delete tmp files if error in download [#277](https://github.com/datagouv/hydra/pull/277)
+- Add parsing_table in extra analysis payload [#279](https://github.com/datagouv/hydra/pull/279)
+- Add a column in catalog that indicates when the status was last changed and delete the status-specific endpoint [#276](https://github.com/datagouv/hydra/pull/276)
+- Remove F401 (unused import) ignore rule and clean up __init__.py files with explicit __all__ declarations [#281](https://github.com/datagouv/hydra/pull/281)
+- Update PostgreSQL version in CI to match Docker Compose (15.13) [#282](https://github.com/datagouv/hydra/pull/282)
+- Add a CI job to create a release on Sentry [#246](https://github.com/datagouv/hydra/pull/246)
+- Use pre-cast dataframe from csv-detective instead of re-reading the file [#236](https://github.com/datagouv/hydra/pull/236)
+- Enable csv to GeoJSON and PMTiles converion if relevant [#278](https://github.com/datagouv/hydra/pull/278) [#285](https://github.com/datagouv/hydra/pull/285) [#291](https://github.com/datagouv/hydra/pull/291)
+- Add conversions state to health endpoint [#284](https://github.com/datagouv/hydra/pull/284)
+- Better logs in Sentry [#287](https://github.com/datagouv/hydra/pull/287) [#289](https://github.com/datagouv/hydra/pull/289)
+- Consistent return types for CRUD methods [#288](https://github.com/datagouv/hydra/pull/288)
+
+## 2.2.1 (2025-06-11)
+
+- ⚠️ resources_exceptions migration from main to csv db. Code is updated accordingly [#264](https://github.com/datagouv/hydra/pull/264)
+   - Migration should be made manually. See migrations instructions in the migrations files.
+- Fix some CLI functions to improve local debug [#269](https://github.com/datagouv/hydra/pull/269)
+- Upgrade csv-detective and use previous analysis to validate if available [#266](https://github.com/datagouv/hydra/pull/266)
+- Fix and add new purge tables CLI utils [#271](https://github.com/datagouv/hydra/pull/271) [#272](https://github.com/datagouv/hydra/pull/272) [#273](https://github.com/datagouv/hydra/pull/273)
+- Increase timeout for exception resources [#274](https://github.com/datagouv/hydra/pull/274)
+- Fix logs when creating indexes [#275](https://github.com/datagouv/hydra/pull/275)
+- Fix datetime insertion in db [#280](https://github.com/datagouv/hydra/pull/280)
+
+## 2.2.0 (2025-05-16)
+
+- Better prioritizing [#255](https://github.com/datagouv/hydra/pull/255)
+- Reset same category udata extra fields on sending [#256](https://github.com/datagouv/hydra/pull/256)
+- Make sure detected_last_modified_at is set even if HAS_NOT_CHANGED [#257](https://github.com/datagouv/hydra/pull/257)
+- Fill in new check even if no update [#258](https://github.com/datagouv/hydra/pull/258)
+- Better change detections and add related tests [#259](https://github.com/datagouv/hydra/pull/259)
+- Enable GeoJSON to PMTiles conversion [#260](https://github.com/datagouv/hydra/pull/260) [#267](https://github.com/datagouv/hydra/pull/267)
+- Parquet files are named after resource ids [#262](https://github.com/datagouv/hydra/pull/262)
+- Upgrade csv-detective [#263](https://github.com/datagouv/hydra/pull/263)
+- Fix call to a sync function after demo crash test [#265](https://github.com/datagouv/hydra/pull/265)
+
+## 2.1.2 (2025-03-19)
+
+- Add a status resetting mechanism for stuck resources [#251](https://github.com/datagouv/hydra/pull/251)
+- Update harvest_modified_at on load catalog [#252](https://github.com/datagouv/hydra/pull/252)
+- Unify exceptions to prevent unhandled ones in Sentry [#253](https://github.com/datagouv/hydra/pull/253)
+- Get max allowed size even in CLI process [#254](https://github.com/datagouv/hydra/pull/254)
+
+## 2.1.1 (2025-03-12)
+
+- Fix CLI analyse-csv and allow analysis from a resource id [#248](https://github.com/datagouv/hydra/pull/248)
+- Rework handling of too large files [#248](https://github.com/datagouv/hydra/pull/248)
+
+## 2.1.0 (2025-01-13)
+
 - Refactor ParseError to enrich Sentry with context and to inquire about Sentry errors like #4096 [#218](https://github.com/datagouv/hydra/pull/218)
 - Remove legacy routes [#203](https://github.com/datagouv/hydra/pull/203)
 - More explicit error reporting when sending to udata without raising errors for udata responding with a 404 [#213](https://github.com/datagouv/hydra/pull/213)
@@ -9,7 +82,18 @@
 - Fix type issue regarding `resource_id` [#220](https://github.com/datagouv/hydra/pull/220)
 - Use bump'X [#226](https://github.com/datagouv/hydra/pull/226)
 - Get actual resource URL in case of 404 (change since last catalog load) [#225](https://github.com/datagouv/hydra/pull/225)
+- Add CLI util to insert or update a resource into the catalog (change since last catalog load) [#228](https://github.com/datagouv/hydra/pull/228)
 - Fix deadlocks errors when purging CSV tables by refactoring `purge_csv_tables` to use atomic transactions [#230](https://github.com/datagouv/hydra/pull/230)
+- Improve timing of checks depending on changes since last check [#163](https://github.com/datagouv/hydra/pull/163)
+- Remove bad default value in CLI to insert a resource [#235](https://github.com/datagouv/hydra/pull/235)
+- Trigger GitLab deployment in CI when pushing on `main` [#186](https://github.com/datagouv/hydra/pull/186)
+- Fix GitLab deployment in CI [#239](https://github.com/datagouv/hydra/pull/239)
+- Add indexes to improve resource filtering and batch selection [#240](https://github.com/datagouv/hydra/pull/240)
+- Parallelize tests in CI [#238](https://github.com/datagouv/hydra/pull/238)
+- Refactor analysis logic to remove 5 non necessary queries, using the existing data in the code instead of re-querying it [#227](https://github.com/datagouv/hydra/pull/227)
+- Use a package-manager-agnostic pyproject.toml instead of a Poetry pyproject.toml [#170](https://github.com/datagouv/hydra/pull/170)
+- Remove unused setup.cfg [#244](https://github.com/datagouv/hydra/pull/244)
+- Use a bash file instead of text file to store env vars across CI jobs [#245](https://github.com/datagouv/hydra/pull/245)
 
 ## 2.0.5 (2024-11-08)
 

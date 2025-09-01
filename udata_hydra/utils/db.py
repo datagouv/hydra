@@ -3,7 +3,7 @@ from asyncpg import Record
 from udata_hydra import context
 
 
-async def get_columns_with_indexes(table_name: str) -> list[Record] | None:
+async def get_columns_with_indexes(table_name: str) -> list[Record]:
     """
     Get the columns of a table which have indexes
     Return a list of records with the following columns:

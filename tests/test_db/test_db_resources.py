@@ -1,9 +1,10 @@
+import asyncpg
 import nest_asyncio
 import pytest
 import typer
 from typer.testing import CliRunner
 
-from tests.conftest import DATASET_ID, RESOURCE_ID, RESOURCE_URL
+from tests.conftest import DATABASE_URL, DATASET_ID, RESOURCE_ID, RESOURCE_URL
 from udata_hydra.cli import load_catalog
 from udata_hydra.crawl import start_checks
 
@@ -44,13 +45,13 @@ async def test_catalog_deleted(setup_catalog, db, rmock):
 
 
 async def test_catalog_deleted_with_checked_resource(
-    setup_catalog, db, rmock, event_loop, mocker, analysis_mock
+    setup_catalog, db, rmock, mocker, analysis_mock
 ):
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
     rurl = RESOURCE_URL
     rmock.get(rurl)
-    event_loop.run_until_complete(start_checks(iterations=1))
+    await start_checks(iterations=1)
 
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE and last_check IS NOT NULL")
     assert len(res) == 1
@@ -60,6 +61,10 @@ async def test_catalog_deleted_with_checked_resource(
     catalog = "https://example.com/catalog"
     # feed empty catalog, should delete the previously loaded resource
     rmock.get(catalog, status=200, body=catalog_content[0])
+    # we have to mock the pool again, as it's closed in the finally clause of start_checks
+    m = mocker.patch("udata_hydra.context.pool")
+    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50)
+    m.return_value = pool
     runner.invoke(typer_app, url=catalog)
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = TRUE")
     assert len(res) == 1
@@ -67,9 +72,7 @@ async def test_catalog_deleted_with_checked_resource(
     assert len(res) == 1
 
 
-async def test_catalog_deleted_with_new_url(
-    setup_catalog, db, rmock, event_loop, mocker, analysis_mock
-):
+async def test_catalog_deleted_with_new_url(setup_catalog, db, rmock, mocker, analysis_mock):
     # load a new catalog with a new URL for this resource
     with open("tests/data/catalog.csv", "r") as cfile:
         catalog_content = cfile.readlines()

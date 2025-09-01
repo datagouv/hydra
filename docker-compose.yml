@@ -21,5 +21,5 @@ services:
       - 5434:5432
 
 volumes:
-  database-data-15: # named volumes can be managed easier using docker-compose
-  database-data-csv-15: # named volumes can be managed easier using docker-compose
+  database-data-15: # named volumes can be managed more easily using docker-compose
+  database-data-csv-15: # named volumes can be managed more easily using docker-compose

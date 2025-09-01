@@ -16,6 +16,7 @@ class CheckSchema(Schema):
     error = fields.Str()
     dataset_id = fields.Str()
     resource_id = fields.UUID()
+    next_check_at = fields.DateTime()
     deleted = fields.Boolean()
     parsing_started_at = fields.DateTime()
     parsing_finished_at = fields.DateTime()
@@ -23,6 +24,10 @@ class CheckSchema(Schema):
     parsing_table = fields.Str()
     parquet_url = fields.Str()
     parquet_size = fields.Integer()
+    pmtiles_url = fields.Str()
+    pmtiles_size = fields.Integer()
+    geojson_url = fields.Str()
+    geojson_size = fields.Integer()
 
     def create(self, data):
         return self.load(data)

@@ -1,7 +1,7 @@
 import csv
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -13,25 +13,19 @@ from humanfriendly import parse_size
 from progressist import ProgressBar
 
 from udata_hydra import config
-from udata_hydra.analysis.csv import analyse_csv, delete_table
+from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.analysis.geojson import analyse_geojson
+from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
+from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
+from udata_hydra.utils import download_file, download_resource
 
 cli = typer.Typer()
 context = {"conn": {}}
 log = setup_logging()
-
-
-async def download_file(url: str, fd):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            while True:
-                chunk = await resp.content.read(1024)
-                if not chunk:
-                    break
-                fd.write(chunk)
 
 
 async def connection(db_name: str = "main"):
@@ -89,31 +83,37 @@ async def load_catalog(
             reader = csv.DictReader(fd, delimiter=";")
             rows = list(reader)
             for row in iter_with_progressbar_or_quiet(rows, quiet):
-                # Skip resources belonging to an archived dataset
                 if row.get("dataset.archived") != "False":
                     continue
 
                 await conn.execute(
                     """
                     INSERT INTO catalog (
-                        dataset_id, resource_id, url, harvest_modified_at,
-                        deleted, priority, status
+                        dataset_id, resource_id, url, type, format,
+                        harvest_modified_at, deleted, priority, status
                     )
-                    VALUES ($1, $2, $3, $4, FALSE, FALSE, NULL)
+                    VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NULL)
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,
-                        deleted = FALSE;
+                        deleted = FALSE,
+                        type = $4,
+                        format = $5,
+                        harvest_modified_at = $6;
                 """,
                     row["dataset.id"],
                     row["id"],
                     row["url"],
+                    row["type"],
+                    row["format"],
                     # force timezone info to UTC (catalog data should be in UTC)
                     datetime.fromisoformat(row["harvest.modified_at"]).replace(tzinfo=timezone.utc)
                     if row["harvest.modified_at"]
                     else None,
                 )
         log.info("Resources catalog successfully upserted into DB.")
+        await Resource.clean_up_statuses()
+        log.info("Stuck statuses sucessfully reset to null.")
     except Exception as e:
         raise e
     finally:
@@ -139,6 +139,32 @@ async def crawl_url(
             log.error(e)
 
 
+@cli.command(name="download-resource")
+async def download_resource_cli(resource_id: str, output_dir: str | None = None):
+    """Download a resource from the catalog
+
+    :resource_id: ID of the resource to download
+    :output_dir: Custom output directory (defaults to TEMPORARY_DOWNLOAD_FOLDER)
+    """
+    resource: asyncpg.Record | None = await Resource.get(resource_id)
+    if not resource:
+        log.error(f"Resource {resource_id} not found in catalog")
+        return
+
+    try:
+        tmp_file, file_extension = await download_resource(resource["url"])
+        output_path = (
+            Path(output_dir or config.TEMPORARY_DOWNLOAD_FOLDER or ".")
+            / f"{resource_id}{file_extension}"
+        )
+        # Move the temporary file to the desired output location
+        Path(tmp_file.name).rename(output_path)
+        log.info(f"Successfully downloaded resource {resource_id} to {output_path}")
+    except Exception as e:
+        log.error(f"Failed to download resource {resource_id}: {e}")
+        raise
+
+
 @cli.command()
 async def check_resource(
     resource_id: str = typer.Argument(..., help="Resource ID to check"),
@@ -155,7 +181,7 @@ async def check_resource(
     async with aiohttp.ClientSession(timeout=None) as session:
         await crawl_check_resource(
             url=resource["url"],
-            resource_id=resource_id,
+            resource=resource,
             session=session,
             method=method,
             force_analysis=force_analysis,
@@ -163,15 +189,77 @@ async def check_resource(
         )
 
 
+@cli.command(name="analyse-resource")
+async def analyse_resource_cli(resource_id: str):
+    """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
+    check: Record | None = await Check.get_by_resource_id(resource_id)
+    if not check:
+        log.error("Could not find a check linked to the specified resource ID")
+        return
+    await analyse_resource(check=check, last_check=None, force_analysis=True)
+
+
 @cli.command(name="analyse-csv")
 async def analyse_csv_cli(
     check_id: str | None = typer.Option(None, help="Check ID to analyze"),
     url: str | None = typer.Option(None, help="URL to analyze"),
+    resource_id: str | None = typer.Option(None, help="Resource ID to analyze"),
     debug_insert: bool = typer.Option(False, help="Enable debug mode for insertion"),
 ):
-    """Trigger a csv analysis from a check_id or an url"""
-    check_id = int(check_id) if check_id else None
-    await analyse_csv(check_id, url, debug_insert)
+    """Trigger a csv analysis from a check_id, an url or a resource_id
+    Try to get the check from the check ID, then from the URL
+    """
+    assert check_id or url or resource_id
+    check = None
+    if check_id:
+        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)
+    if not check and url:
+        checks: list[Record] | None = await Check.get_by_url(url)
+        if checks and len(checks) > 1:
+            log.warning(f"Multiple checks found for URL {url}, using the latest one")
+        check = checks[0] if checks else None
+    if not check and resource_id:
+        check: Record | None = await Check.get_by_resource_id(resource_id)
+    if not check:
+        if check_id:
+            log.error("Could not retrieve the specified check")
+        elif url:
+            log.error("Could not find a check linked to the specified URL")
+        elif resource_id:
+            log.error("Could not find a check linked to the specified resource ID")
+        return
+    await analyse_csv(check=check, debug_insert=debug_insert)
+
+
+@cli.command(name="analyse-geojson")
+async def analyse_geojson_cli(
+    check_id: str | None = None,
+    url: str | None = None,
+    resource_id: str | None = None,
+):
+    """Trigger a GeoJSON analysis from a check_id, an url or a resource_id
+    Try to get the check from the check ID, then from the URL
+    """
+    assert check_id or url or resource_id
+    check = None
+    if check_id:
+        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)
+    if not check and url:
+        checks: list[Record] | None = await Check.get_by_url(url)
+        if checks and len(checks) > 1:
+            log.warning(f"Multiple checks found for URL {url}, using the latest one")
+        check = checks[0] if checks else None
+    if not check and resource_id:
+        check: Record | None = await Check.get_by_resource_id(resource_id)
+    if not check:
+        if check_id:
+            log.error("Could not retrieve the specified check")
+        elif url:
+            log.error("Could not find a check linked to the specified URL")
+        elif resource_id:
+            log.error("Could not find a check linked to the specified resource ID")
+        return
+    await analyse_geojson(check=dict(check))
 
 
 @cli.command()
@@ -311,23 +399,131 @@ async def purge_csv_tables(
     ON checks.parsing_table = md5(c.url)
     WHERE checks.parsing_table IS NOT NULL AND (c.id IS NULL OR c.deleted = TRUE);
     """
-    conn = await connection()
-    res: list[Record] = await conn.fetch(q)
+    conn_main = await connection()
+    res: list[Record] = await conn_main.fetch(q)
     tables_to_delete: list[str] = [r["parsing_table"] for r in res]
 
     success_count = 0
     error_count = 0
 
+    conn_csv = await connection(db_name="csv")
+    log.debug(f"{len(tables_to_delete)} tables to delete")
     for table in tables_to_delete:
         try:
-            async with conn.transaction():
-                log.debug(f'Deleting table "{table}"')
-                await conn.execute(f'DROP TABLE IF EXISTS "{table}"')
-                await conn.execute("DELETE FROM tables_index WHERE parsing_table = $1", table)
-                await conn.execute(
-                    "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-                )
-                success_count += 1
+            async with conn_main.transaction():
+                async with conn_csv.transaction():
+                    log.debug(f'Deleting table "{table}"')
+                    await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
+                    await conn_csv.execute(
+                        "DELETE FROM tables_index WHERE parsing_table = $1", table
+                    )
+                    await conn_main.execute(
+                        "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
+                    )
+                    success_count += 1
+        except Exception as e:
+            error_count += 1
+            log.error(f'Failed to delete table "{table}": {str(e)}')
+            continue
+
+    if success_count:
+        log.info(f"Successfully deleted {success_count} table(s).")
+    if error_count:
+        log.warning(f"Failed to delete {error_count} table(s). Check logs for details.")
+    if not (success_count or error_count):
+        log.info("Nothing to delete.")
+
+
+@cli.command()
+async def insert_resource_into_catalog(resource_id: str):
+    """Insert a resource into the catalog
+    Useful for local tests, instead of having to resync the whole catalog for one new resource
+
+    :resource_id: id of the resource to insert
+    """
+    resource: asyncpg.Record | None = await Resource.get(resource_id)
+    action = "insert"
+    if resource:
+        logging.warning("Resource already exists in catalog, updating...")
+        action = "updat"
+    url = f"https://www.data.gouv.fr/api/2/datasets/resources/{resource_id}/"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            resp.raise_for_status()
+            resource = await resp.json()
+    try:
+        conn = await connection()
+        await conn.execute(
+            """
+            INSERT INTO catalog (
+                dataset_id, resource_id, url, harvest_modified_at,
+                deleted, priority, status
+            )
+            VALUES ($1, $2, $3, $4, FALSE, FALSE, NULL)
+            ON CONFLICT (resource_id) DO UPDATE SET
+                dataset_id = $1,
+                url = $3,
+                deleted = FALSE;
+            """,
+            resource["dataset_id"],
+            resource["resource"]["id"],
+            resource["resource"]["url"],
+            # force timezone info to UTC (catalog data should be in UTC)
+            datetime.fromisoformat(resource["resource"]["harvest"]["modified_at"]).replace(
+                tzinfo=timezone.utc
+            )
+            if (
+                resource["resource"].get("harvest") is not None
+                and resource["resource"]["harvest"].get("modified_at")
+            )
+            else None,
+        )
+        log.info(f"Resource {resource_id} successfully {action}ed into DB.")
+    except Exception as e:
+        raise e
+
+
+@cli.command()
+async def purge_selected_csv_tables(
+    retention_days: int | None = None,
+    retention_tables: int | None = None,
+    quiet: bool = False,
+) -> None:
+    """Delete converted CSV tables either:
+    - if they're more than retention_days days old
+    - if they're not in the top retention_tables most recent
+    """
+    if quiet:
+        log.setLevel(logging.ERROR)
+
+    assert retention_days is not None or retention_tables is not None
+    conn_csv = await connection(db_name="csv")
+    if retention_days is not None:
+        threshold = datetime.now(timezone.utc) - timedelta(days=int(retention_days))
+        q = """SELECT DISTINCT parsing_table FROM tables_index WHERE created_at <= $1"""
+        res: list[Record] = await conn_csv.fetch(q, threshold)
+    elif retention_tables is not None:
+        q = """SELECT DISTINCT ON (created_at) parsing_table FROM tables_index ORDER BY created_at DESC OFFSET $1"""
+        res: list[Record] = await conn_csv.fetch(q, int(retention_tables))
+
+    tables_to_delete: list[str] = [r["parsing_table"] for r in res]
+
+    success_count = 0
+    error_count = 0
+    conn_main = await connection()
+    for table in tables_to_delete:
+        try:
+            async with conn_main.transaction():
+                async with conn_csv.transaction():
+                    log.debug(f'Deleting table "{table}"')
+                    await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
+                    await conn_csv.execute(
+                        "DELETE FROM tables_index WHERE parsing_table = $1", table
+                    )
+                    await conn_main.execute(
+                        "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
+                    )
+                    success_count += 1
         except Exception as e:
             error_count += 1
             log.error(f'Failed to delete table "{table}": {str(e)}')

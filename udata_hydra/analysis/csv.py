@@ -5,11 +5,13 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Iterator
+from typing import Iterator
 
+import pandas as pd
 from asyncpg import Record
-from csv_detective.detection import engine_to_file
-from csv_detective.explore_csv import routine as csv_detective_routine
+from csv_detective import routine as csv_detective_routine
+from csv_detective import validate_then_detect
+from csv_detective.detection.engine import engine_to_file
 from progressist import ProgressBar
 from slugify import slugify
 from sqlalchemy import (
@@ -27,23 +29,21 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import asyncpg
 from sqlalchemy.schema import CreateIndex, CreateTable, Index
-from str2bool import str2bool
-from str2float import str2float
 
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
+from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.db import compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
+    IOException,
     ParseException,
-    Reader,
     Timer,
-    download_resource,
+    detect_tabular_from_headers,
     handle_parse_exception,
-    queue,
-    send,
+    remove_remainders,
 )
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
@@ -68,52 +68,15 @@ PYTHON_TYPE_TO_PG = {
     "json": JSON,
     "date": Date,
     "datetime": DateTime,
-}
-
-PYTHON_TYPE_TO_PY = {
-    "string": str,
-    "float": float,
-    "int": int,
-    "bool": bool,
-    "json": helpers.to_json,
-    "date": helpers.to_date,
-    "datetime": helpers.to_datetime,
+    "datetime_aware": DateTime(timezone=True),
 }
 
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
-minio_client = MinIOClient()
-
-
-async def notify_udata(check_id: int) -> None:
-    """Notify udata of the result of a parsing"""
-    # Get the check again to get its updated data
-    check: Record | None = await Check.get_by_id(check_id, with_deleted=True)
-    resource_id = check["resource_id"]
-    db = await context.pool()
-    record = await db.fetchrow("SELECT dataset_id FROM catalog WHERE resource_id = $1", resource_id)
-    if record:
-        payload = {
-            "resource_id": resource_id,
-            "dataset_id": record["dataset_id"],
-            "document": {
-                "analysis:parsing:error": check["parsing_error"],
-                "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
-                if check["parsing_started_at"]
-                else None,
-                "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
-                if check["parsing_finished_at"]
-                else None,
-            },
-        }
-        if config.CSV_TO_PARQUET:
-            payload["document"]["analysis:parsing:parquet_url"] = check.get("parquet_url")
-            payload["document"]["analysis:parsing:parquet_size"] = check.get("parquet_size")
-        queue.enqueue(send, _priority="high", **payload)
+minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MINIO_PARQUET_FOLDER)
 
 
 async def analyse_csv(
-    check_id: int | None = None,
-    url: str | None = None,
+    check: dict,
     file_path: str | None = None,
     debug_insert: bool = False,
 ) -> None:
@@ -122,21 +85,11 @@ async def analyse_csv(
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
 
-    # Get check and resource_id. Try to get the check from the check ID, then from the URL
-    check: Record | None = await Check.get_by_id(check_id, with_deleted=True) if check_id else None
-    if not check:
-        checks: list[Record] | None = await Check.get_by_url(url) if url else None
-        if checks and len(checks) > 1:
-            log.warning(f"Multiple checks found for URL {url}, using the latest one")
-        check = checks[0] if checks else None
-    if not check:
-        log.error("No check found or URL provided")
-        return
     resource_id: str = str(check["resource_id"])
     url = check["url"]
 
     # Update resource status to ANALYSING_CSV
-    await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
+    resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
 
     # Check if the resource is in the exceptions table
     # If it is, get the table_indexes to use them later
@@ -145,95 +98,164 @@ async def analyse_csv(
     if exception and exception.get("table_indexes"):
         table_indexes = json.loads(exception["table_indexes"])
 
-    timer = Timer("analyse-csv")
+    timer = Timer("analyse-csv", resource_id)
     assert any(_ is not None for _ in (check["id"], url))
 
-    headers = json.loads(check.get("headers") or "{}")
-    tmp_file = (
-        open(file_path, "rb")
-        if file_path
-        else await download_resource(
-            url=url,
-            headers=headers,
-            max_size_allowed=None if exception else int(config.MAX_FILESIZE_ALLOWED["csv"]),
-        )
-    )
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
-    timer.mark("download-file")
-
+    table_name, tmp_file = None, None
     try:
-        await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
+        _, file_format = detect_tabular_from_headers(check)
+        tmp_file = await helpers.read_or_download_file(
+            check=check,
+            file_path=file_path,
+            file_format=file_format,
+            exception=exception,
+        )
+        table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+        timer.mark("download-file")
+
+        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
 
         # Launch csv-detective against given file
         try:
-            csv_inspection: dict | None = csv_detective_routine(
-                csv_file_path=tmp_file.name, output_profile=True, num_rows=-1, save_results=False
-            )
+            previous_analysis: dict | None = await get_previous_analysis(resource_id=resource_id)
+            if previous_analysis:
+                await Resource.update(resource_id, {"status": "VALIDATING_CSV"})
+                csv_inspection, df = validate_then_detect(
+                    file_path=tmp_file.name,
+                    previous_analysis=previous_analysis,
+                    output_profile=True,
+                    output_df=True,
+                    cast_json=False,
+                    num_rows=-1,
+                    save_results=False,
+                )
+            else:
+                csv_inspection, df = csv_detective_routine(
+                    file_path=tmp_file.name,
+                    output_profile=True,
+                    output_df=True,
+                    cast_json=False,
+                    num_rows=-1,
+                    save_results=False,
+                )
         except Exception as e:
             raise ParseException(
-                step="csv_detective", resource_id=resource_id, url=url, check_id=check_id
+                message=str(e),
+                step="csv_detective",
+                resource_id=resource_id,
+                url=url,
+                check_id=check["id"],
             ) from e
-
         timer.mark("csv-inspection")
 
         await csv_to_db(
-            file_path=tmp_file.name,
+            df=df,
             inspection=csv_inspection,
             table_name=table_name,
             table_indexes=table_indexes,
             resource_id=resource_id,
             debug_insert=debug_insert,
         )
+        check = await Check.update(check["id"], {"parsing_table": table_name})
         timer.mark("csv-to-db")
 
-        parquet_args: tuple[str, int] | None = await csv_to_parquet(
-            file_path=tmp_file.name,
-            inspection=csv_inspection,
-            table_name=table_name,
-            resource_id=resource_id,
-        )
-        timer.mark("csv-to-parquet")
-        await Check.update(
+        try:
+            await csv_to_parquet(
+                df=df,
+                inspection=csv_inspection,
+                resource_id=resource_id,
+                check_id=check["id"],
+            )
+            timer.mark("csv-to-parquet")
+        except Exception as e:
+            remove_remainders(resource_id, ["parquet"])
+            raise ParseException(
+                message=str(e),
+                step="parquet_export",
+                resource_id=resource_id,
+                url=url,
+                check_id=check["id"],
+            ) from e
+
+        try:
+            await csv_to_geojson_and_pmtiles(
+                df=df,
+                inspection=csv_inspection,
+                resource_id=resource_id,
+                check_id=check["id"],
+            )
+            timer.mark("csv-to-geojson-pmtiles")
+        except Exception as e:
+            remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
+            raise ParseException(
+                message=str(e),
+                step="geojson_export",
+                resource_id=resource_id,
+                url=url,
+                check_id=check["id"],
+            ) from e
+
+        check = await Check.update(
             check["id"],
             {
-                "parsing_table": table_name,
                 "parsing_finished_at": datetime.now(timezone.utc),
-                "parquet_url": parquet_args[0] if parquet_args else None,
-                "parquet_size": parquet_args[1] if parquet_args else None,
             },
-        )  # TODO: return the outdated check so that we don't have to re-request it in notify_data again
+        )
         await csv_to_db_index(table_name, csv_inspection, check)
 
-    except ParseException as e:
+    except (ParseException, IOException) as e:
         await handle_parse_exception(e, table_name, check)
     finally:
-        await notify_udata(check["id"])
+        await helpers.notify_udata(resource, check)
         timer.stop()
-        tmp_file.close()
-        os.remove(tmp_file.name)
+        if tmp_file is not None:
+            tmp_file.close()
+            os.remove(tmp_file.name)
 
         # Reset resource status to None
         await Resource.update(resource_id, {"status": None})
 
 
-def smart_cast(_type: str, value, failsafe: bool = False) -> Any:
-    try:
-        if value is None or value == "":
-            return None
-        if _type == "bool":
-            return str2bool(value)
-        return PYTHON_TYPE_TO_PY[_type](value)
-    except ValueError as e:
-        if _type == "int":
-            _value = str2float(value, default=None)
-            if _value:
-                return int(_value)
-        elif _type == "float":
-            return str2float(value, default=None)
-        if not failsafe:
-            raise e
-        log.warning(f'Could not convert "{value}" to {_type}, defaulting to null')
+async def get_previous_analysis(resource_id: str) -> dict | None:
+    def match_columns(table_columns: list, analysis_columns: list) -> dict | None:
+        """If a column name is too long for postgres (>60 characters) it gets truncated in the table"""
+        # retrieving the columns that match exactly between table and analysis
+        matching = {col: col for col in table_columns if col in analysis_columns}
+        # early stop if all columns match perfectly
+        if len(matching) == len(table_columns):
+            return matching
+        # matching truncated columns in table with actual label
+        for col in table_columns:
+            if col in matching:
+                continue
+            for label in analysis_columns:
+                if label.startswith(col):
+                    matching[col] = label
+                    break
+        return matching if len(matching) == len(table_columns) else None
+
+    db = await context.pool("csv")
+    q = (
+        "SELECT parsing_table, csv_detective FROM tables_index "
+        f"WHERE resource_id='{resource_id}' ORDER BY created_at DESC LIMIT 1"
+    )
+    res = await db.fetch(q)
+    if not res:
         return None
+    analysis = json.loads(res[0]["csv_detective"])
+    # the csv_detective column is JSONB, so keys are reordered compared to the actual table
+    # so we get the right order from the table
+    # landing here we can safely assume that the table exists
+    rows: list[Record] = await db.fetch(f'SELECT * FROM "{res[0]["parsing_table"]}" LIMIT 1')
+    # the __id column is generated by hydra, not natively in the data
+    table_columns = [col for col in rows[0].keys() if col != "__id"]
+    matching = match_columns(table_columns, list(analysis["columns"].keys()))
+    if matching is None:
+        return None
+    analysis["columns"] = {
+        matching[col]: analysis["columns"][matching[col]] for col in table_columns
+    }
+    return analysis
 
 
 def compute_create_table_query(
@@ -247,22 +269,26 @@ def compute_create_table_query(
     for col_name, col_type in columns.items():
         table.append_column(Column(col_name, PYTHON_TYPE_TO_PG.get(col_type, String)))
 
+    indexes_labels = {}
     if indexes:
         for col_name, index_type in indexes.items():
             if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
                 log.error(
-                    f'Index type "{index_type}" is unknown or not supported yet! Index for colum {col_name} was not created.'
+                    f'Index type "{index_type}" is unknown or not supported yet! '
+                    f"Index for column {col_name} was not created."
                 )
                 continue
 
             else:
                 if index_type == "index":
                     index_name = f"{table_name}_{slugify(col_name)}_idx"
+                    indexes_labels[index_name] = {"column": col_name, "type": index_type}
                     try:
                         table.append_constraint(Index(index_name, col_name))
                     except KeyError:
                         raise KeyError(
-                            f'Error creating index "{index_name}" on column "{col_name}". Does the column "{col_name}" exist in the table?'
+                            f'Error creating index "{index_name}" on column "{col_name}". '
+                            f'Does the column "{col_name}" exist in the table?'
                         )
                 # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
 
@@ -271,7 +297,9 @@ def compute_create_table_query(
 
     # Add the index creation queries to the main query
     for index in table.indexes:
-        log.debug(f'Creating {index_type} on column "{col_name}"')
+        log.debug(
+            f'Creating {indexes_labels[index.name]["type"]} on column "{indexes_labels[index.name]["column"]}"'
+        )
         query_idx = CreateIndex(index).compile(dialect=asyncpg.dialect())
         query: str = query + ";" + query_idx.string
 
@@ -282,20 +310,18 @@ def compute_create_table_query(
     return query
 
 
-def generate_records(file_path: str, inspection: dict, columns: dict) -> Iterator[list]:
-    # because we need the iterator twice, not possible to
-    # handle parquet and db through the same iteration
-    with Reader(file_path, inspection) as reader:
-        for line in reader:
-            if line:
-                yield [smart_cast(t, v, failsafe=True) for t, v in zip(columns.values(), line)]
+def generate_records(df: pd.DataFrame) -> Iterator[list]:
+    # pandas cannot have None in columns typed as int so we have to cast
+    # NaN-int values to None for db insertion, and we also change NaN to None
+    for row in df.values:
+        yield tuple(cell if not pd.isna(cell) else None for cell in row)
 
 
 async def csv_to_parquet(
-    file_path: str,
+    df: pd.DataFrame,
     inspection: dict,
-    table_name: str,
     resource_id: str | None = None,
+    check_id: int | None = None,
 ) -> tuple[str, int] | None:
     """
     Convert a csv file to parquet using inspection data.
@@ -315,33 +341,39 @@ async def csv_to_parquet(
 
     if int(inspection.get("total_lines", 0)) < config.MIN_LINES_FOR_PARQUET:
         log.debug(
-            f"Skipping parquet export for {table_name} because it has less than {config.MIN_LINES_FOR_PARQUET} lines."
+            f"Skipping parquet export for {resource_id} because it has less than {config.MIN_LINES_FOR_PARQUET} lines."
         )
         return
 
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
-        f"to parquet for {table_name} and sending to Minio."
+        f"to parquet for {resource_id} and sending to Minio."
     )
 
     if resource_id:
         # Update resource status to CONVERTING_TO_PARQUET
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
 
-    columns = {c: v["python_type"] for c, v in inspection["columns"].items()}
     # save the file as parquet and store it on Minio instance
     parquet_file, _ = save_as_parquet(
-        records=generate_records(file_path, inspection, columns),
-        columns=columns,
-        output_filename=table_name,
+        df=df,
+        output_filename=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
     parquet_url: str = minio_client.send_file(parquet_file)
+    await Check.update(
+        check_id,
+        {
+            "parquet_url": parquet_url,
+            "parquet_size": parquet_size,
+        },
+    )
+    # returning only for tests purposes
     return parquet_url, parquet_size
 
 
 async def csv_to_db(
-    file_path: str,
+    df: pd.DataFrame,
     inspection: dict,
     table_name: str,
     table_indexes: dict[str, str] | None = None,
@@ -372,7 +404,7 @@ async def csv_to_db(
 
     # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {
-        f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
+        f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: helpers.get_python_type(v)
         for c, v in inspection["columns"].items()
     }
 
@@ -386,7 +418,10 @@ async def csv_to_db(
         await db.execute(q)
     except Exception as e:
         raise ParseException(
-            step="create_table_query", resource_id=resource_id, table_name=table_name
+            message=str(e),
+            step="create_table_query",
+            resource_id=resource_id,
+            table_name=table_name,
         ) from e
 
     # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
@@ -395,18 +430,21 @@ async def csv_to_db(
         try:
             await db.copy_records_to_table(
                 table_name,
-                records=generate_records(file_path, inspection, columns),
-                columns=columns.keys(),
+                records=generate_records(df),
+                columns=list(columns.keys()),
             )
         except Exception as e:  # I know what I'm doing, pinky swear
             raise ParseException(
-                step="copy_records_to_table", resource_id=resource_id, table_name=table_name
+                message=str(e),
+                step="copy_records_to_table",
+                resource_id=resource_id,
+                table_name=table_name,
             ) from e
     # this inserts rows from iterator one by one, slow but useful for debugging
     else:
         bar = ProgressBar(total=inspection["total_lines"])
-        for r in bar.iter(generate_records(file_path, inspection, columns)):
-            data = {k: v for k, v in zip(columns.keys(), r)}
+        for r in bar.iter(generate_records(df)):
+            data = {k: v for k, v in zip(df.columns, r)}
             # NB: possible sql injection here, but should not be used in prod
             q = compute_insert_query(table_name=table_name, data=data, returning="__id")
             await db.execute(q, *data.values())
@@ -419,7 +457,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: Record) -> N
     await db.execute(
         q,
         table_name,
-        json.dumps(inspection),
+        json.dumps(inspection, default=str),
         check.get("resource_id"),
         check.get("url"),
     )

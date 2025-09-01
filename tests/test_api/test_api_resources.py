@@ -8,8 +8,6 @@ from datetime import datetime
 import pytest
 
 from tests.conftest import DATASET_ID, NOT_EXISTING_RESOURCE_ID, RESOURCE_ID, RESOURCE_URL
-from udata_hydra.db.resource import Resource
-from udata_hydra.utils import is_valid_uri
 
 pytestmark = pytest.mark.asyncio
 
@@ -30,32 +28,7 @@ async def test_get_resource(setup_catalog, client):
     assert data["dataset_id"] == DATASET_ID
     assert data["resource_id"] == RESOURCE_ID
     assert data["status"] is None
-
-
-@pytest.mark.parametrize("resource_status,resource_status_verbose", list(Resource.STATUSES.items()))
-async def test_get_resource_status(
-    db, client, insert_fake_resource, resource_status, resource_status_verbose
-):
-    # Create resource with specific status
-    await insert_fake_resource(db, status=resource_status)
-
-    # Test invalid resource_id
-    resp = await client.get(path="/api/resources/STUPID-ID/status")
-    assert resp.status == 400
-
-    # Test non existing resource_id
-    resp = await client.get(path=f"/api/resources/{NOT_EXISTING_RESOURCE_ID}")
-    assert resp.status == 404
-
-    # Test existing resource
-    resp = await client.get(f"/api/resources/{RESOURCE_ID}/status")
-    assert resp.status == 200
-    data = await resp.json()
-    assert data["resource_id"] == RESOURCE_ID
-    assert data["status"] == resource_status
-    assert data["status_verbose"] == resource_status_verbose
-    assert is_valid_uri(data["latest_check_url"])
-    assert data["latest_check_url"].endswith(f"/api/checks/latest?resource_id={RESOURCE_ID}")
+    assert data["status_since"] is None
 
 
 async def test_create_resource(
@@ -112,6 +85,7 @@ async def test_update_resource(client, api_headers, api_headers_wrong_token):
             "description": "random description",
             "filetype": "file",
             "type": "documentation",
+            "format": "pdf",
             "mime": "text/plain",
             "filesize": 1024,
             "checksum_type": "sha1",
@@ -163,6 +137,7 @@ async def test_update_resource_url_since_load_catalog(setup_catalog, db, client,
             "description": "random description",
             "filetype": "file",
             "type": "documentation",
+            "format": "pdf",
             "mime": "text/plain",
             "filesize": 1024,
             "checksum_type": "sha1",

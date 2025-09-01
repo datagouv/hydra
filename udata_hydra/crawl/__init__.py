@@ -18,7 +18,7 @@ async def start_checks(iterations: int = -1) -> None:
     """
     try:
         context.monitor().init(
-            SINCE=config.SINCE,
+            CHECK_DELAYS=config.CHECK_DELAYS,
             BATCH_SIZE=config.BATCH_SIZE,
             BACKOFF_NB_REQ=config.BACKOFF_NB_REQ,
             BACKOFF_PERIOD=config.BACKOFF_PERIOD,
@@ -47,7 +47,7 @@ def run() -> None:
     :iterations: for testing purposes (break infinite loop)
     """
     try:
-        asyncio.get_event_loop().run_until_complete(start_checks())
+        asyncio.run(start_checks())
     except KeyboardInterrupt:
         pass
     finally:

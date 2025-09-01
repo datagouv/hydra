@@ -1,4 +1,9 @@
-# udata-hydra 🦀
+![udata-hydra](banner.png)
+
+# udata-hydra
+
+[![CircleCI](https://circleci.com/gh/datagouv/hydra.svg?style=svg)](https://circleci.com/gh/datagouv/hydra)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 `udata-hydra` is an async metadata crawler for [data.gouv.fr](https://www.data.gouv.fr).
 
@@ -6,10 +11,11 @@ URLs are crawled via _aiohttp_, catalog and crawled metadata are stored in a _Po
 
 Since it's called _hydra_, it also has mythical powers embedded:
 - analyse remote resource metadata over time to detect changes in the smartest way possible
-- if the remote resource is a CSV, convert it to a PostgreSQL table, ready for APIfication
+- if the remote resource is tabular (csv or excel-like), convert it to a PostgreSQL table, ready for APIfication, and to parquet to offer another distribution of the data
+- if the remote resource is a geojson, convert it to PMTiles to offer another distribution of the data
 - send crawl and analysis info to a udata instance
 
-## Architecture schema
+## 🏗️ Architecture schema
 
 The architecture for the full workflow is the following:
 
@@ -20,13 +26,15 @@ The hydra crawler is one of the components of the architecture. It will check if
 
 ![Crawler architecture](docs/hydra.drawio.png)
 
-## Dependencies
+## 📦 Dependencies
 
 This project uses `libmagic`, which needs to be installed on your system, eg:
 
 `brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on linux.
 
-## CLI
+This project uses Python >=3.11 and [Poetry](https://python-poetry.org) >= 2.0.0 to manage dependencies.
+
+## 🖥️ CLI
 
 ### Create database structure
 
@@ -39,7 +47,7 @@ Install udata-hydra dependencies and cli.
 
 `poetry run udata-hydra load-catalog`
 
-## Crawler
+## 🕷️ Crawler
 
 `poetry run udata-hydra-crawl`
 
@@ -47,45 +55,51 @@ It will crawl (forever) the catalog according to the config set in `config.toml`
 
 `BATCH_SIZE` URLs are queued at each loop run.
 
-The crawler will start with URLs never checked and then proceed with URLs crawled before `SINCE` interval. It will then wait until something changes (catalog or time).
+The crawler will start with URLs never checked and then proceed with URLs crawled before `CHECK_DELAYS` interval. It will then wait until something changes (catalog or time).
 
-There's a by-domain backoff mecanism. The crawler will wait when, for a given domain in a given batch, `BACKOFF_NB_REQ` is exceeded in a period of `BACKOFF_PERIOD` seconds. It will retry until the backoff is lifted.
+There's a by-domain backoff mechanism. The crawler will wait when, for a given domain in a given batch, `BACKOFF_NB_REQ` is exceeded in a period of `BACKOFF_PERIOD` seconds. It will retry until the backoff is lifted.
 
 If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
-## Worker
+## ⚙️ Worker
 
 A job queuing system is used to process long-running tasks. Launch the worker with the following command:
 
 `poetry run rq worker -c udata_hydra.worker`
 
-Monitor worker status:
+To monitor worker status:
 
 `poetry run rq info -c udata_hydra.worker --interval 1`
 
-## CSV conversion to database
+To empty all the queues:
 
-Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
+`poetry run rq empty -c udata_hydra.worker low default high`
 
-## Tests
+## 📊 CSV conversion to database
+
+Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's the same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
+
+## 🧪 Tests
 
 To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
 
+Make sure the dev dependencies are installed with `poetry install --extras dev`.
+
 Then you can run the tests with `poetry run pytest`.
 
-To run a specific test file, you can pass the path to the file to pytest, like this: `poetry run pytest tests/test_app.py`.
+To run a specific test file, you can pass the path to the file to pytest, like this: `poetry run pytest tests/test_file.py`.
 
-To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `poetry run pytest tests/test_app.py::test_get_latest_check`.
+To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `poetry run pytest tests/test_api/test_api_checks.py::test_get_latest_check`.
 
 If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
 
-### Tests coverage
+### 📈 Tests coverage
 
 Pytest automatically uses the `coverage` package to generate a coverage report, which is displayed at the end of the test run in the terminal.
-The coverage is configured in the `pypoject.toml` file, in the `[tool.pytest.ini_options]` section.
+The coverage is configured in the `pyproject.toml` file, in the `[tool.pytest.ini_options]` section.
 You can also override the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
 
-## API
+## 🔌 API
 
 The API will need a Bearer token for each request on protected endpoints (any endpoint that isn't a `GET`).
 The token is configured in the `config.toml` file as `API_KEY`, and has a default value set in the `udata_hydra/config_default.toml` file.
@@ -94,7 +108,7 @@ If you're using hydra as an external service to receive resource events from [ud
 API key in its `udata.cfg` file:
 
 ```python
-# Wether udata should publish the resource events
+# Whether udata should publish the resource events
 PUBLISH_ON_RESOURCE_EVENTS = True
 # Where to publish the events
 RESOURCES_ANALYSER_URI = "http://localhost:8000"
@@ -102,21 +116,23 @@ RESOURCES_ANALYSER_URI = "http://localhost:8000"
 RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
 ```
 
-### Run
+### 🚀 Run
 
 ```bash
 poetry install
 poetry run adev runserver udata_hydra/app.py
 ```
+By default, the app will listen on `localhost:8000`.
+You can check the status of the app with `curl http://localhost:8000/api/health`.
 
-### Routes/endpoints
+### 🛣️ Routes/endpoints
 
 The API serves the following endpoints:
 
 *Related to checks:*
 - `GET` on `/api/checks/latest?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
 - `GET` on `/api/checks/all?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
-- `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurences grouped by a `column` for a specific `date`
+- `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurrences grouped by a `column` for a specific `date`
 
 *Related to resources:*
 - `GET` on `/api/resources/{resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
@@ -124,13 +140,13 @@ The API serves the following endpoints:
 - `PUT` on `/api/resources/{resource_id}` to update a resource in the DB "catalog" table
 - `DELETE` on `/api/resources/{resource_id}` to delete a resource in the DB "catalog" table
 
-> :warning: **Warning: the following routes are deprecated and need be removed in the future:**
+> :warning: **Warning: the following routes are deprecated and will be removed in the future:**
 > - `POST` on `/api/resource/created` -> use `POST` on `/api/resources/` instead
 > - `POST` on `/api/resource/updated` -> use `PUT` on `/api/resources/` instead
 > - `POST` on `/api/resource/deleted` -> use `DELETE` on `/api/resources/` instead
 
 *Related to resources exceptions:*
-- `GET` on `/api/resources-exceptions` to get the list all resources exceptions
+- `GET` on `/api/resources-exceptions` to get the list of all resources exceptions
 - `POST` on `/api/resources-exceptions` to create a new resource exception in the DB
 - `PUT` on `/api/resources-exceptions/{resource_id}` to update a resource exception in the DB
 - `DELETE` on `/api/resources-exceptions/{resource_id}` to delete a resource exception from the DB
@@ -141,8 +157,8 @@ The API serves the following endpoints:
 - `GET` on `/api/stats` to get the crawling stats
 - `GET` on `/api/health` to get the API version number and environment
 
-You may want to you a helper such as [Bruno](https://www.usebruno.com/) to handle API calls, in which case all the endpoints are ready to use [here](https://github.com/datagouv/api-calls).
-More details about some enpoints are provided below with examples, but not for all of them:
+You may want to use a helper such as [Bruno](https://www.usebruno.com/) to handle API calls, in which case all the endpoints are ready to use [here](https://github.com/datagouv/api-calls).
+More details about some endpoints are provided below with examples, but not for all of them:
 
 #### Get latest check
 
@@ -221,7 +237,7 @@ $ curl -s "http://localhost:8000/api/checks/all?url=http://www.drees.sante.gouv.
 ]
 ```
 
-#### Get checks occurences grouped by a column for a specific date
+#### Get checks occurrences grouped by a column for a specific date
 
 Works with `?group_by={column}` and `?created_at={date}`.
 `date` should be a date in format `YYYY-MM-DD` or the default keyword `today`.
@@ -395,7 +411,7 @@ $ curl -s "http://localhost:8000/api/stats" | json_pp
 }
 ```
 
-## Using Webhook integration
+## 🔗 Using Webhook integration
 
 ** Set the config values**
 
@@ -409,7 +425,7 @@ SENTRY_DSN = "https://{my-sentry-dsn}"
 
 The webhook integration sends HTTP messages to `udata` when resources are analysed or checked to fill resources extras.
 
-Regarding analysis, there is a phase called "change detection". It will try to guess if a resource has been modified based on different criterions:
+Regarding analysis, there is a phase called "change detection". It will try to guess if a resource has been modified based on different criteria:
 - harvest modified date in catalog
 - content-length and last-modified headers
 - checksum comparison over time
@@ -426,9 +442,9 @@ The payload should look something like:
 }
 ```
 
-## Development
+## 🛠️ Development
 
-### docker compose
+### 🐳 docker compose
 
 Multiple docker-compose files are provided:
 - a minimal `docker-compose.yml` with two PostgreSQL containers (one for catalog and metadata, the other for converted CSV to database)
@@ -437,17 +453,17 @@ Multiple docker-compose files are provided:
 
 NB: you can launch compose from multiple files like this: `docker compose -f docker-compose.yml -f docker-compose.test.yml up`
 
-### Logging & Debugging
+### 📝 Logging & Debugging
 
 The log level can be adjusted using the environment variable LOG_LEVEL.
 For example, to set the log level to `DEBUG` when initializing the database, use `LOG_LEVEL="DEBUG" udata-hydra init_db `.
 
-### Writing a migration
+### 📋 Writing a migration
 
 1. Add a file named `migrations/{YYYYMMDD}_{description}.sql` and write the SQL you need to perform migration.
-2. `udata-hydra migrate` will migrate the database as needeed.
+2. `udata-hydra migrate` will migrate the database as needed.
 
-## Deployment
+## 🚀 Deployment
 
 3 services need to be deployed for the full stack to run:
 - worker
@@ -458,7 +474,7 @@ Refer to each section to learn how to launch them. The only differences from dev
 - use `HYDRA_SETTINGS` env var to point to your custom `config.toml`
 - use `HYDRA_APP_SOCKET_PATH` to configure where aiohttp should listen to a [reverse proxy connection (eg nginx)](https://docs.aiohttp.org/en/stable/deployment.html#nginx-configuration) and use `udata-hydra-app` to launch the app server
 
-## Contributing
+## 🤝 Contributing
 
 Before contributing to the repository and making any PR, it is necessary to initialize the pre-commit hooks:
 ```bash
@@ -468,10 +484,9 @@ Once this is done, code formatting and linting, as well as import sorting, will 
 
 If you cannot use pre-commit, it is necessary to format, lint, and sort imports with [Ruff](https://docs.astral.sh/ruff/) before committing:
 ```bash
-ruff check --fix .
-ruff format .
+poetry run ruff check --fix . && poetry run ruff format .
 ```
 
-### Releases
+### 🏷️ Releases
 
 The release process uses [bump'X](https://github.com/datagouv/bumpx).

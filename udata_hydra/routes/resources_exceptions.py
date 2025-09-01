@@ -5,7 +5,6 @@ from aiohttp import web
 from asyncpg import Record
 from asyncpg.exceptions import UniqueViolationError
 
-from udata_hydra import config
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.schemas import ResourceExceptionSchema

@@ -11,6 +11,43 @@ from udata_hydra.utils import IOException
 log = logging.getLogger("udata-hydra")
 
 
+class UdataPayload:
+    HYDRA_UDATA_METADATA = {
+        "check": ["available", "date", "error", "id", "status", "timeout"],
+        "check:headers": ["content-type", "content-length"],
+        "analysis": [
+            "checksum",
+            "content-length",
+            "error",
+            "check_id",
+            "last-modified-at",
+            "last-modified-detection",
+            "mime-type",
+        ],
+        "analysis:parsing": [
+            "error",
+            "started_at",
+            "finished_at",
+            "parsing_table",
+            "parquet_size",
+            "parquet_url",
+            "pmtiles_size",
+            "pmtiles_url",
+            "geojson_size",
+            "geojson_url",
+        ],
+    }
+
+    def __init__(self, payload: dict):
+        # if we update one element of a udata metadata category, we reset the others to None
+        payload_categories = set([":".join(k.split(":")[:-1]) for k in payload.keys()])
+        for cat in payload_categories:
+            for field in self.HYDRA_UDATA_METADATA[cat]:
+                if f"{cat}:{field}" not in payload:
+                    payload[f"{cat}:{field}"] = None
+        self.payload = payload
+
+
 def is_valid_uri(uri: str) -> bool:
     try:
         result = urlparse(uri)
@@ -27,9 +64,9 @@ def get_request_params(request, params_names: list[str]) -> list:
     return data
 
 
-async def send(dataset_id: str, resource_id: str, document: dict) -> None:
+async def send(dataset_id: str, resource_id: str, document: UdataPayload) -> None:
     log.debug(
-        f"Sending payload to udata {dataset_id}/{resource_id}: {json.dumps(document, indent=4)}"
+        f"Sending payload to udata {dataset_id}/{resource_id}: {json.dumps(document.payload, indent=4)}"
     )
 
     if not config.WEBHOOK_ENABLED:
@@ -47,7 +84,7 @@ async def send(dataset_id: str, resource_id: str, document: dict) -> None:
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.put(uri, json=document, headers=headers) as resp:
+        async with session.put(uri, json=document.payload, headers=headers) as resp:
             # we're raising since we should be in a worker thread
             if resp.status == 404:
                 pass

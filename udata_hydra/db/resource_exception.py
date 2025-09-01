@@ -16,7 +16,7 @@ class ResourceException:
         """
         Get all resource_exceptions
         """
-        pool = await context.pool()
+        pool = await context.pool("csv")
         async with pool.acquire() as connection:
             q = "SELECT * FROM resources_exceptions;"
             return await connection.fetch(q)
@@ -26,7 +26,7 @@ class ResourceException:
         """
         Get a resource_exception by its resource_id
         """
-        pool = await context.pool()
+        pool = await context.pool("csv")
         async with pool.acquire() as connection:
             q = "SELECT * FROM resources_exceptions WHERE resource_id = $1;"
             return await connection.fetchrow(q, resource_id)
@@ -37,16 +37,16 @@ class ResourceException:
         resource_id: str,
         table_indexes: dict[str, str] | None = None,
         comment: str | None = None,
-    ) -> Record:
+    ) -> Record | None:
         """
         Insert a new resource_exception
         table_indexes is a JSON object of column names and index types
         e.g. {"siren": "unique", "code_postal": "index"}
         """
-        pool = await context.pool()
+        pool = await context.pool("csv")
 
         # First, check if the resource_id exists in the catalog table
-        resource: dict | None = await Resource.get(resource_id)
+        resource: Record | None = await Resource.get(resource_id)
         if not resource:
             raise ValueError("Resource not found")
 
@@ -71,16 +71,16 @@ class ResourceException:
         resource_id: str,
         table_indexes: dict[str, str] | None = None,
         comment: str | None = None,
-    ) -> Record:
+    ) -> Record | None:
         """
         Update a resource_exception
         table_indexes is a JSON object of column names and index types
         e.g. {"siren": "unique", "code_postal": "index"}
         """
-        pool = await context.pool()
+        pool = await context.pool("csv")
 
         # First, check if the resource_id exists in the catalog table
-        resource: dict | None = await Resource.get(resource_id)
+        resource: Record | None = await Resource.get(resource_id)
         if not resource:
             raise ValueError("Resource not found")
 
@@ -105,7 +105,7 @@ class ResourceException:
         """
         Delete a resource_exception by its resource_id
         """
-        pool = await context.pool()
+        pool = await context.pool("csv")
         async with pool.acquire() as connection:
             q = "DELETE FROM resources_exceptions WHERE resource_id = $1;"
             await connection.execute(q, resource_id)

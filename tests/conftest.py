@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import uuid
@@ -86,17 +87,17 @@ def setup():
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def mock_pool(mocker, event_loop):
+async def mock_pool(mocker):
     """This avoids having different pools attached to different event loops"""
     m = mocker.patch("udata_hydra.context.pool")
-    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50, loop=event_loop)
+    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50)
     m.return_value = pool
     yield
     await pool.close()
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def patch_enqueue(mocker, event_loop):
+async def patch_enqueue(mocker):
     """
     Patch our enqueue helper
     This bypasses rq totally by executing the function in the same event loop
@@ -105,9 +106,10 @@ async def patch_enqueue(mocker, event_loop):
 
     def _execute(fn, *args, **kwargs):
         kwargs.pop("_priority")
+        kwargs.pop("_exception", None)
         result = fn(*args, **kwargs)
         if asyncio.iscoroutine(result):
-            loop = event_loop
+            loop = asyncio.get_running_loop()
             coro_result = loop.run_until_complete(result)
             return coro_result
         return result
@@ -157,7 +159,11 @@ async def setup_catalog_with_resource_exception(setup_catalog):
     ['__id', 'Nom', 'Prenom', 'Societe', 'Adresse', 'CP', 'Ville', 'Tel1', 'Tel2', 'email', 'Organisme', 'Org Cofrac', 'Type de certificat', 'N° de certificat', 'Date début validité', 'Date fin validité']
     """
     await Resource.insert(
-        dataset_id=DATASET_ID, resource_id=RESOURCE_EXCEPTION_ID, url="http://example.com/"
+        dataset_id=DATASET_ID,
+        resource_id=RESOURCE_EXCEPTION_ID,
+        type="main",
+        format="csv",
+        url="http://example.com/",
     )
     await ResourceException.insert(
         resource_id=RESOURCE_EXCEPTION_ID,
@@ -168,16 +174,16 @@ async def setup_catalog_with_resource_exception(setup_catalog):
 
 @pytest.fixture
 def produce_mock(mocker):
-    mocker.patch("udata_hydra.crawl.process_check_data.send", dummy())
+    mocker.patch("udata_hydra.crawl.preprocess_check_data.send", dummy())
     mocker.patch("udata_hydra.analysis.resource.send", dummy())
-    mocker.patch("udata_hydra.analysis.csv.send", dummy())
+    mocker.patch("udata_hydra.analysis.helpers.send", dummy())
 
 
 @pytest.fixture
 def analysis_mock(mocker):
     """Disable analyse_resource while crawling"""
     mocker.patch(
-        "udata_hydra.crawl.check_resources.analyse_resource",
+        "udata_hydra.analysis.resource.analyse_resource",
         dummy({"error": None, "checksum": None, "filesize": None, "mime_type": None}),
     )
 
@@ -203,6 +209,8 @@ async def insert_fake_resource():
             dataset_id=DATASET_ID,
             resource_id=RESOURCE_ID,
             url=RESOURCE_URL,
+            type="main",
+            format="csv",
             status=status,
             priority=True,
         )
@@ -225,32 +233,48 @@ async def fake_check():
         created_at=None,
         headers={"x-do": "you"},
         checksum=None,
+        mime_type=None,
+        filesize=None,
+        analysis_error=None,
         resource_id=RESOURCE_ID,
         detected_last_modified_at=None,
+        next_check_at=None,
         parsing_table=False,
         parquet_url=False,
         domain="example.com",
+        pmtiles_url=False,
+        geojson_url=False,
     ) -> dict:
         url = f"https://example.com/resource-{resource}"
         data = {
             "url": url,
             "domain": domain,
             "status": status,
-            "headers": headers,
+            "headers": json.dumps(headers),
             "timeout": timeout,
             "response_time": 0.1,
             "resource_id": resource_id,
             "error": error,
             "checksum": checksum,
+            "mime_type": mime_type,
+            "filesize": filesize,
+            "analysis_error": analysis_error,
             "detected_last_modified_at": detected_last_modified_at,
+            "next_check_at": next_check_at,
             "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest()
             if parsing_table
             else None,
             "parquet_url": "https://example.org/file.parquet" if parquet_url else None,
             "parquet_size": 2048 if parquet_url else None,
+            "pmtiles_url": "https://example.org/file.pmtiles" if pmtiles_url else None,
+            "pmtiles_size": 1024 if pmtiles_url else None,
+            "geojson_url": "https://example.org/file.geojson" if pmtiles_url else None,
+            "geojson_size": 1024 if geojson_url else None,
         }
-        check = await Check.insert(data)
+        check: dict = await Check.insert(data=data, returning="*")
         data["id"] = check["id"]
+        if check.get("dataset_id"):
+            data["dataset_id"] = check["dataset_id"]
         if created_at:
             await Check.update(check["id"], {"created_at": created_at})
             data["created_at"] = created_at
@@ -276,6 +300,7 @@ def udata_resource_payload():
             "description": "random description",
             "filetype": "file",
             "type": "documentation",
+            "format": "pdf",
             "mime": "text/plain",
             "schema": None,
             "filesize": 1024,
