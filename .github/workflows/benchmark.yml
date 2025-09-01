@@ -20,7 +20,7 @@ on:
 #         type: string
 
 env:
-  TEST_GEOCSV_URL: "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/HOR/H_01_1990-1999.csv.gz"
+  TEST_GEOCSV_FILE: "H_01_1990-1999.csv.gz"
   BENCHMARK_BRANCH: "benchmarks"
   PYTHON_VERSION: "3.11"
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
@@ -107,18 +107,6 @@ jobs:
           git commit -m "perf: add CSV analysis benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
           git push origin ${{env.BENCHMARK_BRANCH }}
 
-      - name: Download ${{ env.TEST_GEOCSV_URL }}
-        run: |
-          mkdir -p tests/data
-          if [[ "${{ env.TEST_GEOCSV_URL }}" == *.gz ]]; then
-            wget -O tests/data/test_geodata.csv.gz "${{ env.TEST_GEOCSV_URL }}"
-            gunzip tests/data/test_geodata.csv.gz
-          else
-            wget -O tests/data/test_geodata.csv "${{ env.TEST_GEOCSV_URL }}"
-          fi
-          echo "TEST_GEOCSV_PATH=tests/data/test_geodata.csv" >> $GITHUB_ENV
-          ls -la tests/data/
-
       - name: Run CSV to GeoJSON benchmark
         timeout-minutes: 20
         run: |
@@ -128,7 +116,7 @@ jobs:
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ env.TEST_GEOCSV_FILE }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
       - name: Commit CSV to GeoJSON benchmark results
         run: |
@@ -167,7 +155,7 @@ jobs:
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,${{ env.TEST_GEOCSV_URL }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,${{ env.TEST_GEOCSV_FILE }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
       - name: Commit GeoJSON to PMTiles benchmark results
         run: |
