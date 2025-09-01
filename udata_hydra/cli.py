@@ -203,25 +203,73 @@ async def analyse_csv_cli(
     Try to get the check from the check ID, then from the URL
     """
     assert check_id or url or resource_id
+
+    # Try to get check from different sources
     check = None
+    tmp_resource_id = None
+
+    # Try to get check from check_id
     if check_id:
-        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)
+        record = await Check.get_by_id(int(check_id), with_deleted=True)
+        check = dict(record) if record else None
+
+    # Try to get check from URL
     if not check and url:
-        checks: list[Record] | None = await Check.get_by_url(url)
-        if checks and len(checks) > 1:
-            log.warning(f"Multiple checks found for URL {url}, using the latest one")
-        check = checks[0] if checks else None
+        records = await Check.get_by_url(url)
+        if records:
+            if len(records) > 1:
+                log.warning(f"Multiple checks found for URL {url}, using the latest one")
+            check = dict(records[0])
+
+    # Try to get check from resource_id
     if not check and resource_id:
-        check: Record | None = await Check.get_by_resource_id(resource_id)
-    if not check:
-        if check_id:
-            log.error("Could not retrieve the specified check")
-        elif url:
-            log.error("Could not find a check linked to the specified URL")
-        elif resource_id:
-            log.error("Could not find a check linked to the specified resource ID")
+        record = await Check.get_by_resource_id(resource_id)
+        check = dict(record) if record else None
+
+    # We cannot get a check, it's an external URL analysis, we need to create a temporary check
+    if not check and url:
+        tmp_resource_id = str(uuid.uuid4())
+        await insert_url_into_catalog(url=url, resource_id=tmp_resource_id)
+        check = await Check.insert(
+            {
+                "resource_id": tmp_resource_id,
+                "url": url,
+                "status": 200,
+                "headers": {},
+                "timeout": False,
+            },
+            returning="*",
+        )
+
+    elif not check:
+        log.error("Could not find a check for the specified parameters")
         return
+
     await analyse_csv(check=check, debug_insert=debug_insert)
+    log.info("CSV analysis completed")
+
+    if url and tmp_resource_id:
+        # Clean up temporary data created for analysis with external URL
+        try:
+            # Clean up CSV database tables
+            csv_pool = await connection(db_name="csv")
+            table_hash = hashlib.md5(url.encode()).hexdigest()
+
+            await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_hash}"')
+            await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_hash}'")
+
+            # Clean up the temporary resource and temporary check from catalog
+            check = await Check.get_by_resource_id(tmp_resource_id)
+            if check:
+                await Check.delete(check["id"])
+            await Resource.delete(resource_id=tmp_resource_id, hard_delete=True)
+
+            # Clean up MinIO files if any (parquet, etc.)
+            # Note: This would require additional MinIO cleanup logic
+
+            log.info(f"Cleaned up temporary data for {url}")
+        except Exception as e:
+            log.warning(f"Failed to clean temporary external data for {url}: {e}")
 
 
 @cli(name="analyse-geojson")
@@ -253,74 +301,6 @@ async def analyse_geojson_cli(
             log.error("Could not find a check linked to the specified resource ID")
         return
     await analyse_geojson(check=dict(check))
-
-
-@cli(name="analyse-external-csv")
-async def analyse_external_csv_cli(
-    url: str,
-    debug_insert: bool = False,
-    cleanup: bool = True,
-):
-    """Analyze an external CSV URL for testing purposes (not stored in catalog)
-
-    :url: URL of the CSV file to analyze
-    :debug_insert: Enable debug mode for database insertion
-    :cleanup: Clean up temporary data after analysis (default: True)
-    """
-
-    tmp_resource_id = str(uuid.uuid4())  # Generate a valid UUID
-
-    # Insert the URL into catalog first
-    await insert_url_into_catalog(url=url, resource_id=tmp_resource_id)
-
-    # Create a temporary check in the DB
-    check = await Check.insert(
-        {
-            "resource_id": tmp_resource_id,
-            "url": url,
-            "status": 200,  # Assume success for external analysis
-            "headers": {},  # Empty headers for external analysis
-            "timeout": False,  # No timeout for external analysis
-        },
-        returning="*",  # Return all columns, not just id
-    )
-
-    try:
-        await analyse_csv(check=check, debug_insert=debug_insert)
-        log.info(f"External CSV analysis completed for {url}")
-    except Exception as e:
-        log.error(f"External CSV analysis failed for {url}: {e}")
-        # Always clean up on error
-        await cleanup_external_analysis(url=url, resource_id=tmp_resource_id)
-        raise
-    else:
-        # Only clean up on success if cleanup is enabled
-        if cleanup:
-            await cleanup_external_analysis(url=url, resource_id=tmp_resource_id)
-
-
-async def cleanup_external_analysis(url: str, resource_id: str):
-    """Clean up temporary data from external analysis"""
-    try:
-        # Clean up CSV database tables
-        csv_pool = await connection(db_name="csv")
-        table_hash = hashlib.md5(url.encode()).hexdigest()
-
-        await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_hash}"')
-        await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_hash}'")
-
-        # Clean up the temporary resource and temporary check from catalog
-        check = await Check.get_by_resource_id(resource_id)
-        if check:
-            await Check.delete(check["id"])
-        await Resource.delete(resource_id, hard_delete=True)
-
-        # Clean up MinIO files if any (parquet, etc.)
-        # Note: This would require additional MinIO cleanup logic
-
-        log.info(f"Cleaned up external analysis data for {url}")
-    except Exception as e:
-        log.warning(f"Failed to clean up external analysis data for {url}: {e}")
 
 
 @cli
