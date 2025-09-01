@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import tippecanoe
 from asyncpg import Record
+from json_stream import streamable_list
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
@@ -138,6 +139,69 @@ async def csv_to_geojson(
             return None
         return value
 
+    def get_features(df, geo):
+        for _, row in df.iterrows():
+            if "geometry" in geo:
+                yield {
+                    "type": "Feature",
+                    # json is not pre-cast by csv-detective
+                    "geometry": json.loads(row[geo["geometry"]]),
+                    "properties": {
+                        col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
+                    },
+                }
+
+            elif "latlon" in geo:
+                # ending up here means we either have the exact lat,lon format, or NaN
+                # skipping row if NaN
+                if pd.isna(row[geo["latlon"]]):
+                    continue
+                yield {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": cast_latlon(row[geo["latlon"]]),
+                    },
+                    "properties": {
+                        col: prevent_nan(row[col]) for col in df.columns if col != geo["latlon"]
+                    },
+                }
+
+            elif "lonlat" in geo:
+                # ending up here means we either have the exact lon,lat format, or NaN
+                # skipping row if NaN
+                if pd.isna(row[geo["lonlat"]]):
+                    continue
+                yield {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        # inverting lon and lat to match the standard
+                        "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
+                    },
+                    "properties": {
+                        col: prevent_nan(row[col]) for col in df.columns if col != geo["lonlat"]
+                    },
+                }
+
+            else:
+                # skipping row if lat or lon is NaN
+                if any(pd.isna(coord) for coord in (row[geo["lon"]], row[geo["lat"]])):
+                    continue
+                yield {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        # these columns are precast by csv-detective
+                        "coordinates": [row[geo["lon"]], row[geo["lat"]]],
+                    },
+                    "properties": {
+                        col: prevent_nan(row[col])
+                        for col in df.columns
+                        if col not in [geo["lon"], geo["lat"]]
+                    },
+                }
+
     log.debug(f"Converting to geojson for {resource_id}")
 
     geo = {}
@@ -171,73 +235,9 @@ async def csv_to_geojson(
     if resource_id:
         await Resource.update(resource_id, {"status": "CONVERTING_TO_GEOJSON"})
 
-    template = {"type": "FeatureCollection", "features": []}
-    for _, row in df.iterrows():
-        if "geometry" in geo:
-            template["features"].append(
-                {
-                    "type": "Feature",
-                    # json is not pre-cast by csv-detective
-                    "geometry": json.loads(row[geo["geometry"]]),
-                    "properties": {
-                        col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
-                    },
-                }
-            )
-        elif "latlon" in geo:
-            # ending up here means we either have the exact lat,lon format, or NaN
-            # skipping row if NaN
-            if pd.isna(row[geo["latlon"]]):
-                continue
-            template["features"].append(
-                {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": cast_latlon(row[geo["latlon"]]),
-                    },
-                    "properties": {
-                        col: prevent_nan(row[col]) for col in df.columns if col != geo["latlon"]
-                    },
-                }
-            )
-        elif "lonlat" in geo:
-            # ending up here means we either have the exact lon,lat format, or NaN
-            # skipping row if NaN
-            if pd.isna(row[geo["lonlat"]]):
-                continue
-            template["features"].append(
-                {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        # inverting lon and lat to match the standard
-                        "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
-                    },
-                    "properties": {
-                        col: prevent_nan(row[col]) for col in df.columns if col != geo["lonlat"]
-                    },
-                }
-            )
-        else:
-            # skipping row if lat or lon is NaN
-            if any(pd.isna(coord) for coord in (row[geo["lon"]], row[geo["lat"]])):
-                continue
-            template["features"].append(
-                {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        # these columns are precast by csv-detective
-                        "coordinates": [row[geo["lon"]], row[geo["lat"]]],
-                    },
-                    "properties": {
-                        col: prevent_nan(row[col])
-                        for col in df.columns
-                        if col not in [geo["lon"], geo["lat"]]
-                    },
-                }
-            )
+    template = {"type": "FeatureCollection"}
+    template["features"] = streamable_list(get_features(df, geo))
+
     geojson_filepath = Path(f"{resource_id}.geojson")
     with open(geojson_filepath, "w") as f:
         json.dump(template, f, indent=4, ensure_ascii=False, default=str)
