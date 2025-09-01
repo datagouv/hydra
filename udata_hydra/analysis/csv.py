@@ -79,7 +79,6 @@ async def analyse_csv(
     check: dict,
     file_path: str | None = None,
     debug_insert: bool = False,
-    external_mode: bool = False,
 ) -> None:
     """Launch csv analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
     if not config.CSV_ANALYSIS:
@@ -89,19 +88,15 @@ async def analyse_csv(
     resource_id: str = str(check["resource_id"])
     url = check["url"]
 
-    # Skip resource status updates in external mode
-    if not external_mode:
-        resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
+    # Update resource status to ANALYSING_CSV
+    resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
 
     # Check if the resource is in the exceptions table
     # If it is, get the table_indexes to use them later
-    exception: Record | None = None
+    exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
     table_indexes: dict | None = None
-
-    if not external_mode:
-        exception = await ResourceException.get_by_resource_id(resource_id)
-        if exception and exception.get("table_indexes"):
-            table_indexes = json.loads(exception["table_indexes"])
+    if exception and exception.get("table_indexes"):
+        table_indexes = json.loads(exception["table_indexes"])
 
     timer = Timer("analyse-csv", resource_id)
     assert any(_ is not None for _ in (check["id"], url))
@@ -118,11 +113,7 @@ async def analyse_csv(
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         timer.mark("download-file")
 
-        # Skip check updates in external mode
-        if not external_mode:
-            check = await Check.update(
-                check["id"], {"parsing_started_at": datetime.now(timezone.utc)}
-            )
+        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
 
         # Launch csv-detective against given file
         try:
@@ -165,9 +156,7 @@ async def analyse_csv(
             resource_id=resource_id,
             debug_insert=debug_insert,
         )
-        # Skip check updates in external mode
-        if not external_mode:
-            check = await Check.update(check["id"], {"parsing_table": table_name})
+        check = await Check.update(check["id"], {"parsing_table": table_name})
         timer.mark("csv-to-db")
 
         try:
@@ -206,41 +195,25 @@ async def analyse_csv(
                 check_id=check["id"],
             ) from e
 
-        # Skip check updates in external mode
-        if not external_mode:
-            check = await Check.update(
-                check["id"],
-                {
-                    "parsing_finished_at": datetime.now(timezone.utc),
-                },
-            )
-        # In external mode, we still need to create the index entry for testing purposes
-        # This will be cleaned up later if cleanup=True
+        check = await Check.update(
+            check["id"],
+            {
+                "parsing_finished_at": datetime.now(timezone.utc),
+            },
+        )
         await csv_to_db_index(table_name, csv_inspection, check)
 
     except (ParseException, IOException) as e:
-        if external_mode:
-            # In external mode, just log the error and clean up
-            log.error(f"External CSV analysis failed for {url}: {e}")
-            if table_name:
-                # Clean up temporary table
-                csv_pool = await context.pool("csv")
-                await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_name}"')
-        else:
-            await handle_parse_exception(e, table_name, check)
+        await handle_parse_exception(e, table_name, check)
     finally:
-        # Skip udata notification in external mode
-        if not external_mode:
-            await helpers.notify_udata(resource, check)
-
+        await helpers.notify_udata(resource, check)
         timer.stop()
         if tmp_file is not None:
             tmp_file.close()
             os.remove(tmp_file.name)
 
-        if not external_mode:
-            # Reset resource status to None
-            await Resource.update(resource_id, {"status": None})
+        # Reset resource status to None
+        await Resource.update(resource_id, {"status": None})
 
 
 async def get_previous_analysis(resource_id: str) -> dict | None:
