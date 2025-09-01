@@ -257,7 +257,7 @@ jobs:
             poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v -s --durations=0
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
 
       - run:
           name: Commit CSV analysis benchmark results

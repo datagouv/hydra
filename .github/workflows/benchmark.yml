@@ -95,7 +95,7 @@ jobs:
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,,github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
       - name: Commit CSV analysis benchmark results
         run: |
