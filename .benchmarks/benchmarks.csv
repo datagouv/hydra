@@ -120,3 +120,4 @@ datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,
 2025-09-01T20:28:00Z,test_csv_to_geojson_big_file,H_01_1990-1999.csv.gz,github,195.82,bolinocroustibat,21fbe04,large,4,15995,3.11
 2025-09-01T20:44:18Z,test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,github,36.34,bolinocroustibat,d3d1958,large,4,15995,3.11
 2025-09-01T20:47:34Z,test_csv_to_geojson_big_file,H_01_1990-1999.csv.gz,github,194.90,bolinocroustibat,d3d1958,large,4,15995,3.11
+2025-09-01T20:53:00Z,test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,github,37.27,bolinocroustibat,9882dac,large,4,15995,3.11
