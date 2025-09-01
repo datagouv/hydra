@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Iterator
 
 import pandas as pd
 import tippecanoe
@@ -139,7 +140,7 @@ async def csv_to_geojson(
             return None
         return value
 
-    def get_features(df, geo):
+    def get_features(df: pd.DataFrame, geo: dict[str, Any]) -> Iterator[dict[str, Any]]:
         for _, row in df.iterrows():
             if "geometry" in geo:
                 yield {
