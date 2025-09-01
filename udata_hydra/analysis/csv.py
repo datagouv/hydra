@@ -457,7 +457,7 @@ async def csv_to_db_index(table_name: str, inspection: dict, check: Record) -> N
     await db.execute(
         q,
         table_name,
-        json.dumps(inspection),
+        json.dumps(inspection, default=str),
         check.get("resource_id"),
         check.get("url"),
     )
