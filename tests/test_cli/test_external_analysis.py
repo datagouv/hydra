@@ -1,13 +1,15 @@
 import nest_asyncio
 import pytest
 
+from udata_hydra import context
+from udata_hydra.cli import analyse_external_csv_cli
+
 pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
 
 async def test_analyse_external_csv(setup_catalog, rmock, db):
     """Test the analyse-external-csv CLI command for external URLs with cleanup enabled"""
-    from udata_hydra.cli import analyse_external_csv_cli
 
     # Create a simple CSV content for testing
     csv_content = "name,age,city\nJohn,30,Paris\nJane,25,London\nBob,35,Berlin"
@@ -27,7 +29,6 @@ async def test_analyse_external_csv(setup_catalog, rmock, db):
     assert len(checks) == 0
 
     # Verify that temporary CSV table was created and then cleaned up
-    from udata_hydra import context
 
     csv_pool = await context.pool("csv")
 
@@ -70,9 +71,9 @@ async def test_analyse_external_csv_no_cleanup(setup_catalog, rmock, db):
     table_entry = await csv_pool.fetchrow(
         "SELECT * FROM tables_index WHERE parsing_table = $1", table_hash
     )
-    assert table_entry is not None, (
-        f"Table {table_hash} should exist in tables_index when cleanup is disabled"
-    )
+    assert (
+        table_entry is not None
+    ), f"Table {table_hash} should exist in tables_index when cleanup is disabled"
 
     temp_table_name = table_hash
 
@@ -121,9 +122,9 @@ async def test_analyse_external_csv_debug_insert(setup_catalog, rmock, db):
     table_entry = await csv_pool.fetchrow(
         "SELECT * FROM tables_index WHERE parsing_table = $1", table_hash
     )
-    assert table_entry is not None, (
-        f"Table {table_hash} should exist in tables_index when cleanup is disabled"
-    )
+    assert (
+        table_entry is not None
+    ), f"Table {table_hash} should exist in tables_index when cleanup is disabled"
 
     temp_table_name = table_hash
 
