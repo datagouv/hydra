@@ -16,6 +16,7 @@ from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.resource import Resource
+from udata_hydra.utils import ParseException
 from udata_hydra.utils.minio import MinIOClient
 
 pytestmark = pytest.mark.asyncio
@@ -458,24 +459,6 @@ def create_analysis(scan: dict) -> dict:
             },
             False,
         ),
-        # some column names get truncated in db, but validation works (file content and analysis are unchanged)
-        (
-            *(
-                default_kwargs
-                | {
-                    "header": ["a" * 70, "b" * 70, "a" * 30],
-                    "rows": [["1", "13002526500013", "1.2"], ["5", "38271817900023", "2.3"]],
-                    "columns": {
-                        "a" * 70: {"score": 1.0, "format": "int", "python_type": "int"},
-                        "b" * 70: {"score": 1.0, "format": "siret", "python_type": "string"},
-                        "a" * 30: {"score": 1.0, "format": "float", "python_type": "float"},
-                    },
-                    "formats": {"int": ["a" * 70], "siret": ["b" * 70], "float": ["a" * 30]},
-                },
-            )
-            * 2,
-            True,
-        ),
     ),
 )
 async def test_validation(
@@ -700,3 +683,28 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
             # Clean up files after tests
             geojson_filepath.unlink()
             pmtiles_filepath.unlink()
+
+
+async def test_too_long_column_name(
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+):
+    url = "http://example.com/csv"
+    max_len = 10
+    check = await fake_check()
+    url = check["url"]
+    rmock.get(
+        url,
+        status=200,
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        },
+        body=f"{'a' * (max_len + 1)},b,c\n1,2,3".encode("utf-8"),
+        repeat=True,
+    )
+    # should fail because one column name is too long
+    with patch("udata_hydra.config.NAMEDATALEN", max_len), pytest.raises(ParseException):
+        await analyse_csv(check=check)
