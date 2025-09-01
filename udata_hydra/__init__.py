@@ -49,5 +49,12 @@ class Configurator:
     def __dict__(self):
         return self.configuration
 
+    @property
+    def USER_AGENT_FULL(self) -> str | None:
+        """Build the complete user agent string with version"""
+        if self.USER_AGENT and self.APP_VERSION:
+            return f"{self.USER_AGENT}/{self.APP_VERSION}"
+        return None
+
 
 config = Configurator()

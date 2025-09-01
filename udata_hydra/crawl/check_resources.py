@@ -36,7 +36,8 @@ async def check_batch_resources(to_parse: list[Record]) -> None:
     context.monitor().set_status("Checking resources...")
     tasks: list = []
     async with aiohttp.ClientSession(
-        timeout=None, headers={"user-agent": config.USER_AGENT}
+        timeout=None,
+        headers={"user-agent": config.USER_AGENT_FULL} if config.USER_AGENT_FULL else None,
     ) as session:
         for row in to_parse:
             tasks.append(
