@@ -291,8 +291,7 @@ jobs:
               cd ../..
             fi
             # Build the path based on the actual file (without .gz extension)
-            FILENAME=$(basename "<< pipeline.parameters.test-geocsv-file >>" .gz)
-            echo "CSV_FILE_PATH=tests/data/$FILENAME" >> $BASH_ENV
+            echo "CSV_FILE_FILENAME=$(basename "<< pipeline.parameters.test-geocsv-file >>" .gz)" >> $BASH_ENV
             ls -la tests/data/
 
       - run:
@@ -302,7 +301,7 @@ jobs:
             UDATA_INSTANCE_NAME: udata
           command: |
             start_time=$(date +%s.%N)
-            poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$CSV_FILE_PATH"
+            poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$CSV_FILE_FILENAME"
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,<< pipeline.parameters.test-geocsv-file >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
@@ -321,13 +320,11 @@ jobs:
       - run:
           name: Set GeoJSON file path for PMTiles benchmark
           command: |
-            # Construct the expected GeoJSON filename based on CSV_FILE_PATH
-            # CSV_FILE_PATH is set to "tests/data/test_geodata.csv"
-            # So we expect "tests/data/test_geodata.geojson"
-            CSV_BASENAME=$(basename "$CSV_FILE_PATH" .csv)
+            # Construct the expected GeoJSON filename based on TEST_GEOCSV_FILENAME
+            CSV_BASENAME=$(basename "$TEST_GEOCSV_FILENAME" .csv)
             EXPECTED_GEOJSON="tests/data/${CSV_BASENAME}.geojson"
             if [ -f "$EXPECTED_GEOJSON" ]; then
-              echo "TEST_GEOJSON_PATH=$EXPECTED_GEOJSON" >> $BASH_ENV
+              echo "TEST_GEOJSON_FILENAME=$EXPECTED_GEOJSON" >> $BASH_ENV
               echo "Found expected GeoJSON file: $EXPECTED_GEOJSON"
             else
               echo "ERROR: Expected GeoJSON file not found: $EXPECTED_GEOJSON"
@@ -343,7 +340,7 @@ jobs:
             UDATA_INSTANCE_NAME: udata
           command: |
             start_time=$(date +%s.%N)
-            poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v -s --durations=0 --input_file="$TEST_GEOJSON_PATH" -k "test_geojson_to_pmtiles_big_file"
+            poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v -s --durations=0 --input_file="$TEST_GEOJSON_FILENAME" -k "test_geojson_to_pmtiles_big_file"
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,<< pipeline.parameters.test-geocsv-file >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv

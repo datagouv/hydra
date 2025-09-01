@@ -122,15 +122,14 @@ jobs:
             cd ../..
           fi
           # Build the path based on the actual file (without .gz extension)
-          FILENAME=$(basename "${{ env.TEST_GEOCSV_FILE }}" .gz)
-          echo "TEST_GEOCSV_PATH=tests/data/$FILENAME" >> $GITHUB_ENV
+          echo "TEST_GEOCSV_FILENAME=$(basename "${{ env.TEST_GEOCSV_FILE }}" .gz)" >> $GITHUB_ENV
           ls -la tests/data/
 
       - name: Run CSV to GeoJSON benchmark
         timeout-minutes: 20
         run: |
           start_time=$(date +%s.%N)
-          poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$TEST_GEOCSV_PATH"
+          poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$TEST_GEOCSV_FILENAME"
           end_time=$(date +%s.%N)
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
           COMMIT_SHA="${{ github.sha }}"
@@ -149,14 +148,12 @@ jobs:
 
       - name: Set GeoJSON file path for PMTiles benchmark
         run: |
-          # Construct the expected GeoJSON filename based on TEST_GEOCSV_PATH
-          # TEST_GEOCSV_PATH is set to "tests/data/test_geodata.csv"
-          # So we expect "tests/data/test_geodata.geojson"
-          CSV_BASENAME=$(basename "$TEST_GEOCSV_PATH" .csv)
+          # Construct the expected GeoJSON filename based on TEST_GEOCSV_FILENAME
+          CSV_BASENAME=$(basename "$TEST_GEOCSV_FILENAME" .csv)
           EXPECTED_GEOJSON="tests/data/${CSV_BASENAME}.geojson"
 
           if [ -f "$EXPECTED_GEOJSON" ]; then
-            echo "TEST_GEOJSON_PATH=$EXPECTED_GEOJSON" >> $GITHUB_ENV
+            echo "TEST_GEOJSON_FILENAME=$EXPECTED_GEOJSON" >> $GITHUB_ENV
             echo "Found expected GeoJSON file: $EXPECTED_GEOJSON"
           else
             echo "ERROR: Expected GeoJSON file not found: $EXPECTED_GEOJSON"
@@ -169,7 +166,7 @@ jobs:
         timeout-minutes: 20
         run: |
           start_time=$(date +%s.%N)
-          poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v -s --durations=0 --input_file="$TEST_GEOJSON_PATH" -k "test_geojson_to_pmtiles_big_file"
+          poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v -s --durations=0 --input_file="$TEST_GEOJSON_FILENAME" -k "test_geojson_to_pmtiles_big_file"
           end_time=$(date +%s.%N)
           execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
           COMMIT_SHA="${{ github.sha }}"
