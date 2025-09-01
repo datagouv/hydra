@@ -68,8 +68,7 @@ def pytest_generate_tests(metafunc):
         hasattr(metafunc.function, "__code__")
         and "input_file" in metafunc.function.__code__.co_varnames
     ):
-        if input_file_value is not None:
-            metafunc.parametrize("input_file", [input_file_value])
+        metafunc.parametrize("input_file", [input_file_value])
 
 
 @pytest.fixture
