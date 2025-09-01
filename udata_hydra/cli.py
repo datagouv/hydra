@@ -268,36 +268,42 @@ async def analyse_external_csv_cli(
     :cleanup: Clean up temporary data after analysis (default: True)
     """
 
-    temp_resource_id = str(uuid.uuid4())  # Generate a valid UUID
-    # Create a temporary check-like structure
-    temp_check = {
-        "resource_id": temp_resource_id,
-        "url": url,
-        "dataset_id": "temp_external",
-        "headers": {},
-        "created_at": datetime.now(timezone.utc),
-        "id": None,  # No check ID in external mode
-    }
-    await insert_url_into_catalog(url=url, resource_id=temp_resource_id)
+    tmp_resource_id = str(uuid.uuid4())  # Generate a valid UUID
+
+    # Insert the URL into catalog first
+    await insert_url_into_catalog(url=url, resource_id=tmp_resource_id)
+
+    # Create a temporary check in the DB
+    check = await Check.insert(
+        {
+            "resource_id": tmp_resource_id,
+            "url": url,
+            "status": 200,  # Assume success for external analysis
+            "headers": {},  # Empty headers for external analysis
+            "timeout": False,  # No timeout for external analysis
+        },
+        returning="*",  # Return all columns, not just id
+    )
+
     try:
-        await analyse_csv(check=temp_check, debug_insert=debug_insert)
+        await analyse_csv(check=check, debug_insert=debug_insert)
         log.info(f"External CSV analysis completed for {url}")
     except Exception as e:
         log.error(f"External CSV analysis failed for {url}: {e}")
         # Always clean up on error
-        await cleanup_external_analysis(url=url, resource_id=temp_resource_id)
+        await cleanup_external_analysis(url=url, resource_id=tmp_resource_id)
         raise
     else:
         # Only clean up on success if cleanup is enabled
         if cleanup:
-            await cleanup_external_analysis(url=url, resource_id=temp_resource_id)
+            await cleanup_external_analysis(url=url, resource_id=tmp_resource_id)
 
 
 async def cleanup_external_analysis(url: str, resource_id: str):
     """Clean up temporary data from external analysis"""
     try:
         # Clean up CSV database tables
-        csv_pool = await context.pool("csv")
+        csv_pool = await connection(db_name="csv")
         table_hash = hashlib.md5(url.encode()).hexdigest()
 
         await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_hash}"')

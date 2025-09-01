@@ -1,14 +1,14 @@
 import nest_asyncio
 import pytest
+from minicli import run
 
 from udata_hydra import context
-from udata_hydra.cli import analyse_external_csv_cli
 
 pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
 
-async def test_analyse_external_csv(setup_catalog, rmock, db):
+async def test_analyse_external_csv(setup_catalog, rmock, db, produce_mock):
     """Test the analyse-external-csv CLI command for external URLs with cleanup enabled"""
 
     # Create a simple CSV content for testing
@@ -19,7 +19,7 @@ async def test_analyse_external_csv(setup_catalog, rmock, db):
     rmock.get(external_url, status=200, body=csv_content)
 
     # Test with cleanup enabled (default)
-    await analyse_external_csv_cli(external_url, debug_insert=False, cleanup=True)
+    run("analyse-external-csv", external_url, debug_insert=False, cleanup=True)
 
     # Verify that no permanent data was created in the main database
     resources = await db.fetch("SELECT * FROM catalog WHERE url = $1", external_url)
@@ -29,7 +29,6 @@ async def test_analyse_external_csv(setup_catalog, rmock, db):
     assert len(checks) == 0
 
     # Verify that temporary CSV table was created and then cleaned up
-
     csv_pool = await context.pool("csv")
 
     # Check that no tables remain for this URL (they should be cleaned up)
@@ -43,9 +42,8 @@ async def test_analyse_external_csv(setup_catalog, rmock, db):
     assert table_entry is None, f"Table {table_hash} should not exist in tables_index after cleanup"
 
 
-async def test_analyse_external_csv_no_cleanup(setup_catalog, rmock, db):
+async def test_analyse_external_csv_no_cleanup(setup_catalog, rmock, db, produce_mock):
     """Test the analyse-external-csv CLI command without cleanup for inspection"""
-    from udata_hydra.cli import analyse_external_csv_cli
 
     # Create a simple CSV content for testing
     csv_content = "id,value\n1,100\n2,200\n3,300"
@@ -55,7 +53,7 @@ async def test_analyse_external_csv_no_cleanup(setup_catalog, rmock, db):
     rmock.get(external_url, status=200, body=csv_content)
 
     # Test with cleanup disabled
-    await analyse_external_csv_cli(external_url, debug_insert=False, cleanup=False)
+    run("analyse-external-csv", external_url, debug_insert=False, cleanup=False)
 
     # Verify that temporary CSV table was created and NOT cleaned up
     from udata_hydra import context
@@ -95,9 +93,8 @@ async def test_analyse_external_csv_no_cleanup(setup_catalog, rmock, db):
     await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table = '{temp_table_name}'")
 
 
-async def test_analyse_external_csv_debug_insert(setup_catalog, rmock, db):
+async def test_analyse_external_csv_debug_insert(setup_catalog, rmock, db, produce_mock):
     """Test the analyse-external-csv CLI command with debug insert mode"""
-    from udata_hydra.cli import analyse_external_csv_cli
 
     # Create a simple CSV content for testing
     csv_content = "name,value\nAlice,42\nBob,73\nCharlie,91"
@@ -107,7 +104,7 @@ async def test_analyse_external_csv_debug_insert(setup_catalog, rmock, db):
     rmock.get(external_url, status=200, body=csv_content)
 
     # Test with debug insert enabled and cleanup disabled
-    await analyse_external_csv_cli(external_url, debug_insert=True, cleanup=False)
+    run("analyse-external-csv", external_url, debug_insert=True, cleanup=False)
 
     # Verify that temporary CSV table was created
     from udata_hydra import context
@@ -146,16 +143,15 @@ async def test_analyse_external_csv_debug_insert(setup_catalog, rmock, db):
     await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table = '{temp_table_name}'")
 
 
-async def test_analyse_external_csv_invalid_url(setup_catalog, rmock, db):
+async def test_analyse_external_csv_invalid_url(setup_catalog, rmock, db, produce_mock):
     """Test the analyse-external-csv CLI command with an invalid URL"""
-    from udata_hydra.cli import analyse_external_csv_cli
 
     # Mock an invalid URL that returns an error
     invalid_url = "https://invalid-example.com/error.csv"
     rmock.get(invalid_url, status=404, body="Not Found")
 
     # Test should handle the error gracefully
-    await analyse_external_csv_cli(invalid_url, debug_insert=False, cleanup=True)
+    run("analyse-external-csv", invalid_url, debug_insert=False, cleanup=True)
 
     # Verify that no permanent data was created
     resources = await db.fetch("SELECT * FROM catalog WHERE url = $1", invalid_url)
