@@ -113,3 +113,4 @@ datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,
 2025-09-01T19:40:37Z,test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,github,36.71,bolinocroustibat,81d35ee,large,4,15995,3.11
 2025-09-01T19:43:56Z,test_csv_to_geojson_big_file,https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/HOR/H_01_1990-1999.csv.gz,github,195.84,bolinocroustibat,81d35ee,large,4,15995,3.11
 2025-09-01T19:44:02Z,test_geojson_to_pmtiles_big_file,https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/HOR/H_01_1990-1999.csv.gz,github,4.52,bolinocroustibat,81d35ee,large,4,15995,3.11
+2025-09-01T19:55:54Z,test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,github,36.26,bolinocroustibat,16509de,large,4,15995,3.11
