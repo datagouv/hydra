@@ -324,7 +324,7 @@ jobs:
             CSV_BASENAME=$(basename "$TEST_GEOCSV_FILENAME" .csv)
             EXPECTED_GEOJSON="tests/data/${CSV_BASENAME}.geojson"
             if [ -f "$EXPECTED_GEOJSON" ]; then
-              echo "TEST_GEOJSON_FILENAME=${CSV_BASENAME}.geojson" >> $GITHUB_ENV
+              echo "TEST_GEOJSON_FILENAME=${CSV_BASENAME}.geojson" >> $BASH_ENV
               echo "Found expected GeoJSON file: $EXPECTED_GEOJSON"
             else
               echo "ERROR: Expected GeoJSON file not found: $EXPECTED_GEOJSON"
