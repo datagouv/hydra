@@ -322,7 +322,7 @@ jobs:
           command: |
             # Construct the expected GeoJSON filename based on TEST_GEOCSV_FILENAME
             CSV_BASENAME=$(basename "$TEST_GEOCSV_FILENAME" .csv)
-            EXPECTED_GEOJSON="tests/data/${CSV_BASENAME}.geojson"
+            EXPECTED_GEOJSON="${CSV_BASENAME}.geojson"
             if [ -f "$EXPECTED_GEOJSON" ]; then
               echo "TEST_GEOJSON_FILENAME=$EXPECTED_GEOJSON" >> $BASH_ENV
               echo "Found expected GeoJSON file: $EXPECTED_GEOJSON"
