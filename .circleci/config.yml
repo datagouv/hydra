@@ -20,9 +20,9 @@ parameters:
     type: string
     default: "py-cache-v2"
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
-  test-geocsv-url:
+  test-geocsv-file:
     type: string
-    default: "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/HOR/H_01_1990-1999.csv.gz"
+    default: "H_01_1990-1999.csv.gz"
     description: "URL of the CSV file to download for GeoJSON and PMTiles benchmarks"
   resource-class:
     type: string
@@ -276,16 +276,23 @@ jobs:
             git push origin << pipeline.parameters.benchmark-branch >>
 
       - run:
-          name: Download << pipeline.parameters.test-geocsv-url >>
+          name: Download and uncompress << pipeline.parameters.test-geocsv-file >> if needed
           command: |
             mkdir -p tests/data
-            if [[ "<< pipeline.parameters.test-geocsv-url >>" == *.gz ]]; then
-              wget -O tests/data/test_geodata.csv.gz "<< pipeline.parameters.test-geocsv-url >>"
-              gunzip tests/data/test_geodata.csv.gz
-            else
-              wget -O tests/data/test_geodata.csv "<< pipeline.parameters.test-geocsv-url >>"
+            # Check if test-geocsv-file is a URL and download if it is
+            if [[ "<< pipeline.parameters.test-geocsv-file >>" == http* ]]; then
+              # It's a URL, download it
+              wget -O tests/data/$(basename "<< pipeline.parameters.test-geocsv-file >>") "<< pipeline.parameters.test-geocsv-file >>"
             fi
-            echo "CSV_FILE_PATH=tests/data/test_geodata.csv" >> $BASH_ENV
+            # Uncompress if it's a .gz file (either downloaded or already present)
+            if [[ "<< pipeline.parameters.test-geocsv-file >>" == *.gz ]]; then
+              cd tests/data
+              gunzip -k $(basename "<< pipeline.parameters.test-geocsv-file >>")
+              cd ../..
+            fi
+            # Build the path based on the actual file (without .gz extension)
+            FILENAME=$(basename "<< pipeline.parameters.test-geocsv-file >>" .gz)
+            echo "CSV_FILE_PATH=tests/data/$FILENAME" >> $BASH_ENV
             ls -la tests/data/
 
       - run:
@@ -298,7 +305,7 @@ jobs:
             poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$CSV_FILE_PATH"
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,<< pipeline.parameters.test-geocsv-url >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,<< pipeline.parameters.test-geocsv-file >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
           no_output_timeout: 20m
 
       - run:
@@ -339,7 +346,7 @@ jobs:
             poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v -s --durations=0 --input_file="$TEST_GEOJSON_PATH" -k "test_geojson_to_pmtiles_big_file"
             end_time=$(date +%s.%N)
             execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,<< pipeline.parameters.test-geocsv-url >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,<< pipeline.parameters.test-geocsv-file >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
           no_output_timeout: 20m
 
       - run:
