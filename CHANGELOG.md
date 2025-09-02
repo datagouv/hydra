@@ -2,6 +2,10 @@
 
 ## Current (in progress)
 
+- Nothing yet
+
+## 2.4.0 (2025-09-02)
+
 - Simplify CI configuration [#290](https://github.com/datagouv/hydra/pull/290)
 - Remove unused dependencies [#292](https://github.com/datagouv/hydra/pull/292)
 - Fill in check throughout the process to send previous steps infos in case of late crash [#293](https://github.com/datagouv/hydra/pull/293)
@@ -23,6 +27,8 @@
 - Fix deprecated Sentry method [#323](https://github.com/datagouv/hydra/pull/323)
 - Upgrade csv-detective [#322](https://github.com/datagouv/hydra/pull/322) [#324](https://github.com/datagouv/hydra/pull/324) [#327](https://github.com/datagouv/hydra/pull/327)
 - Stream geojson conversion to prevent RAM consumption [#326](https://github.com/datagouv/hydra/pull/326)
+- Gracefully crash if any of the column names is too long for Postgres [#329](https://github.com/datagouv/hydra/pull/329)
+- Return updated check in `handle_resource_exception` to send the right payload to udata [#330](https://github.com/datagouv/hydra/pull/330)
 
 ## 2.3.0 (2025-07-15)
 
