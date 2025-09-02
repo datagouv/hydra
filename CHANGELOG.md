@@ -1,6 +1,6 @@
 # Changelog
 
-## Current (in progress)
+## 2.4.0 (2025-09-02)
 
 - Simplify CI configuration [#290](https://github.com/datagouv/hydra/pull/290)
 - Remove unused dependencies [#292](https://github.com/datagouv/hydra/pull/292)
