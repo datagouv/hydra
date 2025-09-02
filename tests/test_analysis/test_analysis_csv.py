@@ -696,6 +696,7 @@ async def test_too_long_column_name(
     max_len = 10
     check = await fake_check()
     url = check["url"]
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(
         url,
         status=200,
@@ -710,4 +711,10 @@ async def test_too_long_column_name(
     with patch("udata_hydra.config.NAMEDATALEN", max_len):
         await analyse_csv(check=check)
     updated_check = await Check.get_by_id(check["id"])
+    # analysis failed
     assert updated_check["parsing_error"].startswith("scan_column_names:")
+    # table was not created
+    tables = await db.fetch(
+        "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'public';"
+    )
+    assert table_name not in [r["table_name"] for r in tables]
