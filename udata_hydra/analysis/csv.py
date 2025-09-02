@@ -204,10 +204,8 @@ async def analyse_csv(
         await csv_to_db_index(table_name, csv_inspection, check)
 
     except (ParseException, IOException) as e:
-        await handle_parse_exception(e, table_name, check)
+        check = await handle_parse_exception(e, table_name, check)
     finally:
-        # re-getting the check data as it may have been modified since last retrieval
-        check = await Check.get_by_id(check["id"])
         await helpers.notify_udata(resource, check)
         timer.stop()
         if tmp_file is not None:

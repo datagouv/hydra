@@ -91,10 +91,8 @@ async def analyse_geojson(
         )
 
     except (ParseException, IOException) as e:
-        await handle_parse_exception(e, None, check)
+        check = await handle_parse_exception(e, None, check)
     finally:
-        # re-getting the check data as it may have been modified since last retrieval
-        check = await Check.get_by_id(check["id"])
         await helpers.notify_udata(resource, check)
         timer.stop()
         if tmp_file is not None:

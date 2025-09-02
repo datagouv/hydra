@@ -112,7 +112,7 @@ class IOException(ExceptionWithSentryDetails):
 
 async def handle_parse_exception(
     e: IOException | ParseException, table_name: str | None, check: Record | None
-) -> None:
+) -> Record | None:
     """Specific IO/ParseException handling. Store error in :check: if in a check context. Also cleanup :table_name: if needed."""
     if table_name is not None:
         db = await context.pool("csv")
@@ -124,10 +124,11 @@ async def handle_parse_exception(
         err = f"{e.step}:{str(e.__cause__)}"
         if e.sentry_event_id:
             err = f"{e.step}:sentry:{e.sentry_event_id}"
-        await Check.update(
+        check = await Check.update(
             check["id"],
             {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
         )
         log.error("Parsing error", exc_info=e)
+        return check
     else:
         raise e
