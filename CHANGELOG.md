@@ -1,5 +1,9 @@
 # Changelog
 
+## Current (in progress)
+
+- Nothing yet
+
 ## 2.4.0 (2025-09-02)
 
 - Simplify CI configuration [#290](https://github.com/datagouv/hydra/pull/290)
