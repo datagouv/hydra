@@ -137,8 +137,8 @@ class Check:
         return check
 
     @classmethod
-    async def delete(cls, check_id: int) -> int:
+    async def delete(cls, check_id: int) -> None:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """DELETE FROM checks WHERE id = $1"""
-            return await connection.fetch(q, check_id)
+            await connection.execute(q, check_id)
