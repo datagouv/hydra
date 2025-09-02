@@ -125,15 +125,12 @@ class Check:
             return last_check_dict
 
     @classmethod
-    async def update(
-        cls, check_id: int, data: dict, return_as_dict: bool = False
-    ) -> Record | dict | None:
-        """Update a check in DB with new data and return the check id in DB"""
-        check: Record | None = await update_table_record(
+    async def update(cls, check_id: int, data: dict, return_as_dict: bool = False) -> Record | dict:
+        check: Record = await update_table_record(
             table_name="checks", record_id=check_id, data=data
         )
         if return_as_dict:
-            return dict(check) if check else None
+            return dict(check)
         return check
 
     @classmethod

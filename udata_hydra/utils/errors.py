@@ -2,7 +2,6 @@ import logging
 from datetime import datetime, timezone
 
 import sentry_sdk
-from asyncpg import Record
 
 from udata_hydra import context
 from udata_hydra.db.check import Check
@@ -111,7 +110,7 @@ class IOException(ExceptionWithSentryDetails):
 
 
 async def handle_parse_exception(
-    e: IOException | ParseException, table_name: str | None, check: Record | None
+    e: IOException | ParseException, table_name: str | None, check: dict | None
 ) -> None:
     """Specific IO/ParseException handling. Store error in :check: if in a check context. Also cleanup :table_name: if needed."""
     if table_name is not None:
