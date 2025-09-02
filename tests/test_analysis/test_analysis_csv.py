@@ -15,8 +15,8 @@ from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.crawl.check_resources import check_resource
+from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import ParseException
 from udata_hydra.utils.minio import MinIOClient
 
 pytestmark = pytest.mark.asyncio
@@ -690,6 +690,7 @@ async def test_too_long_column_name(
     rmock,
     db,
     fake_check,
+    produce_mock,
 ):
     url = "http://example.com/csv"
     max_len = 10
@@ -706,5 +707,7 @@ async def test_too_long_column_name(
         repeat=True,
     )
     # should fail because one column name is too long
-    with patch("udata_hydra.config.NAMEDATALEN", max_len), pytest.raises(ParseException):
+    with patch("udata_hydra.config.NAMEDATALEN", max_len):
         await analyse_csv(check=check)
+    updated_check = await Check.get_by_id(check["id"])
+    assert updated_check["parsing_error"].startswith("scan_column_names:")
