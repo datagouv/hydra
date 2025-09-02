@@ -138,8 +138,6 @@ async def analyse_csv(
                     num_rows=-1,
                     save_results=False,
                 )
-            if any(len(col) > config.NAMEDATALEN for col in csv_inspection["columns"]):
-                raise ValueError(f"Column names cannot exceed {config.NAMEDATALEN} characters")
         except Exception as e:
             raise ParseException(
                 message=str(e),
@@ -377,6 +375,13 @@ async def csv_to_db(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
         f"to db for {table_name}"
     )
+
+    if any(len(col) > config.NAMEDATALEN for col in inspection["columns"]):
+        raise ParseException(
+            step="scan_column_names",
+            resource_id=resource_id,
+            table_name=table_name,
+        ) from ValueError(f"Column names cannot exceed {config.NAMEDATALEN} characters in Postgres")
 
     if resource_id:
         # Update resource status to INSERTING_IN_DB
