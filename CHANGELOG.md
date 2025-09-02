@@ -24,6 +24,7 @@
 - Upgrade csv-detective [#322](https://github.com/datagouv/hydra/pull/322) [#324](https://github.com/datagouv/hydra/pull/324) [#327](https://github.com/datagouv/hydra/pull/327)
 - Stream geojson conversion to prevent RAM consumption [#326](https://github.com/datagouv/hydra/pull/326)
 - Gracefully crash if any of the column names is too long for Postgres [#329](https://github.com/datagouv/hydra/pull/329)
+- Retrieve check before sending to udata in case of changes [#330](https://github.com/datagouv/hydra/pull/330)
 
 ## 2.3.0 (2025-07-15)
 
