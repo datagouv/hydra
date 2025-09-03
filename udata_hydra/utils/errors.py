@@ -114,7 +114,8 @@ async def handle_parse_exception(
     e: IOException | ParseException, table_name: str | None, check: Record | None
 ) -> Record | None:
     """Specific IO/ParseException handling. Store error in :check: if in a check context. Also cleanup :table_name: if needed."""
-    if table_name is not None:
+    if table_name is not None and (check and not check.get("parsing_table")):
+        # only deleting the table if we have not successfully completed csv_to_db
         db = await context.pool("csv")
         await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
         await db.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_name}'")
