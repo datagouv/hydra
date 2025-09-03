@@ -703,9 +703,7 @@ async def test_too_long_column_name(
     col, has_non_ascii = params
     url = "http://example.com/csv"
     max_len = 10
-    col_name = (col * ((max_len // len(col)) + 1))[
-        :max_len if not has_non_ascii else max_len - 3
-    ]
+    col_name = (col * ((max_len // len(col)) + 1))[: max_len if not has_non_ascii else max_len - 3]
     check = await fake_check()
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()

@@ -386,7 +386,9 @@ async def csv_to_db(
             step="scan_column_names",
             resource_id=resource_id,
             table_name=table_name,
-        ) from ValueError(f"Column names cannot exceed {config.NAMEDATALEN - 1} characters in Postgres")
+        ) from ValueError(
+            f"Column names cannot exceed {config.NAMEDATALEN - 1} characters in Postgres"
+        )
 
     if resource_id:
         # Update resource status to INSERTING_IN_DB
