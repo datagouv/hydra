@@ -378,12 +378,17 @@ async def csv_to_db(
         f"to db for {table_name}"
     )
 
-    if any(len(col) > config.NAMEDATALEN for col in inspection["columns"]):
+    if any(
+        sum(len(char.encode("utf-8")) for char in col) > config.NAMEDATALEN - 1
+        for col in inspection["columns"]
+    ):
         raise ParseException(
             step="scan_column_names",
             resource_id=resource_id,
             table_name=table_name,
-        ) from ValueError(f"Column names cannot exceed {config.NAMEDATALEN} characters in Postgres")
+        ) from ValueError(
+            f"Column names cannot exceed {config.NAMEDATALEN - 1} characters in Postgres"
+        )
 
     if resource_id:
         # Update resource status to INSERTING_IN_DB
