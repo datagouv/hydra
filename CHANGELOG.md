@@ -1,5 +1,9 @@
 # Changelog
 
+## Current (in progress)
+
+- Nothing yet
+
 ## 2.4.1 (2025-09-03)
 
 - Only delete the table if the insertion was not successful [#332](https://github.com/datagouv/hydra/pull/332)
