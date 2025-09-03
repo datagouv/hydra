@@ -685,15 +685,27 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
             pmtiles_filepath.unlink()
 
 
+@pytest.mark.parametrize(
+    "params",
+    (
+        ("col", False),
+        ("çà€", True),
+    ),
+)
 async def test_too_long_column_name(
     setup_catalog,
     rmock,
     db,
     fake_check,
     produce_mock,
+    params,
 ):
+    col, has_non_ascii = params
     url = "http://example.com/csv"
     max_len = 10
+    col_name = (col * ((max_len // len(col)) + 1))[
+        :max_len if not has_non_ascii else max_len - 3
+    ]
     check = await fake_check()
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
@@ -704,7 +716,7 @@ async def test_too_long_column_name(
             "content-type": "application/csv",
             "content-length": "100",
         },
-        body=f"{'a' * (max_len + 1)},b,c\n1,2,3".encode("utf-8"),
+        body=f"{col_name},b,c\n1,2,3".encode("utf-8"),
         repeat=True,
     )
     # should fail because one column name is too long
