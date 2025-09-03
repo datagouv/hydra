@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Only delete the table if the insertion was not successful [#332](https://github.com/datagouv/hydra/pull/332)
 
 ## 2.4.0 (2025-09-02)
 
