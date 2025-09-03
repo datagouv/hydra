@@ -382,7 +382,6 @@ async def csv_to_db(
         sum(len(char.encode("utf-8")) for char in col) > config.NAMEDATALEN - 1
         for col in inspection["columns"]
     ):
-        breakpoint()
         raise ParseException(
             step="scan_column_names",
             resource_id=resource_id,
