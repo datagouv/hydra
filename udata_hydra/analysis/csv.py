@@ -379,7 +379,7 @@ async def csv_to_db(
     )
 
     if any(
-        sum(1 if c.isascii() else 2 for c in col) > config.NAMEDATALEN - 1
+        sum(len(char.encode("utf-8")) for char in col) > config.NAMEDATALEN - 1
         for col in inspection["columns"]
     ):
         raise ParseException(
