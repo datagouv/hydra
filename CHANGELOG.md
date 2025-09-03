@@ -2,7 +2,7 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Handle cases of empty table in db when getting the previous analysis [#333](https://github.com/datagouv/hydra/pull/333)
 
 ## 2.4.0 (2025-09-02)
 
