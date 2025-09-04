@@ -15,6 +15,7 @@ from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.crawl.check_resources import check_resource
+from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils.minio import MinIOClient
 
@@ -458,24 +459,6 @@ def create_analysis(scan: dict) -> dict:
             },
             False,
         ),
-        # some column names get truncated in db, but validation works (file content and analysis are unchanged)
-        (
-            *(
-                default_kwargs
-                | {
-                    "header": ["a" * 70, "b" * 70, "a" * 30],
-                    "rows": [["1", "13002526500013", "1.2"], ["5", "38271817900023", "2.3"]],
-                    "columns": {
-                        "a" * 70: {"score": 1.0, "format": "int", "python_type": "int"},
-                        "b" * 70: {"score": 1.0, "format": "siret", "python_type": "string"},
-                        "a" * 30: {"score": 1.0, "format": "float", "python_type": "float"},
-                    },
-                    "formats": {"int": ["a" * 70], "siret": ["b" * 70], "float": ["a" * 30]},
-                },
-            )
-            * 2,
-            True,
-        ),
     ),
 )
 async def test_validation(
@@ -706,3 +689,48 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
             # Clean up files after tests
             geojson_filepath.unlink()
             pmtiles_filepath.unlink()
+
+
+@pytest.mark.parametrize(
+    "params",
+    (
+        ("col", False),
+        ("çà€", True),
+    ),
+)
+async def test_too_long_column_name(
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+    produce_mock,
+    params,
+):
+    col, has_non_ascii = params
+    url = "http://example.com/csv"
+    max_len = 10
+    col_name = (col * ((max_len // len(col)) + 1))[: max_len if not has_non_ascii else max_len - 3]
+    check = await fake_check()
+    url = check["url"]
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    rmock.get(
+        url,
+        status=200,
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        },
+        body=f"{col_name},b,c\n1,2,3".encode("utf-8"),
+        repeat=True,
+    )
+    # should fail because one column name is too long
+    with patch("udata_hydra.config.NAMEDATALEN", max_len):
+        await analyse_csv(check=check)
+    updated_check = await Check.get_by_id(check["id"])
+    # analysis failed
+    assert updated_check["parsing_error"].startswith("scan_column_names:")
+    # table was not created
+    tables = await db.fetch(
+        "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'public';"
+    )
+    assert table_name not in [r["table_name"] for r in tables]
