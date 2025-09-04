@@ -1,6 +1,7 @@
 import hashlib
 import json
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 from unittest.mock import MagicMock, patch
 
@@ -64,11 +65,14 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     It's meant to act as a "canary in the coal mine": if performance degrades too much, you or the CI should feel it.
     You can deselect it by running `pytest -m "not slow"`.
     """
+    TEST_CSV_FILE, EXPECTED_COUNT = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
+
     check = await fake_check()
-    filename, expected_count = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
-    with open(f"tests/data/{filename}", "rb") as f:
+
+    csv_path = "tests/data" / Path(TEST_CSV_FILE)
+    with csv_path.open("rb") as f:
         data = f.read()
     rmock.get(url, status=200, body=data)
 
@@ -84,14 +88,14 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     assert resource["status"] is None
 
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
-    assert count["count"] == expected_count
+    assert count["count"] == EXPECTED_COUNT
     profile = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
     profile = json.loads(profile["csv_detective"])
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
-    assert profile["total_lines"] == expected_count
+    assert profile["total_lines"] == EXPECTED_COUNT
 
 
 @pytest.mark.parametrize(

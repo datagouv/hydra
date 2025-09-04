@@ -102,7 +102,7 @@ async def test_csv_to_geojson_big_file(
     if not input_file:
         pytest.skip("No input_file provided, skipping performance test")
 
-    csv_path = Path(input_file)
+    csv_path = "tests/data" / Path(input_file)
     test_geojson_path = csv_path.parent / f"{csv_path.stem}.geojson"
 
     # Create timer for performance measurement
@@ -188,7 +188,7 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     if not input_file:
         pytest.skip("No input_file provided, skipping performance test")
 
-    geojson_path = Path(input_file)
+    geojson_path = "tests/data" / Path(input_file)
     test_pmtiles_path = geojson_path.parent / f"{geojson_path.stem}.pmtiles"
 
     # Create timer for performance measurement
