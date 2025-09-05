@@ -49,6 +49,28 @@ def dummy(return_value=None):
     return fn
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--input_file",
+        action="store",
+        default=None,
+        help="Path to input file for performance tests",
+    )
+
+
+def pytest_generate_tests(metafunc):
+    # This is called for every test. Check if the test function has the parameters
+    # we want to parametrize and if the command line options are provided.
+    input_file_value = metafunc.config.option.input_file
+
+    # Check if the test function has 'input_file' as a parameter
+    if (
+        hasattr(metafunc.function, "__code__")
+        and "input_file" in metafunc.function.__code__.co_varnames
+    ):
+        metafunc.parametrize("input_file", [input_file_value])
+
+
 @pytest.fixture
 def is_harvested(request):
     return "catalog_harvested" in [m.name for m in request.node.iter_markers()]
