@@ -125,13 +125,17 @@ class Check:
             return last_check_dict
 
     @classmethod
-    async def update(cls, check_id: int, data: dict) -> Record | None:
-        """Update a check in DB with new data and return the check id in DB"""
-        return await update_table_record(table_name="checks", record_id=check_id, data=data)
+    async def update(cls, check_id: int, data: dict, return_as_dict: bool = False) -> Record | dict:
+        check: Record = await update_table_record(
+            table_name="checks", record_id=check_id, data=data
+        )
+        if return_as_dict:
+            return dict(check)
+        return check
 
     @classmethod
-    async def delete(cls, check_id: int) -> int:
+    async def delete(cls, check_id: int) -> None:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """DELETE FROM checks WHERE id = $1"""
-            return await connection.fetch(q, check_id)
+            await connection.execute(q, check_id)
