@@ -3120,5 +3120,5 @@ dev = ["aiohttp-devtools", "aioresponses", "bumpx", "gunicorn", "mypy", "nest_as
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.11,<3.14"
-content-hash = "9eda70eae7bb433520154d9256d40d88fa236577ca5e88678c591552ad5d54d6"
+python-versions = ">=3.11,<3.13"
+content-hash = "dfefb6e5687f7312cdffa872294907a707505de38a5ae62ab1e8479fdccba897"
