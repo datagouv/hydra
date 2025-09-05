@@ -94,7 +94,7 @@ async def analyse_geojson(
         )  # type: ignore
 
     except (ParseException, IOException) as e:
-        await handle_parse_exception(e, None, check)
+        check = await handle_parse_exception(e, None, check)
     finally:
         await helpers.notify_udata(resource, check)
         timer.stop()
