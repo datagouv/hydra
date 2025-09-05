@@ -2,7 +2,8 @@
 
 ## Current (in progress)
 
-- Nothing yet
+- Dynamic version in user agent [#328](https://github.com/datagouv/hydra/pull/328)
+- Reuse HTTP connexions between sessions [#325](https://github.com/datagouv/hydra/pull/325)
 
 ## 2.4.1 (2025-09-03)
 
@@ -35,8 +36,6 @@
 - Stream geojson conversion to prevent RAM consumption [#326](https://github.com/datagouv/hydra/pull/326)
 - Gracefully crash if any of the column names is too long for Postgres [#329](https://github.com/datagouv/hydra/pull/329)
 - Return updated check in `handle_resource_exception` to send the right payload to udata [#330](https://github.com/datagouv/hydra/pull/330)
-- Dynamic version in user agent [#328](https://github.com/datagouv/hydra/pull/328)
-- Reuse HTTP connexions between sessions [#325](https://github.com/datagouv/hydra/pull/325)
 
 ## 2.3.0 (2025-07-15)
 
