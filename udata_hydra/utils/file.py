@@ -60,7 +60,7 @@ async def download_resource(
     too_large, download_error = False, None
     try:
         async with aiohttp.ClientSession(
-            headers={"user-agent": config.USER_AGENT} if config.USER_AGENT else None,
+            headers={"user-agent": config.USER_AGENT_FULL},
             raise_for_status=True,
         ) as session:
             async with session.get(url, allow_redirects=True) as response:
