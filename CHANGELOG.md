@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Dynamic version in user agent [#328](https://github.com/datagouv/hydra/pull/328)
+- Allow crawling of non datagouv URLs with CLI [#312](https://github.com/datagouv/hydra/pull/312)
 
 ## 2.4.1 (2025-09-03)
 
