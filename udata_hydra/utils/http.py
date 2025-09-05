@@ -81,6 +81,7 @@ async def send(dataset_id: str, resource_id: str, document: UdataPayload) -> Non
 
     uri = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
     headers = {
+        "user-agent": config.USER_AGENT_FULL,
         "content-type": "application/json",
         "X-API-KEY": config.UDATA_URI_API_KEY,
     }
@@ -120,8 +121,8 @@ async def get_http_client(
 
         # Prepare headers
         headers = {}
-        if config.USER_AGENT:
-            headers["User-Agent"] = config.USER_AGENT
+        if config.USER_AGENT_FULL:
+            headers["User-Agent"] = config.USER_AGENT_FULL
 
         _http_client = aiohttp.ClientSession(
             timeout=timeout_obj,

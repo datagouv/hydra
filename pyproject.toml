@@ -1,13 +1,13 @@
 [project]
 name = "udata-hydra"
-version = "2.3.1.dev"
+version = "2.4.2.dev"
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = [{ name = "Opendata Team", email = "opendatateam@data.gouv.fr" }]
 dependencies = [
     "aiohttp>=3.10.3",
     "asyncpg>=0.29.0",
     "coloredlogs>=15.0.1",
-    "csv-detective==0.9.3.dev1948",
+    "csv-detective==0.9.3.dev2010",
     "dateparser>=1.1.7",
     "humanfriendly>=10.0",
     "json-stream>=2.3.3",
