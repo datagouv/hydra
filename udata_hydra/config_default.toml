@@ -13,7 +13,7 @@ SENTRY_SAMPLE_RATE = 1.0
 TESTING = false
 # max postgres pool size
 MAX_POOL_SIZE = 50
-USER_AGENT = "udata-hydra" # without version - version is dynamically added
+USER_AGENT = "udata-hydra/X.X data.gouv.fr crawler <abuse@data.gouv.fr>" # version is dynamically modified
 NAMEDATALEN = 64  # should be set to the same value as in Postgres, but we can't query it
 
 API_KEY = "hydra_api_key_to_change"

@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Dynamic version in user agent [#328](https://github.com/datagouv/hydra/pull/328)
+- Fix full user agent string [#337](https://github.com/datagouv/hydra/pull/337)
 
 ## 2.4.1 (2025-09-03)
 
