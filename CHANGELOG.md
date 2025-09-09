@@ -3,6 +3,7 @@
 ## Current (in progress)
 
 - Dynamic version in user agent [#328](https://github.com/datagouv/hydra/pull/328)
+- Fix full user agent string [#337](https://github.com/datagouv/hydra/pull/337)
 - Add performance tests for csv to geojson and geojson to pmtiles conversion on geographical big data, and CLI commands to convert geographical files locally [#319](https://github.com/datagouv/hydra/pull/319)
 
 ## 2.4.1 (2025-09-03)
