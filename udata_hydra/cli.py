@@ -1,6 +1,8 @@
 import csv
+import hashlib
 import logging
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -13,8 +15,8 @@ from minicli import cli, run, wrap
 from progressist import ProgressBar
 
 from udata_hydra import config
-from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.analysis.geojson import analyse_geojson
+from udata_hydra.analysis.csv import analyse_csv, csv_detective_routine
+from udata_hydra.analysis.geojson import analyse_geojson, csv_to_geojson, geojson_to_pmtiles
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.check import Check
@@ -201,25 +203,73 @@ async def analyse_csv_cli(
     Try to get the check from the check ID, then from the URL
     """
     assert check_id or url or resource_id
+
+    # Try to get check from different sources
     check = None
+    tmp_resource_id = None
+
+    # Try to get check from check_id
     if check_id:
-        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)
+        record = await Check.get_by_id(int(check_id), with_deleted=True)
+        check = dict(record) if record else None
+
+    # Try to get check from URL
     if not check and url:
-        checks: list[Record] | None = await Check.get_by_url(url)
-        if checks and len(checks) > 1:
-            log.warning(f"Multiple checks found for URL {url}, using the latest one")
-        check = checks[0] if checks else None
+        records = await Check.get_by_url(url)
+        if records:
+            if len(records) > 1:
+                log.warning(f"Multiple checks found for URL {url}, using the latest one")
+            check = dict(records[0])
+
+    # Try to get check from resource_id
     if not check and resource_id:
-        check: Record | None = await Check.get_by_resource_id(resource_id)
-    if not check:
-        if check_id:
-            log.error("Could not retrieve the specified check")
-        elif url:
-            log.error("Could not find a check linked to the specified URL")
-        elif resource_id:
-            log.error("Could not find a check linked to the specified resource ID")
+        record = await Check.get_by_resource_id(resource_id)
+        check = dict(record) if record else None
+
+    # We cannot get a check, it's an external URL analysis, we need to create a temporary check
+    if not check and url:
+        tmp_resource_id = str(uuid.uuid4())
+        await insert_url_into_catalog(url=url, resource_id=tmp_resource_id)
+        check = await Check.insert(
+            {
+                "resource_id": tmp_resource_id,
+                "url": url,
+                "status": 200,
+                "headers": {},
+                "timeout": False,
+            },
+            returning="*",
+        )
+
+    elif not check:
+        log.error("Could not find a check for the specified parameters")
         return
+
     await analyse_csv(check=check, debug_insert=debug_insert)
+    log.info("CSV analysis completed")
+
+    if url and tmp_resource_id:
+        # Clean up temporary data created for analysis with external URL
+        try:
+            # Clean up CSV database tables
+            csv_pool = await connection(db_name="csv")
+            table_hash = hashlib.md5(url.encode()).hexdigest()
+
+            await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_hash}"')
+            await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_hash}'")
+
+            # Clean up the temporary resource and temporary check from catalog
+            check = await Check.get_by_resource_id(tmp_resource_id)
+            if check:
+                await Check.delete(check["id"])
+            await Resource.delete(resource_id=tmp_resource_id, hard_delete=True)
+
+            # Clean up MinIO files if any (parquet, etc.)
+            # Note: This would require additional MinIO cleanup logic
+
+            log.info(f"Cleaned up temporary data for {url}")
+        except Exception as e:
+            log.warning(f"Failed to clean temporary external data for {url}: {e}")
 
 
 @cli(name="analyse-geojson")
@@ -251,6 +301,119 @@ async def analyse_geojson_cli(
             log.error("Could not find a check linked to the specified resource ID")
         return
     await analyse_geojson(check=dict(check))
+
+
+@cli(name="convert-csv-to-geojson")
+async def convert_csv_to_geojson_cli(csv_filepath: str):
+    """Convert a CSV file to GeoJSON format using udata-hydra analysis functions.
+
+    :csv_filepath: Path to the CSV file to convert
+    """
+
+    csv_path = Path(csv_filepath)
+    geojson_filepath = Path(f"{csv_path.stem}.geojson")
+
+    if not csv_path.exists():
+        log.error(f"CSV file not found: {csv_path}")
+        return
+
+    file_size = csv_path.stat().st_size
+    log.info(f"Processing CSV file: {csv_path}")
+    log.info(f"File size: {file_size} bytes")
+
+    # Analyze the CSV with csv_detective
+    log.info("Analyzing CSV structure...")
+    try:
+        # csv_detective handles encoding detection automatically
+        inspection, df = csv_detective_routine(
+            file_path=str(csv_path),
+            output_profile=True,
+            output_df=True,
+            cast_json=False,
+            num_rows=-1,
+            save_results=False,
+            verbose=True,
+        )
+
+        log.info(f"CSV analysis complete. Found {len(df)} rows and {len(df.columns)} columns")
+        log.info(f"Columns: {list(df.columns)}")
+
+        # Show column formats for debugging
+        log.info("Column formats detected:")
+        for column, detection in inspection["columns"].items():
+            log.info(f"  {column}: {detection['format']}")
+
+        # Convert to GeoJSON
+        log.info("Converting to GeoJSON...")
+
+        try:
+            # Convert to GeoJSON (no MinIO upload, no database updates)
+            result = await csv_to_geojson(
+                df=df,
+                inspection=inspection,
+                output_file_path=geojson_filepath,
+                upload_to_minio=False,
+            )
+
+            if result:
+                geojson_size, geojson_url = result
+                log.info("Conversion successful!")
+                log.info(f"GeoJSON file: {geojson_filepath}")
+                log.info(f"GeoJSON file size: {geojson_size} bytes")
+                log.info(f"GeoJSON file URL: {geojson_url}")
+            else:
+                log.warning("No geographical data found in CSV, skipping conversion")
+
+        except Exception as e:
+            log.error(f"Error during GeoJSON conversion: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+    except Exception as e:
+        log.error(f"Error during CSV analysis: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
+@cli(name="convert-geojson-to-pmtiles")
+async def convert_geojson_to_pmtiles_cli(geojson_filepath: str):
+    """Convert a GeoJSON file to PMTiles format using udata-hydra analysis functions.
+
+    :geojson_filepath: Path to the GeoJSON file to convert
+    """
+    geojson_path = Path(geojson_filepath)
+
+    if not geojson_path.exists():
+        log.error(f"GeoJSON file not found: {geojson_path}")
+        return
+
+    file_size = geojson_path.stat().st_size
+    log.info(f"Processing GeoJSON file: {geojson_path}")
+    log.info(f"File size: {file_size} bytes")
+
+    # Convert to PMTiles
+    log.info("Converting to PMTiles...")
+
+    pmtiles_filepath = Path(f"{geojson_path.stem}.pmtiles")
+
+    try:
+        # Convert to PMTiles (no MinIO upload, no database updates)
+        pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
+            input_file_path=geojson_path, output_file_path=pmtiles_filepath, upload_to_minio=False
+        )
+
+        log.info("Conversion successful!")
+        log.info(f"PMTiles file: {pmtiles_filepath}")
+        log.info(f"PMTiles file size: {pmtiles_size} bytes")
+        log.info(f"PMTiles file URL: {pmtiles_url}")
+
+    except Exception as e:
+        log.error(f"Error during PMTiles conversion: {e}")
+        import traceback
+
+        traceback.print_exc()
 
 
 @cli
@@ -422,9 +585,9 @@ async def insert_resource_into_catalog(resource_id: str):
 
     :resource_id: id of the resource to insert
     """
-    resource: asyncpg.Record | None = await Resource.get(resource_id)
+    existing_resource: asyncpg.Record | None = await Resource.get(resource_id)
     action = "insert"
-    if resource:
+    if existing_resource:
         logging.warning("Resource already exists in catalog, updating...")
         action = "updat"
     url = f"https://www.data.gouv.fr/api/2/datasets/resources/{resource_id}/"
@@ -460,6 +623,49 @@ async def insert_resource_into_catalog(resource_id: str):
             else None,
         )
         log.info(f"Resource {resource_id} successfully {action}ed into DB.")
+    except Exception as e:
+        raise e
+
+
+@cli
+async def insert_url_into_catalog(url: str, resource_id: str):
+    """Insert a URL into the catalog
+    Useful for local tests, instead of having to resync the whole catalog for one new URL
+
+    :url: URL of the resource to insert
+    :resource_id: resource ID (mandatory)
+    """
+    # Check if resource already exists
+    existing_resource: asyncpg.Record | None = await Resource.get(resource_id)
+    action = "insert"
+    if existing_resource:
+        logging.warning("Resource already exists in catalog, updating...")
+        action = "updat"
+    try:
+        conn = await connection()
+        await conn.execute(
+            """
+            INSERT INTO catalog (
+                dataset_id, resource_id, url, type, format,
+                harvest_modified_at, deleted, priority, status
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NULL)
+            ON CONFLICT (resource_id) DO UPDATE SET
+                dataset_id = $1,
+                url = $3,
+                deleted = FALSE,
+                type = $4,
+                format = $5,
+                harvest_modified_at = $6;
+            """,
+            "temp_external",  # fixed dataset_id for external analysis
+            resource_id,
+            url,
+            "main",  # default type
+            "csv",  # default format, can be overridden later
+            datetime.now(timezone.utc),  # current timestamp as harvest_modified_at
+        )
+        log.info(f"URL {url} successfully {action}ed into DB with resource_id {resource_id}.")
     except Exception as e:
         raise e
 
