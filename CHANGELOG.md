@@ -9,6 +9,7 @@
 - Only delete the table if the insertion was not successful [#332](https://github.com/datagouv/hydra/pull/332)
 - Handle cases of empty table in db when getting the previous analysis [#333](https://github.com/datagouv/hydra/pull/333)
 - Better discriminate long column names [#334](https://github.com/datagouv/hydra/pull/334)
+- Fix full user agent string [#337](https://github.com/datagouv/hydra/pull/337)
 
 ## 2.4.0 (2025-09-02)
 
