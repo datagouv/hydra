@@ -15,8 +15,8 @@ from minicli import cli, run, wrap
 from progressist import ProgressBar
 
 from udata_hydra import config
-from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.analysis.geojson import analyse_geojson
+from udata_hydra.analysis.csv import analyse_csv, csv_detective_routine
+from udata_hydra.analysis.geojson import analyse_geojson, csv_to_geojson, geojson_to_pmtiles
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.check import Check
@@ -301,6 +301,119 @@ async def analyse_geojson_cli(
             log.error("Could not find a check linked to the specified resource ID")
         return
     await analyse_geojson(check=dict(check))
+
+
+@cli(name="convert-csv-to-geojson")
+async def convert_csv_to_geojson_cli(csv_filepath: str):
+    """Convert a CSV file to GeoJSON format using udata-hydra analysis functions.
+
+    :csv_filepath: Path to the CSV file to convert
+    """
+
+    csv_path = Path(csv_filepath)
+    geojson_filepath = Path(f"{csv_path.stem}.geojson")
+
+    if not csv_path.exists():
+        log.error(f"CSV file not found: {csv_path}")
+        return
+
+    file_size = csv_path.stat().st_size
+    log.info(f"Processing CSV file: {csv_path}")
+    log.info(f"File size: {file_size} bytes")
+
+    # Analyze the CSV with csv_detective
+    log.info("Analyzing CSV structure...")
+    try:
+        # csv_detective handles encoding detection automatically
+        inspection, df = csv_detective_routine(
+            file_path=str(csv_path),
+            output_profile=True,
+            output_df=True,
+            cast_json=False,
+            num_rows=-1,
+            save_results=False,
+            verbose=True,
+        )
+
+        log.info(f"CSV analysis complete. Found {len(df)} rows and {len(df.columns)} columns")
+        log.info(f"Columns: {list(df.columns)}")
+
+        # Show column formats for debugging
+        log.info("Column formats detected:")
+        for column, detection in inspection["columns"].items():
+            log.info(f"  {column}: {detection['format']}")
+
+        # Convert to GeoJSON
+        log.info("Converting to GeoJSON...")
+
+        try:
+            # Convert to GeoJSON (no MinIO upload, no database updates)
+            result = await csv_to_geojson(
+                df=df,
+                inspection=inspection,
+                output_file_path=geojson_filepath,
+                upload_to_minio=False,
+            )
+
+            if result:
+                geojson_size, geojson_url = result
+                log.info("Conversion successful!")
+                log.info(f"GeoJSON file: {geojson_filepath}")
+                log.info(f"GeoJSON file size: {geojson_size} bytes")
+                log.info(f"GeoJSON file URL: {geojson_url}")
+            else:
+                log.warning("No geographical data found in CSV, skipping conversion")
+
+        except Exception as e:
+            log.error(f"Error during GeoJSON conversion: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+    except Exception as e:
+        log.error(f"Error during CSV analysis: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
+@cli(name="convert-geojson-to-pmtiles")
+async def convert_geojson_to_pmtiles_cli(geojson_filepath: str):
+    """Convert a GeoJSON file to PMTiles format using udata-hydra analysis functions.
+
+    :geojson_filepath: Path to the GeoJSON file to convert
+    """
+    geojson_path = Path(geojson_filepath)
+
+    if not geojson_path.exists():
+        log.error(f"GeoJSON file not found: {geojson_path}")
+        return
+
+    file_size = geojson_path.stat().st_size
+    log.info(f"Processing GeoJSON file: {geojson_path}")
+    log.info(f"File size: {file_size} bytes")
+
+    # Convert to PMTiles
+    log.info("Converting to PMTiles...")
+
+    pmtiles_filepath = Path(f"{geojson_path.stem}.pmtiles")
+
+    try:
+        # Convert to PMTiles (no MinIO upload, no database updates)
+        pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
+            input_file_path=geojson_path, output_file_path=pmtiles_filepath, upload_to_minio=False
+        )
+
+        log.info("Conversion successful!")
+        log.info(f"PMTiles file: {pmtiles_filepath}")
+        log.info(f"PMTiles file size: {pmtiles_size} bytes")
+        log.info(f"PMTiles file URL: {pmtiles_url}")
+
+    except Exception as e:
+        log.error(f"Error during PMTiles conversion: {e}")
+        import traceback
+
+        traceback.print_exc()
 
 
 @cli
