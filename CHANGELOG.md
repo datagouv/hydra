@@ -2,6 +2,12 @@
 
 ## Current (in progress)
 
+- Dynamic version in user agent [#328](https://github.com/datagouv/hydra/pull/328) and [#337](https://github.com/datagouv/hydra/pull/337)
+- Add performance tests for csv to geojson and geojson to pmtiles conversion on geographical big data, and CLI commands to convert geographical files locally [#319](https://github.com/datagouv/hydra/pull/319)
+- Allow crawling of non datagouv URLs with CLI [#312](https://github.com/datagouv/hydra/pull/312)
+
+## 2.4.1 (2025-09-03)
+
 - Only delete the table if the insertion was not successful [#332](https://github.com/datagouv/hydra/pull/332)
 - Handle cases of empty table in db when getting the previous analysis [#333](https://github.com/datagouv/hydra/pull/333)
 - Better discriminate long column names [#334](https://github.com/datagouv/hydra/pull/334)
