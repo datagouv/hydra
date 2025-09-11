@@ -11,7 +11,8 @@ import aiohttp
 import magic
 
 from udata_hydra import config
-from udata_hydra.utils import IOException
+from udata_hydra.utils.errors import IOException
+from udata_hydra.utils.http import get_http_client
 
 log = logging.getLogger("udata-hydra")
 
@@ -59,18 +60,15 @@ async def download_resource(
     i = 0
     too_large, download_error = False, None
     try:
-        async with aiohttp.ClientSession(
-            headers={"user-agent": config.USER_AGENT_FULL},
-            raise_for_status=True,
-        ) as session:
-            async with session.get(url, allow_redirects=True) as response:
-                async for chunk in response.content.iter_chunked(chunk_size):
-                    if max_size_allowed is None or i * chunk_size < max_size_allowed:
-                        tmp_file.write(chunk)
-                    else:
-                        too_large = True
-                        break
-                    i += 1
+        session = await get_http_client()
+        async with session.get(url, allow_redirects=True) as response:
+            async for chunk in response.content.iter_chunked(chunk_size):
+                if max_size_allowed is None or i * chunk_size < max_size_allowed:
+                    tmp_file.write(chunk)
+                else:
+                    too_large = True
+                    break
+                i += 1
     except aiohttp.ClientResponseError as e:
         download_error = e
     finally:
@@ -107,13 +105,13 @@ async def download_resource(
 
 async def download_file(url: str, fd):
     """Download a file from URL to a file descriptor"""
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            while True:
-                chunk = await resp.content.read(1024)
-                if not chunk:
-                    break
-                fd.write(chunk)
+    session = await get_http_client()
+    async with session.get(url) as resp:
+        while True:
+            chunk = await resp.content.read(1024)
+            if not chunk:
+                break
+            fd.write(chunk)
 
 
 def remove_remainders(resource_id: str, extensions: list[str]) -> None:

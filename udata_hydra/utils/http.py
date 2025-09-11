@@ -10,6 +10,8 @@ from udata_hydra.utils import IOException
 
 log = logging.getLogger("udata-hydra")
 
+_http_client: aiohttp.ClientSession | None = None
+
 
 class UdataPayload:
     HYDRA_UDATA_METADATA = {
@@ -84,16 +86,58 @@ async def send(dataset_id: str, resource_id: str, document: UdataPayload) -> Non
         "X-API-KEY": config.UDATA_URI_API_KEY,
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.put(uri, json=document.payload, headers=headers) as resp:
-            # we're raising since we should be in a worker thread
-            if resp.status == 404:
-                pass
-            elif resp.status == 410:
-                raise IOException(
-                    "Resource has been deleted on udata", resource_id=resource_id, url=uri
-                )
-            if resp.status == 502:
-                raise IOException("Udata is unreachable", resource_id=resource_id, url=uri)
-            else:
-                resp.raise_for_status()
+    session = await get_http_client()
+    async with session.put(uri, json=document.payload, headers=headers) as resp:
+        # we're raising since we should be in a worker thread
+        if resp.status == 404:
+            pass
+        elif resp.status == 410:
+            raise IOException(
+                "Resource has been deleted on udata", resource_id=resource_id, url=uri
+            )
+        if resp.status == 502:
+            raise IOException("Udata is unreachable", resource_id=resource_id, url=uri)
+        else:
+            resp.raise_for_status()
+
+
+async def get_http_client(
+    follow_redirects: bool = True, timeout: float | None = None
+) -> aiohttp.ClientSession:
+    """Get a shared aiohttp ClientSession instance for performance optimization.
+
+    Args:
+        follow_redirects: Whether to follow redirects
+        timeout: Request timeout in seconds
+
+    Returns:
+        Shared aiohttp ClientSession instance
+    """
+    global _http_client
+
+    if _http_client is None or _http_client.closed:
+        # Create a new client session
+        timeout_obj = aiohttp.ClientTimeout(total=timeout) if timeout else None
+
+        # Prepare headers
+        headers = {}
+        if config.USER_AGENT_FULL:
+            headers["User-Agent"] = config.USER_AGENT_FULL
+
+        _http_client = aiohttp.ClientSession(
+            timeout=timeout_obj,
+            headers=headers,
+        )
+        log.debug("Created new aiohttp ClientSession")
+
+    return _http_client
+
+
+async def close_http_client():
+    """Close the shared aiohttp ClientSession instance."""
+    global _http_client
+
+    if _http_client and not _http_client.closed:
+        await _http_client.close()
+        _http_client = None
+        log.debug("Closed aiohttp ClientSession")
