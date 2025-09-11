@@ -16,22 +16,22 @@ from udata_hydra.utils import get_request_params
 async def get_latest_check(request: web.Request) -> web.Response:
     """Get the latest check for a given URL or resource_id"""
     url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
-    data: Record | None = await Check.get_latest(url, resource_id)
+    data: dict | None = await Check.get_latest(url, resource_id, as_dict=True)  # type: ignore
     if not data:
         raise web.HTTPNotFound()
     if data["deleted"]:
         raise web.HTTPGone()
 
-    return web.json_response(CheckSchema().dump(dict(data)))
+    return web.json_response(CheckSchema().dump(data))
 
 
 async def get_all_checks(request: web.Request) -> web.Response:
     url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
-    data: list | None = await Check.get_all(url, resource_id)
-    if not data:
+    checks: list | None = await Check.get_all(url, resource_id, as_dict=True)
+    if not checks:
         raise web.HTTPNotFound()
 
-    return web.json_response([CheckSchema().dump(dict(r)) for r in data])
+    return web.json_response([CheckSchema().dump(c) for c in checks])
 
 
 async def get_checks_aggregate(request: web.Request) -> web.Response:
@@ -49,11 +49,11 @@ async def get_checks_aggregate(request: web.Request) -> web.Response:
     column: str = request.query.get("group_by")
     if not column:
         raise web.HTTPBadRequest(text="Missing mandatory 'group_by' param.")
-    data: list | None = await Check.get_group_by_for_date(column, created_at_date)
-    if not data:
+    checks: list | None = await Check.get_group_by_for_date(column, created_at_date, as_dict=True)
+    if not checks:
         raise web.HTTPNotFound()
 
-    return web.json_response([CheckGroupBy().dump(dict(r)) for r in data])
+    return web.json_response([CheckGroupBy().dump(c) for c in checks])
 
 
 async def create_check(request: web.Request) -> web.Response:
@@ -89,8 +89,8 @@ async def create_check(request: web.Request) -> web.Response:
         )
         context.monitor().refresh(status)
 
-    check: Record | None = await Check.get_latest(url, resource_id)
+    check: dict | None = await Check.get_latest(url, resource_id, as_dict=True)  # type: ignore
     if not check:
         raise web.HTTPBadRequest(text=f"Check not created, status: {status}")
 
-    return web.json_response(CheckSchema().dump(dict(check)), status=201)
+    return web.json_response(CheckSchema().dump(check), status=201)

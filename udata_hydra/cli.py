@@ -185,7 +185,7 @@ async def check_resource(resource_id: str, method: str = "get", force_analysis: 
 @cli(name="analyse-resource")
 async def analyse_resource_cli(resource_id: str):
     """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
-    check: Record | None = await Check.get_by_resource_id(resource_id)
+    check: Record | None = await Check.get_by_resource_id(resource_id)  # type: ignore
     if not check:
         log.error("Could not find a check linked to the specified resource ID")
         return
@@ -210,21 +210,19 @@ async def analyse_csv_cli(
 
     # Try to get check from check_id
     if check_id:
-        record = await Check.get_by_id(int(check_id), with_deleted=True)
-        check = dict(record) if record else None
+        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)  # type: ignore
 
     # Try to get check from URL
     if not check and url:
-        records = await Check.get_by_url(url)
-        if records:
-            if len(records) > 1:
+        checks: list[Record] | None = await Check.get_by_url(url)  # type: ignore
+        if checks:
+            if len(checks) > 1:
                 log.warning(f"Multiple checks found for URL {url}, using the latest one")
-            check = dict(records[0])
+            check = checks[0]
 
     # Try to get check from resource_id
     if not check and resource_id:
-        record = await Check.get_by_resource_id(resource_id)
-        check = dict(record) if record else None
+        check: Record | None = await Check.get_by_resource_id(resource_id)  # type: ignore
 
     # We cannot get a check, it's an external URL analysis, we need to create a temporary check
     if not check and url:
@@ -239,13 +237,13 @@ async def analyse_csv_cli(
                 "timeout": False,
             },
             returning="*",
-        )
+        )  # type: ignore
 
     elif not check:
         log.error("Could not find a check for the specified parameters")
         return
 
-    await analyse_csv(check=check, debug_insert=debug_insert)
+    await analyse_csv(check=dict(check), debug_insert=debug_insert)
     log.info("CSV analysis completed")
 
     if url and tmp_resource_id:
@@ -259,7 +257,7 @@ async def analyse_csv_cli(
             await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_hash}'")
 
             # Clean up the temporary resource and temporary check from catalog
-            check = await Check.get_by_resource_id(tmp_resource_id)
+            check: Record | None = await Check.get_by_resource_id(tmp_resource_id)  # type: ignore
             if check:
                 await Check.delete(check["id"])
             await Resource.delete(resource_id=tmp_resource_id, hard_delete=True)
@@ -284,14 +282,14 @@ async def analyse_geojson_cli(
     assert check_id or url or resource_id
     check = None
     if check_id:
-        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)
+        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)  # type: ignore
     if not check and url:
-        checks: list[Record] | None = await Check.get_by_url(url)
+        checks: list[Record] | None = await Check.get_by_url(url)  # type: ignore
         if checks and len(checks) > 1:
             log.warning(f"Multiple checks found for URL {url}, using the latest one")
         check = checks[0] if checks else None
     if not check and resource_id:
-        check: Record | None = await Check.get_by_resource_id(resource_id)
+        check: Record | None = await Check.get_by_resource_id(resource_id)  # type: ignore
     if not check:
         if check_id:
             log.error("Could not retrieve the specified check")
