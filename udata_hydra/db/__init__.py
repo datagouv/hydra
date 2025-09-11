@@ -38,7 +38,7 @@ def compute_update_query(table_name: str, data: dict, returning: str = "*") -> s
     """
 
 
-async def update_table_record(table_name: str, record_id: int, data: dict) -> Record:
+async def update_table_record(table_name: str, record_id: int, data: dict) -> Record | None:
     data = convert_dict_values_to_json(data)
     q = compute_update_query(table_name, data)
     pool = await context.pool()

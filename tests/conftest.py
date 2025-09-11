@@ -284,7 +284,7 @@ async def fake_check():
             "geojson_url": "https://example.org/file.geojson" if pmtiles_url else None,
             "geojson_size": 1024 if geojson_url else None,
         }
-        check: dict = await Check.insert(data=data, returning="*")
+        check: dict = await Check.insert(data=data, returning="*", as_dict=True)
         data["id"] = check["id"]
         if check.get("dataset_id"):
             data["dataset_id"] = check["dataset_id"]

@@ -68,7 +68,7 @@ async def analyse_geojson(
         timer.mark("download-file")
 
         check = await Check.update(
-            check["id"], {"parsing_started_at": datetime.now(timezone.utc)}, return_as_dict=True
+            check["id"], {"parsing_started_at": datetime.now(timezone.utc)}, as_dict=True
         )  # type: ignore
 
         # Convert to PMTiles
@@ -95,7 +95,7 @@ async def analyse_geojson(
                 "pmtiles_url": pmtiles_url,
                 "pmtiles_size": pmtiles_size,
             },
-            return_as_dict=True,
+            as_dict=True,
         )  # type: ignore
 
     except (ParseException, IOException) as e:

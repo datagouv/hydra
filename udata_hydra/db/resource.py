@@ -156,27 +156,10 @@ class Resource:
             ]
         )
 
-    @classmethod
-    async def get_stuck_resources(cls) -> list[Record]:
-        """Some resources end up being stuck in a not null status forever,
-        we want to get them back on track.
-        This returns all resource ids of such stuck resources.
-        """
-        threshold = (
-            datetime.now(timezone.utc) - timedelta(seconds=config.STUCK_THRESHOLD_SECONDS)
-        ).strftime("%Y-%m-%d %H:%M:%S")
-        q = f"""SELECT ca.resource_id
-            FROM checks c
-            JOIN catalog ca
-            ON c.id = ca.last_check
-            WHERE ca.status IS NOT NULL AND c.created_at < '{threshold}';"""
-        pool = await context.pool()
-        async with pool.acquire() as connection:
-            return await connection.fetch(q)
-
     @staticmethod
     async def clean_up_statuses() -> int:
-        """Reset status to None for all stuck resources in a single query."""
+        """Some resources end up being stuck in a not null status forever,
+        Reset status to None for all those stuck resources in a single query."""
         threshold = datetime.now(timezone.utc) - timedelta(seconds=config.STUCK_THRESHOLD_SECONDS)
 
         pool = await context.pool()

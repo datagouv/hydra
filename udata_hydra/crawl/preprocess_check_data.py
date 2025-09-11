@@ -1,8 +1,6 @@
 import json
 from datetime import datetime, timezone
 
-from asyncpg import Record
-
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_status
 from udata_hydra.db.check import Check
@@ -26,14 +24,14 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
 
     check_data["resource_id"] = str(check_data["resource_id"])
 
-    last_check: dict | None = None
-    last_check_record: Record | None = await Check.get_by_resource_id(check_data["resource_id"])
-    if last_check_record:
-        last_check = dict(last_check_record)
+    last_check: dict | None = await Check.get_by_resource_id(
+        check_data["resource_id"], as_dict=True
+    )  # type: ignore
 
     has_changed: bool = await has_check_changed(check_data, last_check)
     check_data["next_check_at"] = calculate_next_check_date(has_changed, last_check, None)
-    new_check: dict = await Check.insert(data=check_data, returning="*")
+
+    new_check: dict = await Check.insert(data=check_data, returning="*", as_dict=True)  # type: ignore
 
     if has_changed:
         queue.enqueue(

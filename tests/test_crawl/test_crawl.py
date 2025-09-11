@@ -687,10 +687,10 @@ async def test_wrong_url_in_catalog(
     if url_changed:
         r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
         assert r["url"] == new_url
-        check = await Check.get_by_resource_id(RESOURCE_ID)
+        check = await Check.get_by_resource_id(RESOURCE_ID, as_dict=True)
         assert check.get("parsing_finished_at")
     else:
-        check = await Check.get_by_resource_id(RESOURCE_ID)
+        check = await Check.get_by_resource_id(RESOURCE_ID, as_dict=True)
         assert check["status"] == 404
 
 
