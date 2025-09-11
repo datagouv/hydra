@@ -13,24 +13,8 @@ from udata_hydra.db import (
 class Check:
     """Represents a check in the "checks" DB table"""
 
-    @staticmethod
-    def _convert_to_dict_if_needed(result: Record | None, as_dict: bool) -> Record | dict | None:
-        if as_dict and result:
-            return dict(result)
-        return result
-
-    @staticmethod
-    def _convert_list_to_dict_if_needed(
-        results: list[Record], as_dict: bool
-    ) -> list[Record] | list[dict]:
-        if as_dict:
-            return [dict(result) for result in results]
-        return results
-
     @classmethod
-    async def get_by_id(
-        cls, check_id: int, with_deleted: bool = False, as_dict: bool = False
-    ) -> Record | dict | None:
+    async def get_by_id(cls, check_id: int, with_deleted: bool = False) -> Record | None:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
@@ -40,13 +24,12 @@ class Check:
             """
             if not with_deleted:
                 q += " AND catalog.deleted = FALSE"
-            result = await connection.fetchrow(q, check_id)
-            return cls._convert_to_dict_if_needed(result, as_dict)
+            return await connection.fetchrow(q, check_id)
 
     @classmethod
     async def get_by_resource_id(
-        cls, resource_id: str, with_deleted: bool = False, as_dict: bool = False
-    ) -> Record | dict | None:
+        cls, resource_id: str, with_deleted: bool = False
+    ) -> Record | None:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
@@ -56,11 +39,10 @@ class Check:
             """
             if not with_deleted:
                 q += " AND catalog.deleted = FALSE"
-            result = await connection.fetchrow(q, resource_id)
-            return cls._convert_to_dict_if_needed(result, as_dict)
+            return await connection.fetchrow(q, resource_id)
 
     @classmethod
-    async def get_by_url(cls, url: str, as_dict: bool = False) -> list[Record] | list[dict]:
+    async def get_by_url(cls, url: str) -> list[Record]:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
@@ -68,13 +50,12 @@ class Check:
                 WHERE url = $1
                 ORDER BY created_at DESC
             """
-            results = await connection.fetch(q, url)
-            return cls._convert_list_to_dict_if_needed(results, as_dict)
+            return await connection.fetch(q, url)
 
     @classmethod
     async def get_latest(
-        cls, url: str | None = None, resource_id: str | None = None, as_dict: bool = False
-    ) -> Record | dict | None:
+        cls, url: str | None = None, resource_id: str | None = None
+    ) -> Record | None:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -85,13 +66,10 @@ class Check:
             WHERE catalog.{column} = $1
             AND checks.id = catalog.last_check
             """
-            result = await connection.fetchrow(q, url or resource_id)
-            return cls._convert_to_dict_if_needed(result, as_dict)
+            return await connection.fetchrow(q, url or resource_id)
 
     @classmethod
-    async def get_all(
-        cls, url: str | None = None, resource_id: str | None = None, as_dict: bool = False
-    ) -> list[Record] | list[dict]:
+    async def get_all(cls, url: str | None = None, resource_id: str | None = None) -> list[Record]:
         column: str = "url" if url else "resource_id"
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -103,13 +81,12 @@ class Check:
             AND catalog.{column} = checks.{column}
             ORDER BY created_at DESC
             """
-            results = await connection.fetch(q, url or resource_id)
-            return cls._convert_list_to_dict_if_needed(results, as_dict)
+            return await connection.fetch(q, url or resource_id)
 
     @classmethod
     async def get_group_by_for_date(
-        cls, column: str, date: date, page_size: int = 20, as_dict: bool = False
-    ) -> list[Record] | list[dict]:
+        cls, column: str, date: date, page_size: int = 20
+    ) -> list[Record]:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = f"""
@@ -120,20 +97,22 @@ class Check:
             ORDER BY count desc
             LIMIT $2
             """
-            results = await connection.fetch(q, date, page_size)
-            return cls._convert_list_to_dict_if_needed(results, as_dict)
+            return await connection.fetch(q, date, page_size)
 
     @classmethod
-    async def insert(cls, data: dict, returning: str = "id", as_dict: bool = True) -> Record | dict:
+    async def insert(cls, data: dict, returning: str = "id") -> dict:
         """
         Insert a new check in DB, associate it with the resource and return the check dict, optionally associated with the resource dataset_id.
         This uses the info from the last check of the same resource.
+
+        Note: Returns dict instead of Record because this method performs additional operations beyond simple insertion (joins with catalog table, adds dataset_id).
         """
         json_data = convert_dict_values_to_json(data)
         q1: str = compute_insert_query(table_name="checks", data=json_data, returning=returning)
         pool = await context.pool()
         async with pool.acquire() as connection:
             last_check: Record = await connection.fetchrow(q1, *json_data.values())
+            last_check_dict = dict(last_check)
             q2 = (
                 """UPDATE catalog SET last_check = $1 WHERE resource_id = $2 RETURNING dataset_id"""
             )
@@ -142,21 +121,17 @@ class Check:
             )
             # Add the dataset_id arg to the check response, if we can, and if it's asked
             if returning in ["*", "dataset_id"] and updated_resource:
-                last_check_dict = dict(last_check)
                 last_check_dict["dataset_id"] = updated_resource["dataset_id"]
-                return last_check_dict if as_dict else last_check
-            return dict(last_check) if as_dict else last_check
+            return last_check_dict
 
     @classmethod
-    async def update(cls, check_id: int, data: dict, as_dict: bool = False) -> Record | dict | None:
-        check: Record | None = await update_table_record(
-            table_name="checks", record_id=check_id, data=data
-        )
-        return cls._convert_to_dict_if_needed(check, as_dict)
+    async def update(cls, check_id: int, data: dict) -> Record | None:
+        """Update a check in DB with new data and return the check id in DB"""
+        return await update_table_record(table_name="checks", record_id=check_id, data=data)
 
     @classmethod
-    async def delete(cls, check_id: int) -> None:
+    async def delete(cls, check_id: int) -> int:
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """DELETE FROM checks WHERE id = $1"""
-            await connection.execute(q, check_id)
+            return await connection.fetch(q, check_id)

@@ -113,9 +113,7 @@ async def analyse_csv(
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         timer.mark("download-file")
 
-        check = await Check.update(
-            check["id"], {"parsing_started_at": datetime.now(timezone.utc)}, as_dict=True
-        )  # type: ignore
+        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
 
         # Launch csv-detective against given file
         try:
@@ -158,7 +156,7 @@ async def analyse_csv(
             resource_id=resource_id,
             debug_insert=debug_insert,
         )
-        check = await Check.update(check["id"], {"parsing_table": table_name}, as_dict=True)  # type: ignore
+        check = await Check.update(check["id"], {"parsing_table": table_name})
         timer.mark("csv-to-db")
 
         try:
@@ -202,8 +200,7 @@ async def analyse_csv(
             {
                 "parsing_finished_at": datetime.now(timezone.utc),
             },
-            as_dict=True,
-        )  # type: ignore
+        )
         await csv_to_db_index(table_name, csv_inspection, check)
 
     except (ParseException, IOException) as e:
@@ -445,7 +442,7 @@ async def csv_to_db(
             await db.execute(q, *data.values())
 
 
-async def csv_to_db_index(table_name: str, inspection: dict, check: dict) -> None:
+async def csv_to_db_index(table_name: str, inspection: dict, check: Record) -> None:
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)"
