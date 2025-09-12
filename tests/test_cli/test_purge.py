@@ -27,13 +27,16 @@ async def test_purge_checks(setup_catalog, db, fake_check):
 
 
 @pytest.mark.parametrize(
-    "hard_delete,expected_deleted",
+    "hard_delete,expected_deleted_at",
     [
-        (False, True),  # hard_delete=False: table_index entry should be marked as deleted
+        (
+            False,
+            "timestamp",
+        ),  # hard_delete=False: table_index entry should be marked as deleted with timestamp
         (True, None),  # hard_delete=True: table_index entry should be completely deleted
     ],
 )
-async def test_purge_csv_tables(setup_catalog, db, fake_check, hard_delete, expected_deleted):
+async def test_purge_csv_tables(setup_catalog, db, fake_check, hard_delete, expected_deleted_at):
     """Test the purge_csv_tables CLI command with different hard_delete values"""
     # pretend we have a csv_analysis with a converted table for this url
     check = await fake_check(parsing_table=True)
@@ -65,13 +68,14 @@ async def test_purge_csv_tables(setup_catalog, db, fake_check, hard_delete, expe
 
     # Check tables_index entry based on hard_delete parameter
     res = await db.fetchrow("SELECT * FROM tables_index WHERE parsing_table = $1", md5)
-    if expected_deleted is None:
+    if expected_deleted_at is None:
         # Entry should be completely deleted
         assert res is None
     else:
-        # Entry should exist and be marked as deleted
+        # Entry should exist and be marked as deleted with a timestamp
         assert res is not None
-        assert res["deleted"] == expected_deleted
+        assert res["deleted_at"] is not None  # Should have a timestamp
+        assert isinstance(res["deleted_at"], datetime)  # Should be a datetime object
 
 
 async def test_purge_csv_tables_url_used_by_other_resource(setup_catalog, db, fake_check):

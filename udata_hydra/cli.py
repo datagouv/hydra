@@ -564,7 +564,8 @@ async def purge_csv_tables(quiet: bool = False, hard_delete: bool = False) -> No
                         )
                     else:
                         await conn_csv.execute(
-                            "UPDATE tables_index SET deleted = TRUE WHERE parsing_table = $1", table
+                            "UPDATE tables_index SET deleted_at = NOW() WHERE parsing_table = $1",
+                            table,
                         )
                     await conn_main.execute(
                         "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table

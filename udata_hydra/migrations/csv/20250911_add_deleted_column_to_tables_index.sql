@@ -1,2 +1,2 @@
--- Add deleted column to tables_index table
-ALTER TABLE tables_index ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT FALSE;
+-- Add deleted_at column to tables_index table
+ALTER TABLE tables_index ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
