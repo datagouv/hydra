@@ -495,10 +495,11 @@ async def test_validation(
 
     # set up previous analysis and db insertion
     await db.execute(
-        "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)",
+        "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)",
         table_name,
         json.dumps(previous_analysis),
         check.get("resource_id"),
+        check.get("dataset_id"),
         check.get("url"),
     )
     await db.execute(
@@ -532,6 +533,8 @@ async def test_validation(
     assert all(row["parsing_table"] == table_name for row in res)
     assert all(str(row["resource_id"]) == check["resource_id"] for row in res)
     assert all(row["url"] == check["url"] for row in res)
+    assert all(row["dataset_id"] == check["dataset_id"] for row in res)
+    assert all(row["deleted_at"] is None for row in res)  # Should be NULL for new records
     latest_analysis = json.loads(res[0]["csv_detective"])
     # check that latest analysis is in line with expectation
     for key in current_analysis.keys():
