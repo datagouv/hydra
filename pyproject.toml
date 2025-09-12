@@ -24,7 +24,7 @@ dependencies = [
     "sqlalchemy>=1.4.46",
     "tippecanoe>=2.72.0",
 ]
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.11,<3.14"
 license = { text = "MIT" }
 readme = "README.md"
 

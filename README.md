@@ -93,11 +93,69 @@ To run a specific test function, you can pass the path to the file and the name 
 
 If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
 
-### 📈 Tests coverage
+### 🎯 Tests coverage
 
 Pytest automatically uses the `coverage` package to generate a coverage report, which is displayed at the end of the test run in the terminal.
 The coverage is configured in the `pyproject.toml` file, in the `[tool.pytest.ini_options]` section.
 You can also override the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
+
+### 📈 Performance benchmarking
+
+Hydra includes performance benchmarks to track and compare the performance of different operations on large files.
+These benchmarks help identify performance regressions and improvements across different commits.
+
+#### How it works
+
+Performance benchmarks are automatically executed on CI runners when pushing to the `benchmarks` branch. The benchmarks test three key operations:
+
+1. **CSV analysis** on large files using integrated test data
+2. **CSV to GeoJSON conversion** on large files using the `TEST_GEOCSV_URL` configured in CI
+3. **GeoJSON to PMTiles conversion** on large files using the `TEST_GEOCSV_URL` configured in CI
+
+#### Benchmark execution
+
+Benchmarks run automatically on:
+- **[GitHub Actions](https://github.com/datagouv/hydra/actions/workflows/benchmark.yml)** - triggered automatically on pushes to `benchmarks` branch
+- **[CircleCI](https://app.circleci.com/pipelines/github/datagouv/hydra)** - available as a manually triggerable pipeline after a push to `benchmarks` branch
+
+Using two different CI systems allows for performance comparison across different environments and gives a way to avoid exhausting CI time limits.
+
+#### Metrics collected
+
+Each benchmark run collects **execution time** in seconds, **Ccmmit information** (hash, author) and **runner specifications** (CPU cores, memory, Python version, runner class), which are stored in [`.benchmarks/benchmarks.csv`](https://github.com/datagouv/hydra/blob/benchmarks/.benchmarks/benchmarks.csv).
+
+More specifically:
+- `datetime` - when the test was run
+- `test_name` - which test was executed
+- `input_file` - URL or path of the input file used
+- `ci` - which CI system ran the test (github or circleci)
+- `execution_time_seconds` - performance measurement
+- `commit_author` - who made the commit
+- `commit_id` - the commit hash (7 characters)
+- `runner_class` - CircleCI/GitHub Actions runner type
+- `runner_cpu` - number of CPU cores
+- `runner_memory` - available memory in MB
+- `python_version` - Python version used
+
+Results are committed and pushed back to the `benchmarks` branch, creating a historical performance tracking dataset.
+
+#### Viewing results
+
+You can view the current benchmark results at: [benchmarks.csv](https://github.com/datagouv/hydra/blob/benchmarks/.benchmarks/benchmarks.csv)
+
+#### Running benchmarks locally
+
+To run performance benchmarks locally, you can use the CLI commands:
+
+```bash
+# Convert CSV to GeoJSON
+poetry run udata-hydra convert-csv-to-geojson /path/to/large/file.csv
+
+# Convert GeoJSON to PMTiles
+poetry run udata-hydra convert-geojson-to-pmtiles /path/to/large/file.geojson
+```
+
+These commands allow you to test performance improvements locally before pushing to the benchmarks branch.
 
 ## 🔌 API
 
