@@ -523,7 +523,7 @@ async def purge_checks(retention_days: int = 60, quiet: bool = False) -> None:
 
 
 @cli
-async def purge_csv_tables(quiet: bool = False) -> None:
+async def purge_csv_tables(quiet: bool = False, hard_delete: bool = False) -> None:
     """Delete converted CSV tables for resources url no longer in catalog"""
     # TODO: check if we should use parsing_table from table_index?
     # And are they necessarily in sync?
@@ -558,9 +558,15 @@ async def purge_csv_tables(quiet: bool = False) -> None:
                 async with conn_csv.transaction():
                     log.debug(f'Deleting table "{table}"')
                     await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
-                    await conn_csv.execute(
-                        "DELETE FROM tables_index WHERE parsing_table = $1", table
-                    )
+                    if hard_delete:
+                        await conn_csv.execute(
+                            "DELETE FROM tables_index WHERE parsing_table = $1", table
+                        )
+                    else:
+                        await conn_csv.execute(
+                            "UPDATE tables_index SET deleted_at = NOW() WHERE parsing_table = $1",
+                            table,
+                        )
                     await conn_main.execute(
                         "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
                     )
