@@ -122,12 +122,12 @@ Using two different CI systems allows for performance comparison across differen
 
 #### Metrics collected
 
-Each benchmark run collects **execution time** in seconds, **Ccmmit information** (hash, author) and **runner specifications** (CPU cores, memory, Python version, runner class), which are stored in [`.benchmarks/benchmarks.csv`](https://github.com/datagouv/hydra/blob/benchmarks/.benchmarks/benchmarks.csv).
+Each benchmark run collects **execution time** in seconds, **commit information** (hash, author) and **runner specifications** (CPU cores, memory, Python version, runner class), which are stored in [`.benchmarks/benchmarks.csv`](https://github.com/datagouv/hydra/blob/benchmarks/.benchmarks/benchmarks.csv).
 
 More specifically:
 - `datetime` - when the test was run
 - `test_name` - which test was executed
-- `input_file` - URL or path of the input file used
+- `input_file` - URL or path of the input test data file used
 - `ci` - which CI system ran the test (github or circleci)
 - `execution_time_seconds` - performance measurement
 - `commit_author` - who made the commit
