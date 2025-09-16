@@ -13,11 +13,6 @@ on:
 #         required: true
 #         default: 'benchmarks'
 #         type: string
-#       test_resource_id:
-#         description: 'Resource ID to use for GeoJSON benchmark tests'
-#         required: false
-#         default: 'af0cc2eb-b78a-471b-baad-80c29e3ee6e6'
-#         type: string
 
 env:
   TEST_GEOCSV_FILE: "H_01_1990-1999.csv.gz"
