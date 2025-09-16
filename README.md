@@ -114,9 +114,9 @@ Performance benchmarks are automatically executed on CI runners when pushing to 
 
 #### Benchmark execution
 
-Benchmarks run automatically on:
-- **[GitHub Actions](https://github.com/datagouv/hydra/actions/workflows/benchmark.yml)** - triggered automatically on pushes to `benchmarks` branch
-- **[CircleCI](https://app.circleci.com/pipelines/github/datagouv/hydra)** - available as a manually triggerable pipeline after a push to `benchmarks` branch
+Benchmarks run on:
+- **[CircleCI](https://app.circleci.com/pipelines/github/datagouv/hydra)** ([workflow file](https://github.com/datagouv/hydra/blob/main/.circleci/config.yml)) - available as a manually triggerable pipeline after a push to `benchmarks` branch
+- **[GitHub Actions](https://github.com/datagouv/hydra/actions/workflows/benchmark.yml)** ([workflow file](https://github.com/datagouv/hydra/blob/main/.github/workflows/benchmark.yml)) - triggered automatically on pushes to `benchmarks` branch
 
 Using two different CI systems allows for performance comparison across different environments and gives a way to avoid exhausting CI time limits.
 
