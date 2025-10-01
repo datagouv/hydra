@@ -7,6 +7,7 @@
 - Allow crawling of non datagouv URLs with CLI [#312](https://github.com/datagouv/hydra/pull/312)
 - Flag deleted resources in CSV DB instead of deleting them [#340](https://github.com/datagouv/hydra/pull/340)
 - Add a CI workflow for performance benchmarks [#339](https://github.com/datagouv/hydra/pull/339)
+- Store `dataset_id` in `tables_index` table of CSV database [#341](https://github.com/datagouv/hydra/pull/341)
 
 ## 2.4.1 (2025-09-03)
 
