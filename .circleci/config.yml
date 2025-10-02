@@ -121,27 +121,20 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Install system dependencies
-          command: |
-            apt-get update
-            apt-get install -y cmake
-      - run:
           name: Set the version
           command: |
-            # Get base version from pyproject.toml
-            BASE_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
-                RELEASE_VERSION=$CIRCLE_TAG
+                echo "export RELEASE_VERSION=$CIRCLE_TAG" > version.sh
+            # Otherwise, relies on a dev version like "1.2.1.dev" by default
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
                 # for main branches, can't add the commit hash since it's not a valid format for publishing
-                RELEASE_VERSION=${BASE_VERSION}${CIRCLE_BUILD_NUM}
+                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM" > version.sh
             else
                 # for feature branches, add the commit hash
-                RELEASE_VERSION=${BASE_VERSION}${CIRCLE_BUILD_NUM}+${CIRCLE_SHA1:0:7}
+                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}" > version.sh
             fi
-            echo "$RELEASE_VERSION" > version.txt
+            chmod +x version.sh
       - run:
           name: Display build info for debugging
           command: |
@@ -153,7 +146,7 @@ jobs:
       - run:
           name: Build package
           command: |
-            RELEASE_VERSION=$(cat version.txt)
+            source version.sh
             # Update version in pyproject.toml
             sed -i "s/version = \".*\"/version = \"$RELEASE_VERSION\"/" pyproject.toml
             # Build the package
