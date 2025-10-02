@@ -1,0 +1,191 @@
+name: Run Performance Benchmarks
+
+on:
+  push:
+    branches:
+      - "benchmarks"
+
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       branch:
+#         description: 'Branch to run benchmarks on (should always be "benchmarks")'
+#         required: true
+#         default: 'benchmarks'
+#         type: string
+
+env:
+  TEST_GEOCSV_FILE: "H_01_1990-1999.csv.gz"
+  BENCHMARK_BRANCH: "benchmarks"
+  PYTHON_VERSION: "3.11"
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+  UDATA_INSTANCE_NAME: udata
+
+jobs:
+  benchmark:
+    name: Run performance benchmark tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        resource-class: [large]
+    services:
+      postgres:
+        image: postgres:15.13
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install Python dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --extras "dev"
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+
+      - name: Install required tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc
+
+      - name: Create benchmarks directory
+        run: |
+          mkdir -p .benchmarks
+          if [ ! -f .benchmarks/benchmarks.csv ]; then
+            echo "datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version" > .benchmarks/benchmarks.csv
+          fi
+
+      - name: Run CSV analysis on big file benchmark
+        run: |
+          start_time=$(date +%s.%N)
+          poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v -s --durations=0
+          end_time=$(date +%s.%N)
+          execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+
+      - name: Commit CSV analysis benchmark results
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          git config --global user.email "opendatateam@data.gouv.fr"
+          git config --global user.name "data.gouv.fr"
+          git add .benchmarks/benchmarks.csv
+          git commit -m "perf: add CSV analysis benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
+          git push origin ${{env.BENCHMARK_BRANCH }}
+
+      - name: Download and uncompress ${{ env.TEST_GEOCSV_FILE }} if needed
+        run: |
+          mkdir -p tests/data
+          # Check if TEST_GEOCSV_FILE is a URL and download if it is
+          if [[ "${{ env.TEST_GEOCSV_FILE }}" == http* ]]; then
+            # It's a URL, download it
+            wget -O tests/data/$(basename "${{ env.TEST_GEOCSV_FILE }}") "${{ env.TEST_GEOCSV_FILE }}"
+          fi
+          # Uncompress if it's a .gz file (either downloaded or already present)
+          if [[ "${{ env.TEST_GEOCSV_FILE }}" == *.gz ]]; then
+            cd tests/data
+            gunzip -k $(basename "${{ env.TEST_GEOCSV_FILE }}")
+            cd ../..
+          fi
+          # Build the path based on the actual file (without .gz extension)
+          echo "TEST_GEOCSV_FILENAME=$(basename "${{ env.TEST_GEOCSV_FILE }}" .gz)" >> $GITHUB_ENV
+          ls -la tests/data/
+
+      - name: Run CSV to GeoJSON benchmark
+        timeout-minutes: 20
+        run: |
+          start_time=$(date +%s.%N)
+          poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$TEST_GEOCSV_FILENAME"
+          end_time=$(date +%s.%N)
+          execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ env.TEST_GEOCSV_FILE }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+
+      - name: Commit CSV to GeoJSON benchmark results
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          git config --global user.email "opendatateam@data.gouv.fr"
+          git config --global user.name "data.gouv.fr"
+          git add .benchmarks/benchmarks.csv
+          git commit -m "perf: add CSV to GeoJSON benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
+          git push origin ${{env.BENCHMARK_BRANCH }}
+
+      - name: Set GeoJSON file path for PMTiles benchmark
+        run: |
+          # Construct the expected GeoJSON filename based on TEST_GEOCSV_FILENAME
+          CSV_BASENAME=$(basename "$TEST_GEOCSV_FILENAME" .csv)
+          EXPECTED_GEOJSON="tests/data/${CSV_BASENAME}.geojson"
+          if [ -f "$EXPECTED_GEOJSON" ]; then
+            echo "TEST_GEOJSON_FILENAME=${CSV_BASENAME}.geojson" >> $GITHUB_ENV
+            echo "Found expected GeoJSON file: $EXPECTED_GEOJSON"
+          else
+            echo "ERROR: Expected GeoJSON file not found: $EXPECTED_GEOJSON"
+            echo "Available files in tests/data:"
+            ls -la tests/data/
+            exit 1
+          fi
+
+      - name: Run GeoJSON to PMTiles benchmark
+        timeout-minutes: 20
+        run: |
+          start_time=$(date +%s.%N)
+          poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v -s --durations=0 --input_file="$TEST_GEOJSON_FILENAME" -k "test_geojson_to_pmtiles_big_file"
+          end_time=$(date +%s.%N)
+          execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,${{ env.TEST_GEOCSV_FILE }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
+
+      - name: Commit GeoJSON to PMTiles benchmark results
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          git config --global user.email "opendatateam@data.gouv.fr"
+          git config --global user.name "data.gouv.fr"
+          git add .benchmarks/benchmarks.csv
+          git commit -m "perf: add GeoJSON to PMTiles benchmark results from GitHub Actions run #${{ github.run_number }} for commit $SHORT_SHA [skip ci]"
+          git push origin ${{env.BENCHMARK_BRANCH }}
+
+      - name: Display benchmark results
+        run: |
+          echo "=== Benchmark Results ==="
+          cat .benchmarks/benchmarks.csv
+          echo "========================="
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: .benchmarks/benchmarks.csv
+          retention-days: 1

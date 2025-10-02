@@ -85,6 +85,9 @@ async def analyse_csv(
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
 
+    # Preserve dataset_id from original check record
+    dataset_id = check.get("dataset_id")
+
     resource_id: str = str(check["resource_id"])
     url = check["url"]
 
@@ -201,7 +204,7 @@ async def analyse_csv(
                 "parsing_finished_at": datetime.now(timezone.utc),
             },
         )
-        await csv_to_db_index(table_name, csv_inspection, check)
+        await csv_to_db_index(table_name, csv_inspection, check, dataset_id)
 
     except (ParseException, IOException) as e:
         check = await handle_parse_exception(e, table_name, check)
@@ -442,22 +445,17 @@ async def csv_to_db(
             await db.execute(q, *data.values())
 
 
-async def csv_to_db_index(table_name: str, inspection: dict, check: Record) -> None:
+async def csv_to_db_index(
+    table_name: str, inspection: dict, check: Record, dataset_id: str
+) -> None:
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")
-    q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)"
+    q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)"
     await db.execute(
         q,
         table_name,
         json.dumps(inspection, default=str),
         check.get("resource_id"),
+        dataset_id,
         check.get("url"),
     )
-
-
-async def delete_table(table_name: str) -> None:
-    pool = await context.pool("csv")
-    async with pool.acquire() as conn:
-        async with conn.transaction():
-            await conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
-            await conn.execute("DELETE FROM tables_index WHERE parsing_table = $1", table_name)
