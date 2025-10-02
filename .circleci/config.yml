@@ -51,7 +51,7 @@ jobs:
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-
       - run:
-          name: Create venv and install Python dependencies
+          name: Install Python dependencies with uv
           command: |
             uv sync --extra dev
       - save_cache:
