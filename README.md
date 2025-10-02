@@ -32,7 +32,7 @@ This project uses `libmagic`, which needs to be installed on your system, eg:
 
 `brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on linux.
 
-This project uses Python >=3.11 and [uv](https://docs.astral.sh/uv/) >= 2.0.0 to manage dependencies.
+This project uses Python >=3.11 and [uv](https://docs.astral.sh/uv/) to manage dependencies.
 
 ## 🚀 Installation
 
