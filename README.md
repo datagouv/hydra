@@ -38,12 +38,12 @@ This project uses Python >=3.11 and [uv](https://docs.astral.sh/uv/) >= 2.0.0 to
 
 ### With uv (recommended)
 ```bash
-uv pip install -r pylock.toml
+uv sync
 ```
 
 ### With pip
 ```bash
-pip3 install -r pylock.toml
+pip3 install -e .
 ```
 
 ## 🖥️ CLI
@@ -86,7 +86,7 @@ To empty all the queues:
 
 `uv run rq empty -c udata_hydra.worker low default high`
 
-## 📊 CSV conversion to databasepip in
+## 📊 CSV conversion to database
 
 Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's the same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
 
