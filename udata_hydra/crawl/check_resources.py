@@ -16,7 +16,7 @@ from udata_hydra.crawl.helpers import (
 )
 from udata_hydra.crawl.preprocess_check_data import preprocess_check_data
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import queue
+from udata_hydra.utils import get_http_client, queue
 
 RESOURCE_RESPONSE_STATUSES = {
     "OK": "ok",
@@ -35,23 +35,20 @@ async def check_batch_resources(to_parse: list[Record]) -> None:
     """Check a batch of resources"""
     context.monitor().set_status("Checking resources...")
     tasks: list = []
-    async with aiohttp.ClientSession(
-        timeout=None,
-        headers={"user-agent": config.USER_AGENT_FULL},
-    ) as session:
-        for row in to_parse:
-            tasks.append(
-                check_resource(
-                    url=row["url"],
-                    resource=row,
-                    session=session,
-                    worker_priority="default" if row["priority"] else "low",
-                )
+    session = await get_http_client()
+    for row in to_parse:
+        tasks.append(
+            check_resource(
+                url=row["url"],
+                resource=row,
+                session=session,
+                worker_priority="default" if row["priority"] else "low",
             )
-        for task in asyncio.as_completed(tasks):
-            result = await task
-            results[result] += 1
-            context.monitor().refresh(results)
+        )
+    for task in asyncio.as_completed(tasks):
+        result = await task
+        results[result] += 1
+        context.monitor().refresh(results)
 
 
 async def check_resource(
