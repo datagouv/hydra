@@ -18,7 +18,7 @@ parameters:
     description: "Branch name that triggers the benchmark workflow on push"
   cache-prefix:
     type: string
-    default: "py-cache-v2"
+    default: "py-cache-v3"
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
   test-geocsv-file:
     type: string
@@ -46,17 +46,16 @@ jobs:
           command: export BASE_BRANCH=$(base_branch)
       - restore_cache:
           keys:
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}
+            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}-{{ checksum "uv.lock" }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Branch }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-
       - run:
           name: Create venv and install Python dependencies
           command: |
-            uv venv
-            uv pip install -e ".[dev]"
+            uv sync --extra dev
       - save_cache:
-          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}
+          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}-{{ checksum "uv.lock" }}
           paths:
             - .venv
       - persist_to_workspace:
@@ -75,9 +74,9 @@ jobs:
           # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
           # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
-            .venv/bin/ruff --version
-            .venv/bin/ruff check --select I .
-            .venv/bin/ruff format --check .
+            uv run ruff --version
+            uv run ruff check --select I .
+            uv run ruff format --check .
 
   tests:
     docker:
@@ -107,7 +106,7 @@ jobs:
             echo "$TESTFILES"
             # Run the found tests
             if [ -n "$TESTFILES" ]; then
-              .venv/bin/pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+              uv run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
             else
               echo "No tests to run in this split"
               exit 1
@@ -176,10 +175,7 @@ jobs:
       - run:
           name: Publish on PyPI
           command: |
-            # Install twine for publishing to PyPI
-            uv pip install twine
-            # Upload all distribution files
-            .venv/bin/twine upload --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" dist/*
+            uv publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" dist/*
 
   trigger-gitlab-pipeline:
     docker:
