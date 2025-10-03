@@ -1,6 +1,6 @@
 import hashlib
-from datetime import datetime
 import json
+from datetime import datetime
 from unittest.mock import patch
 
 import pandas as pd
@@ -25,11 +25,16 @@ async def test_analyse_parquet_disabled(fake_check):
     "check_kwargs",
     [
         {"url": "http://example.com/file.parquet"},
-        {"headers": {"content-type": "application/vnd.apache.parquet"}}
-    ]
+        {"headers": {"content-type": "application/vnd.apache.parquet"}},
+    ],
 )
 async def test_analyse_parquet(
-    setup_catalog, rmock, db, fake_check, produce_mock, check_kwargs,
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+    produce_mock,
+    check_kwargs,
 ):
     check = await fake_check(**check_kwargs)
     url = check["url"]

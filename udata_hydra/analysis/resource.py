@@ -86,16 +86,12 @@ async def analyse_resource(
             row: Record = await connection.fetchrow(
                 "SELECT format FROM catalog WHERE resource_id = $1", f"{check['resource_id']}"
             )
-        is_geojson: bool = (
-            row["format"] == "geojson"
-            or await detect_geojson_from_headers(check)
-        )
+        is_geojson: bool = row["format"] == "geojson" or await detect_geojson_from_headers(check)
         if is_geojson:
             file_format = "geojson"
         if not is_geojson:
-            is_parquet: bool = (
-                row["format"] == "parquet"
-                or await detect_parquet_from_headers(check)
+            is_parquet: bool = row["format"] == "parquet" or await detect_parquet_from_headers(
+                check
             )
             if is_parquet:
                 file_format = "parquet"

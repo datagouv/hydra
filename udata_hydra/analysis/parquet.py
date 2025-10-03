@@ -2,15 +2,14 @@ import hashlib
 import json
 import logging
 import os
-from datetime import datetime, timezone
 import re
+from datetime import datetime, timezone
 from typing import Iterator
 
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 from asyncpg import Record
-
 from progressist import ProgressBar
 
 from udata_hydra import config, context
