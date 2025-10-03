@@ -257,10 +257,10 @@ async def fake_check():
         domain="example.com",
         pmtiles_url=False,
         geojson_url=False,
+        url=None,
     ) -> dict:
-        url = f"https://example.com/resource-{resource}"
         data = {
-            "url": url,
+            "url": url or f"https://example.com/resource-{resource}",
             "domain": domain,
             "status": status,
             "headers": json.dumps(headers),
