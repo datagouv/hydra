@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import re
 from typing import Iterator
 
+import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 from asyncpg import Record
@@ -40,7 +41,7 @@ PYARROW_TYPE_TO_PYTHON = {
     "^date": "date",
     "^struct": "json",  # dictionary
     "^list": "json",
-    r"^timestamp\[\ws\]": "datetime_naive",
+    r"^timestamp\[\ws\]": "datetime",
     r"^timestamp\[\ws,": "datetime_aware",  # the rest of the field depends on the timezone
 }
 
@@ -161,7 +162,17 @@ def generate_records_from_parquet(parquet_file: pq.ParquetFile) -> Iterator[list
     for batch in parquet_file.iter_batches():
         df = batch.to_pandas()
         for row in df.values:
-            yield tuple(cell if not pd.isna(cell) else None for cell in row)
+            yield tuple(
+                (cell if not pd.isna(cell) else None)
+                # dumping the cell if it's a JSON object
+                if not isinstance(cell, (list, dict, np.ndarray))
+                else json.dumps(
+                    # np.ndarray is the cast type for lists in pandas
+                    # but it's not JSON-serializable, we need a pure list
+                    cell if isinstance(cell, (list, dict)) else cell.tolist()
+                )
+                for cell in row
+            )
 
 
 async def parquet_to_db(
