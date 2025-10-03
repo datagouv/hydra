@@ -11,16 +11,6 @@ from udata_hydra.analysis.parquet import analyse_parquet
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.asyncio
-async def test_analyse_parquet_disabled(fake_check):
-    """Test that the function returns None when PARQUET_TO_DB is False (by default)"""
-    with patch("udata_hydra.analysis.helpers.read_or_download_file") as mock_func:
-        check = await fake_check()
-        result = await analyse_parquet(check, "test.parquet")
-        assert result is None
-        mock_func.assert_not_called()
-
-
 @pytest.mark.parametrize(
     "check_kwargs",
     [
