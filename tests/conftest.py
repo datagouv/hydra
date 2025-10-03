@@ -259,8 +259,9 @@ async def fake_check():
         geojson_url=False,
         url=None,
     ) -> dict:
+        _url = url or f"https://example.com/resource-{resource}"
         data = {
-            "url": url or f"https://example.com/resource-{resource}",
+            "url": _url,
             "domain": domain,
             "status": status,
             "headers": json.dumps(headers),
@@ -274,7 +275,7 @@ async def fake_check():
             "analysis_error": analysis_error,
             "detected_last_modified_at": detected_last_modified_at,
             "next_check_at": next_check_at,
-            "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest()
+            "parsing_table": hashlib.md5(_url.encode("utf-8")).hexdigest()
             if parsing_table
             else None,
             "parquet_url": "https://example.org/file.parquet" if parquet_url else None,
