@@ -24,15 +24,41 @@ def monitor() -> MagicMock:
     return context["monitor"]
 
 
-async def pool(db: str = "main") -> asyncpg.pool.Pool:
-    if db not in context["databases"]:
+async def pool(db: str = "main", component: str = "worker") -> asyncpg.pool.Pool:
+    """Get or create a connection pool for a specific database and component.
+
+    Args:
+        db: Database name ("main" or "csv")
+        component: Component name ("crawler", "api", "worker")
+
+    Returns:
+        Connection pool for the specified database/component
+
+    Examples:
+        crawler_pool = await pool("main", "crawler")
+        api_pool = await pool("main", "api")
+        worker_pool = await pool("main", "worker")
+        csv_pool = await pool("csv", "worker")
+    """
+    # Create a unique key for the pool
+    pool_key = f"{db}:{component}"
+
+    if pool_key not in context["databases"]:
         dsn = config.DATABASE_URL if db == "main" else getattr(config, f"DATABASE_URL_{db.upper()}")
-        context["databases"][db] = await asyncpg.create_pool(
+
+        # Get component-specific pool size
+        component_size_key = f"MAX_POOL_SIZE_{component.upper()}"
+        max_size = getattr(config, component_size_key)
+
+        log.info(f"Creating {component} pool for {db} database with max_size={max_size}")
+
+        context["databases"][pool_key] = await asyncpg.create_pool(
             dsn=dsn,
-            max_size=config.MAX_POOL_SIZE,
+            max_size=max_size,
             server_settings={"search_path": config.DATABASE_SCHEMA},
         )
-    return context["databases"][db]
+
+    return context["databases"][pool_key]
 
 
 def queue(name: str = "default", exception: bool = False) -> Queue | None:

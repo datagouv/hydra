@@ -39,7 +39,7 @@ async def select_batch_resources_to_check() -> list[Record]:
     """
     context.monitor().set_status("Getting a batch from catalog...")
 
-    pool = await context.pool()
+    pool = await context.pool(component="crawler")
     async with pool.acquire() as connection:
         excluded = Resource.get_excluded_clause()
 

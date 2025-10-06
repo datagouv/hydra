@@ -25,19 +25,22 @@ async def start_checks(iterations: int = -1) -> None:
         )
 
         while iterations != 0:
-            batch: list[Record] = await select_batch_resources_to_check()
+            try:
+                batch: list[Record] = await select_batch_resources_to_check()
 
-            if batch and len(batch):
-                await check_batch_resources(batch)
+                if batch and len(batch):
+                    await check_batch_resources(batch)
+                else:
+                    context.monitor().set_status("No resources to check for now.")
 
-            else:
-                context.monitor().set_status("No resources to check for now.")
+            except Exception as e:
+                context.monitor().set_error(f"Batch failed: {e}")
 
             await asyncio.sleep(config.SLEEP_BETWEEN_BATCHES)
             iterations -= 1
 
     finally:
-        pool = await context.pool()
+        pool = await context.pool(component="crawler")
         await pool.close()
 
 
