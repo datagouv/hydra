@@ -3,7 +3,7 @@ version: 2.1
 parameters:
   python-version:
     type: string
-    default: "3.11"
+    default: "3.13"
   publish-branch:
     type: string
     default: "main"
@@ -18,7 +18,7 @@ parameters:
     description: "Branch name that triggers the benchmark workflow on push"
   cache-prefix:
     type: string
-    default: "py-cache-v2"
+    default: "py-cache-v3"
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
   test-geocsv-file:
     type: string
