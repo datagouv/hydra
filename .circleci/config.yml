@@ -3,7 +3,7 @@ version: 2.1
 parameters:
   python-version:
     type: string
-    default: "3.11"
+    default: "3.13"
   publish-branch:
     type: string
     default: "main"
