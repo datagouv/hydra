@@ -59,6 +59,8 @@ async def analyse_parquet(
 
     resource_id: str = str(check["resource_id"])
     url = check["url"]
+    # Preserve dataset_id from original check record
+    dataset_id = check.get("dataset_id")
 
     resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_PARQUET"})
 
@@ -140,7 +142,7 @@ async def analyse_parquet(
                 "parsing_finished_at": datetime.now(timezone.utc),
             },
         )
-        await parquet_to_db_index(table_name, inspection, check)
+        await parquet_to_db_index(table_name, inspection, check, dataset_id)
 
     except (ParseException, IOException) as e:
         check = await handle_parse_exception(e, table_name, check)
@@ -259,6 +261,11 @@ async def parquet_to_db(
             await db.execute(q, *data.values())
 
 
-async def parquet_to_db_index(table_name: str, inspection: dict, check: Record) -> None:
+async def parquet_to_db_index(
+    table_name: str,
+    inspection: dict,
+    check: Record,
+    dataset_id: str,
+) -> None:
     # convenience method just to make it clearer
-    await csv_to_db_index(table_name, inspection, check)
+    await csv_to_db_index(table_name, inspection, check, dataset_id)
