@@ -152,5 +152,6 @@ async def get_health(request: web.Request) -> web.Response:
             "csv_to_parquet": config.CSV_TO_PARQUET,
             "geojson_to_pmtiles": config.GEOJSON_TO_PMTILES,
             "csv_to_geojson": config.CSV_TO_GEOJSON,
+            "parquet_to_db": config.PARQUET_TO_DB,
         }
     )
