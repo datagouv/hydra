@@ -57,6 +57,7 @@ MAX_FILESIZE_ALLOWED.xls = 52428800    # /2
 MAX_FILESIZE_ALLOWED.xlsx = 13107200   # /8
 MAX_FILESIZE_ALLOWED.ods = 10485760    # /10
 MAX_FILESIZE_ALLOWED.geojson = 104857600
+MAX_FILESIZE_ALLOWED.parquet = 52428800
 
 # -- CSV analysis settings -- #
 SQL_INDEXES_TYPES_SUPPORTED = ["index"]
@@ -93,3 +94,6 @@ MINIO_PMTILES_FOLDER = "" # no trailing slash
 CSV_TO_GEOJSON = false
 MINIO_GEOJSON_BUCKET = ""
 MINIO_GEOJSON_FOLDER = "" # no trailing slash
+
+# -- Parquet analysis settings -- #
+PARQUET_TO_DB = false
