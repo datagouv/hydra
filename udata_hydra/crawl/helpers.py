@@ -79,7 +79,7 @@ async def is_domain_backoff(domain: str) -> tuple[bool, str]:
 
     since_backoff_period = datetime.now(timezone.utc) - timedelta(seconds=config.BACKOFF_PERIOD)
 
-    pool = await context.pool()
+    pool = await context.pool(component="crawler")
     async with pool.acquire() as connection:
         # check if we trigger BACKOFF_NB_REQ for BACKOFF_PERIOD on this domain
         res = await connection.fetchrow(

@@ -9,7 +9,7 @@ from udata_hydra.utils import token_auth_middleware
 
 async def app_factory() -> web.Application:
     async def app_startup(app):
-        app["pool"] = await context.pool()
+        app["pool"] = await context.pool(component="api")
 
     async def app_cleanup(app):
         if "pool" in app:

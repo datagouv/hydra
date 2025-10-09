@@ -107,9 +107,14 @@ def setup():
 @pytest_asyncio.fixture(autouse=True)
 async def mock_pool(mocker):
     """This avoids having different pools attached to different event loops"""
-    m = mocker.patch("udata_hydra.context.pool")
+    # Create a single pool that will be returned for all component types
     pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50)
-    m.return_value = pool
+
+    # Mock the pool function to always return the same pool regardless of component
+    async def mock_pool_func(db: str = "main", component: str = "worker"):
+        return pool
+
+    m = mocker.patch("udata_hydra.context.pool", side_effect=mock_pool_func)
     yield
     await pool.close()
 
