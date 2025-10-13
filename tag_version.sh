@@ -209,7 +209,7 @@ if [ "$DRY_RUN" = true ]; then
     echo "Would update CHANGELOG.md with:"
     echo "$NEW_ENTRY"
     echo "Would run: git add pyproject.toml CHANGELOG.md"
-    echo "Would run: git commit -m \"Bump version $VERSION\""
+    echo "Would run: git commit -m \"chore: bump version to $VERSION\""
     echo "Would run: git tag -a \"v$VERSION\" -m \"Version $VERSION\""
     echo "Would run: git push origin HEAD v$VERSION"
     echo "Would run: gh release create \"v$VERSION\" --title \"v$VERSION\" --notes <release notes>"
@@ -243,7 +243,7 @@ echo "CHANGELOG.md updated with commits from $LAST_TAG to HEAD"
 
 # Commit the version and CHANGELOG updates
 git add pyproject.toml CHANGELOG.md
-git commit -m "Bump version $VERSION"
+git commit -m "chore: bump version to $VERSION"
 
 echo "✓ Committed pyproject.toml and CHANGELOG.md"
 
