@@ -9,7 +9,7 @@ from .file import (
     remove_remainders,
 )
 from .geojson import detect_geojson_from_headers
-from .http import UdataPayload, get_request_params, send
+from .http import UdataPayload, get_http_client, get_request_params, send
 from .parquet import detect_parquet_from_headers
 from .queue import enqueue
 from .timer import Timer
@@ -28,6 +28,7 @@ __all__ = [
     "detect_geojson_from_headers",
     "UdataPayload",
     "get_request_params",
+    "get_http_client",
     "send",
     "detect_parquet_from_headers",
     "enqueue",
