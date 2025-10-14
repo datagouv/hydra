@@ -8,8 +8,9 @@ from .file import (
     extract_gzip,
     remove_remainders,
 )
-from .geojson import detect_geojson_from_headers_or_catalog
+from .geojson import detect_geojson_from_headers
 from .http import UdataPayload, get_http_client, get_request_params, send
+from .parquet import detect_parquet_from_headers
 from .queue import enqueue
 from .timer import Timer
 
@@ -24,11 +25,12 @@ __all__ = [
     "download_resource",
     "extract_gzip",
     "remove_remainders",
-    "detect_geojson_from_headers_or_catalog",
+    "detect_geojson_from_headers",
     "UdataPayload",
     "get_request_params",
     "get_http_client",
     "send",
+    "detect_parquet_from_headers",
     "enqueue",
     "Timer",
 ]
