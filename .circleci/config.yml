@@ -18,7 +18,7 @@ parameters:
     description: "Branch name that triggers the benchmark workflow on push"
   cache-prefix:
     type: string
-    default: "py-cache-v2"
+    default: "py-cache-v3"
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
   test-geocsv-file:
     type: string
@@ -32,25 +32,30 @@ parameters:
 jobs:
   install:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - checkout
+      - run:
+          name: Install system dependencies
+          command: |
+            apt-get update -qq && apt-get install -y \
+              cmake \
+              libgeos-dev  # Added for shapely dependency
       - run:
           name: Get the base reference branch
           command: export BASE_BRANCH=$(base_branch)
       - restore_cache:
           keys:
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
+            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}-{{ checksum "uv.lock" }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Branch }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-
       - run:
-          name: Install Python dependencies with Poetry 2
+          name: Install Python dependencies with uv
           command: |
-            poetry config virtualenvs.in-project true
-            poetry install --extras "dev"
+            uv sync --frozen --extra dev
       - save_cache:
-          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
+          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}-{{ checksum "uv.lock" }}
           paths:
             - .venv
       - persist_to_workspace:
@@ -60,7 +65,7 @@ jobs:
 
   lint:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - attach_workspace:
           at: .
@@ -69,14 +74,13 @@ jobs:
           # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
           # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
-            poetry run ruff --version
-            poetry run ruff check --select I .
-            poetry run ruff format --check .
+            uv run ruff --version
+            uv run ruff check --select I .
+            uv run ruff format --check .
 
   tests:
     docker:
-      # Can't use a slim or slim image here ad we need libmagik to run the tests
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
       - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres
@@ -86,6 +90,9 @@ jobs:
     steps:
       - attach_workspace:
           at: .
+      - run:
+          name: Install system dependencies
+          command: apt-get update -qq && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
       - run:
           name: Run tests
           environment:
@@ -99,7 +106,7 @@ jobs:
             echo "$TESTFILES"
             # Run the found tests
             if [ -n "$TESTFILES" ]; then
-              poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+              uv run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
             else
               echo "No tests to run in this split"
               exit 1
@@ -109,7 +116,7 @@ jobs:
 
   build:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - attach_workspace:
           at: .
@@ -137,12 +144,13 @@ jobs:
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Git tag: $CIRCLE_TAG"
       - run:
-          name: Build a distributable package as a wheel release with Poetry
+          name: Build package
           command: |
             source version.sh
-            # Set the version in pyproject.toml
-            poetry version $RELEASE_VERSION
-            poetry build
+            # Update version in pyproject.toml
+            sed -i "s/version = \".*\"/version = \"$RELEASE_VERSION\"/" pyproject.toml
+            # Build the package
+            uv build
       - store_artifacts:
           path: dist
       - persist_to_workspace:
@@ -153,14 +161,14 @@ jobs:
 
   publish:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
     steps:
       - attach_workspace:
           at: .
       - run:
           name: Publish on PyPI
           command: |
-            poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+            uv publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" dist/*
 
   trigger-gitlab-pipeline:
     docker:
