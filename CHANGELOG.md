@@ -9,6 +9,7 @@
 - Add a CI workflow for performance benchmarks [#339](https://github.com/datagouv/hydra/pull/339)
 - Store `dataset_id` in `tables_index` table of CSV database [#341](https://github.com/datagouv/hydra/pull/341)
 - Enable to analyse and insert parquet files [#342](https://github.com/datagouv/hydra/pull/342) [#346](https://github.com/datagouv/hydra/pull/346)
+- New `tag_version.sh` script to replace Bump'x [#342](https://github.com/datagouv/hydra/pull/342)
 
 ## 2.4.1 (2025-09-03)
 
