@@ -1,7 +1,8 @@
 import json
+import tempfile
+
 from aiohttp import web
 from csv_detective import routine as csv_detective_routine
-import tempfile
 
 from udata_hydra import config
 
@@ -17,7 +18,7 @@ async def analyse_file(request: web.Request) -> web.Response:
         async for chunk in request.content.iter_chunked(1024):
             tmp_file.write(chunk)
         tmp_file.close()
-        
+
         analysis: dict = csv_detective_routine(
             file_path=tmp_file.name,
             output_profile=True,

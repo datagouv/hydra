@@ -2,13 +2,13 @@ from typing import Callable
 
 from aiohttp import web
 
-from udata_hydra.routes.file_analysis import analyse_file
 from udata_hydra.routes.checks import (
     create_check,
     get_all_checks,
     get_checks_aggregate,
     get_latest_check,
 )
+from udata_hydra.routes.file_analysis import analyse_file
 from udata_hydra.routes.resources import (
     create_resource,
     delete_resource,
