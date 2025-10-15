@@ -24,9 +24,8 @@ async def analyse_file(request: web.Request) -> web.Response:
             output_profile=True,
             num_rows=-1,
             save_results=False,
-            verbose=True,
         )
 
-        return web.json_response(json.dumps(analysis), status=200)
+        return web.json_response(analysis, status=200)
     except Exception as err:
         return web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
