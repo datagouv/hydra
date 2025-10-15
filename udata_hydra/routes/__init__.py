@@ -2,6 +2,7 @@ from typing import Callable
 
 from aiohttp import web
 
+from udata_hydra.routes.file_analysis import analyse_file
 from udata_hydra.routes.checks import (
     create_check,
     get_all_checks,
@@ -72,6 +73,7 @@ routes_params = [
         delete_resource_exception,
         None,
     ),
+    (web.post, "/api/file-analysis/", analyse_file, None),
 ]
 
 # Generate the routes
