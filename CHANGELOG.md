@@ -1,17 +1,5 @@
 # Changelog
 
-## Current (in progress)
-
-- Dynamic version in user agent [#328](https://github.com/datagouv/hydra/pull/328) and [#337](https://github.com/datagouv/hydra/pull/337)
-- Add performance tests for csv to geojson and geojson to pmtiles conversion on geographical big data, and CLI commands to convert geographical files locally [#319](https://github.com/datagouv/hydra/pull/319)
-- Allow crawling of non datagouv URLs with CLI [#312](https://github.com/datagouv/hydra/pull/312)
-- Flag deleted resources in CSV DB instead of deleting them [#340](https://github.com/datagouv/hydra/pull/340)
-- Add a CI workflow for performance benchmarks [#339](https://github.com/datagouv/hydra/pull/339)
-- Store `dataset_id` in `tables_index` table of CSV database [#341](https://github.com/datagouv/hydra/pull/341)
-- Enable to analyse and insert parquet files [#342](https://github.com/datagouv/hydra/pull/342) [#346](https://github.com/datagouv/hydra/pull/346)
-- New `tag_version.sh` script to replace Bump'x [#342](https://github.com/datagouv/hydra/pull/342)
-- Use [uv](https://docs.astral.sh/uv/) as package manager and lockfile [#241](https://github.com/datagouv/hydra/pull/241)
-
 ## 2.4.1 (2025-09-03)
 
 - Only delete the table if the insertion was not successful [#332](https://github.com/datagouv/hydra/pull/332)
