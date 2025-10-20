@@ -1,25 +1,5 @@
 # Changelog
 
-## 2.4.2 (2025-10-20)
-
-- build: add tag_version.sh script ([#342](https://github.com/datagouv/hydra/pull/342))
-- build: use uv instead of Poetry for lock file and in CI ([#241](https://github.com/datagouv/hydra/pull/241))
-- docs: fix changelog
-- docs: fix error in changelog
-- docs: remove "current" section in changelog to prepare it for automatic update of changelog
-- docs: update changelog for merged PR [#328](https://github.com/datagouv/hydra/pull/328)
-- Enable to analyse and insert parquet files ([#343](https://github.com/datagouv/hydra/pull/343))
-- feat: add performance tests and CLI tools for geographical file conversion benchmarking ([#319](https://github.com/datagouv/hydra/pull/319))
-- feat: allow to crawl non-data.gouv URLs ([#312](https://github.com/datagouv/hydra/pull/312))
-- feat: benchmarks CI workflow ([#339](https://github.com/datagouv/hydra/pull/339))
-- feat: dynamic version in user agent ([#328](https://github.com/datagouv/hydra/pull/328))
-- feat: flag deleted resources in CSV DB instead of deleting them ([#340](https://github.com/datagouv/hydra/pull/340))
-- feat: store dataset_id in CSV tables_index ([#341](https://github.com/datagouv/hydra/pull/341))
-- Fix after parquet ([#346](https://github.com/datagouv/hydra/pull/346))
-- fix: fix user agent string ([#337](https://github.com/datagouv/hydra/pull/337))
-- Update to version 2.4.2.dev for next development cycle
-
-
 ## 2.4.1 (2025-09-03)
 
 - Only delete the table if the insertion was not successful [#332](https://github.com/datagouv/hydra/pull/332)
