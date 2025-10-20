@@ -123,16 +123,18 @@ jobs:
       - run:
           name: Set the version
           command: |
+            # Read version from pyproject.toml
+            VERSION=$(sed -nE 's/^version = "(.*)"/\1/p' pyproject.toml)
             if [[ $CIRCLE_TAG ]]; then
                 # This is a tagged release, version has been handled upstream
                 echo "export RELEASE_VERSION=$CIRCLE_TAG" > version.sh
             # Otherwise, relies on a dev version like "1.2.1.dev" by default
             elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
                 # for main branches, can't add the commit hash since it's not a valid format for publishing
-                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM" > version.sh
+                echo "export RELEASE_VERSION=${VERSION}${CIRCLE_BUILD_NUM}" > version.sh
             else
                 # for feature branches, add the commit hash
-                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}" > version.sh
+                echo "export RELEASE_VERSION=${VERSION}${CIRCLE_BUILD_NUM}+${CIRCLE_SHA1:0:7}" > version.sh
             fi
             chmod +x version.sh
       - run:
