@@ -263,15 +263,6 @@ wheels = [
 ]
 
 [[package]]
-name = "bumpx"
-version = "0.3.10"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/03/81/e2f216d7098c2de4ab49fd65a48d77a07a802dfa962848bdee57f90ad246/bumpx-0.3.10.tar.gz", hash = "sha256:3139185d3b9c7ae6cd45edb9a51e18b6f2673c69137508fb0230353f99c0dae6", size = 15668, upload-time = "2024-11-15T12:15:08.088Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/23/6c3e1e858923713976fa3994e585f9d477b8c2b36e0a5e5c93305bdd6828/bumpx-0.3.10-py3-none-any.whl", hash = "sha256:90fa97d8f19b6c3db77f453bbcb649d519303a45165fc8b623a96e182d3a8336", size = 21489, upload-time = "2024-11-15T12:15:06.917Z" },
-]
-
-[[package]]
 name = "certifi"
 version = "2025.8.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1781,7 +1772,6 @@ wheels = [
 
 [[package]]
 name = "udata-hydra"
-version = "2.4.2.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1809,7 +1799,6 @@ dependencies = [
 dev = [
     { name = "aiohttp-devtools" },
     { name = "aioresponses" },
-    { name = "bumpx" },
     { name = "gunicorn" },
     { name = "mypy" },
     { name = "nest-asyncio" },
@@ -1826,7 +1815,6 @@ requires-dist = [
     { name = "aiohttp-devtools", marker = "extra == 'dev'", specifier = ">=1.0.post0" },
     { name = "aioresponses", marker = "extra == 'dev'", specifier = ">=0.7.3" },
     { name = "asyncpg", specifier = ">=0.29.0" },
-    { name = "bumpx", marker = "extra == 'dev'", specifier = ">=0.3.10" },
     { name = "coloredlogs", specifier = ">=15.0.1" },
     { name = "csv-detective", specifier = "==0.9.3.dev2010" },
     { name = "dateparser", specifier = ">=1.1.7" },
