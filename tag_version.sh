@@ -205,27 +205,17 @@ RELEASE_NOTES="$SORTED_COMMITS"
 
 # Update CHANGELOG.md and version in pyproject.toml
 if [ "$DRY_RUN" = true ]; then
-    echo "Would update pyproject.toml version to: $VERSION"
     echo "Would update CHANGELOG.md with:"
     echo "$NEW_ENTRY"
-    echo "Would run: git add pyproject.toml CHANGELOG.md"
-    echo "Would run: git commit -m \"chore: bump version to $VERSION\""
+    echo "Would run: git add CHANGELOG.md"
+    echo "Would run: git commit -m \"chore: release $VERSION (CHANGELOG)\""
     echo "Would run: git tag -a \"v$VERSION\" -m \"Version $VERSION\""
     echo "Would run: git push origin HEAD v$VERSION"
     echo "Would run: gh release create \"v$VERSION\" --title \"v$VERSION\" --notes <release notes>"
     exit 0
 fi
 
-# Update version in pyproject.toml
-if [ -f "pyproject.toml" ]; then
-    # Use sed to update the version line
-    sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
-    rm pyproject.toml.bak
-    echo "✓ Updated pyproject.toml version to $VERSION"
-else
-    echo "Warning: pyproject.toml not found, skipping version update"
-fi
-
+# Update CHANGELOG.md (we no longer write version into pyproject.toml; uv-dynamic-versioning handles it)
 if [ -f "CHANGELOG.md" ]; then
     # Keep existing entries (skip the first line "# Changelog")
     EXISTING_ENTRIES=$(tail -n +2 CHANGELOG.md)
@@ -241,9 +231,9 @@ fi
 
 echo "CHANGELOG.md updated with commits from $LAST_TAG to HEAD"
 
-# Commit the version and CHANGELOG updates
-git add pyproject.toml CHANGELOG.md
-git commit -m "chore: bump version to $VERSION"
+# Commit CHANGELOG update
+git add CHANGELOG.md
+git commit -m "chore: release $VERSION (CHANGELOG)"
 
 echo "✓ Committed pyproject.toml and CHANGELOG.md"
 
@@ -263,32 +253,3 @@ echo "$RELEASE_NOTES" | gh release create "v$VERSION" \
     --notes-file -
 
 echo "✓ Created GitHub release v$VERSION"
-
-# --- Post-release: bump to next development version ---
-# Compute next patch version and set X.Y.(Z+1).dev in pyproject.toml, then commit and push
-NEXT_DEV_VERSION=""
-
-# Extract semver components MAJOR.MINOR.PATCH from $VERSION
-if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-    MAJOR="${BASH_REMATCH[1]}"
-    MINOR="${BASH_REMATCH[2]}"
-    PATCH="${BASH_REMATCH[3]}"
-    NEXT_PATCH=$((PATCH + 1))
-    NEXT_DEV_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}.dev"
-else
-    echo "Warning: VERSION '$VERSION' is not a plain X.Y.Z; skipping automatic dev bump"
-fi
-
-if [ -n "$NEXT_DEV_VERSION" ]; then
-    if [ -f "pyproject.toml" ]; then
-        sed -i.bak "s/^version = \".*\"/version = \"$NEXT_DEV_VERSION\"/" pyproject.toml
-        rm -f pyproject.toml.bak
-        echo "✓ Updated pyproject.toml version to $NEXT_DEV_VERSION"
-        git add pyproject.toml
-        git commit -m "chore: start next development cycle: $NEXT_DEV_VERSION"
-        git push origin HEAD
-        echo "✓ Pushed post-release dev bump to $NEXT_DEV_VERSION"
-    else
-        echo "Warning: pyproject.toml not found, skipping post-release dev bump"
-    fi
-fi

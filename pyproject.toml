@@ -1,6 +1,10 @@
+[build-system]
+requires = ["uv_build>=0.8.4,<0.9.0", "uv-dynamic-versioning"]
+build-backend = "uv_build"
+
 [project]
 name = "udata-hydra"
-version = "2.4.2"
+dynamic = ["version"]
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = [{ name = "Opendata Team", email = "opendatateam@data.gouv.fr" }]
 dependencies = [
@@ -80,6 +84,6 @@ line-length = 100
 module-name = "udata_hydra"
 module-root = ""
 
-[build-system]
-requires = ["uv_build>=0.8.4,<0.9.0"]
-build-backend = "uv_build"
+[tool.uv-dynamic-versioning]
+enable = true
+format = "{tag}.dev{distance}+{commit}"

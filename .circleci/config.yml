@@ -121,21 +121,19 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Set the version
+          name: Build package and set RELEASE_VERSION from wheel metadata
           command: |
-            # Read version from pyproject.toml
-            VERSION=$(sed -nE 's/^version = "(.*)"/\1/p' pyproject.toml)
-            if [[ $CIRCLE_TAG ]]; then
-                # This is a tagged release, version has been handled upstream
-                echo "export RELEASE_VERSION=$CIRCLE_TAG" > version.sh
-            # Otherwise, relies on a dev version like "1.2.1.dev" by default
-            elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
-                # for main branches, can't add the commit hash since it's not a valid format for publishing
-                echo "export RELEASE_VERSION=${VERSION}${CIRCLE_BUILD_NUM}" > version.sh
-            else
-                # for feature branches, add the commit hash
-                echo "export RELEASE_VERSION=${VERSION}${CIRCLE_BUILD_NUM}+${CIRCLE_SHA1:0:7}" > version.sh
-            fi
+            # Ensure tags are present for uv-dynamic-versioning
+            git fetch --tags --force --prune || true
+
+            # Build once; uv-dynamic-versioning will compute version from VCS
+            uv build
+
+            # Extract version from wheel name: udata_hydra-<version>-*.whl
+            WHEEL=$(ls dist/udata_hydra-*.whl | head -n1)
+            [ -z "$WHEEL" ] && echo "No wheel produced" && exit 1
+            RELEASE_VERSION=$(basename "$WHEEL" | sed -nE 's/^udata_hydra-([^-]+)-.*/\1/p')
+            echo "export RELEASE_VERSION=$RELEASE_VERSION" > version.sh
             chmod +x version.sh
       - run:
           name: Display build info for debugging
@@ -145,14 +143,7 @@ jobs:
             echo "Build number: $CIRCLE_BUILD_NUM"
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Git tag: $CIRCLE_TAG"
-      - run:
-          name: Build package
-          command: |
-            source version.sh
-            # Update version in pyproject.toml
-            sed -i "s/version = \".*\"/version = \"$RELEASE_VERSION\"/" pyproject.toml
-            # Build the package
-            uv build
+      # Build already executed above; artifacts are in dist/
       - store_artifacts:
           path: dist
       - persist_to_workspace:
