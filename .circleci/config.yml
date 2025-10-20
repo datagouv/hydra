@@ -124,12 +124,10 @@ jobs:
       - run:
           name: Install build tools
           command: |
-            uv pip install setuptools_scm
+            uv pip install setuptools-scm
       - run:
           name: Compute RELEASE_VERSION via setuptools_scm
           command: |
-            # Ensure tags are present for setuptools_scm
-            git fetch --tags --force --prune || true
             # derive from setuptools_scm or base version + build number
             RELEASE_VERSION=$(uv run python -m setuptools_scm)
             echo "export RELEASE_VERSION=$RELEASE_VERSION" > version.sh

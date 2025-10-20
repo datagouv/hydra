@@ -215,7 +215,6 @@ if [ "$DRY_RUN" = true ]; then
     exit 0
 fi
 
-# Update CHANGELOG.md (we no longer write version into pyproject.toml; uv-dynamic-versioning handles it)
 if [ -f "CHANGELOG.md" ]; then
     # Keep existing entries (skip the first line "# Changelog")
     EXISTING_ENTRIES=$(tail -n +2 CHANGELOG.md)
