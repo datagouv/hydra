@@ -1,6 +1,6 @@
 [build-system]
-requires = ["uv_build>=0.8.4,<0.9.0", "uv-dynamic-versioning"]
-build-backend = "uv_build"
+requires = ["setuptools>=68", "wheel", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "udata-hydra"
@@ -80,10 +80,10 @@ markers = [
 lint = { extend-select = ["I"] } # ["I"] is to also sort imports with an isort rule
 line-length = 100
 
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
+
 [tool.uv.build-backend]
 module-name = "udata_hydra"
 module-root = ""
-
-[tool.uv-dynamic-versioning]
-enable = true
-format = "{tag}.dev{distance}+{commit}"

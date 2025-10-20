@@ -32,7 +32,7 @@ parameters:
 jobs:
   install:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
     steps:
       - checkout
       - run:
@@ -65,7 +65,7 @@ jobs:
 
   lint:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
     steps:
       - attach_workspace:
           at: .
@@ -80,7 +80,7 @@ jobs:
 
   tests:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
       - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres
@@ -92,7 +92,8 @@ jobs:
           at: .
       - run:
           name: Install system dependencies
-          command: apt-get update -qq && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
+          command: |
+            apt-get update -qq && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
       - run:
           name: Run tests
           environment:
@@ -116,23 +117,21 @@ jobs:
 
   build:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm  # needs git for setuptools_scm
     steps:
       - attach_workspace:
           at: .
       - run:
-          name: Build package and set RELEASE_VERSION from wheel metadata
+          name: Install build tools
           command: |
-            # Ensure tags are present for uv-dynamic-versioning
+            uv pip install setuptools_scm
+      - run:
+          name: Compute RELEASE_VERSION via setuptools_scm
+          command: |
+            # Ensure tags are present for setuptools_scm
             git fetch --tags --force --prune || true
-
-            # Build once; uv-dynamic-versioning will compute version from VCS
-            uv build
-
-            # Extract version from wheel name: udata_hydra-<version>-*.whl
-            WHEEL=$(ls dist/udata_hydra-*.whl | head -n1)
-            [ -z "$WHEEL" ] && echo "No wheel produced" && exit 1
-            RELEASE_VERSION=$(basename "$WHEEL" | sed -nE 's/^udata_hydra-([^-]+)-.*/\1/p')
+            # derive from setuptools_scm or base version + build number
+            RELEASE_VERSION=$(uv run python -m setuptools_scm)
             echo "export RELEASE_VERSION=$RELEASE_VERSION" > version.sh
             chmod +x version.sh
       - run:
@@ -143,6 +142,10 @@ jobs:
             echo "Build number: $CIRCLE_BUILD_NUM"
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Git tag: $CIRCLE_TAG"
+      - run:
+          name: Build a distributable package as a wheel release
+          command: |
+            uv build --wheel
       # Build already executed above; artifacts are in dist/
       - store_artifacts:
           path: dist
@@ -154,7 +157,7 @@ jobs:
 
   publish:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
     steps:
       - attach_workspace:
           at: .
@@ -204,7 +207,7 @@ jobs:
 
   create-sentry-release:
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:stable-slim
     steps:
       - attach_workspace:
           at: .
@@ -226,8 +229,8 @@ jobs:
 
   benchmark:
     docker:
-      # Can't use a slim or slim image here ad we need libmagik to run the tests
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>
+      # Can't use a slim image here as we need libmagik to run the tests and git for commits
+      - image: python:<< pipeline.parameters.python-version >>-bookworm
       - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres
