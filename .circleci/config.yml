@@ -205,7 +205,7 @@ jobs:
 
   create-sentry-release:
     docker:
-      - image: cimg/base:stable-slim
+      - image: cimg/base:stable
     steps:
       - attach_workspace:
           at: .
