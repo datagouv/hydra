@@ -32,24 +32,35 @@ This project uses `libmagic`, which needs to be installed on your system, eg:
 
 `brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on linux.
 
-This project uses Python >=3.11 and [Poetry](https://python-poetry.org) >= 2.0.0 to manage dependencies.
+This project uses Python >=3.11 and [uv](https://docs.astral.sh/uv/) to manage dependencies.
+
+## 🚀 Installation
+
+### With uv (recommended)
+```bash
+uv sync
+```
+
+### With pip
+```bash
+pip3 install -e .
+```
 
 ## 🖥️ CLI
 
 ### Create database structure
 
-Install udata-hydra dependencies and cli.
-`poetry install`
+Install udata-hydra dependencies and cli (see Installation section above), then migrate the DB with:
 
-`poetry run udata-hydra migrate`
+`uv run udata-hydra migrate`
 
 ### Load (UPSERT) latest catalog version from data.gouv.fr
 
-`poetry run udata-hydra load-catalog`
+`uv run udata-hydra load-catalog`
 
 ## 🕷️ Crawler
 
-`poetry run udata-hydra-crawl`
+`uv run udata-hydra-crawl`
 
 It will crawl (forever) the catalog according to the config set in `config.toml`, with a default config in `udata_hydra/config_default.toml`.
 
@@ -65,15 +76,15 @@ If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
 A job queuing system is used to process long-running tasks. Launch the worker with the following command:
 
-`poetry run rq worker -c udata_hydra.worker`
+`uv run rq worker -c udata_hydra.worker`
 
 To monitor worker status:
 
-`poetry run rq info -c udata_hydra.worker --interval 1`
+`uv run rq info -c udata_hydra.worker --interval 1`
 
 To empty all the queues:
 
-`poetry run rq empty -c udata_hydra.worker low default high`
+`uv run rq empty -c udata_hydra.worker low default high`
 
 ## 📊 CSV conversion to database
 
@@ -83,15 +94,15 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 
 To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
 
-Make sure the dev dependencies are installed with `poetry install --extras dev`.
+Make sure the dev dependencies are installed with `uv pip install -r pylock.toml --extras dev` or `pip3 install -r pylock.toml --extras dev`.
 
-Then you can run the tests with `poetry run pytest`.
+Then you can run the tests with `uv run pytest`.
 
-To run a specific test file, you can pass the path to the file to pytest, like this: `poetry run pytest tests/test_file.py`.
+To run a specific test file, you can pass the path to the file to pytest, like this: `uv run pytest tests/test_file.py`.
 
-To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `poetry run pytest tests/test_api/test_api_checks.py::test_get_latest_check`.
+To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `uv run pytest tests/test_api/test_api_checks.py::test_get_latest_check`.
 
-If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
+If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`uv run pytest -s`). However, note that this can sometimes be difficult to parse.
 
 ### 🎯 Tests coverage
 
@@ -177,8 +188,8 @@ RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
 ### 🚀 Run
 
 ```bash
-poetry install
-poetry run adev runserver udata_hydra/app.py
+# Install dependencies (see Installation section above)
+uv run adev runserver udata_hydra/app.py
 ```
 By default, the app will listen on `localhost:8000`.
 You can check the status of the app with `curl http://localhost:8000/api/health`.
@@ -542,7 +553,7 @@ Once this is done, code formatting and linting, as well as import sorting, will 
 
 If you cannot use pre-commit, it is necessary to format, lint, and sort imports with [Ruff](https://docs.astral.sh/ruff/) before committing:
 ```bash
-poetry run ruff check --fix . && poetry run ruff format .
+uv run ruff check --fix . && uv run ruff format .
 ```
 
 ### 🏷️ Releases
