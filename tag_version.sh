@@ -263,3 +263,32 @@ echo "$RELEASE_NOTES" | gh release create "v$VERSION" \
     --notes-file -
 
 echo "✓ Created GitHub release v$VERSION"
+
+# --- Post-release: bump to next development version ---
+# Compute next patch version and set X.Y.(Z+1).dev in pyproject.toml, then commit and push
+NEXT_DEV_VERSION=""
+
+# Extract semver components MAJOR.MINOR.PATCH from $VERSION
+if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    MAJOR="${BASH_REMATCH[1]}"
+    MINOR="${BASH_REMATCH[2]}"
+    PATCH="${BASH_REMATCH[3]}"
+    NEXT_PATCH=$((PATCH + 1))
+    NEXT_DEV_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}.dev"
+else
+    echo "Warning: VERSION '$VERSION' is not a plain X.Y.Z; skipping automatic dev bump"
+fi
+
+if [ -n "$NEXT_DEV_VERSION" ]; then
+    if [ -f "pyproject.toml" ]; then
+        sed -i.bak "s/^version = \".*\"/version = \"$NEXT_DEV_VERSION\"/" pyproject.toml
+        rm -f pyproject.toml.bak
+        echo "✓ Updated pyproject.toml version to $NEXT_DEV_VERSION"
+        git add pyproject.toml
+        git commit -m "chore: start next development cycle: $NEXT_DEV_VERSION"
+        git push origin HEAD
+        echo "✓ Pushed post-release dev bump to $NEXT_DEV_VERSION"
+    else
+        echo "Warning: pyproject.toml not found, skipping post-release dev bump"
+    fi
+fi
