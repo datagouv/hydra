@@ -32,7 +32,7 @@ parameters:
 jobs:
   install:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
     steps:
       - checkout
       - run:
@@ -65,7 +65,7 @@ jobs:
 
   lint:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
     steps:
       - attach_workspace:
           at: .
@@ -80,7 +80,7 @@ jobs:
 
   tests:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
       - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres
@@ -92,7 +92,8 @@ jobs:
           at: .
       - run:
           name: Install system dependencies
-          command: apt-get update -qq && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
+          command: |
+            apt-get update -qq && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
       - run:
           name: Run tests
           environment:
@@ -116,24 +117,20 @@ jobs:
 
   build:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm  # needs git for setuptools_scm
     steps:
       - attach_workspace:
           at: .
       - run:
-          name: Set the version
+          name: Install build tools
           command: |
-            if [[ $CIRCLE_TAG ]]; then
-                # This is a tagged release, version has been handled upstream
-                echo "export RELEASE_VERSION=$CIRCLE_TAG" > version.sh
-            # Otherwise, relies on a dev version like "1.2.1.dev" by default
-            elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
-                # for main branches, can't add the commit hash since it's not a valid format for publishing
-                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM" > version.sh
-            else
-                # for feature branches, add the commit hash
-                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}" > version.sh
-            fi
+            uv pip install setuptools-scm
+      - run:
+          name: Compute RELEASE_VERSION via setuptools_scm
+          command: |
+            # derive from setuptools_scm or base version + build number
+            RELEASE_VERSION=$(uv run python -m setuptools_scm)
+            echo "export RELEASE_VERSION=$RELEASE_VERSION" > version.sh
             chmod +x version.sh
       - run:
           name: Display build info for debugging
@@ -144,13 +141,10 @@ jobs:
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Git tag: $CIRCLE_TAG"
       - run:
-          name: Build package
+          name: Build a distributable package as a wheel release
           command: |
-            source version.sh
-            # Update version in pyproject.toml
-            sed -i "s/version = \".*\"/version = \"$RELEASE_VERSION\"/" pyproject.toml
-            # Build the package
-            uv build
+            uv build --wheel
+      # Build already executed above; artifacts are in dist/
       - store_artifacts:
           path: dist
       - persist_to_workspace:
@@ -161,7 +155,7 @@ jobs:
 
   publish:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
     steps:
       - attach_workspace:
           at: .
@@ -211,7 +205,7 @@ jobs:
 
   create-sentry-release:
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:stable-slim
     steps:
       - attach_workspace:
           at: .
@@ -233,8 +227,8 @@ jobs:
 
   benchmark:
     docker:
-      # Can't use a slim or slim image here ad we need libmagik to run the tests
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>
+      # Can't use a slim image here as we need libmagik to run the tests and git for commits
+      - image: python:<< pipeline.parameters.python-version >>-bookworm
       - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres

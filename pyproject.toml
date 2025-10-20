@@ -1,6 +1,10 @@
+[build-system]
+requires = ["setuptools>=68", "wheel", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "udata-hydra"
-version = "2.4.2"
+dynamic = ["version"]
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = [{ name = "Opendata Team", email = "opendatateam@data.gouv.fr" }]
 dependencies = [
@@ -42,6 +46,11 @@ dev = [
     "ruff>=0.9.3",
 ]
 
+[project.scripts]
+udata-hydra = "udata_hydra.cli:run"
+udata-hydra-crawl = "udata_hydra.crawl:run"
+udata-hydra-app = "udata_hydra.app:run"
+
 [tool.mypy]
 [[tool.mypy.overrides]]
 module = [
@@ -58,11 +67,6 @@ module = [
 ]
 ignore_missing_imports = true
 
-[tool.poetry.scripts]
-udata-hydra = "udata_hydra.cli:run"
-udata-hydra-crawl = "udata_hydra.crawl:run"
-udata-hydra-app = "udata_hydra.app:run"
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 markers = [
@@ -76,10 +80,10 @@ markers = [
 lint = { extend-select = ["I"] } # ["I"] is to also sort imports with an isort rule
 line-length = 100
 
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
+
 [tool.uv.build-backend]
 module-name = "udata_hydra"
 module-root = ""
-
-[build-system]
-requires = ["uv_build>=0.8.4,<0.9.0"]
-build-backend = "uv_build"

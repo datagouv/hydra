@@ -205,25 +205,14 @@ RELEASE_NOTES="$SORTED_COMMITS"
 
 # Update CHANGELOG.md and version in pyproject.toml
 if [ "$DRY_RUN" = true ]; then
-    echo "Would update pyproject.toml version to: $VERSION"
     echo "Would update CHANGELOG.md with:"
     echo "$NEW_ENTRY"
-    echo "Would run: git add pyproject.toml CHANGELOG.md"
-    echo "Would run: git commit -m \"chore: bump version to $VERSION\""
+    echo "Would run: git add CHANGELOG.md"
+    echo "Would run: git commit -m \"chore: release $VERSION (CHANGELOG)\""
     echo "Would run: git tag -a \"v$VERSION\" -m \"Version $VERSION\""
     echo "Would run: git push origin HEAD v$VERSION"
     echo "Would run: gh release create \"v$VERSION\" --title \"v$VERSION\" --notes <release notes>"
     exit 0
-fi
-
-# Update version in pyproject.toml
-if [ -f "pyproject.toml" ]; then
-    # Use sed to update the version line
-    sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
-    rm pyproject.toml.bak
-    echo "✓ Updated pyproject.toml version to $VERSION"
-else
-    echo "Warning: pyproject.toml not found, skipping version update"
 fi
 
 if [ -f "CHANGELOG.md" ]; then
@@ -241,9 +230,9 @@ fi
 
 echo "CHANGELOG.md updated with commits from $LAST_TAG to HEAD"
 
-# Commit the version and CHANGELOG updates
-git add pyproject.toml CHANGELOG.md
-git commit -m "chore: bump version to $VERSION"
+# Commit CHANGELOG update
+git add CHANGELOG.md
+git commit -m "chore: release $VERSION (CHANGELOG)"
 
 echo "✓ Committed pyproject.toml and CHANGELOG.md"
 
