@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.3 (2025-10-21)
+
+- fix: fix entrypoint ([#350](https://github.com/datagouv/hydra/pull/350))
+
+
 ## 2.4.2 (2025-10-20)
 
 - build: add tag_version.sh script ([#342](https://github.com/datagouv/hydra/pull/342))
