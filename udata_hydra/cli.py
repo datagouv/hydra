@@ -11,7 +11,8 @@ import aiohttp
 import asyncpg
 from asyncpg import Record
 from humanfriendly import parse_size
-from minicli import cli, run, wrap
+from minicli import cli, wrap
+from minicli import run as minicli_run
 from progressist import ProgressBar
 
 from udata_hydra import config
@@ -768,6 +769,11 @@ async def cli_wrapper():
     yield
     for db in context["conn"]:
         await context["conn"][db].close()
+
+
+def run():
+    """Main CLI entry point"""
+    minicli_run()
 
 
 if __name__ == "__main__":
