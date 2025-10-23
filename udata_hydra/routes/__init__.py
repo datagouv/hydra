@@ -8,6 +8,7 @@ from udata_hydra.routes.checks import (
     get_checks_aggregate,
     get_latest_check,
 )
+from udata_hydra.routes.file_analysis import analyse_file
 from udata_hydra.routes.resources import (
     create_resource,
     delete_resource,
@@ -72,6 +73,7 @@ routes_params = [
         delete_resource_exception,
         None,
     ),
+    (web.post, "/api/file-analysis/", analyse_file, None),
 ]
 
 # Generate the routes
