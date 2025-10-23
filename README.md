@@ -160,10 +160,10 @@ To run performance benchmarks locally, you can use the CLI commands:
 
 ```bash
 # Convert CSV to GeoJSON
-poetry run udata-hydra convert-csv-to-geojson /path/to/large/file.csv
+uv run udata-hydra convert-csv-to-geojson /path/to/large/file.csv
 
 # Convert GeoJSON to PMTiles
-poetry run udata-hydra convert-geojson-to-pmtiles /path/to/large/file.geojson
+uv run udata-hydra convert-geojson-to-pmtiles /path/to/large/file.geojson
 ```
 
 These commands allow you to test performance improvements locally before pushing to the benchmarks branch.
