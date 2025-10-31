@@ -28,9 +28,9 @@ The hydra crawler is one of the components of the architecture. It will check if
 
 ## 📦 Dependencies
 
-This project uses `libmagic`, which needs to be installed on your system, eg:
+This project uses `libmagic`, which needs to be installed on your system, e.g.:
 
-`brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on linux.
+`brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on Linux.
 
 This project uses Python >=3.11 and [uv](https://docs.astral.sh/uv/) to manage dependencies.
 
@@ -94,7 +94,7 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 
 To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
 
-Make sure the dev dependencies are installed with `uv pip install -r pylock.toml --extras dev` or `pip3 install -r pylock.toml --extras dev`.
+Make sure the dev dependencies are installed with `uv sync --extra dev` or `pip3 install -e .[dev]`.
 
 Then you can run the tests with `uv run pytest`.
 
@@ -366,7 +366,7 @@ $ curl   -X POST http://localhost:8000/api/resources-exceptions \
 ...or, if you don't want to add table indexes and a comment:
 ```bash
 $ curl  -X POST localhost:8000/api/resources-exceptions \
-        -H 'Authorization: Bearer <myAPIkey>" \
+        -H 'Authorization: Bearer <myAPIkey>' \
         -d '{"resource_id": "f868cca6-8da1-4369-a78d-47463f19a9a3"}'
 ```
 
@@ -482,7 +482,7 @@ $ curl -s "http://localhost:8000/api/stats" | json_pp
 
 ## 🔗 Using Webhook integration
 
-** Set the config values**
+**Set the config values**
 
 Create a `config.toml` where your service and commands are launched, or specify a path to a TOML file via the `HYDRA_SETTINGS` environment variable. `config.toml` or equivalent will override values from `udata_hydra/config_default.toml`, lookup there for values that can/need to be defined.
 
@@ -556,9 +556,11 @@ If you cannot use pre-commit, it is necessary to format, lint, and sort imports 
 uv run ruff check --fix . && uv run ruff format .
 ```
 
-### 🏷️ Releases
+### 🏷️ Releases and versioning
 
-The release process uses the [`tag_version.sh`](tag_version.sh) script to create git tags and update [CHANGELOG.md](CHANGELOG.md) and [pyproject.toml](pyproject.toml) automatically.
+The release process uses the [`tag_version.sh`](tag_version.sh) script to create git tags, GitHub releases and update [CHANGELOG.md](CHANGELOG.md) automatically. Package version numbers are automatically derived from git tags using [setuptools_scm](https://github.com/pypa/setuptools_scm), so no manual version updates are needed in `pyproject.toml`.
+
+**Prerequisites**: [GitHub CLI](https://cli.github.com/) must be installed and authenticated, and you must be on the main branch with a clean working directory.
 
 ```bash
 # Create a new release
@@ -571,10 +573,7 @@ The release process uses the [`tag_version.sh`](tag_version.sh) script to create
 ./tag_version.sh 2.5.0 --dry-run
 ```
 
-**Prerequisites**: GitHub CLI (`gh`) must be installed and authenticated, and you must be on the main branch with a clean working directory.
-
 The script automatically:
-- Updates the version in pyproject.toml
 - Extracts commits since the last tag and formats them for CHANGELOG.md
 - Identifies breaking changes (commits with `!:` in the subject)
 - Creates a git tag and pushes it to the remote repository
