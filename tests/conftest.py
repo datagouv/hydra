@@ -29,8 +29,8 @@ RESOURCE_EXCEPTION_TABLE_INDEXES = {"Nom": "index", "N° de certificat": "index"
 RESOURCE_URL = "https://example.com/resource-1"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 NOT_EXISTING_RESOURCE_ID = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
-
 pytestmark = pytest.mark.asyncio
+
 nest_asyncio.apply()
 
 log = logging.getLogger("udata-hydra")

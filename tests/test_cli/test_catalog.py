@@ -17,7 +17,6 @@ async def test_load_catalog_url_has_changed(setup_catalog, rmock, db, catalog_co
     )
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    # Call the async function directly - CliRunner.invoke() doesn't properly await in async tests
     await load_catalog(url=catalog, drop_meta=False, drop_all=False, quiet=False)
 
     # check that we still only have one entry for this resource in the catalog
@@ -35,7 +34,6 @@ async def test_load_catalog_harvest_modified_at_has_changed(
     catalog_content = catalog_content.replace(b'""\n', b'"2025-03-14 15:49:16.876+02"\n')
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    # Call the async function directly - CliRunner.invoke() doesn't properly await in async tests
     await load_catalog(url=catalog, drop_meta=False, drop_all=False, quiet=False)
 
     # check that harvest metadata has been updated
@@ -62,7 +60,6 @@ async def test_insert_resource_in_catalog(rmock):
             },
         },
     )
-    # Call the async function directly - CliRunner.invoke() doesn't properly await in async tests
     await insert_resource_into_catalog(resource_id=RESOURCE_ID)
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
