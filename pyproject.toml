@@ -59,7 +59,6 @@ module = [
     "botocore.*",
     "csv_detective.*",
     "humanfriendly.*",
-    "minicli.*",
     "sqlalchemy.*",
     "str2bool.*",
     "str2float.*",
