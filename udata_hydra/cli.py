@@ -826,7 +826,7 @@ async def cleanup():
         await context["conn"][db].close()
 
 
-def main():
+def run():
     """Main entry point for the CLI"""
     try:
         import asyncio
@@ -837,4 +837,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run()
