@@ -154,8 +154,6 @@ async def analyse_resource(
 
     timer.stop()
 
-    timer.stop()
-
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
         if is_tabular and tmp_file:
             # Change status to TO_ANALYSE_CSV
