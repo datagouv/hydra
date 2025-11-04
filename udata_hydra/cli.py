@@ -54,6 +54,8 @@ async def load_catalog(
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
 ):
     """Load the catalog into DB from CSV file"""
+    start_time = datetime.now(timezone.utc)
+    original_level = log.level
     if quiet:
         log.setLevel(logging.ERROR)
 
@@ -117,6 +119,15 @@ async def load_catalog(
         log.info("Resources catalog successfully upserted into DB.")
         await Resource.clean_up_statuses()
         log.info("Stuck statuses sucessfully reset to null.")
+        end_time = datetime.now(timezone.utc)
+        log.setLevel(logging.INFO)
+        log.info(
+            f"load_catalog completed. Start time: {start_time.isoformat()}, End time: {end_time.isoformat()}\n"
+        )
+        if quiet:
+            log.setLevel(logging.ERROR)
+        else:
+            log.setLevel(original_level)
     except Exception as e:
         raise e
     finally:
@@ -564,6 +575,8 @@ async def purge_checks(
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
 ) -> None:
     """Delete outdated checks that are more than `retention_days` days old"""
+    start_time = datetime.now(timezone.utc)
+    original_level = log.level
     if quiet:
         log.setLevel(logging.ERROR)
 
@@ -573,7 +586,16 @@ async def purge_checks(
         f"""WITH deleted AS (DELETE FROM checks WHERE created_at < now() - interval '{retention_days} days' RETURNING *) SELECT count(*) FROM deleted"""
     )
     deleted: int = res["count"]
+    end_time = datetime.now(timezone.utc)
     log.info(f"Deleted {deleted} checks.")
+    log.setLevel(logging.INFO)
+    log.info(
+        f"purge_checks completed. Start time: {start_time.isoformat()}, End time: {end_time.isoformat()}\n"
+    )
+    if quiet:
+        log.setLevel(logging.ERROR)
+    else:
+        log.setLevel(original_level)
 
 
 @cli.command()
@@ -587,6 +609,8 @@ async def purge_csv_tables(
 
     # Fetch all parsing tables from checks where we don't have any entry on
     # md5(url) in catalog or all entries are marked as deleted.
+    start_time = datetime.now(timezone.utc)
+    original_level = log.level
     if quiet:
         log.setLevel(logging.ERROR)
 
@@ -639,6 +663,15 @@ async def purge_csv_tables(
         log.warning(f"Failed to delete {error_count} table(s). Check logs for details.")
     if not (success_count or error_count):
         log.info("Nothing to delete.")
+    end_time = datetime.now(timezone.utc)
+    log.setLevel(logging.INFO)
+    log.info(
+        f"purge_csv_tables completed. Start time: {start_time.isoformat()}, End time: {end_time.isoformat()}\n"
+    )
+    if quiet:
+        log.setLevel(logging.ERROR)
+    else:
+        log.setLevel(original_level)
 
 
 @cli.command()
