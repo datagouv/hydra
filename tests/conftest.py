@@ -53,6 +53,28 @@ def dummy(return_value=None):
     return fn
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--input_file",
+        action="store",
+        default=None,
+        help="Path to input file for performance tests",
+    )
+
+
+def pytest_generate_tests(metafunc):
+    # This is called for every test. Check if the test function has the parameters
+    # we want to parametrize and if the command line options are provided.
+    input_file_value = metafunc.config.option.input_file
+
+    # Check if the test function has 'input_file' as a parameter
+    if (
+        hasattr(metafunc.function, "__code__")
+        and "input_file" in metafunc.function.__code__.co_varnames
+    ):
+        metafunc.parametrize("input_file", [input_file_value])
+
+
 @pytest.fixture
 def is_harvested(request):
     return "catalog_harvested" in [m.name for m in request.node.iter_markers()]
@@ -244,10 +266,11 @@ async def fake_check():
         domain="example.com",
         pmtiles_url=False,
         geojson_url=False,
+        url=None,
     ) -> dict:
-        url = f"https://example.com/resource-{resource}"
+        _url = url or f"https://example.com/resource-{resource}"
         data = {
-            "url": url,
+            "url": _url,
             "domain": domain,
             "status": status,
             "headers": json.dumps(headers),
@@ -261,7 +284,7 @@ async def fake_check():
             "analysis_error": analysis_error,
             "detected_last_modified_at": detected_last_modified_at,
             "next_check_at": next_check_at,
-            "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest()
+            "parsing_table": hashlib.md5(_url.encode("utf-8")).hexdigest()
             if parsing_table
             else None,
             "parquet_url": "https://example.org/file.parquet" if parquet_url else None,

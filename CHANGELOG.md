@@ -1,6 +1,41 @@
 # Changelog
 
-## Current (in progress)
+## 2.4.3 (2025-10-21)
+
+- fix: fix entrypoint ([#350](https://github.com/datagouv/hydra/pull/350))
+
+
+## 2.4.2 (2025-10-20)
+
+- build: add tag_version.sh script ([#342](https://github.com/datagouv/hydra/pull/342))
+- build: use uv instead of Poetry for lock file and in CI ([#241](https://github.com/datagouv/hydra/pull/241))
+- chore: bump version to 2.4.2
+- docs: fix changelog
+- docs: fix error in changelog
+- docs: remove "current" section in changelog to prepare it for automatic update of changelog
+- docs: update changelog for merged PR [#328](https://github.com/datagouv/hydra/pull/328)
+- Enable to analyse and insert parquet files ([#343](https://github.com/datagouv/hydra/pull/343))
+- feat: add performance tests and CLI tools for geographical file conversion benchmarking ([#319](https://github.com/datagouv/hydra/pull/319))
+- feat: allow to crawl non-data.gouv URLs ([#312](https://github.com/datagouv/hydra/pull/312))
+- feat: benchmarks CI workflow ([#339](https://github.com/datagouv/hydra/pull/339))
+- feat: dynamic version in user agent ([#328](https://github.com/datagouv/hydra/pull/328))
+- feat: flag deleted resources in CSV DB instead of deleting them ([#340](https://github.com/datagouv/hydra/pull/340))
+- feat: store dataset_id in CSV tables_index ([#341](https://github.com/datagouv/hydra/pull/341))
+- Fix after parquet ([#346](https://github.com/datagouv/hydra/pull/346))
+- fix: fix docker image
+- fix: fix release in CI ([#349](https://github.com/datagouv/hydra/pull/349))
+- fix: fix user agent string ([#337](https://github.com/datagouv/hydra/pull/337))
+- Revert "chore: bump version to 2.4.2"
+- Update to version 2.4.2.dev for next development cycle
+
+
+## 2.4.1 (2025-09-03)
+
+- Only delete the table if the insertion was not successful [#332](https://github.com/datagouv/hydra/pull/332)
+- Handle cases of empty table in db when getting the previous analysis [#333](https://github.com/datagouv/hydra/pull/333)
+- Better discriminate long column names [#334](https://github.com/datagouv/hydra/pull/334)
+
+## 2.4.0 (2025-09-02)
 
 - Simplify CI configuration [#290](https://github.com/datagouv/hydra/pull/290)
 - Remove unused dependencies [#292](https://github.com/datagouv/hydra/pull/292)
@@ -23,6 +58,8 @@
 - Fix deprecated Sentry method [#323](https://github.com/datagouv/hydra/pull/323)
 - Upgrade csv-detective [#322](https://github.com/datagouv/hydra/pull/322) [#324](https://github.com/datagouv/hydra/pull/324) [#327](https://github.com/datagouv/hydra/pull/327)
 - Stream geojson conversion to prevent RAM consumption [#326](https://github.com/datagouv/hydra/pull/326)
+- Gracefully crash if any of the column names is too long for Postgres [#329](https://github.com/datagouv/hydra/pull/329)
+- Return updated check in `handle_resource_exception` to send the right payload to udata [#330](https://github.com/datagouv/hydra/pull/330)
 
 ## 2.3.0 (2025-07-15)
 

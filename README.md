@@ -32,24 +32,35 @@ This project uses `libmagic`, which needs to be installed on your system, eg:
 
 `brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on linux.
 
-This project uses Python >=3.11 and [Poetry](https://python-poetry.org) >= 2.0.0 to manage dependencies.
+This project uses Python >=3.11 and [uv](https://docs.astral.sh/uv/) to manage dependencies.
+
+## 🚀 Installation
+
+### With uv (recommended)
+```bash
+uv sync
+```
+
+### With pip
+```bash
+pip3 install -e .
+```
 
 ## 🖥️ CLI
 
 ### Create database structure
 
-Install udata-hydra dependencies and cli.
-`poetry install`
+Install udata-hydra dependencies and cli (see Installation section above), then migrate the DB with:
 
-`poetry run udata-hydra migrate`
+`uv run udata-hydra migrate`
 
 ### Load (UPSERT) latest catalog version from data.gouv.fr
 
-`poetry run udata-hydra load-catalog`
+`uv run udata-hydra load-catalog`
 
 ## 🕷️ Crawler
 
-`poetry run udata-hydra-crawl`
+`uv run udata-hydra-crawl`
 
 It will crawl (forever) the catalog according to the config set in `config.toml`, with a default config in `udata_hydra/config_default.toml`.
 
@@ -65,15 +76,15 @@ If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
 A job queuing system is used to process long-running tasks. Launch the worker with the following command:
 
-`poetry run rq worker -c udata_hydra.worker`
+`uv run rq worker -c udata_hydra.worker`
 
 To monitor worker status:
 
-`poetry run rq info -c udata_hydra.worker --interval 1`
+`uv run rq info -c udata_hydra.worker --interval 1`
 
 To empty all the queues:
 
-`poetry run rq empty -c udata_hydra.worker low default high`
+`uv run rq empty -c udata_hydra.worker low default high`
 
 ## 📊 CSV conversion to database
 
@@ -83,21 +94,79 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 
 To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
 
-Make sure the dev dependencies are installed with `poetry install --extras dev`.
+Make sure the dev dependencies are installed with `uv pip install -r pylock.toml --extras dev` or `pip3 install -r pylock.toml --extras dev`.
 
-Then you can run the tests with `poetry run pytest`.
+Then you can run the tests with `uv run pytest`.
 
-To run a specific test file, you can pass the path to the file to pytest, like this: `poetry run pytest tests/test_file.py`.
+To run a specific test file, you can pass the path to the file to pytest, like this: `uv run pytest tests/test_file.py`.
 
-To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `poetry run pytest tests/test_api/test_api_checks.py::test_get_latest_check`.
+To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `uv run pytest tests/test_api/test_api_checks.py::test_get_latest_check`.
 
-If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
+If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`uv run pytest -s`). However, note that this can sometimes be difficult to parse.
 
-### 📈 Tests coverage
+### 🎯 Tests coverage
 
 Pytest automatically uses the `coverage` package to generate a coverage report, which is displayed at the end of the test run in the terminal.
 The coverage is configured in the `pyproject.toml` file, in the `[tool.pytest.ini_options]` section.
 You can also override the coverage report configuration when running the tests by passing some flags like `--cov-report` to pytest. See [the pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/config.html) for more information.
+
+### 📈 Performance benchmarking
+
+Hydra includes performance benchmarks to track and compare the performance of different operations on large files.
+These benchmarks help identify performance regressions and improvements across different commits.
+
+#### How it works
+
+Performance benchmarks are automatically executed on CI runners when pushing to the `benchmarks` branch. The benchmarks test three key operations:
+
+1. **CSV analysis** on large files using integrated test data
+2. **CSV to GeoJSON conversion** on large files using the `TEST_GEOCSV_URL` configured in CI
+3. **GeoJSON to PMTiles conversion** on large files using the `TEST_GEOCSV_URL` configured in CI
+
+#### Benchmark execution
+
+Benchmarks run on:
+- **[CircleCI](https://app.circleci.com/pipelines/github/datagouv/hydra)** ([workflow file](https://github.com/datagouv/hydra/blob/main/.circleci/config.yml)) - available as a manually triggerable pipeline after a push to `benchmarks` branch
+- **[GitHub Actions](https://github.com/datagouv/hydra/actions/workflows/benchmark.yml)** ([workflow file](https://github.com/datagouv/hydra/blob/main/.github/workflows/benchmark.yml)) - triggered automatically on pushes to `benchmarks` branch
+
+Using two different CI systems allows for performance comparison across different environments and gives a way to avoid exhausting CI time limits.
+
+#### Metrics collected
+
+Each benchmark run collects **execution time** in seconds, **commit information** (hash, author) and **runner specifications** (CPU cores, memory, Python version, runner class), which are stored in [`.benchmarks/benchmarks.csv`](https://github.com/datagouv/hydra/blob/benchmarks/.benchmarks/benchmarks.csv).
+
+More specifically:
+- `datetime` - when the test was run
+- `test_name` - which test was executed
+- `input_file` - URL or path of the input test data file used
+- `ci` - which CI system ran the test (github or circleci)
+- `execution_time_seconds` - performance measurement
+- `commit_author` - who made the commit
+- `commit_id` - the commit hash (7 characters)
+- `runner_class` - CircleCI/GitHub Actions runner type
+- `runner_cpu` - number of CPU cores
+- `runner_memory` - available memory in MB
+- `python_version` - Python version used
+
+Results are committed and pushed back to the `benchmarks` branch, creating a historical performance tracking dataset.
+
+#### Viewing results
+
+You can view the current benchmark results at: [benchmarks.csv](https://github.com/datagouv/hydra/blob/benchmarks/.benchmarks/benchmarks.csv)
+
+#### Running benchmarks locally
+
+To run performance benchmarks locally, you can use the CLI commands:
+
+```bash
+# Convert CSV to GeoJSON
+uv run udata-hydra convert-csv-to-geojson /path/to/large/file.csv
+
+# Convert GeoJSON to PMTiles
+uv run udata-hydra convert-geojson-to-pmtiles /path/to/large/file.geojson
+```
+
+These commands allow you to test performance improvements locally before pushing to the benchmarks branch.
 
 ## 🔌 API
 
@@ -119,8 +188,8 @@ RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
 ### 🚀 Run
 
 ```bash
-poetry install
-poetry run adev runserver udata_hydra/app.py
+# Install dependencies (see Installation section above)
+uv run adev runserver udata_hydra/app.py
 ```
 By default, the app will listen on `localhost:8000`.
 You can check the status of the app with `curl http://localhost:8000/api/health`.
@@ -484,9 +553,29 @@ Once this is done, code formatting and linting, as well as import sorting, will 
 
 If you cannot use pre-commit, it is necessary to format, lint, and sort imports with [Ruff](https://docs.astral.sh/ruff/) before committing:
 ```bash
-poetry run ruff check --fix . && poetry run ruff format .
+uv run ruff check --fix . && uv run ruff format .
 ```
 
 ### 🏷️ Releases
 
-The release process uses [bump'X](https://github.com/datagouv/bumpx).
+The release process uses the [`tag_version.sh`](tag_version.sh) script to create git tags and update [CHANGELOG.md](CHANGELOG.md) and [pyproject.toml](pyproject.toml) automatically.
+
+```bash
+# Create a new release
+./tag_version.sh <version>
+
+# Example
+./tag_version.sh 2.5.0
+
+# Dry run to see what would happen
+./tag_version.sh 2.5.0 --dry-run
+```
+
+**Prerequisites**: GitHub CLI (`gh`) must be installed and authenticated, and you must be on the main branch with a clean working directory.
+
+The script automatically:
+- Updates the version in pyproject.toml
+- Extracts commits since the last tag and formats them for CHANGELOG.md
+- Identifies breaking changes (commits with `!:` in the subject)
+- Creates a git tag and pushes it to the remote repository
+- Creates a GitHub release with the changelog content

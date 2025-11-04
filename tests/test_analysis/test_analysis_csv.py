@@ -1,6 +1,7 @@
 import hashlib
 import json
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +16,7 @@ from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
 from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.crawl.check_resources import check_resource
+from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils.minio import MinIOClient
 
@@ -63,11 +65,14 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     It's meant to act as a "canary in the coal mine": if performance degrades too much, you or the CI should feel it.
     You can deselect it by running `pytest -m "not slow"`.
     """
+    TEST_CSV_FILE, EXPECTED_COUNT = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
+
     check = await fake_check()
-    filename, expected_count = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
-    with open(f"tests/data/{filename}", "rb") as f:
+
+    csv_path = "tests/data" / Path(TEST_CSV_FILE)
+    with csv_path.open("rb") as f:
         data = f.read()
     rmock.get(url, status=200, body=data)
 
@@ -83,14 +88,14 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     assert resource["status"] is None
 
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
-    assert count["count"] == expected_count
+    assert count["count"] == EXPECTED_COUNT
     profile = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
     profile = json.loads(profile["csv_detective"])
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
-    assert profile["total_lines"] == expected_count
+    assert profile["total_lines"] == EXPECTED_COUNT
 
 
 @pytest.mark.parametrize(
@@ -458,24 +463,6 @@ def create_analysis(scan: dict) -> dict:
             },
             False,
         ),
-        # some column names get truncated in db, but validation works (file content and analysis are unchanged)
-        (
-            *(
-                default_kwargs
-                | {
-                    "header": ["a" * 70, "b" * 70, "a" * 30],
-                    "rows": [["1", "13002526500013", "1.2"], ["5", "38271817900023", "2.3"]],
-                    "columns": {
-                        "a" * 70: {"score": 1.0, "format": "int", "python_type": "int"},
-                        "b" * 70: {"score": 1.0, "format": "siret", "python_type": "string"},
-                        "a" * 30: {"score": 1.0, "format": "float", "python_type": "float"},
-                    },
-                    "formats": {"int": ["a" * 70], "siret": ["b" * 70], "float": ["a" * 30]},
-                },
-            )
-            * 2,
-            True,
-        ),
     ),
 )
 async def test_validation(
@@ -508,10 +495,11 @@ async def test_validation(
 
     # set up previous analysis and db insertion
     await db.execute(
-        "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)",
+        "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)",
         table_name,
         json.dumps(previous_analysis),
         check.get("resource_id"),
+        check.get("dataset_id"),
         check.get("url"),
     )
     await db.execute(
@@ -545,6 +533,8 @@ async def test_validation(
     assert all(row["parsing_table"] == table_name for row in res)
     assert all(str(row["resource_id"]) == check["resource_id"] for row in res)
     assert all(row["url"] == check["url"] for row in res)
+    assert all(row["dataset_id"] == check["dataset_id"] for row in res)
+    assert all(row["deleted_at"] is None for row in res)  # Should be NULL for new records
     latest_analysis = json.loads(res[0]["csv_detective"])
     # check that latest analysis is in line with expectation
     for key in current_analysis.keys():
@@ -664,6 +654,12 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                     new=mocked_minio_client_pmtiles,
                 ),
             ):
+                result = await csv_to_geojson_and_pmtiles(
+                    df, inspection, RESOURCE_ID, cleanup=False
+                )
+                assert result is not None, (
+                    "Expected geographical data to be processed, but function returned None"
+                )
                 (
                     geojson_filepath,
                     geojson_size,
@@ -671,7 +667,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                     pmtiles_filepath,
                     pmtiles_size,
                     pmtiles_url,
-                ) = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID, cleanup=False)
+                ) = result
             # checking geojson
             with open(f"{RESOURCE_ID}.geojson", "r") as f:
                 geojson = json.load(f)
@@ -700,3 +696,48 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
             # Clean up files after tests
             geojson_filepath.unlink()
             pmtiles_filepath.unlink()
+
+
+@pytest.mark.parametrize(
+    "params",
+    (
+        ("col", False),
+        ("çà€", True),
+    ),
+)
+async def test_too_long_column_name(
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+    produce_mock,
+    params,
+):
+    col, has_non_ascii = params
+    url = "http://example.com/csv"
+    max_len = 10
+    col_name = (col * ((max_len // len(col)) + 1))[: max_len if not has_non_ascii else max_len - 3]
+    check = await fake_check()
+    url = check["url"]
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    rmock.get(
+        url,
+        status=200,
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        },
+        body=f"{col_name},b,c\n1,2,3".encode("utf-8"),
+        repeat=True,
+    )
+    # should fail because one column name is too long
+    with patch("udata_hydra.config.NAMEDATALEN", max_len):
+        await analyse_csv(check=check)
+    updated_check = await Check.get_by_id(check["id"])
+    # analysis failed
+    assert updated_check["parsing_error"].startswith("scan_column_names:")
+    # table was not created
+    tables = await db.fetch(
+        "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'public';"
+    )
+    assert table_name not in [r["table_name"] for r in tables]
