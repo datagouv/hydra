@@ -1,7 +1,9 @@
 import gzip
 import hashlib
 import logging
+import mimetypes
 import os
+import re
 import tempfile
 from typing import IO
 
@@ -34,15 +36,19 @@ def extract_gzip(file_path: str) -> IO[bytes]:
 
 async def download_resource(
     url: str,
-    headers: dict,
-    max_size_allowed: int | None,
-) -> IO[bytes]:
+    headers: dict | None = None,
+    max_size_allowed: int | None = None,
+) -> tuple[IO[bytes], str]:
     """
     Attempts downloading a resource from a given url.
-    Returns the downloaded file object.
+    Returns a tuple of (downloaded_file_object, detected_extension).
     Raises custom IOException if the resource is too large or if the URL is unreachable.
     """
-    if max_size_allowed is not None and float(headers.get("content-length", -1)) > max_size_allowed:
+    if (
+        headers
+        and max_size_allowed is not None
+        and float(headers.get("content-length", -1)) > max_size_allowed
+    ):
         raise IOException("File too large to download", url=url)
 
     tmp_file = tempfile.NamedTemporaryFile(
@@ -54,7 +60,8 @@ async def download_resource(
     too_large, download_error = False, None
     try:
         async with aiohttp.ClientSession(
-            headers={"user-agent": config.USER_AGENT}, raise_for_status=True
+            headers={"user-agent": config.USER_AGENT_FULL},
+            raise_for_status=True,
         ) as session:
             async with session.get(url, allow_redirects=True) as response:
                 async for chunk in response.content.iter_chunked(chunk_size):
@@ -74,12 +81,39 @@ async def download_resource(
         if download_error:
             os.remove(tmp_file.name)
             raise IOException("Error downloading CSV", url=url) from download_error
-        if magic.from_file(tmp_file.name, mime=True) in [
-            "application/x-gzip",
-            "application/gzip",
-        ]:
-            tmp_file = extract_gzip(tmp_file.name)
-        return tmp_file
+
+    detected_extension = ""
+
+    if magic.from_file(tmp_file.name, mime=True) in [
+        "application/x-gzip",
+        "application/gzip",
+    ]:
+        # It's compressed - extract and determine extension from URL
+        tmp_file = extract_gzip(tmp_file.name)
+
+        # Extract any extension before .gz using regex
+        match = re.search(r"\.([^.]+)\.gz$", url)
+        if match:
+            detected_extension = f".{match.group(1)}"
+        else:
+            detected_extension = ""
+    else:
+        # Not compressed - use magic to detect type
+        mime_type = magic.from_file(tmp_file.name, mime=True)
+        detected_extension = mimetypes.guess_extension(mime_type) or ""
+
+    return tmp_file, detected_extension
+
+
+async def download_file(url: str, fd):
+    """Download a file from URL to a file descriptor"""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            while True:
+                chunk = await resp.content.read(1024)
+                if not chunk:
+                    break
+                fd.write(chunk)
 
 
 def remove_remainders(resource_id: str, extensions: list[str]) -> None:

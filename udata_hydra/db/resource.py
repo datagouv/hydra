@@ -25,6 +25,8 @@ class Resource:
         "ANALYSING_GEOJSON": "geojson resource content currently being analysed",
         "CONVERTING_TO_PMTILES": "currently being converted to pmtiles",
         "CONVERTING_TO_GEOJSON": "csv is currently being converted to geojson",
+        "TO_ANALYSE_PARQUET": "parquet resource content to be analysed",
+        "ANALYSING_PARQUET": "retrieving parquet column metadata",
     }
 
     @classmethod
@@ -129,11 +131,16 @@ class Resource:
     async def delete(
         cls,
         resource_id: str,
+        hard_delete: bool = False,
     ) -> None:
         pool = await context.pool()
         async with pool.acquire() as connection:
-            # Mark resource as deleted in catalog table
-            q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
+            if hard_delete:
+                q = f"""DELETE FROM catalog WHERE resource_id = '{resource_id}';"""
+                await connection.execute(q)
+            else:
+                # Mark resource as deleted in catalog table
+                q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
             await connection.execute(q)
 
     @staticmethod

@@ -32,6 +32,9 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
         last_check = dict(last_check_record)
 
     has_changed: bool = await has_check_changed(check_data, last_check)
+    check_data["next_check_at"] = calculate_next_check_date(has_changed, last_check, None)
+    new_check: dict = await Check.insert(data=check_data, returning="*")
+
     if has_changed:
         queue.enqueue(
             send,
@@ -39,6 +42,7 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
             resource_id=check_data["resource_id"],
             document=UdataPayload(
                 {
+                    "check:id": new_check["id"],
                     "check:available": is_valid_status(check_data.get("status")),
                     "check:status": check_data.get("status"),
                     "check:timeout": check_data["timeout"],
@@ -60,10 +64,6 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
     # Reset resource status so that it's not forbidden to be checked again.
     # Reset priority so that it's not prioritised anymore.
     await Resource.update(check_data["resource_id"], data={"status": None, "priority": False})
-
-    check_data["next_check_at"] = calculate_next_check_date(has_changed, last_check, None)
-
-    new_check: dict = await Check.insert(data=check_data, returning="*")
 
     return new_check, last_check
 

@@ -1,4 +1,3 @@
----
 version: 2.1
 
 parameters:
@@ -13,33 +12,50 @@ parameters:
     type: string
     default: "dev"
     description: "Environment to deploy to"
+  benchmark-branch:
+    type: string
+    default: "benchmarks"
+    description: "Branch name that triggers the benchmark workflow on push"
   cache-prefix:
     type: string
-    default: "py-cache-v2"
+    default: "py-cache-v3"
     description: "Prefix used for cache keys to store and restore Python dependencies. Increment this value to invalidate existing caches."
+  test-geocsv-file:
+    type: string
+    default: "H_01_1990-1999.csv.gz"
+    description: "URL of the CSV file to download for GeoJSON and PMTiles benchmarks"
+  resource-class:
+    type: string
+    default: "large"
+    description: "Resource class for benchmark jobs (small, medium, large, large+, xlarge, 2xlarge)"
 
 jobs:
   install:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
     steps:
       - checkout
+      - run:
+          name: Install system dependencies
+          command: |
+            apt-get update -qq && apt-get install -y \
+              cmake \
+              libgeos-dev  # Added for shapely dependency
       - run:
           name: Get the base reference branch
           command: export BASE_BRANCH=$(base_branch)
       - restore_cache:
           keys:
-            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
+            - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}-{{ checksum "uv.lock" }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Branch }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-
       - run:
-          name: Install Python dependencies with Poetry 2
+          name: Install Python dependencies with uv
           command: |
-            poetry config virtualenvs.in-project true
-            poetry install --extras "dev"
+            uv sync --frozen --extra dev
       - save_cache:
-          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "poetry.lock" }}
+          key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}-{{ checksum "uv.lock" }}
           paths:
             - .venv
       - persist_to_workspace:
@@ -49,7 +65,7 @@ jobs:
 
   lint:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
     steps:
       - attach_workspace:
           at: .
@@ -58,14 +74,13 @@ jobs:
           # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
           # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
-            poetry run ruff --version
-            poetry run ruff check --select I .
-            poetry run ruff format --check .
+            uv run ruff --version
+            uv run ruff check --select I .
+            uv run ruff format --check .
 
   tests:
     docker:
-      # Can't use a slim or slim image here ad we need libmagik to run the tests
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
       - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres
@@ -75,6 +90,10 @@ jobs:
     steps:
       - attach_workspace:
           at: .
+      - run:
+          name: Install system dependencies
+          command: |
+            apt-get update -qq && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
       - run:
           name: Run tests
           environment:
@@ -88,7 +107,7 @@ jobs:
             echo "$TESTFILES"
             # Run the found tests
             if [ -n "$TESTFILES" ]; then
-              poetry run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+              uv run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
             else
               echo "No tests to run in this split"
               exit 1
@@ -98,24 +117,20 @@ jobs:
 
   build:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm  # needs git for setuptools_scm
     steps:
       - attach_workspace:
           at: .
       - run:
-          name: Set the version
+          name: Install build tools
           command: |
-            if [[ $CIRCLE_TAG ]]; then
-                # This is a tagged release, version has been handled upstream
-                echo "export RELEASE_VERSION=$CIRCLE_TAG" > version.sh
-            # Otherwise, relies on a dev version like "1.2.1.dev" by default
-            elif [[ $CIRCLE_BRANCH == << pipeline.parameters.publish-branch >> ]]; then
-                # for main branches, can't add the commit hash since it's not a valid format for publishing
-                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM" > version.sh
-            else
-                # for feature branches, add the commit hash
-                echo "export RELEASE_VERSION=$(poetry version -s)$CIRCLE_BUILD_NUM+${CIRCLE_SHA1:0:7}" > version.sh
-            fi
+            uv pip install setuptools-scm
+      - run:
+          name: Compute RELEASE_VERSION via setuptools_scm
+          command: |
+            # derive from setuptools_scm or base version + build number
+            RELEASE_VERSION=$(uv run python -m setuptools_scm)
+            echo "export RELEASE_VERSION=$RELEASE_VERSION" > version.sh
             chmod +x version.sh
       - run:
           name: Display build info for debugging
@@ -126,12 +141,10 @@ jobs:
             echo "Commit hash: ${CIRCLE_SHA1:0:7}"
             echo "Git tag: $CIRCLE_TAG"
       - run:
-          name: Build a distributable package as a wheel release with Poetry
+          name: Build a distributable package as a wheel release
           command: |
-            source version.sh
-            # Set the version in pyproject.toml
-            poetry version $RELEASE_VERSION
-            poetry build
+            uv build --wheel
+      # Build already executed above; artifacts are in dist/
       - store_artifacts:
           path: dist
       - persist_to_workspace:
@@ -142,14 +155,14 @@ jobs:
 
   publish:
     docker:
-      - image: acidrain/python-poetry:<< pipeline.parameters.python-version >>-slim
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
     steps:
       - attach_workspace:
           at: .
       - run:
           name: Publish on PyPI
           command: |
-            poetry publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+            uv publish --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" dist/*
 
   trigger-gitlab-pipeline:
     docker:
@@ -212,6 +225,156 @@ jobs:
               -H 'Content-Type: application/json' \
               -d "{\"environment\":\"<< pipeline.parameters.deploy-env >>\"}"
 
+  benchmark:
+    docker:
+      # Can't use a slim image here as we need libmagik to run the tests and git for commits
+      - image: python:<< pipeline.parameters.python-version >>-bookworm
+      - image: cimg/postgres:15.13
+        environment:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+    resource_class: << pipeline.parameters.resource-class >>
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Install required tools
+          command: |
+            apt-get update && apt-get install -y bc
+      - run:
+          name: Create .benchmarks/benchmarks.csv file if it doesn't exist
+          command: |
+            mkdir -p .benchmarks
+            if [ ! -f .benchmarks/benchmarks.csv ]; then
+              echo "datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,runner_class,runner_cpu,runner_memory,python_version" > .benchmarks/benchmarks.csv
+            fi
+
+      - run:
+          name: Pull latest changes
+          command: |
+            git config --global user.email "opendatateam@data.gouv.fr"
+            git config --global user.name "data.gouv.fr"
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
+            git pull origin << pipeline.parameters.benchmark-branch >> --rebase
+
+      - run:
+          name: Run CSV analysis on big file benchmark
+          environment:
+            DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+            UDATA_INSTANCE_NAME: udata
+          command: |
+            start_time=$(date +%s.%N)
+            poetry run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v -s --durations=0
+            end_time=$(date +%s.%N)
+            execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+
+      - run:
+          name: Commit CSV analysis benchmark results
+          command: |
+            git add .benchmarks/benchmarks.csv
+            git commit -m "perf: add CSV analysis benchmark results from CircleCI run #$CIRCLE_BUILD_NUM for commit ${CIRCLE_SHA1:0:7} [skip ci]"
+            git push origin << pipeline.parameters.benchmark-branch >>
+
+      - run:
+          name: Download and uncompress << pipeline.parameters.test-geocsv-file >> if needed
+          command: |
+            mkdir -p tests/data
+            # Check if test-geocsv-file is a URL and download if it is
+            if [[ "<< pipeline.parameters.test-geocsv-file >>" == http* ]]; then
+              # It's a URL, download it
+              wget -O tests/data/$(basename "<< pipeline.parameters.test-geocsv-file >>") "<< pipeline.parameters.test-geocsv-file >>"
+            fi
+            # Uncompress if it's a .gz file (either downloaded or already present)
+            if [[ "<< pipeline.parameters.test-geocsv-file >>" == *.gz ]]; then
+              cd tests/data
+              gunzip -k $(basename "<< pipeline.parameters.test-geocsv-file >>")
+              cd ../..
+            fi
+            # Build the path based on the actual file (without .gz extension)
+            echo "TEST_GEOCSV_FILENAME=$(basename "<< pipeline.parameters.test-geocsv-file >>" .gz)" >> $BASH_ENV
+            ls -la tests/data/
+
+      - run:
+          name: Run CSV to GeoJSON benchmark
+          environment:
+            DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+            UDATA_INSTANCE_NAME: udata
+          command: |
+            start_time=$(date +%s.%N)
+            poetry run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$TEST_GEOCSV_FILENAME"
+            end_time=$(date +%s.%N)
+            execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,<< pipeline.parameters.test-geocsv-file >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+          no_output_timeout: 20m
+
+      - run:
+          name: Commit CSV to GeoJSON benchmark results
+          command: |
+            git config --global user.email "opendatateam@data.gouv.fr"
+            git config --global user.name "data.gouv.fr"
+            git add .benchmarks/benchmarks.csv
+            git commit -m "perf: add CSV to GeoJSON benchmark results from CircleCI run #$CIRCLE_BUILD_NUM for commit ${CIRCLE_SHA1:0:7} [skip ci]"
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
+            git push origin << pipeline.parameters.benchmark-branch >>
+
+      - run:
+          name: Set GeoJSON file path for PMTiles benchmark
+          command: |
+            # Construct the expected GeoJSON filename based on TEST_GEOCSV_FILENAME
+            CSV_BASENAME=$(basename "$TEST_GEOCSV_FILENAME" .csv)
+            EXPECTED_GEOJSON="tests/data/${CSV_BASENAME}.geojson"
+            if [ -f "$EXPECTED_GEOJSON" ]; then
+              echo "TEST_GEOJSON_FILENAME=${CSV_BASENAME}.geojson" >> $BASH_ENV
+              echo "Found expected GeoJSON file: $EXPECTED_GEOJSON"
+            else
+              echo "ERROR: Expected GeoJSON file not found: $EXPECTED_GEOJSON"
+              echo "Available files in tests/data:"
+              ls -la tests/data/
+              exit 1
+            fi
+
+      - run:
+          name: Run GeoJSON to PMTiles benchmark
+          environment:
+            DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+            UDATA_INSTANCE_NAME: udata
+          command: |
+            start_time=$(date +%s.%N)
+            poetry run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v -s --durations=0 --input_file="$TEST_GEOJSON_FILENAME" -k "test_geojson_to_pmtiles_big_file"
+            end_time=$(date +%s.%N)
+            execution_time=$(echo "scale=2; ($end_time - $start_time) / 1" | bc -l)
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,<< pipeline.parameters.test-geocsv-file >>,circleci,$execution_time,$CIRCLE_USERNAME,${CIRCLE_SHA1:0:7},<< pipeline.parameters.resource-class >>,$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),<< pipeline.parameters.python-version >>" >> .benchmarks/benchmarks.csv
+          no_output_timeout: 20m
+
+      - run:
+          name: Commit GeoJSON to PMTiles benchmark results
+          command: |
+            git config --global user.email "opendatateam@data.gouv.fr"
+            git config --global user.name "data.gouv.fr"
+            git add .benchmarks/benchmarks.csv
+            git commit -m "perf: add GeoJSON to PMTiles benchmark results from CircleCI run #$CIRCLE_BUILD_NUM for commit ${CIRCLE_SHA1:0:7} [skip ci]"
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
+            git push origin << pipeline.parameters.benchmark-branch >>
+
+      - run:
+          name: Display benchmark results
+          command: |
+            echo "=== Benchmark Results ==="
+            cat .benchmarks/benchmarks.csv
+            echo "========================="
+      - run:
+          name: Store benchmark results
+          command: |
+            mkdir -p /tmp/artifacts
+            cp .benchmarks/benchmarks.csv /tmp/artifacts/
+          when: always
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+            - artifacts
+
 workflows:
   build-test-deploy:
     jobs:
@@ -219,18 +382,24 @@ workflows:
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: << pipeline.parameters.benchmark-branch >>
       - lint:
           requires:
             - install
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: << pipeline.parameters.benchmark-branch >>
       - tests:
           requires:
             - install
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: << pipeline.parameters.benchmark-branch >>
       - build:
           requires:
             - tests
@@ -238,6 +407,8 @@ workflows:
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: << pipeline.parameters.benchmark-branch >>
       - publish:
           requires:
             - build
@@ -271,3 +442,24 @@ workflows:
               only: /v[0-9]+(\.[0-9]+)*/
           context:
             - org-global
+
+  benchmark-workflow:
+    jobs:
+      - hold:
+          type: approval
+          filters:
+            branches:
+              only: << pipeline.parameters.benchmark-branch >>
+      - install:
+          requires:
+            - hold
+          filters:
+            branches:
+              only: << pipeline.parameters.benchmark-branch >>
+      - benchmark:
+          requires:
+            - install
+          filters:
+            branches:
+              only: << pipeline.parameters.benchmark-branch >>
+          context: benchmark-context

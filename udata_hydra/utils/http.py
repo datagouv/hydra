@@ -13,12 +13,13 @@ log = logging.getLogger("udata-hydra")
 
 class UdataPayload:
     HYDRA_UDATA_METADATA = {
-        "check": ["available", "date", "error", "status", "timeout"],
+        "check": ["available", "date", "error", "id", "status", "timeout"],
         "check:headers": ["content-type", "content-length"],
         "analysis": [
             "checksum",
             "content-length",
             "error",
+            "check_id",
             "last-modified-at",
             "last-modified-detection",
             "mime-type",
@@ -78,6 +79,7 @@ async def send(dataset_id: str, resource_id: str, document: UdataPayload) -> Non
 
     uri = f"{config.UDATA_URI}/datasets/{dataset_id}/resources/{resource_id}/extras/"
     headers = {
+        "user-agent": config.USER_AGENT_FULL,
         "content-type": "application/json",
         "X-API-KEY": config.UDATA_URI_API_KEY,
     }

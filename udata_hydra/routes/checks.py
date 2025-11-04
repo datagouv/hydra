@@ -90,7 +90,8 @@ async def create_check(request: web.Request) -> web.Response:
     context.monitor().set_status(f'Crawling url "{url}"...')
 
     async with aiohttp.ClientSession(
-        timeout=None, headers={"user-agent": str(config.USER_AGENT)}
+        timeout=None,
+        headers={"user-agent": config.USER_AGENT_FULL},
     ) as session:
         status: str = await check_resource(
             url=url,
