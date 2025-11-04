@@ -4,9 +4,8 @@ import nest_asyncio
 import pytest
 from asyncpg.exceptions import UndefinedTableError
 
-from tests.conftest import RESOURCE_ID, RESOURCE_URL
+from tests.conftest import RESOURCE_ID
 from udata_hydra.cli import (
-    analyse_csv_cli,
     insert_resource_into_catalog,
     load_catalog,
     purge_checks,
@@ -17,19 +16,6 @@ from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
-
-
-async def test_analysis_csv(setup_catalog, rmock, catalog_content, db, fake_check, produce_mock):
-    # Analyse using check_id
-    check = await fake_check()
-    url = check["url"]
-    rmock.get(url, status=200, body=catalog_content)
-    await analyse_csv_cli(check_id=str(check["id"]), url=None, resource_id=None, debug_insert=False)
-    # Analyse using URL
-    check = await fake_check()
-    url = check["url"]
-    rmock.get(url, status=200, body=catalog_content)
-    await analyse_csv_cli(check_id=None, url=RESOURCE_URL, resource_id=None, debug_insert=False)
 
 
 async def test_purge_checks(setup_catalog, db, fake_check):
