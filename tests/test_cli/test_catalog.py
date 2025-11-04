@@ -1,13 +1,11 @@
 import nest_asyncio
 import pytest
-from typer.testing import CliRunner
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.cli import insert_resource_into_catalog, load_catalog
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
-runner = CliRunner()
 nest_asyncio.apply()
 
 
