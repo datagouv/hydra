@@ -105,15 +105,49 @@ jobs:
             # Debug: Show what's in TESTFILES
             echo "Test files assigned to the executor ${CIRCLE_NODE_INDEX}/${CIRCLE_NODE_TOTAL}:"
             echo "$TESTFILES"
-            # Run the found tests
+            # Run the found tests with coverage
             if [ -n "$TESTFILES" ]; then
-              uv run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes $TESTFILES
+              uv run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes \
+                --cov=udata_hydra \
+                --cov-branch \
+                --cov-data-file=.coverage.${CIRCLE_NODE_INDEX} \
+                $TESTFILES
             else
               echo "No tests to run in this split"
               exit 1
             fi
       - store_test_results:
           path: reports/python
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .coverage.*
+
+  coverage:
+    docker:
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Combine coverage reports
+          command: |
+            # Check if coverage files exist
+            if ls .coverage.* 1> /dev/null 2>&1; then
+              # Combine all coverage files from parallel executors
+              uv run coverage combine .coverage.*
+              # Generate final coverage report
+              uv run coverage report --show-missing
+              uv run coverage xml
+              # Fail if coverage is below threshold
+              uv run coverage report --fail-under=80
+            else
+              echo "No coverage files found. This should not happen if tests ran successfully."
+              exit 1
+            fi
+      - store_artifacts:
+          path: coverage.xml
+          destination: coverage
 
   build:
     docker:
@@ -400,10 +434,19 @@ workflows:
               only: /v[0-9]+(\.[0-9]+)*/
             branches:
               ignore: << pipeline.parameters.benchmark-branch >>
+      - coverage:
+          requires:
+            - tests
+          filters:
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: << pipeline.parameters.benchmark-branch >>
       - build:
           requires:
             - tests
             - lint
+            - coverage
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
