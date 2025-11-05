@@ -99,6 +99,7 @@ jobs:
           environment:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
+            COVERAGE_FILE: .coverage.${CIRCLE_NODE_INDEX}
           command: |
             # Find and split tests
             TESTFILES=$(find tests -name "test_*.py" | circleci tests split --split-by=timings)
@@ -110,7 +111,6 @@ jobs:
               uv run pytest --junitxml=reports/python/tests.xml -p no:sugar --color=yes \
                 --cov=udata_hydra \
                 --cov-branch \
-                --cov-data-file=.coverage.${CIRCLE_NODE_INDEX} \
                 $TESTFILES
             else
               echo "No tests to run in this split"

@@ -73,7 +73,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "catalog_harvested: use catalog_harvested.csv as source",
 ]
-addopts = "--cov=udata_hydra/ --cov-report term-missing --cov-fail-under=85" # if we want to fail if coverage is less than 85%
+addopts = "--cov=udata_hydra --cov-report term-missing --cov-branch" # Coverage threshold enforced in CI, not locally
 
 [tool.ruff]
 lint = { extend-select = ["I"] } # ["I"] is to also sort imports with an isort rule
