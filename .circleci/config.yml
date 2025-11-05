@@ -99,8 +99,10 @@ jobs:
           environment:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
             UDATA_INSTANCE_NAME: udata
-            COVERAGE_FILE: .coverage.${CIRCLE_NODE_INDEX}
           command: |
+            # Set coverage file name for this executor
+            export COVERAGE_FILE=".coverage.${CIRCLE_NODE_INDEX}"
+            echo "Coverage file will be: $COVERAGE_FILE"
             # Find and split tests
             TESTFILES=$(find tests -name "test_*.py" | circleci tests split --split-by=timings)
             # Debug: Show what's in TESTFILES
@@ -132,8 +134,16 @@ jobs:
       - run:
           name: Combine coverage reports
           command: |
+            # List all coverage files found
+            echo "Looking for coverage files..."
+            ls -la .coverage.* || echo "No .coverage.* files found"
+            # List all files in current directory for debugging
+            echo "Files in workspace:"
+            ls -la | grep -E "\.coverage|coverage" || echo "No coverage files in root"
             # Check if coverage files exist
             if ls .coverage.* 1> /dev/null 2>&1; then
+              echo "Found coverage files:"
+              ls -la .coverage.*
               # Combine all coverage files from parallel executors
               uv run coverage combine .coverage.*
               # Generate final coverage report
