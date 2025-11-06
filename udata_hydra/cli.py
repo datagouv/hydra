@@ -570,11 +570,11 @@ async def purge_csv_tables(quiet: bool = False, hard_delete: bool = False) -> No
     res_catalog: list[Record] = await conn_main.fetch(q_catalog)
     catalog_tables: set[str] = set([r["parsing_table"] for r in res_catalog])
 
-    # we should not have any other table with 32 characters right?
-    q_tables = """SELECT tablename FROM pg_catalog.pg_tables
-    WHERE schemaname != 'pg_catalog'
-    AND schemaname != 'information_schema'
-    AND LENGTH(tablename) = 32;"""
+    # only including the parsing tables (hopefully the conditions are restrictive enough)
+    q_tables = f"""SELECT tablename FROM pg_catalog.pg_tables
+    WHERE schemaname = '{config.DATABASE_SCHEMA}'
+    AND LENGTH(tablename) = 32
+    AND tablename ~ '[0-9]';"""
     conn_csv = await connection(db_name="csv")
     res_tables: list[Record] = await conn_csv.fetch(q_tables)
     parsing_tables: set[str] = set([r["tablename"] for r in res_tables])
