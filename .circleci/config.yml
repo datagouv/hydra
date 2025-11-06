@@ -241,6 +241,7 @@ jobs:
       - run:
           name: Pull latest changes
           command: |
+            git config --global --add safe.directory "$(pwd)"
             git config --global user.email "opendatateam@data.gouv.fr"
             git config --global user.name "data.gouv.fr"
             git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
@@ -261,6 +262,7 @@ jobs:
       - run:
           name: Commit CSV analysis benchmark results
           command: |
+            git config --global --add safe.directory "$(pwd)"
             git add .benchmarks/benchmarks.csv
             git commit -m "perf: add CSV analysis benchmark results from CircleCI run #$CIRCLE_BUILD_NUM for commit ${CIRCLE_SHA1:0:7} [skip ci]"
             git push origin << pipeline.parameters.benchmark-branch >>
@@ -300,6 +302,7 @@ jobs:
       - run:
           name: Commit CSV to GeoJSON benchmark results
           command: |
+            git config --global --add safe.directory "$(pwd)"
             git config --global user.email "opendatateam@data.gouv.fr"
             git config --global user.name "data.gouv.fr"
             git add .benchmarks/benchmarks.csv
@@ -339,6 +342,7 @@ jobs:
       - run:
           name: Commit GeoJSON to PMTiles benchmark results
           command: |
+            git config --global --add safe.directory "$(pwd)"
             git config --global user.email "opendatateam@data.gouv.fr"
             git config --global user.name "data.gouv.fr"
             git add .benchmarks/benchmarks.csv

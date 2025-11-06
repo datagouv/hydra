@@ -93,6 +93,7 @@ jobs:
         run: |
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
+          git config --global --add safe.directory "$(pwd)"
           git config --global user.email "opendatateam@data.gouv.fr"
           git config --global user.name "data.gouv.fr"
           git add .benchmarks/benchmarks.csv
@@ -135,6 +136,7 @@ jobs:
         run: |
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
+          git config --global --add safe.directory "$(pwd)"
           git config --global user.email "opendatateam@data.gouv.fr"
           git config --global user.name "data.gouv.fr"
           git add .benchmarks/benchmarks.csv
@@ -173,6 +175,7 @@ jobs:
         run: |
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
+          git config --global --add safe.directory "$(pwd)"
           git config --global user.email "opendatateam@data.gouv.fr"
           git config --global user.name "data.gouv.fr"
           git add .benchmarks/benchmarks.csv
