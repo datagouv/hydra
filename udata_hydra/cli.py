@@ -565,7 +565,9 @@ async def purge_csv_tables(quiet: bool = False, hard_delete: bool = False) -> No
     if quiet:
         log.setLevel(logging.ERROR)
 
-    q_catalog = "select DISTINCT md5(url) as parsing_table from catalog;"
+    q_catalog = (
+        "SELECT DISTINCT md5(url) AS parsing_table FROM catalog WHERE deleted IS false;"
+    )
     conn_main = await connection()
     res_catalog: list[Record] = await conn_main.fetch(q_catalog)
     catalog_tables: set[str] = set([r["parsing_table"] for r in res_catalog])
