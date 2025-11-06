@@ -11,12 +11,14 @@ import aiohttp
 import asyncpg
 from asyncpg import Record
 from humanfriendly import parse_size
-from minicli import cli, run, wrap
+from minicli import cli, wrap
+from minicli import run as minicli_run
 from progressist import ProgressBar
 
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, csv_detective_routine
 from udata_hydra.analysis.geojson import analyse_geojson, csv_to_geojson, geojson_to_pmtiles
+from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.db.check import Check
@@ -416,6 +418,37 @@ async def convert_geojson_to_pmtiles_cli(geojson_filepath: str):
         traceback.print_exc()
 
 
+@cli(name="analyse-parquet")
+async def analyse_parquet_cli(
+    check_id: str | None = None,
+    url: str | None = None,
+    resource_id: str | None = None,
+):
+    """Trigger a parquet analysis from a check_id, an url or a resource_id
+    Try to get the check from the check ID, then from the URL
+    """
+    assert check_id or url or resource_id
+    check = None
+    if check_id:
+        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)
+    if not check and url:
+        checks: list[Record] | None = await Check.get_by_url(url)
+        if checks and len(checks) > 1:
+            log.warning(f"Multiple checks found for URL {url}, using the latest one")
+        check = checks[0] if checks else None
+    if not check and resource_id:
+        check: Record | None = await Check.get_by_resource_id(resource_id)
+    if not check:
+        if check_id:
+            log.error("Could not retrieve the specified check")
+        elif url:
+            log.error("Could not find a check linked to the specified URL")
+        elif resource_id:
+            log.error("Could not find a check linked to the specified resource ID")
+        return
+    await analyse_parquet(check=dict(check))
+
+
 @cli
 async def csv_sample(size: int = 1000, download: bool = False, max_size: str = "100M"):
     """Get a csv sample from latest checks
@@ -528,29 +561,28 @@ async def purge_csv_tables(quiet: bool = False, hard_delete: bool = False) -> No
     # TODO: check if we should use parsing_table from table_index?
     # And are they necessarily in sync?
 
-    # Fetch all parsing tables from checks where we don't have any entry on
-    # md5(url) in catalog or all entries are marked as deleted.
+    # We want to delete all tables which names (from md5(url)) don't match any URL in catalog
     if quiet:
         log.setLevel(logging.ERROR)
 
-    q = """
-    SELECT DISTINCT checks.parsing_table
-    FROM checks
-    LEFT JOIN (
-        select url, MAX(id) as id, BOOL_AND(deleted) as deleted
-        FROM catalog
-        GROUP BY url) c
-    ON checks.parsing_table = md5(c.url)
-    WHERE checks.parsing_table IS NOT NULL AND (c.id IS NULL OR c.deleted = TRUE);
-    """
+    q_catalog = "SELECT DISTINCT md5(url) AS parsing_table FROM catalog WHERE deleted IS false;"
     conn_main = await connection()
-    res: list[Record] = await conn_main.fetch(q)
-    tables_to_delete: list[str] = [r["parsing_table"] for r in res]
+    res_catalog: list[Record] = await conn_main.fetch(q_catalog)
+    catalog_tables: set[str] = set([r["parsing_table"] for r in res_catalog])
+
+    # only including the parsing tables (hopefully the conditions are restrictive enough)
+    q_tables = f"""SELECT tablename FROM pg_catalog.pg_tables
+    WHERE schemaname = '{config.DATABASE_SCHEMA}'
+    AND LENGTH(tablename) = 32
+    AND tablename ~ '[0-9]';"""
+    conn_csv = await connection(db_name="csv")
+    res_tables: list[Record] = await conn_csv.fetch(q_tables)
+    parsing_tables: set[str] = set([r["tablename"] for r in res_tables])
+
+    tables_to_delete: set[str] = parsing_tables - catalog_tables
 
     success_count = 0
     error_count = 0
-
-    conn_csv = await connection(db_name="csv")
     log.debug(f"{len(tables_to_delete)} tables to delete")
     for table in tables_to_delete:
         try:
@@ -736,6 +768,11 @@ async def cli_wrapper():
     yield
     for db in context["conn"]:
         await context["conn"][db].close()
+
+
+def run():
+    """Main CLI entry point"""
+    minicli_run()
 
 
 if __name__ == "__main__":

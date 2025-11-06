@@ -5,7 +5,7 @@ import pytest
 from asyncpg.exceptions import UndefinedTableError
 from minicli import run
 
-from tests.conftest import RESOURCE_ID
+from tests.conftest import RESOURCE_ID, RESOURCE_URL
 
 pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
@@ -56,8 +56,10 @@ async def test_purge_csv_tables(setup_catalog, db, fake_check, hard_delete, expe
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
     assert res is not None
 
-    # pretend the resource is deleted
-    await db.execute("UPDATE catalog SET deleted = TRUE")
+    # pretend the resource's url has changed
+    await db.execute(
+        f"UPDATE catalog SET url = '{RESOURCE_URL + '-new'}' WHERE resource_id = '{RESOURCE_ID}'"
+    )
 
     # purge with the specified hard_delete parameter
     run("purge_csv_tables", hard_delete=hard_delete)

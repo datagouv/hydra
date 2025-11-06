@@ -1,6 +1,10 @@
+[build-system]
+requires = ["setuptools>=68", "wheel", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "udata-hydra"
-version = "2.4.2.dev"
+dynamic = ["version"]
 description = "Async crawler and parsing service for data.gouv.fr"
 authors = [{ name = "Opendata Team", email = "opendatateam@data.gouv.fr" }]
 dependencies = [
@@ -32,7 +36,6 @@ readme = "README.md"
 dev = [
     "aiohttp-devtools>=1.0.post0",
     "aioresponses>=0.7.3",
-    "bumpx>=0.3.10",
     "gunicorn>=20.1.0",
     "mypy>=1.11.0",
     "nest_asyncio>=1.5.5",
@@ -42,6 +45,11 @@ dev = [
     "pytest-mock>=3.7.0",
     "ruff>=0.9.3",
 ]
+
+[project.scripts]
+udata-hydra = "udata_hydra.cli:run"
+udata-hydra-crawl = "udata_hydra.crawl:run"
+udata-hydra-app = "udata_hydra.app:run"
 
 [tool.mypy]
 [[tool.mypy.overrides]]
@@ -59,24 +67,22 @@ module = [
 ]
 ignore_missing_imports = true
 
-[tool.poetry.scripts]
-udata-hydra = "udata_hydra.cli:run"
-udata-hydra-crawl = "udata_hydra.crawl:run"
-udata-hydra-app = "udata_hydra.app:run"
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "catalog_harvested: use catalog_harvested.csv as source",
 ]
-# addopts = "--cov=udata_hydra/ --cov-report term-missing --cov-fail-under=89" # if we want to fail if coverage is less than 89%
-addopts = "--cov=udata_hydra/ --cov-report term-missing"
+addopts = "--cov=udata_hydra --cov-report term-missing --cov-branch --cov-fail-under=80"
 
 [tool.ruff]
 lint = { extend-select = ["I"] } # ["I"] is to also sort imports with an isort rule
 line-length = 100
 
-[build-system]
-requires = ["poetry-core>=2.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
+
+[tool.uv.build-backend]
+module-name = "udata_hydra"
+module-root = ""
