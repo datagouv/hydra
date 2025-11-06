@@ -561,29 +561,28 @@ async def purge_csv_tables(quiet: bool = False, hard_delete: bool = False) -> No
     # TODO: check if we should use parsing_table from table_index?
     # And are they necessarily in sync?
 
-    # Fetch all parsing tables from checks where we don't have any entry on
-    # md5(url) in catalog or all entries are marked as deleted.
+    # We want to delete all tables which names (from md5(url)) don't match any URL in catalog
     if quiet:
         log.setLevel(logging.ERROR)
 
-    q = """
-    SELECT DISTINCT checks.parsing_table
-    FROM checks
-    LEFT JOIN (
-        select url, MAX(id) as id, BOOL_AND(deleted) as deleted
-        FROM catalog
-        GROUP BY url) c
-    ON checks.parsing_table = md5(c.url)
-    WHERE checks.parsing_table IS NOT NULL AND (c.id IS NULL OR c.deleted = TRUE);
-    """
+    q_catalog = "SELECT DISTINCT md5(url) AS parsing_table FROM catalog WHERE deleted IS false;"
     conn_main = await connection()
-    res: list[Record] = await conn_main.fetch(q)
-    tables_to_delete: list[str] = [r["parsing_table"] for r in res]
+    res_catalog: list[Record] = await conn_main.fetch(q_catalog)
+    catalog_tables: set[str] = set([r["parsing_table"] for r in res_catalog])
+
+    # only including the parsing tables (hopefully the conditions are restrictive enough)
+    q_tables = f"""SELECT tablename FROM pg_catalog.pg_tables
+    WHERE schemaname = '{config.DATABASE_SCHEMA}'
+    AND LENGTH(tablename) = 32
+    AND tablename ~ '[0-9]';"""
+    conn_csv = await connection(db_name="csv")
+    res_tables: list[Record] = await conn_csv.fetch(q_tables)
+    parsing_tables: set[str] = set([r["tablename"] for r in res_tables])
+
+    tables_to_delete: set[str] = parsing_tables - catalog_tables
 
     success_count = 0
     error_count = 0
-
-    conn_csv = await connection(db_name="csv")
     log.debug(f"{len(tables_to_delete)} tables to delete")
     for table in tables_to_delete:
         try:
