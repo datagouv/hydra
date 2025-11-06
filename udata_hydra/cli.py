@@ -578,7 +578,7 @@ async def purge_csv_tables(quiet: bool = False, hard_delete: bool = False) -> No
     conn_csv = await connection(db_name="csv")
     res_tables: list[Record] = await conn_csv.fetch(q_tables)
     parsing_tables: set[str] = set([r["tablename"] for r in res_tables])
-    
+
     tables_to_delete: set[str] = parsing_tables - catalog_tables
 
     success_count = 0
