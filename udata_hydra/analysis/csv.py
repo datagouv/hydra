@@ -9,6 +9,7 @@ from typing import Iterator
 
 import pandas as pd
 from asyncpg import Record
+from asyncpg.exceptions import UndefinedTableError
 from csv_detective import routine as csv_detective_routine
 from csv_detective import validate_then_detect
 from csv_detective.detection.engine import engine_to_file
@@ -225,7 +226,10 @@ async def get_previous_analysis(resource_id: str) -> dict | None:
         "SELECT parsing_table, csv_detective FROM tables_index "
         f"WHERE resource_id='{resource_id}' ORDER BY created_at DESC LIMIT 1"
     )
-    res = await db.fetch(q)
+    try:
+        res = await db.fetch(q)
+    except UndefinedTableError:
+        return None
     if not res:
         return None
     analysis = json.loads(res[0]["csv_detective"])
