@@ -18,7 +18,7 @@ env:
   TEST_GEOCSV_FILE: "H_01_1990-1999.csv.gz"
   BENCHMARK_BRANCH: "benchmarks"
   PYTHON_VERSION: "3.11"
-  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+  DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
   UDATA_INSTANCE_NAME: udata
 
 jobs:
@@ -28,6 +28,8 @@ jobs:
     strategy:
       matrix:
         resource-class: [large]
+    container:
+      image: ghcr.io/astral-sh/uv:python3.11-bookworm
     services:
       postgres:
         image: postgres:15.13
@@ -41,16 +43,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
       - name: Load cached venv
         id: cached-uv-dependencies
         uses: actions/cache@v4
@@ -62,18 +54,21 @@ jobs:
         if: steps.cached-uv-dependencies.outputs.cache-hit != 'true'
         run: uv sync --frozen --extra dev
 
+      - name: Install required tools
+        run: |
+          apt-get update -qq && apt-get install -y --no-install-recommends \
+            bc \
+            postgresql-client \
+            git \
+            wget
+
       - name: Wait for PostgreSQL to be ready
         run: |
-          until pg_isready -h localhost -p 5432 -U postgres; do
+          until pg_isready -h postgres -p 5432 -U postgres; do
             echo "Waiting for PostgreSQL to be ready..."
             sleep 2
           done
           echo "PostgreSQL is ready!"
-
-      - name: Install required tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bc
 
       - name: Create benchmarks directory
         run: |
