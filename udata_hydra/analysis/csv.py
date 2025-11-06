@@ -235,6 +235,9 @@ async def get_previous_analysis(resource_id: str) -> dict | None:
     try:
         rows: list[Record] = await db.fetch(f'SELECT * FROM "{res[0]["parsing_table"]}" LIMIT 1')
     except UndefinedTableError:
+        log.error(
+            f"Could not find table {res[0]['parsing_table']} for resource {resource_id}"
+        )
         return None
     if len(rows) == 0:
         return None
