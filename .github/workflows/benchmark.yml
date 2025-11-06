@@ -78,6 +78,7 @@ jobs:
           fi
 
       - name: Run CSV analysis on big file benchmark
+        shell: bash
         run: |
           start_time=$(date +%s.%N)
           uv run pytest tests/test_analysis/test_analysis_csv.py::test_analyse_csv_big_file -v -s --durations=0
@@ -88,6 +89,7 @@ jobs:
           echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
       - name: Commit CSV analysis benchmark results
+        shell: bash
         run: |
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
@@ -98,6 +100,7 @@ jobs:
           git push origin ${{env.BENCHMARK_BRANCH }}
 
       - name: Download and uncompress ${{ env.TEST_GEOCSV_FILE }} if needed
+        shell: bash
         run: |
           mkdir -p tests/data
           # Check if TEST_GEOCSV_FILE is a URL and download if it is
@@ -117,6 +120,7 @@ jobs:
 
       - name: Run CSV to GeoJSON benchmark
         timeout-minutes: 20
+        shell: bash
         run: |
           start_time=$(date +%s.%N)
           uv run pytest tests/test_analysis/test_geojson.py::test_csv_to_geojson_big_file -v -s --durations=0 --input_file="$TEST_GEOCSV_FILENAME"
@@ -127,6 +131,7 @@ jobs:
           echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_csv_to_geojson_big_file,${{ env.TEST_GEOCSV_FILE }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
       - name: Commit CSV to GeoJSON benchmark results
+        shell: bash
         run: |
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
@@ -153,6 +158,7 @@ jobs:
 
       - name: Run GeoJSON to PMTiles benchmark
         timeout-minutes: 20
+        shell: bash
         run: |
           start_time=$(date +%s.%N)
           uv run pytest tests/test_analysis/test_geojson.py::test_geojson_to_pmtiles_big_file -v -s --durations=0 --input_file="$TEST_GEOJSON_FILENAME" -k "test_geojson_to_pmtiles_big_file"
@@ -163,6 +169,7 @@ jobs:
           echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ"),test_geojson_to_pmtiles_big_file,${{ env.TEST_GEOCSV_FILE }},github,$execution_time,${{ github.actor }},$SHORT_SHA,${{ matrix.resource-class }},$(nproc),$(free -m | awk 'NR==2{printf "%.0f", $2}'),${{ env.PYTHON_VERSION }}" >> .benchmarks/benchmarks.csv
 
       - name: Commit GeoJSON to PMTiles benchmark results
+        shell: bash
         run: |
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
