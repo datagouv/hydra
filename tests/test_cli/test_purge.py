@@ -3,9 +3,13 @@ from datetime import datetime, timedelta, timezone
 import nest_asyncio
 import pytest
 from asyncpg.exceptions import UndefinedTableError
-from minicli import run
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
+from udata_hydra.cli import (
+    purge_checks,
+    purge_csv_tables,
+    purge_selected_csv_tables,
+)
 
 pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
@@ -17,11 +21,11 @@ async def test_purge_checks(setup_catalog, db, fake_check):
     await fake_check(created_at=datetime.now() - timedelta(days=30))
     await fake_check(created_at=datetime.now() - timedelta(days=10))
 
-    run("purge_checks", retention_days=40)
+    await purge_checks(retention_days=40, quiet=False)
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 2
 
-    run("purge_checks", retention_days=20)
+    await purge_checks(retention_days=20, quiet=False)
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 1
 
@@ -62,7 +66,7 @@ async def test_purge_csv_tables(setup_catalog, db, fake_check, hard_delete, expe
     )
 
     # purge with the specified hard_delete parameter
-    run("purge_csv_tables", hard_delete=hard_delete)
+    await purge_csv_tables(quiet=False, hard_delete=hard_delete)
 
     # check table is gone
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
@@ -105,7 +109,7 @@ async def test_purge_csv_tables_url_used_by_other_resource(setup_catalog, db, fa
     )
 
     # purge
-    run("purge_csv_tables")
+    await purge_csv_tables(quiet=False, hard_delete=False)
 
     # check table is _not_ gone
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
@@ -137,7 +141,7 @@ async def test_purge_csv_tables_url_used_by_deleted_resource_only(setup_catalog,
     )
 
     # purge
-    run("purge_csv_tables")
+    await purge_csv_tables(quiet=False, hard_delete=False)
 
     # check table is gone
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
@@ -161,7 +165,7 @@ async def test_purge_csv_tables_url_not_in_catalog(setup_catalog, db, fake_check
     await db.execute("UPDATE catalog SET url = 'https://example.com/resource-0'")
 
     # purge
-    run("purge_csv_tables")
+    await purge_csv_tables(quiet=False, hard_delete=False)
 
     # check table is gone
     res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
@@ -212,7 +216,8 @@ async def test_purge_selected_csv_tables(setup_catalog, db, fake_check, _kwargs)
     assert len(checks) == nb
     assert all(check["parsing_table"] is not None for check in checks)
 
-    run("purge_selected_csv_tables", **_kwargs)
+    await purge_selected_csv_tables(**_kwargs)
+
     tb_idx = await db.fetch("SELECT * FROM tables_index")
     expected_count = list(_kwargs.values())[0]
     assert len(tb_idx) == expected_count

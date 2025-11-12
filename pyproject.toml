@@ -16,7 +16,6 @@ dependencies = [
     "humanfriendly>=10.0",
     "json-stream>=2.3.3",
     "marshmallow>=3.14.1",
-    "minicli>=0.5.3",
     "minio>=7.2.8",
     "progressist>=0.1.0",
     "pyarrow>=16.1.0",
@@ -27,6 +26,7 @@ dependencies = [
     "sentry-sdk>=2.10.0",
     "sqlalchemy>=1.4.46",
     "tippecanoe>=2.72.0",
+    "typer>=0.15.1",
 ]
 requires-python = ">=3.11,<3.14"
 license = { text = "MIT" }
@@ -59,7 +59,6 @@ module = [
     "botocore.*",
     "csv_detective.*",
     "humanfriendly.*",
-    "minicli.*",
     "sqlalchemy.*",
     "str2bool.*",
     "str2float.*",
