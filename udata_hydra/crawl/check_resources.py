@@ -257,7 +257,7 @@ async def probe_cors(session, url: str) -> dict | None:
     if request_header_names:
         request_headers["Access-Control-Request-Headers"] = ",".join(request_header_names)
 
-    timeout_seconds: int = int(getattr(config, "CORS_PROBE_TIMEOUT_SECONDS", 5) or 5)
+    timeout_seconds = int(getattr(config, "CORS_PROBE_TIMEOUT_SECONDS", 5) or 5)
     probe_timeout = aiohttp.ClientTimeout(total=timeout_seconds)
 
     try:
@@ -280,16 +280,25 @@ async def probe_cors(session, url: str) -> dict | None:
     except asyncio.TimeoutError:
         return {"status": None, "error": "timeout"}
     except aiohttp.ClientError as exc:
-        error = getattr(exc, "message", None) or str(exc)
-        status = getattr(exc, "status", None)
+        error: str = getattr(exc, "message", None) or str(exc)
+        status: int | None = getattr(exc, "status", None)
         return {"status": status, "error": fix_surrogates(error)}
 
 
 def build_cors_payload(raw: dict) -> dict:
-    if not raw:
+    if not raw or raw.get("error"):
+        return {}
+    status: int | str | None = raw.get("status")
+    if status is None:
+        return {}
+    try:
+        status_int = int(status)
+    except (TypeError, ValueError):
+        return {}
+    if status_int < 200 or status_int >= 400:
         return {}
     return {
-        "check:cors:status": raw.get("status"),
+        "check:cors:status": status_int,
         "check:cors:allow-origin": raw.get("allow-origin"),
         "check:cors:allow-methods": raw.get("allow-methods"),
         "check:cors:allow-headers": raw.get("allow-headers"),
