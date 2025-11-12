@@ -321,6 +321,14 @@ async def test_analyse_resource_from_crawl(setup_catalog, rmock, db, udata_url):
     rmock.head(rurl, status=200, headers={"Content-Length": "200"})
     # mock for download
     rmock.get(rurl, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+    rmock.options(
+        rurl,
+        status=204,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
+        },
+    )
     # mock for check and analysis results
     rmock.put(udata_url, status=200, repeat=True)
 
