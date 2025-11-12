@@ -12,11 +12,11 @@ import pytest
 import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
 from aioresponses import aioresponses
-from minicli import run
 
 import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra import config
 from udata_hydra.app import app_factory
+from udata_hydra.cli import drop_dbs, load_catalog, migrate
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -149,20 +149,40 @@ def catalog_content(is_harvested):
         return cfile.read()
 
 
-@pytest.fixture
-def clean_db():
-    run("drop_dbs", dbs=["main"])
-    run("migrate")
+async def _cleanup_cli_connections():
+    """Helper function to clean up CLI connection context between tests"""
+    from udata_hydra.cli import context
+
+    for conn in list(context["conn"].values()):
+        if not conn.is_closed():
+            try:
+                await conn.close()
+            except (RuntimeError, AttributeError):
+                # Connection might be attached to a different/closed event loop
+                # Just mark it as closed in our context
+                pass
+    context["conn"].clear()
+
+
+@pytest_asyncio.fixture
+async def clean_db():
+    await _cleanup_cli_connections()
+    await drop_dbs(dbs=["main"])
+    await migrate(skip_errors=False, dbs=["main", "csv"])
     yield
+    await _cleanup_cli_connections()
 
 
-@pytest.fixture
-def setup_catalog(catalog_content, rmock):
+@pytest_asyncio.fixture
+async def setup_catalog(catalog_content, rmock):
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    run("drop_dbs", dbs=["main"])
-    run("migrate")
-    run("load_catalog", url=catalog)
+    await _cleanup_cli_connections()
+    await drop_dbs(dbs=["main"])
+    await migrate(skip_errors=False, dbs=["main", "csv"])
+    await load_catalog(url=catalog, drop_meta=False, drop_all=False, quiet=False)
+    yield
+    await _cleanup_cli_connections()
 
 
 @pytest.fixture
