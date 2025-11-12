@@ -297,7 +297,7 @@ def build_cors_payload(raw: dict) -> dict:
         status_int = int(status)
     except (TypeError, ValueError):
         return {}
-    if status_int < 200 or status_int >= 400:
+    if not (200 <= status_int < 400):
         return {}
     return {
         "check:cors:status": status_int,
