@@ -2,9 +2,9 @@ import hashlib
 
 import nest_asyncio
 import pytest
-from minicli import run
 
 from udata_hydra import context
+from udata_hydra.cli import analyse_csv_cli
 from udata_hydra.db.check import Check
 
 pytestmark = pytest.mark.asyncio
@@ -18,7 +18,7 @@ async def test_csv_analysis_from_check_id(
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
-    run("analyse-csv", check_id=str(check["id"]))
+    await analyse_csv_cli(check_id=str(check["id"]))
 
 
 async def test_csv_analysis_with_debug_insert(setup_catalog, rmock, db, fake_check, produce_mock):
@@ -33,7 +33,7 @@ async def test_csv_analysis_with_debug_insert(setup_catalog, rmock, db, fake_che
     rmock.get(url, status=200, body=csv_content)
 
     # Test with debug insert enabled
-    run("analyse-csv", url=url, debug_insert=True)
+    await analyse_csv_cli(check_id=None, url=url, debug_insert=True)
 
     # Verify that the CSV table was created and contains data
     csv_pool = await context.pool("csv")
@@ -60,7 +60,7 @@ async def test_csv_analysis_from_url(
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
-    run("analyse-csv", url=url)
+    await analyse_csv_cli(check_id=None, url=url, debug_insert=False)
 
 
 async def test_csv_analysis_from_external_url(setup_catalog, rmock, db, produce_mock):
@@ -73,7 +73,7 @@ async def test_csv_analysis_from_external_url(setup_catalog, rmock, db, produce_
     external_url = "https://external-example.com/test.csv"
     rmock.get(external_url, status=200, body=csv_content)
 
-    run("analyse-csv", url=external_url)
+    await analyse_csv_cli(check_id=None, url=external_url, resource_id=None, debug_insert=False)
 
     # Verify that no permanent data was created in the main database
     resources = await db.fetch("SELECT * FROM catalog WHERE url = $1", external_url)
@@ -103,7 +103,7 @@ async def test_csv_analysis_from_external_invalid_url(setup_catalog, rmock, db, 
     rmock.get(invalid_url, status=404, body="Not Found")
 
     # Test should handle the error gracefully
-    run("analyse-csv", url=invalid_url)
+    await analyse_csv_cli(check_id=None, url=invalid_url, resource_id=None, debug_insert=False)
 
     # Verify that no permanent data was created
     resources = await db.fetch("SELECT * FROM catalog WHERE url = $1", invalid_url)
