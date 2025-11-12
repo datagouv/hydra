@@ -245,6 +245,7 @@ async def handle_wrong_resource_url(
 
 
 async def probe_cors(session, url: str) -> dict | None:
+    """Send an OPTIONS preflight to collect CORS headers, skipping requests that lack a configured origin."""
     origin: str | None = getattr(config, "CORS_PROBE_ORIGIN", None)
     if not origin:
         return None
@@ -286,6 +287,7 @@ async def probe_cors(session, url: str) -> dict | None:
 
 
 def build_cors_payload(raw: dict) -> dict:
+    """Shape a successful CORS preflight response into udata extras while ignoring failures or non-permissive replies."""
     if not raw or raw.get("error"):
         return {}
     status: int | str | None = raw.get("status")
