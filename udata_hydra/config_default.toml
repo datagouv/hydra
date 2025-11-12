@@ -50,6 +50,11 @@ CHECK_DELAYS = [12, 24, 168, 720] # in hours (1/2, 1, 7, 30 days)
 # seconds to wait for between batches
 SLEEP_BETWEEN_BATCHES = 60
 
+# -- CORS probe settings -- #
+CORS_PROBE_ORIGIN = "https://www.data.gouv.fr"
+CORS_PROBE_REQUEST_HEADERS = ["authorization", "content-type"]
+CORS_PROBE_TIMEOUT_SECONDS = 5
+
 # max download filesize in bytes (100 MB)
 MAX_FILESIZE_ALLOWED.csv = 104857600
 MAX_FILESIZE_ALLOWED.csvgz = 104857600

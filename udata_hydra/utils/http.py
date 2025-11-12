@@ -15,6 +15,16 @@ class UdataPayload:
     HYDRA_UDATA_METADATA = {
         "check": ["available", "date", "error", "id", "status", "timeout"],
         "check:headers": ["content-type", "content-length"],
+        "check:cors": [
+            "status",
+            "allow-origin",
+            "allow-methods",
+            "allow-headers",
+            "exposed-headers",
+            "max-age",
+            "allow-credentials",
+            "error",
+        ],
         "analysis": [
             "checksum",
             "content-length",
