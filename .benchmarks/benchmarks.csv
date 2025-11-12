@@ -180,3 +180,6 @@ datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,
 2025-11-12T15:43:46Z,test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,github,19.14,bolinocroustibat,0f8a3e0,large,4,15994,3.11
 2025-11-12T15:46:19Z,test_csv_to_geojson_big_file,H_01_1990-1999.csv.gz,github,151.81,bolinocroustibat,0f8a3e0,large,4,15994,3.11
 2025-11-12T15:46:23Z,test_geojson_to_pmtiles_big_file,H_01_1990-1999.csv.gz,github,2.69,bolinocroustibat,0f8a3e0,large,4,15994,3.11
+2025-11-12T16:43:50Z,test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,circleci,26.10,bolinocroustibat,0f8a3e0,large,36,8192,3.11
+2025-11-12T16:47:36Z,test_csv_to_geojson_big_file,H_01_1990-1999.csv.gz,circleci,224.85,bolinocroustibat,0f8a3e0,large,36,8192,3.11
+2025-11-12T16:47:41Z,test_geojson_to_pmtiles_big_file,H_01_1990-1999.csv.gz,circleci,4.15,bolinocroustibat,0f8a3e0,large,36,8192,3.11
