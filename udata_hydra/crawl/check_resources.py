@@ -16,7 +16,7 @@ from udata_hydra.crawl.helpers import (
 )
 from udata_hydra.crawl.preprocess_check_data import preprocess_check_data
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import queue
+from udata_hydra.utils import UdataPayload, queue, send
 
 RESOURCE_RESPONSE_STATUSES = {
     "OK": "ok",
@@ -128,6 +128,17 @@ async def check_resource(
                 },
             )
 
+            if cors_probe := await probe_cors(session, url):
+                cors_payload = build_cors_payload(cors_probe)
+                if cors_payload:
+                    queue.enqueue(
+                        send,
+                        dataset_id=resource["dataset_id"],
+                        resource_id=str(resource["resource_id"]),
+                        document=UdataPayload(cors_payload),
+                        _priority="high",
+                    )
+
             # Update resource status to TO_ANALYSE_RESOURCE
             await Resource.update(
                 str(resource["resource_id"]), data={"status": "TO_ANALYSE_RESOURCE"}
@@ -231,3 +242,70 @@ async def handle_wrong_resource_url(
             worker_priority=worker_priority,
         )
     return
+
+
+async def probe_cors(session, url: str) -> dict | None:
+    """Send an OPTIONS preflight to collect CORS headers, skipping requests that lack a configured origin."""
+    origin: str | None = getattr(config, "CORS_PROBE_ORIGIN", None)
+    if not origin:
+        return None
+
+    request_headers: dict[str, str] = {
+        "Origin": origin,
+        "Access-Control-Request-Method": "GET",
+    }
+    request_header_names: list[str] | None = getattr(config, "CORS_PROBE_REQUEST_HEADERS", None)
+    if request_header_names:
+        request_headers["Access-Control-Request-Headers"] = ",".join(request_header_names)
+
+    timeout_seconds = int(getattr(config, "CORS_PROBE_TIMEOUT_SECONDS", 5) or 5)
+    probe_timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+
+    try:
+        async with session.options(
+            url,
+            headers=request_headers,
+            timeout=probe_timeout,
+            allow_redirects=True,
+        ) as cors_resp:
+            cors_headers = convert_headers(cors_resp.headers)
+            return {
+                "status": cors_resp.status,
+                "allow-origin": cors_headers.get("access-control-allow-origin"),
+                "allow-methods": cors_headers.get("access-control-allow-methods"),
+                "allow-headers": cors_headers.get("access-control-allow-headers"),
+                "exposed-headers": cors_headers.get("access-control-expose-headers"),
+                "max-age": cors_headers.get("access-control-max-age"),
+                "allow-credentials": cors_headers.get("access-control-allow-credentials"),
+            }
+    except asyncio.TimeoutError:
+        return {"status": None, "error": "timeout"}
+    except aiohttp.ClientError as exc:
+        error: str = getattr(exc, "message", None) or str(exc)
+        status: int | None = getattr(exc, "status", None)
+        return {"status": status, "error": fix_surrogates(error)}
+
+
+def build_cors_payload(raw: dict) -> dict:
+    """Shape a successful CORS preflight response into udata extras while ignoring failures or non-permissive replies."""
+    if not raw or raw.get("error"):
+        return {}
+    status: int | str | None = raw.get("status")
+    if status is None:
+        return {}
+    try:
+        status_int = int(status)
+    except (TypeError, ValueError):
+        return {}
+    if not (200 <= status_int < 400):
+        return {}
+    return {
+        "check:cors:status": status_int,
+        "check:cors:allow-origin": raw.get("allow-origin"),
+        "check:cors:allow-methods": raw.get("allow-methods"),
+        "check:cors:allow-headers": raw.get("allow-headers"),
+        "check:cors:exposed-headers": raw.get("exposed-headers"),
+        "check:cors:max-age": raw.get("max-age"),
+        "check:cors:allow-credentials": raw.get("allow-credentials"),
+        "check:cors:error": raw.get("error"),
+    }
