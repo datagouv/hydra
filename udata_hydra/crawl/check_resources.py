@@ -17,6 +17,7 @@ from udata_hydra.crawl.helpers import (
 from udata_hydra.crawl.preprocess_check_data import preprocess_check_data
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import UdataPayload, queue, send
+from udata_hydra.utils.http import CORS_HEADER_FIELDS
 
 RESOURCE_RESPONSE_STATUSES = {
     "OK": "ok",
@@ -271,12 +272,10 @@ async def probe_cors(session, url: str) -> dict | None:
             cors_headers = convert_headers(cors_resp.headers)
             return {
                 "status": cors_resp.status,
-                "allow-origin": cors_headers.get("access-control-allow-origin"),
-                "allow-methods": cors_headers.get("access-control-allow-methods"),
-                "allow-headers": cors_headers.get("access-control-allow-headers"),
-                "exposed-headers": cors_headers.get("access-control-expose-headers"),
-                "max-age": cors_headers.get("access-control-max-age"),
-                "allow-credentials": cors_headers.get("access-control-allow-credentials"),
+                **{
+                    field: cors_headers.get(header_name)
+                    for field, header_name in CORS_HEADER_FIELDS
+                },
             }
     except asyncio.TimeoutError:
         return {"status": None, "error": "timeout"}
@@ -299,13 +298,7 @@ def build_cors_payload(raw: dict) -> dict:
         return {}
     if not (200 <= status_int < 400):
         return {}
-    return {
-        "check:cors:status": status_int,
-        "check:cors:allow-origin": raw.get("allow-origin"),
-        "check:cors:allow-methods": raw.get("allow-methods"),
-        "check:cors:allow-headers": raw.get("allow-headers"),
-        "check:cors:exposed-headers": raw.get("exposed-headers"),
-        "check:cors:max-age": raw.get("max-age"),
-        "check:cors:allow-credentials": raw.get("allow-credentials"),
-        "check:cors:error": raw.get("error"),
-    }
+    payload = {"check:cors:status": status_int, "check:cors:error": raw.get("error")}
+    for field, _ in CORS_HEADER_FIELDS:
+        payload[f"check:cors:{field}"] = raw.get(field)
+    return payload
