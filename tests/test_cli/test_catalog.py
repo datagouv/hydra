@@ -1,8 +1,8 @@
 import nest_asyncio
 import pytest
-from minicli import run
 
 from tests.conftest import RESOURCE_ID
+from udata_hydra.cli import insert_resource_into_catalog, load_catalog
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -17,7 +17,7 @@ async def test_load_catalog_url_has_changed(setup_catalog, rmock, db, catalog_co
     )
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    run("load_catalog", url=catalog)
+    await load_catalog(url=catalog, drop_meta=False, drop_all=False, quiet=False)
 
     # check that we still only have one entry for this resource in the catalog
     res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", f"{RESOURCE_ID}")
@@ -34,7 +34,7 @@ async def test_load_catalog_harvest_modified_at_has_changed(
     catalog_content = catalog_content.replace(b'""\n', b'"2025-03-14 15:49:16.876+02"\n')
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    run("load_catalog", url=catalog)
+    await load_catalog(url=catalog, drop_meta=False, drop_all=False, quiet=False)
 
     # check that harvest metadata has been updated
     res = await db.fetch("SELECT * FROM catalog WHERE resource_id = $1", f"{RESOURCE_ID}")
@@ -60,7 +60,7 @@ async def test_insert_resource_in_catalog(rmock):
             },
         },
     )
-    run("insert_resource_into_catalog", RESOURCE_ID)
+    await insert_resource_into_catalog(resource_id=RESOURCE_ID)
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
     assert resource["dataset_id"] == new_dataset_id

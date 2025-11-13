@@ -9,10 +9,9 @@ from tempfile import NamedTemporaryFile
 
 import aiohttp
 import asyncpg
+import typer
 from asyncpg import Record
 from humanfriendly import parse_size
-from minicli import cli, wrap
-from minicli import run as minicli_run
 from progressist import ProgressBar
 
 from udata_hydra import config
@@ -27,7 +26,8 @@ from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
 from udata_hydra.utils import download_file, download_resource
 
-context = {}
+cli = typer.Typer()
+context = {"conn": {}}
 log = setup_logging()
 
 
@@ -44,17 +44,16 @@ async def connection(db_name: str = "main"):
     return context["conn"][db_name]
 
 
-@cli
+@cli.command()
 async def load_catalog(
-    url: str | None = None, drop_meta: bool = False, drop_all: bool = False, quiet: bool = False
+    url: str | None = typer.Option(
+        None, help="URL of the catalog to fetch, by default defined in config"
+    ),
+    drop_meta: bool = typer.Option(False, help="Drop the metadata tables (catalog, checks...)"),
+    drop_all: bool = typer.Option(False, help="Drop metadata tables and parsed csv content"),
+    quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
 ):
-    """Load the catalog into DB from CSV file
-
-    :url: URL of the catalog to fetch, by default defined in config
-    :drop_meta: drop the metadata tables (catalog, checks...)
-    :drop_all: drop metadata tables and parsed csv content
-    :quiet: ingore logs except for errors
-    """
+    """Load the catalog into DB from CSV file"""
     if quiet:
         log.setLevel(logging.ERROR)
 
@@ -125,8 +124,11 @@ async def load_catalog(
         os.unlink(fd.name)
 
 
-@cli
-async def crawl_url(url: str, method: str = "get"):
+@cli.command()
+async def crawl_url(
+    url: str = typer.Argument(..., help="URL to crawl"),
+    method: str = typer.Option("get", help="HTTP method to use"),
+):
     """Quickly crawl an URL"""
     log.info(f"Checking url {url}")
     async with aiohttp.ClientSession(timeout=None) as session:
@@ -140,7 +142,7 @@ async def crawl_url(url: str, method: str = "get"):
             log.error(e)
 
 
-@cli(name="download-resource")
+@cli.command(name="download-resource")
 async def download_resource_cli(resource_id: str, output_dir: str | None = None):
     """Download a resource from the catalog
 
@@ -166,8 +168,14 @@ async def download_resource_cli(resource_id: str, output_dir: str | None = None)
         raise
 
 
-@cli
-async def check_resource(resource_id: str, method: str = "get", force_analysis: bool = True):
+@cli.command()
+async def check_resource(
+    resource_id: str = typer.Argument(..., help="Resource ID to check"),
+    method: str = typer.Option("get", help="HTTP method to use"),
+    force_analysis: bool = typer.Option(
+        True, help="Force analysis even if resource hasn't changed"
+    ),
+):
     """Trigger a complete check for a given resource_id"""
     resource: asyncpg.Record | None = await Resource.get(resource_id)
     if not resource:
@@ -184,7 +192,7 @@ async def check_resource(resource_id: str, method: str = "get", force_analysis: 
         )
 
 
-@cli(name="analyse-resource")
+@cli.command(name="analyse-resource")
 async def analyse_resource_cli(resource_id: str):
     """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
     check: Record | None = await Check.get_by_resource_id(resource_id)
@@ -194,12 +202,12 @@ async def analyse_resource_cli(resource_id: str):
     await analyse_resource(check=check, last_check=None, force_analysis=True)
 
 
-@cli(name="analyse-csv")
+@cli.command(name="analyse-csv")
 async def analyse_csv_cli(
-    check_id: str | None = None,
-    url: str | None = None,
-    resource_id: str | None = None,
-    debug_insert: bool = False,
+    check_id: str | None = typer.Option(None, help="Check ID to analyze"),
+    url: str | None = typer.Option(None, help="URL to analyze"),
+    resource_id: str | None = typer.Option(None, help="Resource ID to analyze"),
+    debug_insert: bool = typer.Option(False, help="Enable debug mode for insertion"),
 ):
     """Trigger a csv analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
@@ -274,7 +282,7 @@ async def analyse_csv_cli(
             log.warning(f"Failed to clean temporary external data for {url}: {e}")
 
 
-@cli(name="analyse-geojson")
+@cli.command(name="analyse-geojson")
 async def analyse_geojson_cli(
     check_id: str | None = None,
     url: str | None = None,
@@ -305,7 +313,7 @@ async def analyse_geojson_cli(
     await analyse_geojson(check=dict(check))
 
 
-@cli(name="convert-csv-to-geojson")
+@cli.command(name="convert-csv-to-geojson")
 async def convert_csv_to_geojson_cli(csv_filepath: str):
     """Convert a CSV file to GeoJSON format using udata-hydra analysis functions.
 
@@ -379,7 +387,7 @@ async def convert_csv_to_geojson_cli(csv_filepath: str):
         traceback.print_exc()
 
 
-@cli(name="convert-geojson-to-pmtiles")
+@cli.command(name="convert-geojson-to-pmtiles")
 async def convert_geojson_to_pmtiles_cli(geojson_filepath: str):
     """Convert a GeoJSON file to PMTiles format using udata-hydra analysis functions.
 
@@ -418,7 +426,7 @@ async def convert_geojson_to_pmtiles_cli(geojson_filepath: str):
         traceback.print_exc()
 
 
-@cli(name="analyse-parquet")
+@cli.command(name="analyse-parquet")
 async def analyse_parquet_cli(
     check_id: str | None = None,
     url: str | None = None,
@@ -449,15 +457,19 @@ async def analyse_parquet_cli(
     await analyse_parquet(check=dict(check))
 
 
-@cli
-async def csv_sample(size: int = 1000, download: bool = False, max_size: str = "100M"):
+@cli.command()
+async def csv_sample(
+    size: int = typer.Option(1000, help="Size of the sample (how many files to query)"),
+    download: bool = typer.Option(False, help="Download files or just list them"),
+    max_size: str = typer.Option("100M", help="Maximum size for one file (from headers)"),
+):
     """Get a csv sample from latest checks
 
     :size: Size of the sample (how many files to query)
     :download: Download files or just list them
     :max_size: Maximum size for one file (from headers)
     """
-    max_size: int = parse_size(max_size)
+    max_size_bytes: int = parse_size(max_size)
     start_q = f"""
         SELECT catalog.resource_id, catalog.dataset_id, checks.url,
             checks.headers->>'content-type' as content_type,
@@ -466,7 +478,7 @@ async def csv_sample(size: int = 1000, download: bool = False, max_size: str = "
         WHERE catalog.last_check = checks.id
         AND checks.headers->>'content-type' LIKE '%csv%'
         AND checks.status >= 200 and checks.status < 400
-        AND CAST(checks.headers->>'content-length' AS INTEGER) <= {max_size}
+        AND CAST(checks.headers->>'content-length' AS INTEGER) <= {max_size_bytes}
     """
     end_q = f"""
         ORDER BY RANDOM()
@@ -519,8 +531,11 @@ async def csv_sample(size: int = 1000, download: bool = False, max_size: str = "
         writer.writerows(lines)
 
 
-@cli
-async def drop_dbs(dbs: list = []):
+@cli.command()
+async def drop_dbs(
+    dbs: list[str] = typer.Option(["main"], help="List of databases to drop"),
+):
+    """Drop tables from specified databases"""
     for db in dbs:
         conn = await connection(db)
         tables = await conn.fetch(f"""
@@ -531,8 +546,11 @@ async def drop_dbs(dbs: list = []):
             await conn.execute(f'DROP TABLE "{table["tablename"]}" CASCADE')
 
 
-@cli
-async def migrate(skip_errors: bool = False, dbs: list[str] = ["main", "csv"]):
+@cli.command()
+async def migrate(
+    skip_errors: bool = typer.Option(False, help="Skip migration errors"),
+    dbs: list[str] = typer.Option(["main", "csv"], help="List of databases to migrate"),
+):
     """Migrate the database(s)"""
     for db in dbs:
         log.info(f"Migrating db {db}...")
@@ -540,8 +558,11 @@ async def migrate(skip_errors: bool = False, dbs: list[str] = ["main", "csv"]):
         await migrator.migrate()
 
 
-@cli
-async def purge_checks(retention_days: int = 60, quiet: bool = False) -> None:
+@cli.command()
+async def purge_checks(
+    retention_days: int = typer.Option(60, help="Number of days to keep checks"),
+    quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
+) -> None:
     """Delete outdated checks that are more than `retention_days` days old"""
     if quiet:
         log.setLevel(logging.ERROR)
@@ -555,35 +576,37 @@ async def purge_checks(retention_days: int = 60, quiet: bool = False) -> None:
     log.info(f"Deleted {deleted} checks.")
 
 
-@cli
-async def purge_csv_tables(quiet: bool = False, hard_delete: bool = False) -> None:
+@cli.command()
+async def purge_csv_tables(
+    quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
+    hard_delete: bool = False,
+) -> None:
     """Delete converted CSV tables for resources url no longer in catalog"""
     # TODO: check if we should use parsing_table from table_index?
     # And are they necessarily in sync?
 
-    # Fetch all parsing tables from checks where we don't have any entry on
-    # md5(url) in catalog or all entries are marked as deleted.
+    # We want to delete all tables which names (from md5(url)) don't match any URL in catalog
     if quiet:
         log.setLevel(logging.ERROR)
 
-    q = """
-    SELECT DISTINCT checks.parsing_table
-    FROM checks
-    LEFT JOIN (
-        select url, MAX(id) as id, BOOL_AND(deleted) as deleted
-        FROM catalog
-        GROUP BY url) c
-    ON checks.parsing_table = md5(c.url)
-    WHERE checks.parsing_table IS NOT NULL AND (c.id IS NULL OR c.deleted = TRUE);
-    """
+    q_catalog = "SELECT DISTINCT md5(url) AS parsing_table FROM catalog WHERE deleted IS false;"
     conn_main = await connection()
-    res: list[Record] = await conn_main.fetch(q)
-    tables_to_delete: list[str] = [r["parsing_table"] for r in res]
+    res_catalog: list[Record] = await conn_main.fetch(q_catalog)
+    catalog_tables: set[str] = set([r["parsing_table"] for r in res_catalog])
+
+    # only including the parsing tables (hopefully the conditions are restrictive enough)
+    q_tables = f"""SELECT tablename FROM pg_catalog.pg_tables
+    WHERE schemaname = '{config.DATABASE_SCHEMA}'
+    AND LENGTH(tablename) = 32
+    AND tablename ~ '[0-9]';"""
+    conn_csv = await connection(db_name="csv")
+    res_tables: list[Record] = await conn_csv.fetch(q_tables)
+    parsing_tables: set[str] = set([r["tablename"] for r in res_tables])
+
+    tables_to_delete: set[str] = parsing_tables - catalog_tables
 
     success_count = 0
     error_count = 0
-
-    conn_csv = await connection(db_name="csv")
     log.debug(f"{len(tables_to_delete)} tables to delete")
     for table in tables_to_delete:
         try:
@@ -617,7 +640,7 @@ async def purge_csv_tables(quiet: bool = False, hard_delete: bool = False) -> No
         log.info("Nothing to delete.")
 
 
-@cli
+@cli.command()
 async def insert_resource_into_catalog(resource_id: str):
     """Insert a resource into the catalog
     Useful for local tests, instead of having to resync the whole catalog for one new resource
@@ -666,7 +689,7 @@ async def insert_resource_into_catalog(resource_id: str):
         raise e
 
 
-@cli
+@cli.command()
 async def insert_url_into_catalog(url: str, resource_id: str):
     """Insert a URL into the catalog
     Useful for local tests, instead of having to resync the whole catalog for one new URL
@@ -709,7 +732,7 @@ async def insert_url_into_catalog(url: str, resource_id: str):
         raise e
 
 
-@cli
+@cli.command()
 async def purge_selected_csv_tables(
     retention_days: int | None = None,
     retention_tables: int | None = None,
@@ -763,17 +786,20 @@ async def purge_selected_csv_tables(
         log.info("Nothing to delete.")
 
 
-@wrap
-async def cli_wrapper():
-    context["conn"] = {}
-    yield
+async def cleanup():
+    """Cleanup function to close database connections"""
     for db in context["conn"]:
         await context["conn"][db].close()
 
 
 def run():
-    """Main CLI entry point"""
-    minicli_run()
+    """Main entry point for the CLI"""
+    try:
+        import asyncio
+
+        asyncio.run(cli())
+    finally:
+        asyncio.run(cleanup())
 
 
 if __name__ == "__main__":

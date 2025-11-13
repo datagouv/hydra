@@ -15,7 +15,7 @@ dependencies = [
     "dateparser>=1.1.7",
     "humanfriendly>=10.0",
     "json-stream>=2.3.3",
-    "minicli>=0.5.3",
+    "marshmallow>=3.14.1",
     "minio>=7.2.8",
     "progressist>=0.1.0",
     "pyarrow>=16.1.0",
@@ -27,6 +27,7 @@ dependencies = [
     "sentry-sdk>=2.10.0",
     "sqlalchemy>=1.4.46",
     "tippecanoe>=2.72.0",
+    "typer>=0.15.1",
 ]
 requires-python = ">=3.11,<3.14"
 license = { text = "MIT" }
@@ -59,7 +60,6 @@ module = [
     "botocore.*",
     "csv_detective.*",
     "humanfriendly.*",
-    "minicli.*",
     "sqlalchemy.*",
     "str2bool.*",
     "str2float.*",
@@ -73,8 +73,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "catalog_harvested: use catalog_harvested.csv as source",
 ]
-# addopts = "--cov=udata_hydra/ --cov-report term-missing --cov-fail-under=89" # if we want to fail if coverage is less than 89%
-# addopts = "--cov=udata_hydra/ --cov-report term-missing"
+addopts = "--cov=udata_hydra --cov-report term-missing --cov-branch --cov-fail-under=80"
 
 [tool.ruff]
 lint = { extend-select = ["I"] } # ["I"] is to also sort imports with an isort rule
