@@ -17,7 +17,7 @@ from udata_hydra.crawl.helpers import (
 from udata_hydra.crawl.preprocess_check_data import preprocess_check_data
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import UdataPayload, queue, send
-from udata_hydra.utils.http import CORS_HEADER_FIELDS
+from udata_hydra.utils.http import CORS_HEADER_FIELDS, CORS_HEADER_PREFIX
 
 RESOURCE_RESPONSE_STATUSES = {
     "OK": "ok",
@@ -273,8 +273,8 @@ async def probe_cors(session, url: str) -> dict | None:
             return {
                 "status": cors_resp.status,
                 **{
-                    field: cors_headers.get(header_name)
-                    for field, header_name in CORS_HEADER_FIELDS
+                    field: cors_headers.get(f"{CORS_HEADER_PREFIX}{field}")
+                    for field in CORS_HEADER_FIELDS
                 },
             }
     except asyncio.TimeoutError:
@@ -299,6 +299,6 @@ def build_cors_payload(raw: dict) -> dict:
     if not (200 <= status_int < 400):
         return {}
     payload = {"check:cors:status": status_int, "check:cors:error": raw.get("error")}
-    for field, _ in CORS_HEADER_FIELDS:
+    for field in CORS_HEADER_FIELDS:
         payload[f"check:cors:{field}"] = raw.get(field)
     return payload

@@ -10,13 +10,14 @@ from udata_hydra.utils import IOException
 
 log = logging.getLogger("udata-hydra")
 
+CORS_HEADER_PREFIX = "access-control-"
 CORS_HEADER_FIELDS = [
-    ("allow-origin", "access-control-allow-origin"),
-    ("allow-methods", "access-control-allow-methods"),
-    ("allow-headers", "access-control-allow-headers"),
-    ("exposed-headers", "access-control-expose-headers"),
-    ("max-age", "access-control-max-age"),
-    ("allow-credentials", "access-control-allow-credentials"),
+    "allow-origin",
+    "allow-methods",
+    "allow-headers",
+    "expose-headers",
+    "max-age",
+    "allow-credentials",
 ]
 
 
@@ -24,7 +25,7 @@ class UdataPayload:
     HYDRA_UDATA_METADATA = {
         "check": ["available", "date", "error", "id", "status", "timeout"],
         "check:headers": ["content-type", "content-length"],
-        "check:cors": ["status", "error"] + [field for field, _ in CORS_HEADER_FIELDS],
+        "check:cors": ["status", "error"] + CORS_HEADER_FIELDS,
         "analysis": [
             "checksum",
             "content-length",
