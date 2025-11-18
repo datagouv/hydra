@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import hashlib
 import logging
@@ -122,6 +123,22 @@ async def _load_catalog(
         os.unlink(fd.name)
 
 
+def _make_async_wrapper(async_func):
+    """Create a wrapper that works both in sync and async contexts"""
+
+    def wrapper(*args, **kwargs):
+        try:
+            # Check if we're in an async context (event loop is running)
+            asyncio.get_running_loop()
+            # We're in an async context, return a coroutine
+            return async_func(*args, **kwargs)
+        except RuntimeError:
+            # No event loop running, use aiorun
+            return aiorun(async_func(*args, **kwargs))
+
+    return wrapper
+
+
 @cli.command()
 def load_catalog(
     url: str | None = typer.Option(
@@ -132,7 +149,9 @@ def load_catalog(
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
 ):
     """Load the catalog into DB from CSV file"""
-    aiorun(_load_catalog(url=url, drop_meta=drop_meta, drop_all=drop_all, quiet=quiet))
+    return _make_async_wrapper(_load_catalog)(
+        url=url, drop_meta=drop_meta, drop_all=drop_all, quiet=quiet
+    )
 
 
 async def _crawl_url(
@@ -158,7 +177,7 @@ def crawl_url(
     method: str = typer.Option("get", help="HTTP method to use"),
 ):
     """Quickly crawl an URL"""
-    aiorun(_crawl_url(url=url, method=method))
+    return _make_async_wrapper(_crawl_url)(url=url, method=method)
 
 
 async def _download_resource_cli(resource_id: str, output_dir: str | None = None):
@@ -193,7 +212,9 @@ def download_resource_cli(resource_id: str, output_dir: str | None = None):
     :resource_id: ID of the resource to download
     :output_dir: Custom output directory (defaults to TEMPORARY_DOWNLOAD_FOLDER)
     """
-    aiorun(_download_resource_cli(resource_id=resource_id, output_dir=output_dir))
+    return _make_async_wrapper(_download_resource_cli)(
+        resource_id=resource_id, output_dir=output_dir
+    )
 
 
 async def _check_resource(
@@ -226,7 +247,9 @@ def check_resource(
     ),
 ):
     """Trigger a complete check for a given resource_id"""
-    aiorun(_check_resource(resource_id=resource_id, method=method, force_analysis=force_analysis))
+    return _make_async_wrapper(_check_resource)(
+        resource_id=resource_id, method=method, force_analysis=force_analysis
+    )
 
 
 async def _analyse_resource_cli(resource_id: str):
@@ -241,7 +264,7 @@ async def _analyse_resource_cli(resource_id: str):
 @cli.command(name="analyse-resource")
 def analyse_resource_cli(resource_id: str):
     """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
-    aiorun(_analyse_resource_cli(resource_id=resource_id))
+    return _make_async_wrapper(_analyse_resource_cli)(resource_id=resource_id)
 
 
 async def _analyse_csv_cli(
@@ -333,10 +356,8 @@ def analyse_csv_cli(
     """Trigger a csv analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
     """
-    aiorun(
-        _analyse_csv_cli(
-            check_id=check_id, url=url, resource_id=resource_id, debug_insert=debug_insert
-        )
+    return _make_async_wrapper(_analyse_csv_cli)(
+        check_id=check_id, url=url, resource_id=resource_id, debug_insert=debug_insert
     )
 
 
@@ -379,7 +400,9 @@ def analyse_geojson_cli(
     """Trigger a GeoJSON analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
     """
-    aiorun(_analyse_geojson_cli(check_id=check_id, url=url, resource_id=resource_id))
+    return _make_async_wrapper(_analyse_geojson_cli)(
+        check_id=check_id, url=url, resource_id=resource_id
+    )
 
 
 async def _convert_csv_to_geojson_cli(csv_filepath: str):
@@ -461,7 +484,7 @@ def convert_csv_to_geojson_cli(csv_filepath: str):
 
     :csv_filepath: Path to the CSV file to convert
     """
-    aiorun(_convert_csv_to_geojson_cli(csv_filepath=csv_filepath))
+    return _make_async_wrapper(_convert_csv_to_geojson_cli)(csv_filepath=csv_filepath)
 
 
 async def _convert_geojson_to_pmtiles_cli(geojson_filepath: str):
@@ -508,7 +531,7 @@ def convert_geojson_to_pmtiles_cli(geojson_filepath: str):
 
     :geojson_filepath: Path to the GeoJSON file to convert
     """
-    aiorun(_convert_geojson_to_pmtiles_cli(geojson_filepath=geojson_filepath))
+    return _make_async_wrapper(_convert_geojson_to_pmtiles_cli)(geojson_filepath=geojson_filepath)
 
 
 async def _analyse_parquet_cli(
@@ -550,7 +573,9 @@ def analyse_parquet_cli(
     """Trigger a parquet analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
     """
-    aiorun(_analyse_parquet_cli(check_id=check_id, url=url, resource_id=resource_id))
+    return _make_async_wrapper(_analyse_parquet_cli)(
+        check_id=check_id, url=url, resource_id=resource_id
+    )
 
 
 async def _csv_sample(
@@ -638,7 +663,7 @@ def csv_sample(
     :download: Download files or just list them
     :max_size: Maximum size for one file (from headers)
     """
-    aiorun(_csv_sample(size=size, download=download, max_size=max_size))
+    return _make_async_wrapper(_csv_sample)(size=size, download=download, max_size=max_size)
 
 
 async def _drop_dbs(
@@ -662,7 +687,7 @@ def drop_dbs(
     dbs: list[str] = typer.Option(["main"], help="List of databases to drop"),
 ):
     """Drop tables from specified databases"""
-    aiorun(_drop_dbs(dbs=dbs))
+    return _make_async_wrapper(_drop_dbs)(dbs=dbs)
 
 
 async def _migrate(
@@ -684,7 +709,7 @@ def migrate(
     dbs: list[str] = typer.Option(["main", "csv"], help="List of databases to migrate"),
 ):
     """Migrate the database(s)"""
-    aiorun(_migrate(skip_errors=skip_errors, dbs=dbs))
+    return _make_async_wrapper(_migrate)(skip_errors=skip_errors, dbs=dbs)
 
 
 async def _purge_checks(
@@ -710,7 +735,7 @@ def purge_checks(
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
 ) -> None:
     """Delete outdated checks that are more than `retention_days` days old"""
-    aiorun(_purge_checks(retention_days=retention_days, quiet=quiet))
+    return _make_async_wrapper(_purge_checks)(retention_days=retention_days, quiet=quiet)
 
 
 async def _purge_csv_tables(
@@ -782,7 +807,7 @@ def purge_csv_tables(
     hard_delete: bool = False,
 ) -> None:
     """Delete converted CSV tables for resources url no longer in catalog"""
-    aiorun(_purge_csv_tables(quiet=quiet, hard_delete=hard_delete))
+    return _make_async_wrapper(_purge_csv_tables)(quiet=quiet, hard_delete=hard_delete)
 
 
 async def _insert_resource_into_catalog(resource_id: str):
@@ -840,7 +865,7 @@ def insert_resource_into_catalog(resource_id: str):
 
     :resource_id: id of the resource to insert
     """
-    aiorun(_insert_resource_into_catalog(resource_id=resource_id))
+    return _make_async_wrapper(_insert_resource_into_catalog)(resource_id=resource_id)
 
 
 async def _insert_url_into_catalog(url: str, resource_id: str):
@@ -893,7 +918,7 @@ def insert_url_into_catalog(url: str, resource_id: str):
     :url: URL of the resource to insert
     :resource_id: resource ID (mandatory)
     """
-    aiorun(_insert_url_into_catalog(url=url, resource_id=resource_id))
+    return _make_async_wrapper(_insert_url_into_catalog)(url=url, resource_id=resource_id)
 
 
 async def _purge_selected_csv_tables(
@@ -959,10 +984,8 @@ def purge_selected_csv_tables(
     - if they're more than retention_days days old
     - if they're not in the top retention_tables most recent
     """
-    aiorun(
-        _purge_selected_csv_tables(
-            retention_days=retention_days, retention_tables=retention_tables, quiet=quiet
-        )
+    return _make_async_wrapper(_purge_selected_csv_tables)(
+        retention_days=retention_days, retention_tables=retention_tables, quiet=quiet
     )
 
 
