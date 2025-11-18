@@ -3,6 +3,7 @@ import hashlib
 import logging
 import os
 import uuid
+from asyncio import run as aiorun
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -44,14 +45,11 @@ async def connection(db_name: str = "main"):
     return context["conn"][db_name]
 
 
-@cli.command()
-async def load_catalog(
-    url: str | None = typer.Option(
-        None, help="URL of the catalog to fetch, by default defined in config"
-    ),
-    drop_meta: bool = typer.Option(False, help="Drop the metadata tables (catalog, checks...)"),
-    drop_all: bool = typer.Option(False, help="Drop metadata tables and parsed csv content"),
-    quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
+async def _load_catalog(
+    url: str | None = None,
+    drop_meta: bool = False,
+    drop_all: bool = False,
+    quiet: bool = False,
 ):
     """Load the catalog into DB from CSV file"""
     if quiet:
@@ -62,8 +60,8 @@ async def load_catalog(
 
     if drop_meta or drop_all:
         dbs = ["main"] if drop_meta else ["main", "csv"]
-        await drop_dbs(dbs=dbs)
-        await migrate()
+        await _drop_dbs(dbs=dbs)
+        await _migrate()
 
     def iter_with_progressbar_or_quiet(rows, quiet):
         if quiet:
@@ -125,9 +123,21 @@ async def load_catalog(
 
 
 @cli.command()
-async def crawl_url(
-    url: str = typer.Argument(..., help="URL to crawl"),
-    method: str = typer.Option("get", help="HTTP method to use"),
+def load_catalog(
+    url: str | None = typer.Option(
+        None, help="URL of the catalog to fetch, by default defined in config"
+    ),
+    drop_meta: bool = typer.Option(False, help="Drop the metadata tables (catalog, checks...)"),
+    drop_all: bool = typer.Option(False, help="Drop metadata tables and parsed csv content"),
+    quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
+):
+    """Load the catalog into DB from CSV file"""
+    aiorun(_load_catalog(url=url, drop_meta=drop_meta, drop_all=drop_all, quiet=quiet))
+
+
+async def _crawl_url(
+    url: str,
+    method: str = "get",
 ):
     """Quickly crawl an URL"""
     log.info(f"Checking url {url}")
@@ -142,8 +152,16 @@ async def crawl_url(
             log.error(e)
 
 
-@cli.command(name="download-resource")
-async def download_resource_cli(resource_id: str, output_dir: str | None = None):
+@cli.command()
+def crawl_url(
+    url: str = typer.Argument(..., help="URL to crawl"),
+    method: str = typer.Option("get", help="HTTP method to use"),
+):
+    """Quickly crawl an URL"""
+    aiorun(_crawl_url(url=url, method=method))
+
+
+async def _download_resource_cli(resource_id: str, output_dir: str | None = None):
     """Download a resource from the catalog
 
     :resource_id: ID of the resource to download
@@ -168,13 +186,20 @@ async def download_resource_cli(resource_id: str, output_dir: str | None = None)
         raise
 
 
-@cli.command()
-async def check_resource(
-    resource_id: str = typer.Argument(..., help="Resource ID to check"),
-    method: str = typer.Option("get", help="HTTP method to use"),
-    force_analysis: bool = typer.Option(
-        True, help="Force analysis even if resource hasn't changed"
-    ),
+@cli.command(name="download-resource")
+def download_resource_cli(resource_id: str, output_dir: str | None = None):
+    """Download a resource from the catalog
+
+    :resource_id: ID of the resource to download
+    :output_dir: Custom output directory (defaults to TEMPORARY_DOWNLOAD_FOLDER)
+    """
+    aiorun(_download_resource_cli(resource_id=resource_id, output_dir=output_dir))
+
+
+async def _check_resource(
+    resource_id: str,
+    method: str = "get",
+    force_analysis: bool = True,
 ):
     """Trigger a complete check for a given resource_id"""
     resource: asyncpg.Record | None = await Resource.get(resource_id)
@@ -192,22 +217,38 @@ async def check_resource(
         )
 
 
-@cli.command(name="analyse-resource")
-async def analyse_resource_cli(resource_id: str):
+@cli.command()
+def check_resource(
+    resource_id: str = typer.Argument(..., help="Resource ID to check"),
+    method: str = typer.Option("get", help="HTTP method to use"),
+    force_analysis: bool = typer.Option(
+        True, help="Force analysis even if resource hasn't changed"
+    ),
+):
+    """Trigger a complete check for a given resource_id"""
+    aiorun(_check_resource(resource_id=resource_id, method=method, force_analysis=force_analysis))
+
+
+async def _analyse_resource_cli(resource_id: str):
     """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
     check: Record | None = await Check.get_by_resource_id(resource_id)
     if not check:
         log.error("Could not find a check linked to the specified resource ID")
         return
-    await analyse_resource(check=check, last_check=None, force_analysis=True)
+    await analyse_resource(check=dict(check), last_check=None, force_analysis=True)
 
 
-@cli.command(name="analyse-csv")
-async def analyse_csv_cli(
-    check_id: str | None = typer.Option(None, help="Check ID to analyze"),
-    url: str | None = typer.Option(None, help="URL to analyze"),
-    resource_id: str | None = typer.Option(None, help="Resource ID to analyze"),
-    debug_insert: bool = typer.Option(False, help="Enable debug mode for insertion"),
+@cli.command(name="analyse-resource")
+def analyse_resource_cli(resource_id: str):
+    """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
+    aiorun(_analyse_resource_cli(resource_id=resource_id))
+
+
+async def _analyse_csv_cli(
+    check_id: str | None = None,
+    url: str | None = None,
+    resource_id: str | None = None,
+    debug_insert: bool = False,
 ):
     """Trigger a csv analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
@@ -239,7 +280,7 @@ async def analyse_csv_cli(
     # We cannot get a check, it's an external URL analysis, we need to create a temporary check
     if not check and url:
         tmp_resource_id = str(uuid.uuid4())
-        await insert_url_into_catalog(url=url, resource_id=tmp_resource_id)
+        await _insert_url_into_catalog(url=url, resource_id=tmp_resource_id)
         check = await Check.insert(
             {
                 "resource_id": tmp_resource_id,
@@ -282,8 +323,24 @@ async def analyse_csv_cli(
             log.warning(f"Failed to clean temporary external data for {url}: {e}")
 
 
-@cli.command(name="analyse-geojson")
-async def analyse_geojson_cli(
+@cli.command(name="analyse-csv")
+def analyse_csv_cli(
+    check_id: str | None = typer.Option(None, help="Check ID to analyze"),
+    url: str | None = typer.Option(None, help="URL to analyze"),
+    resource_id: str | None = typer.Option(None, help="Resource ID to analyze"),
+    debug_insert: bool = typer.Option(False, help="Enable debug mode for insertion"),
+):
+    """Trigger a csv analysis from a check_id, an url or a resource_id
+    Try to get the check from the check ID, then from the URL
+    """
+    aiorun(
+        _analyse_csv_cli(
+            check_id=check_id, url=url, resource_id=resource_id, debug_insert=debug_insert
+        )
+    )
+
+
+async def _analyse_geojson_cli(
     check_id: str | None = None,
     url: str | None = None,
     resource_id: str | None = None,
@@ -313,8 +370,19 @@ async def analyse_geojson_cli(
     await analyse_geojson(check=dict(check))
 
 
-@cli.command(name="convert-csv-to-geojson")
-async def convert_csv_to_geojson_cli(csv_filepath: str):
+@cli.command(name="analyse-geojson")
+def analyse_geojson_cli(
+    check_id: str | None = None,
+    url: str | None = None,
+    resource_id: str | None = None,
+):
+    """Trigger a GeoJSON analysis from a check_id, an url or a resource_id
+    Try to get the check from the check ID, then from the URL
+    """
+    aiorun(_analyse_geojson_cli(check_id=check_id, url=url, resource_id=resource_id))
+
+
+async def _convert_csv_to_geojson_cli(csv_filepath: str):
     """Convert a CSV file to GeoJSON format using udata-hydra analysis functions.
 
     :csv_filepath: Path to the CSV file to convert
@@ -387,8 +455,16 @@ async def convert_csv_to_geojson_cli(csv_filepath: str):
         traceback.print_exc()
 
 
-@cli.command(name="convert-geojson-to-pmtiles")
-async def convert_geojson_to_pmtiles_cli(geojson_filepath: str):
+@cli.command(name="convert-csv-to-geojson")
+def convert_csv_to_geojson_cli(csv_filepath: str):
+    """Convert a CSV file to GeoJSON format using udata-hydra analysis functions.
+
+    :csv_filepath: Path to the CSV file to convert
+    """
+    aiorun(_convert_csv_to_geojson_cli(csv_filepath=csv_filepath))
+
+
+async def _convert_geojson_to_pmtiles_cli(geojson_filepath: str):
     """Convert a GeoJSON file to PMTiles format using udata-hydra analysis functions.
 
     :geojson_filepath: Path to the GeoJSON file to convert
@@ -426,8 +502,16 @@ async def convert_geojson_to_pmtiles_cli(geojson_filepath: str):
         traceback.print_exc()
 
 
-@cli.command(name="analyse-parquet")
-async def analyse_parquet_cli(
+@cli.command(name="convert-geojson-to-pmtiles")
+def convert_geojson_to_pmtiles_cli(geojson_filepath: str):
+    """Convert a GeoJSON file to PMTiles format using udata-hydra analysis functions.
+
+    :geojson_filepath: Path to the GeoJSON file to convert
+    """
+    aiorun(_convert_geojson_to_pmtiles_cli(geojson_filepath=geojson_filepath))
+
+
+async def _analyse_parquet_cli(
     check_id: str | None = None,
     url: str | None = None,
     resource_id: str | None = None,
@@ -457,11 +541,22 @@ async def analyse_parquet_cli(
     await analyse_parquet(check=dict(check))
 
 
-@cli.command()
-async def csv_sample(
-    size: int = typer.Option(1000, help="Size of the sample (how many files to query)"),
-    download: bool = typer.Option(False, help="Download files or just list them"),
-    max_size: str = typer.Option("100M", help="Maximum size for one file (from headers)"),
+@cli.command(name="analyse-parquet")
+def analyse_parquet_cli(
+    check_id: str | None = None,
+    url: str | None = None,
+    resource_id: str | None = None,
+):
+    """Trigger a parquet analysis from a check_id, an url or a resource_id
+    Try to get the check from the check ID, then from the URL
+    """
+    aiorun(_analyse_parquet_cli(check_id=check_id, url=url, resource_id=resource_id))
+
+
+async def _csv_sample(
+    size: int = 1000,
+    download: bool = False,
+    max_size: str = "100M",
 ):
     """Get a csv sample from latest checks
 
@@ -532,10 +627,26 @@ async def csv_sample(
 
 
 @cli.command()
-async def drop_dbs(
-    dbs: list[str] = typer.Option(["main"], help="List of databases to drop"),
+def csv_sample(
+    size: int = typer.Option(1000, help="Size of the sample (how many files to query)"),
+    download: bool = typer.Option(False, help="Download files or just list them"),
+    max_size: str = typer.Option("100M", help="Maximum size for one file (from headers)"),
+):
+    """Get a csv sample from latest checks
+
+    :size: Size of the sample (how many files to query)
+    :download: Download files or just list them
+    :max_size: Maximum size for one file (from headers)
+    """
+    aiorun(_csv_sample(size=size, download=download, max_size=max_size))
+
+
+async def _drop_dbs(
+    dbs: list[str] | None = None,
 ):
     """Drop tables from specified databases"""
+    if dbs is None:
+        dbs = ["main"]
     for db in dbs:
         conn = await connection(db)
         tables = await conn.fetch(f"""
@@ -547,11 +658,20 @@ async def drop_dbs(
 
 
 @cli.command()
-async def migrate(
-    skip_errors: bool = typer.Option(False, help="Skip migration errors"),
-    dbs: list[str] = typer.Option(["main", "csv"], help="List of databases to migrate"),
+def drop_dbs(
+    dbs: list[str] = typer.Option(["main"], help="List of databases to drop"),
+):
+    """Drop tables from specified databases"""
+    aiorun(_drop_dbs(dbs=dbs))
+
+
+async def _migrate(
+    skip_errors: bool = False,
+    dbs: list[str] | None = None,
 ):
     """Migrate the database(s)"""
+    if dbs is None:
+        dbs = ["main", "csv"]
     for db in dbs:
         log.info(f"Migrating db {db}...")
         migrator = await Migrator.create(db, skip_errors=skip_errors)
@@ -559,9 +679,17 @@ async def migrate(
 
 
 @cli.command()
-async def purge_checks(
-    retention_days: int = typer.Option(60, help="Number of days to keep checks"),
-    quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
+def migrate(
+    skip_errors: bool = typer.Option(False, help="Skip migration errors"),
+    dbs: list[str] = typer.Option(["main", "csv"], help="List of databases to migrate"),
+):
+    """Migrate the database(s)"""
+    aiorun(_migrate(skip_errors=skip_errors, dbs=dbs))
+
+
+async def _purge_checks(
+    retention_days: int = 60,
+    quiet: bool = False,
 ) -> None:
     """Delete outdated checks that are more than `retention_days` days old"""
     if quiet:
@@ -577,8 +705,16 @@ async def purge_checks(
 
 
 @cli.command()
-async def purge_csv_tables(
+def purge_checks(
+    retention_days: int = typer.Option(60, help="Number of days to keep checks"),
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
+) -> None:
+    """Delete outdated checks that are more than `retention_days` days old"""
+    aiorun(_purge_checks(retention_days=retention_days, quiet=quiet))
+
+
+async def _purge_csv_tables(
+    quiet: bool = False,
     hard_delete: bool = False,
 ) -> None:
     """Delete converted CSV tables for resources url no longer in catalog"""
@@ -641,7 +777,15 @@ async def purge_csv_tables(
 
 
 @cli.command()
-async def insert_resource_into_catalog(resource_id: str):
+def purge_csv_tables(
+    quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
+    hard_delete: bool = False,
+) -> None:
+    """Delete converted CSV tables for resources url no longer in catalog"""
+    aiorun(_purge_csv_tables(quiet=quiet, hard_delete=hard_delete))
+
+
+async def _insert_resource_into_catalog(resource_id: str):
     """Insert a resource into the catalog
     Useful for local tests, instead of having to resync the whole catalog for one new resource
 
@@ -690,7 +834,16 @@ async def insert_resource_into_catalog(resource_id: str):
 
 
 @cli.command()
-async def insert_url_into_catalog(url: str, resource_id: str):
+def insert_resource_into_catalog(resource_id: str):
+    """Insert a resource into the catalog
+    Useful for local tests, instead of having to resync the whole catalog for one new resource
+
+    :resource_id: id of the resource to insert
+    """
+    aiorun(_insert_resource_into_catalog(resource_id=resource_id))
+
+
+async def _insert_url_into_catalog(url: str, resource_id: str):
     """Insert a URL into the catalog
     Useful for local tests, instead of having to resync the whole catalog for one new URL
 
@@ -733,7 +886,17 @@ async def insert_url_into_catalog(url: str, resource_id: str):
 
 
 @cli.command()
-async def purge_selected_csv_tables(
+def insert_url_into_catalog(url: str, resource_id: str):
+    """Insert a URL into the catalog
+    Useful for local tests, instead of having to resync the whole catalog for one new URL
+
+    :url: URL of the resource to insert
+    :resource_id: resource ID (mandatory)
+    """
+    aiorun(_insert_url_into_catalog(url=url, resource_id=resource_id))
+
+
+async def _purge_selected_csv_tables(
     retention_days: int | None = None,
     retention_tables: int | None = None,
     quiet: bool = False,
@@ -786,6 +949,23 @@ async def purge_selected_csv_tables(
         log.info("Nothing to delete.")
 
 
+@cli.command()
+def purge_selected_csv_tables(
+    retention_days: int | None = None,
+    retention_tables: int | None = None,
+    quiet: bool = False,
+) -> None:
+    """Delete converted CSV tables either:
+    - if they're more than retention_days days old
+    - if they're not in the top retention_tables most recent
+    """
+    aiorun(
+        _purge_selected_csv_tables(
+            retention_days=retention_days, retention_tables=retention_tables, quiet=quiet
+        )
+    )
+
+
 async def cleanup():
     """Cleanup function to close database connections"""
     for db in context["conn"]:
@@ -794,12 +974,7 @@ async def cleanup():
 
 def run():
     """Main entry point for the CLI"""
-    try:
-        import asyncio
-
-        asyncio.run(cli())
-    finally:
-        asyncio.run(cleanup())
+    cli()
 
 
 if __name__ == "__main__":
