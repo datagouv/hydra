@@ -989,12 +989,6 @@ def purge_selected_csv_tables(
     )
 
 
-async def cleanup():
-    """Cleanup function to close database connections"""
-    for db in context["conn"]:
-        await context["conn"][db].close()
-
-
 def run():
     """Main entry point for the CLI"""
     cli()
