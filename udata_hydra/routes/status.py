@@ -16,7 +16,6 @@ async def get_crawler_status(request: web.Request) -> web.Response:
         FROM catalog, checks
         WHERE {Resource.get_excluded_clause()}
         AND catalog.last_check = checks.id
-        AND catalog.deleted = False
     """
     stats_checks: dict = await request.app["pool"].fetchrow(q, now)
 
@@ -101,7 +100,6 @@ async def get_stats(request: web.Request) -> web.Response:
         FROM catalog
         WHERE {Resource.get_excluded_clause()}
         AND last_check IS NOT NULL
-        AND catalog.deleted = False
     """
     stats_catalog = await request.app["pool"].fetchrow(q)
 
@@ -113,7 +111,6 @@ async def get_stats(request: web.Request) -> web.Response:
         FROM catalog, checks
         WHERE {Resource.get_excluded_clause()}
         AND catalog.last_check = checks.id
-        AND catalog.deleted = False
     """
     stats_status = await request.app["pool"].fetchrow(q)
 
@@ -128,7 +125,6 @@ async def get_stats(request: web.Request) -> web.Response:
         AND checks.status IS NOT NULL
         AND {Resource.get_excluded_clause()}
         AND last_check IS NOT NULL
-        AND catalog.deleted = False
         GROUP BY checks.status
         ORDER BY count DESC;
     """
