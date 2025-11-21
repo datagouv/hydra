@@ -8,17 +8,7 @@ from udata_hydra.worker import QUEUES
 
 
 async def get_crawler_status(request: web.Request) -> web.Response:
-    # Count resources with no check and resources with a check
-    q = f"""
-        SELECT
-            COALESCE(SUM(CASE WHEN last_check IS NULL THEN 1 ELSE 0 END), 0) AS count_never_checked,
-            COALESCE(SUM(CASE WHEN last_check IS NOT NULL THEN 1 ELSE 0 END), 0) AS count_checked
-        FROM catalog
-        WHERE {Resource.get_excluded_clause()}
-        AND catalog.deleted = False
-    """
-    stats_resources: dict = await request.app["pool"].fetchrow(q)
-
+    # Count outdated checks (checks that need to be refreshed, filtered by excluded patterns)
     now = datetime.now(timezone.utc)
     q = f"""
         SELECT
@@ -30,15 +20,38 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     """
     stats_checks: dict = await request.app["pool"].fetchrow(q, now)
 
+    # Count total resources and deleted resources (all resources in catalog, no filters)
+    q_total = """
+        SELECT
+            COALESCE(COUNT(*), 0) AS total_resources,
+            COALESCE(SUM(CASE WHEN catalog.deleted = True THEN 1 ELSE 0 END), 0) AS deleted_resources
+        FROM catalog
+    """
+    stats_resources: dict = await request.app["pool"].fetchrow(q_total)
+
+    # Count resources with no check and resources with a check (filtered by excluded patterns)
+    q = f"""
+        SELECT
+            COALESCE(SUM(CASE WHEN catalog.deleted = False AND last_check IS NULL THEN 1 ELSE 0 END), 0) AS count_never_checked,
+            COALESCE(SUM(CASE WHEN catalog.deleted = False AND last_check IS NOT NULL THEN 1 ELSE 0 END), 0) AS count_checked
+        FROM catalog
+        WHERE {Resource.get_excluded_clause()}
+    """
+    stats_check_status: dict = await request.app["pool"].fetchrow(q)
     count_pending_checks: int = (
-        stats_resources["count_never_checked"] + stats_checks["count_outdated"]
+        stats_check_status["count_never_checked"] + stats_checks["count_outdated"]
     )
     # all w/ a check, minus those with an outdated checked
-    count_fresh_checks: int = stats_resources["count_checked"] - stats_checks["count_outdated"]
-    total: int = stats_resources["count_never_checked"] + stats_resources["count_checked"]
-    if total > 0:
-        rate_checked: float = round(stats_resources["count_checked"] / total * 100, 1)
-        rate_checked_fresh: float = round(count_fresh_checks / total * 100, 1)
+    count_fresh_checks: int = stats_check_status["count_checked"] - stats_checks["count_outdated"]
+    # Total resources eligible for checks (filtered by excluded patterns, non-deleted)
+    total_resources_filtered: int = (
+        stats_check_status["count_never_checked"] + stats_check_status["count_checked"]
+    )
+    if total_resources_filtered > 0:
+        rate_checked: float = round(
+            stats_check_status["count_checked"] / total_resources_filtered * 100, 1
+        )
+        rate_checked_fresh: float = round(count_fresh_checks / total_resources_filtered * 100, 1)
     else:
         rate_checked, rate_checked_fresh = None, None
 
@@ -61,12 +74,18 @@ async def get_crawler_status(request: web.Request) -> web.Response:
 
     return web.json_response(
         {
-            "total": total,
-            "pending_checks": count_pending_checks,
-            "fresh_checks": count_fresh_checks,
-            "checks_percentage": rate_checked,
-            "fresh_checks_percentage": rate_checked_fresh,
-            "resources_statuses_count": await get_resources_status_counts(request),
+            "checks": {
+                "pending_count": count_pending_checks,
+                "fresh_count": count_fresh_checks,
+                "checked_percentage": rate_checked,
+                "fresh_percentage": rate_checked_fresh,
+            },
+            "resources": {
+                "total_count": stats_resources["total_resources"],
+                "total_filtered_count": total_resources_filtered,
+                "deleted_count": stats_resources["deleted_resources"],
+                "statuses_count": await get_resources_status_counts(request),
+            },
         }
     )
 
