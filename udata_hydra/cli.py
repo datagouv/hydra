@@ -51,6 +51,22 @@ async def connection(db_name: str = "main"):
     return context["conn"][db_name]
 
 
+def _make_async_wrapper(async_func):
+    """Create a wrapper that works both in sync and async contexts"""
+
+    def wrapper(*args, **kwargs):
+        try:
+            # Check if we're in an async context (event loop is running)
+            asyncio.get_running_loop()
+            # We're in an async context, return a coroutine
+            return async_func(*args, **kwargs)
+        except RuntimeError:
+            # No event loop running, use aiorun
+            return aiorun(async_func(*args, **kwargs))
+
+    return wrapper
+
+
 async def _load_catalog(
     url: str | None = None,
     drop_meta: bool = False,
@@ -126,22 +142,6 @@ async def _load_catalog(
     finally:
         fd.close()
         os.unlink(fd.name)
-
-
-def _make_async_wrapper(async_func):
-    """Create a wrapper that works both in sync and async contexts"""
-
-    def wrapper(*args, **kwargs):
-        try:
-            # Check if we're in an async context (event loop is running)
-            asyncio.get_running_loop()
-            # We're in an async context, return a coroutine
-            return async_func(*args, **kwargs)
-        except RuntimeError:
-            # No event loop running, use aiorun
-            return aiorun(async_func(*args, **kwargs))
-
-    return wrapper
 
 
 @cli.command()
