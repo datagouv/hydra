@@ -20,6 +20,7 @@ from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, csv_detective_routine
 from udata_hydra.analysis.geojson import analyse_geojson, csv_to_geojson, geojson_to_pmtiles
 from udata_hydra.analysis.parquet import analyse_parquet
+from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import (
     check_resource as crawl_check_resource,
 )
@@ -298,6 +299,21 @@ def probe_cors_cli(
 ):
     """Trigger a standalone CORS preflight using the crawler helper."""
     return _make_async_wrapper(_probe_cors_cli)(url=url, resource_id=resource_id)
+
+
+async def _analyse_resource_cli(resource_id: str):
+    """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
+    check: Record | None = await Check.get_by_resource_id(resource_id)
+    if not check:
+        log.error("Could not find a check linked to the specified resource ID")
+        return
+    await analyse_resource(check=dict(check), last_check=None, force_analysis=True)
+
+
+@cli.command(name="analyse-resource")
+def analyse_resource_cli(resource_id: str):
+    """Trigger a resource analysis, mainly useful for local debug (with breakpoints)"""
+    return _make_async_wrapper(_analyse_resource_cli)(resource_id=resource_id)
 
 
 async def _analyse_csv_cli(
@@ -1020,12 +1036,6 @@ def purge_selected_csv_tables(
     return _make_async_wrapper(_purge_selected_csv_tables)(
         retention_days=retention_days, retention_tables=retention_tables, quiet=quiet
     )
-
-
-async def cleanup():
-    """Cleanup function to close database connections"""
-    for db in context["conn"]:
-        await context["conn"][db].close()
 
 
 def run():
