@@ -135,8 +135,8 @@ async def _load_catalog(
                     else None,
                 )
         log.info("Resources catalog successfully upserted into DB.")
-        await Resource.clean_up_statuses()
-        log.info("Stuck statuses sucessfully reset to null.")
+        cleaned_count: int = await Resource.clean_up_statuses()
+        log.info(f" {cleaned_count} stuck statuses successfully reset to null.")
     except Exception as e:
         raise e
     finally:
