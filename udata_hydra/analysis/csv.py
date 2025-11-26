@@ -24,6 +24,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     Integer,
+    LargeBinary,
     MetaData,
     String,
     Table,
@@ -70,6 +71,7 @@ PYTHON_TYPE_TO_PG = {
     "date": Date,
     "datetime": DateTime,
     "datetime_aware": DateTime(timezone=True),
+    "binary": LargeBinary,
 }
 
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
