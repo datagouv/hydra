@@ -1,7 +1,7 @@
 import hashlib
 import json
-from datetime import date, datetime, timedelta, timezone
 import os
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from unittest.mock import MagicMock, patch
@@ -563,7 +563,8 @@ async def test_validation(
                         {"type": "Point", "coordinates": [10 * k * (-1) ** k, 20 * k * (-1) ** k]}
                     )
                     for k in range(1, 5)
-                ] + [float("nan")]
+                ]
+                + [float("nan")]
             },
             {"polyg": "geojson"},
             True,
