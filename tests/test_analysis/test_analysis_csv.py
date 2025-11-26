@@ -741,3 +741,45 @@ async def test_too_long_column_name(
         "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'public';"
     )
     assert table_name not in [r["table_name"] for r in tables]
+
+
+async def test_crash_after_db_insertion(
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+    produce_mock,
+):
+    def _crash(*args, **kwargs):
+        raise Exception("BOOM")
+    
+    check = await fake_check()
+    url = check["url"]
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    rmock.get(
+        url,
+        status=200,
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        },
+        body=("a,b,c\n" + "1,2,3\n" * 200).encode("utf-8"),
+        repeat=True,
+    )
+    with patch(
+        "udata_hydra.analysis.csv.csv_to_parquet",
+        new=_crash,
+    ):
+        # pretend the analysis crashes during parquet conversion
+        await analyse_csv(check=check)
+    # we should still have the table and its reference in tables_index
+    await db.execute(f'SELECT * FROM "{table_name}"')
+    rows = list(await db.fetch(
+        "SELECT * FROM tables_index WHERE resource_id = $1", check["resource_id"]
+    ))
+    assert len(rows) == 1
+    assert rows[0]["parsing_table"] == table_name
+    # yet we have the error where we should
+    updated_check = await Check.get_by_id(check["id"])
+    assert updated_check["parsing_error"] is not None
+    assert updated_check["parquet_url"] is None
