@@ -59,6 +59,12 @@ async def test_analyse_parquet(
                 {"c": 3},
                 {"d": 4, "e": 5},
             ],
+            "bina": [
+                b"\x01\x01\x00",
+                b"\x00\x00\x8c",
+                b"\x01\x9e\xd1",
+                b"\xb7\xd4\x00",
+            ],
         }
     ).to_parquet()
     expected_types = {
@@ -70,6 +76,7 @@ async def test_analyse_parquet(
         "stamp": {"python": "datetime_aware", "pg": "timestamp with time zone"},
         "liste": {"python": "json", "pg": "json"},
         "dicts": {"python": "json", "pg": "json"},
+        "bina": {"python": "binary", "pg": "bytea"},
     }
     rmock.get(url, status=200, body=parquet_file_content)
     with patch("udata_hydra.config.PARQUET_TO_DB", True):
