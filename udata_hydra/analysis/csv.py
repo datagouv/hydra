@@ -162,6 +162,7 @@ async def analyse_csv(
         )
         check = await Check.update(check["id"], {"parsing_table": table_name})
         timer.mark("csv-to-db")
+        await csv_to_db_index(table_name, csv_inspection, check, dataset_id)
 
         try:
             await csv_to_parquet(
@@ -205,7 +206,6 @@ async def analyse_csv(
                 "parsing_finished_at": datetime.now(timezone.utc),
             },
         )
-        await csv_to_db_index(table_name, csv_inspection, check, dataset_id)
 
     except (ParseException, IOException) as e:
         check = await handle_parse_exception(e, table_name, check)
