@@ -561,8 +561,9 @@ async def test_validation(
                     json.dumps(
                         {"type": "Point", "coordinates": [10 * k * (-1) ** k, 20 * k * (-1) ** k]}
                     )
-                    for k in range(1, 6)
+                    for k in range(1, 5)
                 ]
+                + [float("nan")]
             },
             {"polyg": "geojson"},
             True,
@@ -591,6 +592,12 @@ async def test_validation(
     ),
 )
 async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
+    # removing remainders if one of the previous parametered tests failed
+    for ext in ["geojson", "pmtiles", "pmtiles.journal"]:
+        try:
+            Path(f"{RESOURCE_ID}.{ext}").unlink()
+        except FileNotFoundError:
+            pass
     other_columns = {
         "nombre": range(1, 6),
         "score": [0.01, 1.2, 34.5, 678.9, 10],
@@ -673,9 +680,13 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 geojson = json.load(f)
             assert all(key in geojson for key in ("type", "features"))
             assert len(geojson["features"]) == 5
-            for feat in geojson["features"]:
+            for idx, feat in enumerate(geojson["features"]):
                 assert feat["type"] == "Feature"
-                assert isinstance(feat["geometry"], dict)
+                if "polyg" in df.columns and idx == len(geojson["features"]) - 1:
+                    # the last feature of the polyg data is missing, we should have None here
+                    assert feat["geometry"] is None
+                else:
+                    assert isinstance(feat["geometry"], dict)
                 assert all(col in feat["properties"] for col in other_columns)
             assert (
                 geojson_url
