@@ -40,6 +40,7 @@ PYARROW_TYPE_TO_PYTHON = {
     "^date": "date",
     "^struct": "json",  # dictionary
     "^list": "json",
+    "^binary": "binary",
     r"^timestamp\[\ws\]": "datetime",
     r"^timestamp\[\ws,": "datetime_aware",  # the rest of the field depends on the timezone
 }
