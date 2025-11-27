@@ -1,6 +1,5 @@
 import hashlib
 import json
-import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -595,8 +594,10 @@ async def test_validation(
 async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
     # removing remainders if one of the previous parametered tests failed
     for ext in ["geojson", "pmtiles", "pmtiles.journal"]:
-        if os.path.isfile(f"{RESOURCE_ID}.{ext}"):
-            os.remove(f"{RESOURCE_ID}.{ext}")
+        try:
+            Path(f"{RESOURCE_ID}.{ext}").unlink()
+        except FileNotFoundError:
+            pass
     other_columns = {
         "nombre": range(1, 6),
         "score": [0.01, 1.2, 34.5, 678.9, 10],
