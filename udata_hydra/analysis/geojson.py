@@ -150,7 +150,10 @@ async def csv_to_geojson(
                 yield {
                     "type": "Feature",
                     # json is not pre-cast by csv-detective
-                    "geometry": json.loads(row[geo["geometry"]]),
+                    # empty geometry cells can happen, we keep them but they won't be displayable
+                    "geometry": (
+                        json.loads(row[geo["geometry"]]) if pd.notna(row[geo["geometry"]]) else None
+                    ),
                     "properties": {
                         col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
                     },

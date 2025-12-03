@@ -24,6 +24,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     Integer,
+    LargeBinary,
     MetaData,
     String,
     Table,
@@ -70,6 +71,7 @@ PYTHON_TYPE_TO_PG = {
     "date": Date,
     "datetime": DateTime,
     "datetime_aware": DateTime(timezone=True),
+    "binary": LargeBinary,
 }
 
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
@@ -162,6 +164,7 @@ async def analyse_csv(
         )
         check = await Check.update(check["id"], {"parsing_table": table_name})
         timer.mark("csv-to-db")
+        await csv_to_db_index(table_name, csv_inspection, check, dataset_id)
 
         try:
             await csv_to_parquet(
@@ -205,7 +208,6 @@ async def analyse_csv(
                 "parsing_finished_at": datetime.now(timezone.utc),
             },
         )
-        await csv_to_db_index(table_name, csv_inspection, check, dataset_id)
 
     except (ParseException, IOException) as e:
         check = await handle_parse_exception(e, table_name, check)

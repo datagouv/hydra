@@ -561,8 +561,9 @@ async def test_validation(
                     json.dumps(
                         {"type": "Point", "coordinates": [10 * k * (-1) ** k, 20 * k * (-1) ** k]}
                     )
-                    for k in range(1, 6)
+                    for k in range(1, 5)
                 ]
+                + [float("nan")]
             },
             {"polyg": "geojson"},
             True,
@@ -591,6 +592,12 @@ async def test_validation(
     ),
 )
 async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
+    # removing remainders if one of the previous parametered tests failed
+    for ext in ["geojson", "pmtiles", "pmtiles.journal"]:
+        try:
+            Path(f"{RESOURCE_ID}.{ext}").unlink()
+        except FileNotFoundError:
+            pass
     other_columns = {
         "nombre": range(1, 6),
         "score": [0.01, 1.2, 34.5, 678.9, 10],
@@ -673,9 +680,13 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 geojson = json.load(f)
             assert all(key in geojson for key in ("type", "features"))
             assert len(geojson["features"]) == 5
-            for feat in geojson["features"]:
+            for idx, feat in enumerate(geojson["features"]):
                 assert feat["type"] == "Feature"
-                assert isinstance(feat["geometry"], dict)
+                if "polyg" in df.columns and idx == len(geojson["features"]) - 1:
+                    # the last feature of the polyg data is missing, we should have None here
+                    assert feat["geometry"] is None
+                else:
+                    assert isinstance(feat["geometry"], dict)
                 assert all(col in feat["properties"] for col in other_columns)
             assert (
                 geojson_url
@@ -741,3 +752,45 @@ async def test_too_long_column_name(
         "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'public';"
     )
     assert table_name not in [r["table_name"] for r in tables]
+
+
+async def test_crash_after_db_insertion(
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+    produce_mock,
+):
+    def _crash(*args, **kwargs):
+        raise Exception("BOOM")
+
+    check = await fake_check()
+    url = check["url"]
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    rmock.get(
+        url,
+        status=200,
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        },
+        body=("a,b,c\n" + "1,2,3\n" * 200).encode("utf-8"),
+        repeat=True,
+    )
+    with patch(
+        "udata_hydra.analysis.csv.csv_to_parquet",
+        new=_crash,
+    ):
+        # pretend the analysis crashes during parquet conversion
+        await analyse_csv(check=check)
+    # we should still have the table and its reference in tables_index
+    await db.execute(f'SELECT * FROM "{table_name}"')
+    rows = list(
+        await db.fetch("SELECT * FROM tables_index WHERE resource_id = $1", check["resource_id"])
+    )
+    assert len(rows) == 1
+    assert rows[0]["parsing_table"] == table_name
+    # yet we have the error where we should
+    updated_check = await Check.get_by_id(check["id"])
+    assert updated_check["parsing_error"] is not None
+    assert updated_check["parquet_url"] is None
