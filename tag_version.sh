@@ -205,7 +205,7 @@ $SORTED_COMMITS
 # Prepare release notes for GitHub
 RELEASE_NOTES="$SORTED_COMMITS"
 
-# Update CHANGELOG.md and version in pyproject.toml
+# Update CHANGELOG.md
 if [ "$DRY_RUN" = true ]; then
     echo "Would update CHANGELOG.md with:"
     echo "$NEW_ENTRY"
@@ -236,7 +236,7 @@ echo "CHANGELOG.md updated with commits from $LAST_TAG to HEAD"
 git add CHANGELOG.md
 git commit -m "chore: release $VERSION (CHANGELOG)"
 
-echo "✓ Committed pyproject.toml and CHANGELOG.md"
+echo "✓ Committed CHANGELOG.md"
 
 # Create the git tag
 git tag -a "v$VERSION" -m "Version $VERSION"
