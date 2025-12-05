@@ -24,7 +24,9 @@ def save_as_parquet(
     # the "output_name = None" case is only used in tests
     table = pa.Table.from_pylist(
         [{c: v for c, v in zip(columns, values)} for values in records],
-        schema=pa.schema([pa.field(c, PYTHON_TYPE_TO_PA[columns[c]["python_type"]]) for c in columns]),
+        schema=pa.schema(
+            [pa.field(c, PYTHON_TYPE_TO_PA[columns[c]["python_type"]]) for c in columns]
+        ),
     )
     if output_filename:
         pq.write_table(table, f"{output_filename}.parquet")

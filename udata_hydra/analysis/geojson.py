@@ -144,7 +144,9 @@ async def csv_to_geojson(
             return None
         return value
 
-    def get_features(df_chunks: Iterator[pd.DataFrame], geo: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    def get_features(
+        df_chunks: Iterator[pd.DataFrame], geo: dict[str, Any]
+    ) -> Iterator[dict[str, Any]]:
         for df in df_chunks:
             for _, row in df.iterrows():
                 if "geometry" in geo:
@@ -153,10 +155,14 @@ async def csv_to_geojson(
                         # json is not pre-cast by csv-detective
                         # empty geometry cells can happen, we keep them but they won't be displayable
                         "geometry": (
-                            json.loads(row[geo["geometry"]]) if pd.notna(row[geo["geometry"]]) else None
+                            json.loads(row[geo["geometry"]])
+                            if pd.notna(row[geo["geometry"]])
+                            else None
                         ),
                         "properties": {
-                            col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
+                            col: prevent_nan(row[col])
+                            for col in df.columns
+                            if col != geo["geometry"]
                         },
                     }
 
