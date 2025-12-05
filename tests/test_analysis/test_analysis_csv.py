@@ -387,7 +387,7 @@ default_kwargs = {
     "encoding": "ASCII",
     "columns": {
         "a": {"score": 1.0, "format": "int", "python_type": "int"},
-        "b": {"score": 1.0, "format": "siret", "python_type": "string"},
+        "ecpi": {"score": 1.0, "format": "siret", "python_type": "string"},
     },
     "header_row_idx": 0,
     "categorical": None,
@@ -443,7 +443,7 @@ def create_analysis(scan: dict) -> dict:
                 "header": ["a", "c"],
                 "columns": {
                     "a": {"score": 1.0, "format": "int", "python_type": "int"},
-                    "c": {"score": 1.0, "format": "siret", "python_type": "string"},
+                    "ecpi": {"score": 1.0, "format": "siret", "python_type": "string"},
                 },
                 "formats": {"int": ["a"], "siret": ["c"]},
             },
