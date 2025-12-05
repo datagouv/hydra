@@ -382,16 +382,16 @@ def create_body(
 
 default_kwargs = {
     "separator": ",",
-    "header": ["a", "b"],
+    "header": ["a", "epci"],
     "rows": [["1", "13002526500013"], ["5", "38271817900023"]],
     "encoding": "ASCII",
     "columns": {
         "a": {"score": 1.0, "format": "int", "python_type": "int"},
-        "ecpi": {"score": 1.0, "format": "siret", "python_type": "string"},
+        "epci": {"score": 1.5, "format": "siret", "python_type": "string"},
     },
     "header_row_idx": 0,
     "categorical": None,
-    "formats": {"int": ["a"], "siret": ["b"]},
+    "formats": {"int": ["a"], "siret": ["epci"]},
     "columns_fields": None,
     "columns_labels": None,
     "profile": None,
@@ -440,12 +440,12 @@ def create_analysis(scan: dict) -> dict:
             default_kwargs,
             default_kwargs
             | {
-                "header": ["a", "c"],
+                "header": ["a", "ID_EPCI"],
                 "columns": {
                     "a": {"score": 1.0, "format": "int", "python_type": "int"},
-                    "ecpi": {"score": 1.0, "format": "siret", "python_type": "string"},
+                    "ID_EPCI": {"score": 1.25, "format": "siret", "python_type": "string"},
                 },
-                "formats": {"int": ["a"], "siret": ["c"]},
+                "formats": {"int": ["a"], "siret": ["ID_EPCI"]},
             },
             False,
         ),
@@ -454,6 +454,7 @@ def create_analysis(scan: dict) -> dict:
             default_kwargs,
             default_kwargs
             | {
+                "header": ["a", "b"],
                 "rows": [["1", "2022-11-03"], ["5", "2025-11-02"]],
                 "columns": {
                     "a": {"score": 1.0, "format": "int", "python_type": "int"},
