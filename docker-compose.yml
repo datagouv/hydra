@@ -9,6 +9,7 @@ services:
       - database-data-15:/var/lib/postgresql/data/ # persist data even if container shuts down
     ports:
       - 5432:5432
+
   database-csv:
     image: "postgres:15"
     environment:
@@ -19,6 +20,24 @@ services:
       - database-data-csv-15:/var/lib/postgresql/data/ # persist data even if container shuts down
     ports:
       - 5434:5432
+
+  test-database:
+    image: "postgres:15"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    ports:
+      - 5433:5432
+    profiles:
+      - test
+
+  broker:
+    image: redis
+    ports:
+      - 6379:6379
+    profiles:
+      - broker
 
 volumes:
   database-data-15: # named volumes can be managed more easily using docker-compose
