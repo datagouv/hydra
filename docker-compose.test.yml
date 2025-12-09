@@ -1,9 +1,0 @@
-services:
-  test_database:
-    image: "postgres:15" # target production version
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=postgres
-    ports:
-      - 5433:5432
