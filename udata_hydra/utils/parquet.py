@@ -21,7 +21,7 @@ def save_as_parquet(
     columns: dict[str, dict],
     output_filename: str | None = None,
 ) -> tuple[str, pa.Table]:
-    # the "output_name = None" case is only used in tests
+    # the "output_filename = None" case is only used in tests
     table = pa.Table.from_pylist(
         [{c: v for c, v in zip(columns, values)} for values in records],
         schema=pa.schema(
