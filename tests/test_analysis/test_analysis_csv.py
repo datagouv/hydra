@@ -573,21 +573,21 @@ async def test_validation(
         ),
         # a column contains coordinates (format: lat,lon)
         (
-            {"coords": [f"{10 * k * (-1) ** k},{20 * k * (-1) ** k}" for k in range(1, 6)]},
+            {"coords": [f"{10.0 * k * (-1) ** k},{20.0 * k * (-1) ** k}" for k in range(1, 6)]},
             {"coords": "latlon_wgs"},
             True,
         ),
         # a column contains coordinates (format: [lon, lat])
         (
-            {"lonlat": [f"[{20 * k * (-1) ** k}, {10 * k * (-1) ** k}]" for k in range(1, 6)]},
-            {"lonlat": "lonlat_wgs"},
+            {"geopoint": [f"[{20.0 * k * (-1) ** k}, {10.0 * k * (-1) ** k}]" for k in range(1, 6)]},
+            {"geopoint": "lonlat_wgs"},
             True,
         ),
         # the table has latitude and longitude in separate columns
         (
             {
-                "lat": [10 * k * (-1) ** k for k in range(1, 6)],
-                "long": [20 * k * (-1) ** k for k in range(1, 6)],
+                "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
+                "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
             },
             {"lat": "latitude_wgs", "long": "longitude_wgs"},
             True,
