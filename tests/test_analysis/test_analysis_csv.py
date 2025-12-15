@@ -579,7 +579,11 @@ async def test_validation(
         ),
         # a column contains coordinates (format: [lon, lat])
         (
-            {"geopoint": [f"[{20.0 * k * (-1) ** k}, {10.0 * k * (-1) ** k}]" for k in range(1, 6)]},
+            {
+                "geopoint": [
+                    f"[{20.0 * k * (-1) ** k}, {10.0 * k * (-1) ** k}]" for k in range(1, 6)
+                ]
+            },
             {"geopoint": "lonlat_wgs"},
             True,
         ),
