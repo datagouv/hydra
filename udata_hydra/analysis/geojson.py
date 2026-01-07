@@ -20,6 +20,7 @@ from udata_hydra.utils import (
     ParseException,
     Timer,
     handle_parse_exception,
+    remove_remainders,
 )
 from udata_hydra.utils.minio import MinIOClient
 
@@ -78,6 +79,7 @@ async def analyse_geojson(
             )
             timer.mark("geojson-to-pmtiles")
         except Exception as e:
+            remove_remainders(resource_id, ["pmtiles", "pmtiles-journal"])
             raise ParseException(
                 message=str(e),
                 step="pmtiles_export",
@@ -259,6 +261,7 @@ async def geojson_to_pmtiles(
     input_file_path: Path,
     output_file_path: Path,
     upload_to_minio: bool = True,
+    cleanup: bool = True,
 ) -> tuple[int, str | None]:
     """
     Convert a GeoJSON file to PMTiles file and optionally upload to MinIO.
@@ -279,6 +282,7 @@ async def geojson_to_pmtiles(
         "--maximum-zoom=g",  # guess
         "-o",
         str(output_file_path),
+        "--force",  # don't crash if output file already exists, override it
         "--coalesce-densest-as-needed",
         "--extend-zooms-if-still-dropping",
         str(input_file_path),
@@ -295,6 +299,9 @@ async def geojson_to_pmtiles(
         pmtiles_url = minio_client_pmtiles.send_file(str(output_file_path), delete_source=False)
     else:
         pmtiles_url = None
+
+    if cleanup:
+        output_file_path.unlink()
 
     return pmtiles_size, pmtiles_url
 
@@ -342,7 +349,9 @@ async def csv_to_geojson_and_pmtiles(
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
 
     # Convert GeoJSON to PMTiles
-    pmtiles_size, pmtiles_url = await geojson_to_pmtiles(geojson_filepath, pmtiles_filepath)
+    pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
+        geojson_filepath, pmtiles_filepath, cleanup=cleanup
+    )
 
     await Check.update(
         check_id,

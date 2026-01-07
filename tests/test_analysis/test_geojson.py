@@ -39,7 +39,6 @@ async def test_geojson_to_pmtiles_invalid_geometry():
     test_pmtiles_path = Path(f"{RESOURCE_ID}.pmtiles")
     with pytest.raises(Exception):
         await geojson_to_pmtiles(Path("tests/data/invalid.geojson"), test_pmtiles_path)
-    test_pmtiles_path.unlink(missing_ok=True)
 
 
 @pytest.mark.asyncio
@@ -52,6 +51,8 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
     mocked_minio = MagicMock()
     mocked_minio.fput_object.return_value = None
     mocked_minio.bucket_exists.return_value = True
+    # Make sure that we don't crash even if output pmtiles already exists
+    Path(f"{RESOURCE_ID}.pmtiles").touch()
     with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
         mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
     with patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client):
@@ -59,7 +60,7 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
         mock_os.path = os.path
         mock_os.remove.return_value = None
         size, url = await geojson_to_pmtiles(
-            Path("tests/data/valid.geojson"), Path(f"{RESOURCE_ID}.pmtiles")
+            Path("tests/data/valid.geojson"), Path(f"{RESOURCE_ID}.pmtiles"), cleanup=False
         )
     # very (too?) simple test, we could install a specific library to read the file
     with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
@@ -212,7 +213,7 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
         mock_os.remove.return_value = None
 
         # Test the performance of geojson_to_pmtiles with the real file
-        result = await geojson_to_pmtiles(geojson_path, test_pmtiles_path)
+        result = await geojson_to_pmtiles(geojson_path, test_pmtiles_path, cleanup=False)
         timer.mark("pmtiles-conversion")
         pmtiles_size, pmtiles_url = result
 
