@@ -47,6 +47,5 @@ def queue(name: str = "default", exception: bool = False) -> Queue | None:
             default_timeout=(
                 config.RQ_DEFAULT_TIMEOUT * 5 if exception else config.RQ_DEFAULT_TIMEOUT
             ),
-            failure_ttl=config.RQ_DEFAULT_FAILURE_TTL,
         )
     return context["queues"][name]
