@@ -68,6 +68,7 @@ TEMPORARY_DOWNLOAD_FOLDER = ""
 
 # -- Worker settings -- #
 RQ_DEFAULT_TIMEOUT = 180
+RQ_DEFAULT_FAILURE_TTL = 864000  # How long failed jobs are kept in redis: 10 days.
 
 # -- Webhook integration config -- #
 WEBHOOK_ENABLED = true
