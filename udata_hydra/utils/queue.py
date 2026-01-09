@@ -1,5 +1,4 @@
-from udata_hydra import config
-from udata_hydra import context
+from udata_hydra import config, context
 from udata_hydra.logger import setup_logging
 
 log = setup_logging()
@@ -15,5 +14,5 @@ def enqueue(fn, *args, **kwargs):
     """
     priority = kwargs.pop("_priority", "default")
     exception = kwargs.pop("_exception", False)
-    failure_ttl=config.RQ_DEFAULT_FAILURE_TTL
+    failure_ttl = config.RQ_DEFAULT_FAILURE_TTL
     return context.queue(priority, exception).enqueue(fn, *args, **kwargs, failure_ttl=failure_ttl)
