@@ -295,7 +295,9 @@ async def geojson_to_pmtiles(
 
     if upload_to_minio:
         log.debug(f"Sending PMTiles file {output_file_path} to MinIO")
-        pmtiles_url = minio_client_pmtiles.send_file(str(output_file_path), delete_source=config.REMOVE_GENERATED_FILES)
+        pmtiles_url = minio_client_pmtiles.send_file(
+            str(output_file_path), delete_source=config.REMOVE_GENERATED_FILES
+        )
     else:
         pmtiles_url = None
 
