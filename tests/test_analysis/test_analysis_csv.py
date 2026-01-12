@@ -664,9 +664,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                     new=mocked_minio_client_pmtiles,
                 ),
             ):
-                result = await csv_to_geojson_and_pmtiles(
-                    df, inspection, RESOURCE_ID
-                )
+                result = await csv_to_geojson_and_pmtiles(df, inspection, RESOURCE_ID)
                 assert result is not None, (
                     "Expected geographical data to be processed, but function returned None"
                 )

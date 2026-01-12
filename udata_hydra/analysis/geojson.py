@@ -347,9 +347,7 @@ async def csv_to_geojson_and_pmtiles(
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
 
     # Convert GeoJSON to PMTiles
-    pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
-        geojson_filepath, pmtiles_filepath
-    )
+    pmtiles_size, pmtiles_url = await geojson_to_pmtiles(geojson_filepath, pmtiles_filepath)
 
     await Check.update(
         check_id,
