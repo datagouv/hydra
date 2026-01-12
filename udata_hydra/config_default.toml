@@ -75,6 +75,9 @@ WEBHOOK_ENABLED = true
 UDATA_URI = ""
 UDATA_URI_API_KEY = ""
 
+# -- File generation cleanup, only patched in the tests -- #
+REMOVE_GENERATED_FILES = true
+
 # -- Minio / datalake settings -- #
 MINIO_URL = "" # no scheme
 MINIO_USER = ""

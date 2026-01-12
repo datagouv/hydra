@@ -261,7 +261,6 @@ async def geojson_to_pmtiles(
     input_file_path: Path,
     output_file_path: Path,
     upload_to_minio: bool = True,
-    cleanup: bool = True,
 ) -> tuple[int, str | None]:
     """
     Convert a GeoJSON file to PMTiles file and optionally upload to MinIO.
@@ -300,7 +299,7 @@ async def geojson_to_pmtiles(
     else:
         pmtiles_url = None
 
-    if cleanup:
+    if config.REMOVE_GENERATED_FILES:
         output_file_path.unlink()
 
     return pmtiles_size, pmtiles_url
@@ -311,7 +310,6 @@ async def csv_to_geojson_and_pmtiles(
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
-    cleanup: bool = True,
 ) -> tuple[Path, int, str | None, Path, int, str | None] | None:
     if not config.CSV_TO_GEOJSON:
         log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
@@ -350,7 +348,7 @@ async def csv_to_geojson_and_pmtiles(
 
     # Convert GeoJSON to PMTiles
     pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
-        geojson_filepath, pmtiles_filepath, cleanup=False
+        geojson_filepath, pmtiles_filepath
     )
 
     await Check.update(
@@ -361,9 +359,8 @@ async def csv_to_geojson_and_pmtiles(
         },
     )
 
-    if cleanup:
+    if config.REMOVE_GENERATED_FILES:
         geojson_filepath.unlink()
-        pmtiles_filepath.unlink()
 
     # returning only for tests purposes
     return geojson_filepath, geojson_size, geojson_url, pmtiles_filepath, pmtiles_size, pmtiles_url
