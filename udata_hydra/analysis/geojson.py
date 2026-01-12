@@ -350,7 +350,7 @@ async def csv_to_geojson_and_pmtiles(
 
     # Convert GeoJSON to PMTiles
     pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
-        geojson_filepath, pmtiles_filepath, cleanup=cleanup
+        geojson_filepath, pmtiles_filepath, cleanup=False
     )
 
     await Check.update(
