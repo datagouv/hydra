@@ -55,12 +55,15 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
     Path(f"{RESOURCE_ID}.pmtiles").touch()
     with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
         mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
-    with patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client):
+    with (
+        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client),
+        patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
+    ):
         mock_os = mocker.patch("udata_hydra.utils.minio.os")
         mock_os.path = os.path
         mock_os.remove.return_value = None
         size, url = await geojson_to_pmtiles(
-            Path("tests/data/valid.geojson"), Path(f"{RESOURCE_ID}.pmtiles"), cleanup=False
+            Path("tests/data/valid.geojson"), Path(f"{RESOURCE_ID}.pmtiles")
         )
     # very (too?) simple test, we could install a specific library to read the file
     with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
@@ -207,13 +210,16 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
         mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
 
-    with patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client):
+    with (
+        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client),
+        patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
+    ):
         mock_os = mocker.patch("udata_hydra.utils.minio.os")
         mock_os.path = os.path
         mock_os.remove.return_value = None
 
         # Test the performance of geojson_to_pmtiles with the real file
-        result = await geojson_to_pmtiles(geojson_path, test_pmtiles_path, cleanup=False)
+        result = await geojson_to_pmtiles(geojson_path, test_pmtiles_path)
         timer.mark("pmtiles-conversion")
         pmtiles_size, pmtiles_url = result
 
