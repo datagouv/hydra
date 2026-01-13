@@ -19,6 +19,7 @@ dependencies = [
     "minio>=7.2.8",
     "progressist>=0.1.0",
     "pyarrow>=16.1.0",
+    "pydantic>=2.11.7",
     "python-magic>=0.4.25",
     "python-slugify>=8.0.4",
     "redis>=4.1.4",
