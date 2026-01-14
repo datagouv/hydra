@@ -5,9 +5,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Iterator
 
-import pandas as pd
 from asyncpg import Record
 from asyncpg.exceptions import UndefinedTableError
 from csv_detective import routine as csv_detective_routine
@@ -47,6 +45,7 @@ from udata_hydra.utils import (
     handle_parse_exception,
     remove_remainders,
 )
+from udata_hydra.utils.casting import generate_records
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet
 
@@ -100,6 +99,7 @@ async def analyse_csv(
     # Check if the resource is in the exceptions table
     # If it is, get the table_indexes to use them later
     exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
+
     table_indexes: dict | None = None
     if exception and exception.get("table_indexes"):
         table_indexes = json.loads(exception["table_indexes"])
@@ -126,21 +126,17 @@ async def analyse_csv(
             previous_analysis: dict | None = await get_previous_analysis(resource_id=resource_id)
             if previous_analysis:
                 await Resource.update(resource_id, {"status": "VALIDATING_CSV"})
-                csv_inspection, df_chunks = validate_then_detect(
+                csv_inspection = validate_then_detect(
                     file_path=tmp_file.name,
                     previous_analysis=previous_analysis,
                     output_profile=True,
-                    output_df=True,
-                    cast_json=False,
                     num_rows=-1,
                     save_results=False,
                 )
             else:
-                csv_inspection, df_chunks = csv_detective_routine(
+                csv_inspection = csv_detective_routine(
                     file_path=tmp_file.name,
                     output_profile=True,
-                    output_df=True,
-                    cast_json=False,
                     num_rows=-1,
                     save_results=False,
                 )
@@ -155,7 +151,7 @@ async def analyse_csv(
         timer.mark("csv-inspection")
 
         await csv_to_db(
-            df_chunks=df_chunks,
+            file_path=tmp_file.name,
             inspection=csv_inspection,
             table_name=table_name,
             table_indexes=table_indexes,
@@ -168,7 +164,7 @@ async def analyse_csv(
 
         try:
             await csv_to_parquet(
-                df_chunks=df_chunks,
+                file_path=tmp_file.name,
                 inspection=csv_inspection,
                 resource_id=resource_id,
                 check_id=check["id"],
@@ -186,7 +182,7 @@ async def analyse_csv(
 
         try:
             await csv_to_geojson_and_pmtiles(
-                df_chunks=df_chunks,
+                file_path=tmp_file.name,
                 inspection=csv_inspection,
                 resource_id=resource_id,
                 check_id=check["id"],
@@ -299,16 +295,8 @@ def compute_create_table_query(
     return query
 
 
-def generate_records(df_chunks: Iterator[pd.DataFrame]) -> Iterator[tuple]:
-    # pandas cannot have None in columns typed as int so we have to cast
-    # NaN-int values to None for db insertion, and we also change NaN to None
-    for df in df_chunks:
-        for row in df.values:
-            yield tuple(cell if not pd.isna(cell) else None for cell in row)
-
-
 async def csv_to_parquet(
-    df_chunks: Iterator[pd.DataFrame],
+    file_path: str,
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
@@ -346,12 +334,13 @@ async def csv_to_parquet(
 
     # save the file as parquet and store it on Minio instance
     parquet_file, _ = save_as_parquet(
-        records=generate_records(df_chunks),
+        records=generate_records(file_path, inspection, cast_json=False),
         columns=inspection["columns"],
         output_filename=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
     parquet_url: str = minio_client.send_file(parquet_file)
+
     await Check.update(
         check_id,
         {
@@ -364,7 +353,7 @@ async def csv_to_parquet(
 
 
 async def csv_to_db(
-    df_chunks: Iterator[pd.DataFrame],
+    file_path: str,
     inspection: dict,
     table_name: str,
     table_indexes: dict[str, str] | None = None,
@@ -433,7 +422,7 @@ async def csv_to_db(
         try:
             await db.copy_records_to_table(
                 table_name,
-                records=generate_records(df_chunks),
+                records=generate_records(file_path, inspection, cast_json=False),
                 columns=list(columns.keys()),
             )
         except Exception as e:  # I know what I'm doing, pinky swear
@@ -446,7 +435,7 @@ async def csv_to_db(
     # this inserts rows from iterator one by one, slow but useful for debugging
     else:
         bar = ProgressBar(total=inspection["total_lines"])
-        for r in bar.iter(generate_records(df_chunks)):
+        for r in bar.iter(generate_records(file_path, inspection, cast_json=False)):
             data = {k: v for k, v in zip(inspection["columns"], r)}
             # NB: possible sql injection here, but should not be used in prod
             q = compute_insert_query(table_name=table_name, data=data, returning="__id")

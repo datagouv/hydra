@@ -17,7 +17,7 @@ PYTHON_TYPE_TO_PA = {
 
 
 def save_as_parquet(
-    records: Iterator[tuple],
+    records: Iterator[list],
     columns: dict[str, dict],
     output_filename: str | None = None,
 ) -> tuple[str, pa.Table]:
@@ -29,7 +29,7 @@ def save_as_parquet(
         ),
     )
     if output_filename:
-        pq.write_table(table, f"{output_filename}.parquet")
+        pq.write_table(table, f"{output_filename}.parquet", compression="zstd")
     return f"{output_filename}.parquet", table
 
 
