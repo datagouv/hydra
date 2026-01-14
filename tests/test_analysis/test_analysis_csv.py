@@ -116,14 +116,13 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"{header}\n{line}".encode("utf-8"))
         fp.seek(0)
-        inspection, df_chunks = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
-            output_df=True,
             num_rows=-1,
             save_results=False,
         )
         assert inspection["separator"] == separator
-        await csv_to_db(df_chunks=df_chunks, inspection=inspection, table_name="test_table")
+        await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
     cols = ["__id", "int", "float", "string", "bool"]
@@ -161,16 +160,14 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"json;date;datetime;aware_datetime\n{line}".encode("utf-8"))
         fp.seek(0)
-        inspection, df_chunks = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
             encoding="utf-8",
-            output_df=True,
-            cast_json=False,
             num_rows=-1,
             save_results=False,
         )
         await csv_to_db(
-            df_chunks=df_chunks, inspection=inspection, table_name="test_table", debug_insert=True
+            fp.name, inspection=inspection, table_name="test_table", debug_insert=True
         )
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
@@ -185,14 +182,13 @@ async def test_basic_sql_injection(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"int,{injection}\n1,test".encode("utf-8"))
         fp.seek(0)
-        inspection, df_chunks = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
             sep=",",
-            output_df=True,
             num_rows=-1,
             save_results=False,
         )
-        await csv_to_db(df_chunks=df_chunks, inspection=inspection, table_name="test_table")
+        await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res[injection] == "test"
 
@@ -201,13 +197,12 @@ async def test_percentage_column(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write("int,% mon pourcent\n1,test".encode("utf-8"))
         fp.seek(0)
-        inspection, df_chunks = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
-            output_df=True,
             num_rows=-1,
             save_results=False,
         )
-        await csv_to_db(df_chunks=df_chunks, inspection=inspection, table_name="test_table")
+        await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["% mon pourcent"] == "test"
 
@@ -216,13 +211,12 @@ async def test_reserved_column_name(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write("int,xmin\n1,test".encode("utf-8"))
         fp.seek(0)
-        inspection, df_chunks = csv_detective_routine(
+        inspection  = csv_detective_routine(
             file_path=fp.name,
-            output_df=True,
             num_rows=-1,
             save_results=False,
         )
-        await csv_to_db(df_chunks=df_chunks, inspection=inspection, table_name="test_table")
+        await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["xmin__hydra_renamed"] == "test"
 
@@ -566,7 +560,7 @@ async def test_validation(
                     )
                     for k in range(1, 5)
                 ]
-                + [float("nan")]
+                + [""]
             },
             {"polyg": "geojson"},
             True,
@@ -618,14 +612,12 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
     for _ in range(5):
         file += sep.join(str(val) for val in [data[_] for data in columns.values()]) + "\n"
 
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(delete=False) as fp:
         fp.write(file.encode("utf-8"))
         fp.seek(0)
-        inspection, df_chunks = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
             output_profile=True,
-            output_df=True,
-            cast_json=False,
             num_rows=-1,
             save_results=False,
         )
@@ -638,7 +630,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
         if not patched_config or expected_formats is None:
             # process is disabled or early exit because no geo data
             with patch("udata_hydra.analysis.geojson.geojson_to_pmtiles") as mock_func:
-                res = await csv_to_geojson_and_pmtiles(df_chunks, inspection, RESOURCE_ID)
+                res = await csv_to_geojson_and_pmtiles(fp.name, inspection, RESOURCE_ID)
                 assert res is None
                 mock_func.assert_not_called()
         else:
@@ -669,7 +661,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 ),
             ):
                 result = await csv_to_geojson_and_pmtiles(
-                    df_chunks, inspection, RESOURCE_ID, cleanup=False
+                    fp.name, inspection, RESOURCE_ID, cleanup=False
                 )
                 assert result is not None, (
                     "Expected geographical data to be processed, but function returned None"

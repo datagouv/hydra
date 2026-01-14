@@ -142,7 +142,7 @@ async def csv_to_geojson(
     def get_features(
         file_path: str, inspection: dict, geo: dict[str, Any]
     ) -> Iterator[dict[str, Any]]:
-        for row in generate_records(file_path, inspection, as_dict=True):
+        for row in generate_records(file_path, inspection, cast_json=False, as_dict=True):
             if "geometry" in geo:
                 yield {
                     "type": "Feature",
