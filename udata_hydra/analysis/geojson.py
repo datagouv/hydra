@@ -152,11 +152,7 @@ async def csv_to_geojson(
                         if row[geo["geometry"]] is not None
                         else None
                     ),
-                    "properties": {
-                        col: row[col]
-                        for col in row.keys()
-                        if col != geo["geometry"]
-                    },
+                    "properties": {col: row[col] for col in row.keys() if col != geo["geometry"]},
                 }
 
             elif "latlon" in geo:
@@ -170,9 +166,7 @@ async def csv_to_geojson(
                         "type": "Point",
                         "coordinates": cast_latlon(row[geo["latlon"]]),
                     },
-                    "properties": {
-                        col: row[col] for col in row.keys() if col != geo["latlon"]
-                    },
+                    "properties": {col: row[col] for col in row.keys() if col != geo["latlon"]},
                 }
 
             elif "lonlat" in geo:
@@ -187,9 +181,7 @@ async def csv_to_geojson(
                         # inverting lon and lat to match the standard
                         "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
                     },
-                    "properties": {
-                        col: row[col] for col in row.keys() if col != geo["lonlat"]
-                    },
+                    "properties": {col: row[col] for col in row.keys() if col != geo["lonlat"]},
                 }
 
             else:
@@ -204,9 +196,7 @@ async def csv_to_geojson(
                         "coordinates": [row[geo["lon"]], row[geo["lat"]]],
                     },
                     "properties": {
-                        col: row[col]
-                        for col in  row.keys()
-                        if col not in [geo["lon"], geo["lat"]]
+                        col: row[col] for col in row.keys() if col not in [geo["lon"], geo["lat"]]
                     },
                 }
 

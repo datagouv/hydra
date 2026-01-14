@@ -166,9 +166,7 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
             num_rows=-1,
             save_results=False,
         )
-        await csv_to_db(
-            fp.name, inspection=inspection, table_name="test_table", debug_insert=True
-        )
+        await csv_to_db(fp.name, inspection=inspection, table_name="test_table", debug_insert=True)
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
     cols = ["__id", "json", "date", "datetime", "aware_datetime"]
@@ -211,7 +209,7 @@ async def test_reserved_column_name(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write("int,xmin\n1,test".encode("utf-8"))
         fp.seek(0)
-        inspection  = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
             num_rows=-1,
             save_results=False,
