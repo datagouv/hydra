@@ -447,7 +447,7 @@ wheels = [
 
 [[package]]
 name = "csv-detective"
-version = "0.10.1.dev2660"
+version = "0.10.1.dev2669"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dateparser" },
@@ -466,7 +466,7 @@ dependencies = [
     { name = "xlrd" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/88/58a550911e239378084ffcbb5f5d2d4849c82782553ed1213f861fcd2911/csv_detective-0.10.1.dev2660-py3-none-any.whl", hash = "sha256:4975f586731b0a6d5297c6e6e8c03a38a73c452c7e8b3a2b89bb3585137dd7a6", size = 83043, upload-time = "2025-12-15T16:52:12.857Z" },
+    { url = "https://files.pythonhosted.org/packages/74/07/af2dac432a034115f3c927c84e5715edf6a883f91cd49ea4e650486f5042/csv_detective-0.10.1.dev2669-py3-none-any.whl", hash = "sha256:fda6d72c1c7ff12a5196c4c4ef80f88322fe0e63e3052386f4264d5f08c18b58", size = 83093, upload-time = "2026-01-14T10:18:17.592Z" },
 ]
 
 [[package]]
@@ -1831,7 +1831,7 @@ requires-dist = [
     { name = "aioresponses", marker = "extra == 'dev'", specifier = ">=0.7.3" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "coloredlogs", specifier = ">=15.0.1" },
-    { name = "csv-detective", specifier = "==0.10.1.dev2660" },
+    { name = "csv-detective", specifier = "==0.10.1.dev2669" },
     { name = "dateparser", specifier = ">=1.1.7" },
     { name = "gunicorn", marker = "extra == 'dev'", specifier = ">=20.1.0" },
     { name = "humanfriendly", specifier = ">=10.0" },
