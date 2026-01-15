@@ -624,7 +624,10 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
         for col in expected_formats:
             assert expected_formats[col] in inspection["columns"][col]["format"]
 
-    with patch("udata_hydra.config.CSV_TO_GEOJSON", patched_config):
+    with (
+        patch("udata_hydra.config.CSV_TO_GEOJSON", patched_config),
+        patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
+    ):
         if not patched_config or expected_formats is None:
             # process is disabled or early exit because no geo data
             with patch("udata_hydra.analysis.geojson.geojson_to_pmtiles") as mock_func:
@@ -658,9 +661,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                     new=mocked_minio_client_pmtiles,
                 ),
             ):
-                result = await csv_to_geojson_and_pmtiles(
-                    fp.name, inspection, RESOURCE_ID, cleanup=False
-                )
+                result = await csv_to_geojson_and_pmtiles(fp.name, inspection, RESOURCE_ID)
                 assert result is not None, (
                     "Expected geographical data to be processed, but function returned None"
                 )

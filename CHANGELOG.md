@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.5 (2026-01-12)
+
+- chore(rq): set failure ttl to 10 days ([#372](https://github.com/datagouv/hydra/pull/372))
+- chore: clean remaining pmtiles files ([#371](https://github.com/datagouv/hydra/pull/371))
+- fix: fix tag_version.sh to work with MacOS ([#367](https://github.com/datagouv/hydra/pull/367))
+
+
 ## 2.4.4 (2025-11-27)
 
 - Add binary type support ([#364](https://github.com/datagouv/hydra/pull/364))

@@ -68,11 +68,15 @@ TEMPORARY_DOWNLOAD_FOLDER = ""
 
 # -- Worker settings -- #
 RQ_DEFAULT_TIMEOUT = 180
+RQ_DEFAULT_FAILURE_TTL = 864000  # How long failed jobs are kept in redis: 10 days.
 
 # -- Webhook integration config -- #
 WEBHOOK_ENABLED = true
 UDATA_URI = ""
 UDATA_URI_API_KEY = ""
+
+# -- File generation cleanup, only patched in the tests -- #
+REMOVE_GENERATED_FILES = true
 
 # -- Minio / datalake settings -- #
 MINIO_URL = "" # no scheme
