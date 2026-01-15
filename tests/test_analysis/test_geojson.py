@@ -142,7 +142,7 @@ async def test_csv_to_geojson_big_file(
 
         # Test the performance of csv_to_geojson with the real file
         result = await csv_to_geojson(
-            df=df,
+            file_path=str(csv_path),
             inspection=inspection,
             output_file_path=test_geojson_path,
             upload_to_minio=False,
