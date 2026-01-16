@@ -150,9 +150,7 @@ async def csv_to_geojson(
                     "type": "Feature",
                     # empty geometry cells can happen, we keep them but they won't be displayable
                     "geometry": (
-                        json.loads(row[geo["geojson"]])
-                        if row[geo["geojson"]] is not None
-                        else None
+                        json.loads(row[geo["geojson"]]) if row[geo["geojson"]] is not None else None
                     ),
                     "properties": {col: row[col] for col in row.keys() if col != geo["geojson"]},
                 }
@@ -198,7 +196,9 @@ async def csv_to_geojson(
                         "coordinates": [row[geo["longitude"]], row[geo["latitude"]]],
                     },
                     "properties": {
-                        col: row[col] for col in row.keys() if col not in [geo["longitude"], geo["latitude"]]
+                        col: row[col]
+                        for col in row.keys()
+                        if col not in [geo["longitude"], geo["latitude"]]
                     },
                 }
 
@@ -229,7 +229,6 @@ async def csv_to_geojson(
     else:
         log.debug("No geographical columns found, skipping")
         return None
-    
 
     template = {"type": "FeatureCollection"}
 

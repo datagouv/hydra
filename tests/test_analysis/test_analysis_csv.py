@@ -699,10 +699,13 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                     assert isinstance(feat["geometry"], dict)
                 assert all(
                     col in feat["properties"]
-                    for col in list(other_columns.keys()) + [
+                    for col in list(other_columns.keys())
+                    + [
                         # this is only for the test with misleading geo columns
                         # checking that the two ambiguous columns are in the properties
-                        col for col in geo_columns if col not in expected_formats
+                        col
+                        for col in geo_columns
+                        if col not in expected_formats
                     ]
                 )
                 assert not any(col in feat["properties"] for col in expected_formats)
