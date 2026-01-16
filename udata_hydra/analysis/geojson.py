@@ -145,16 +145,14 @@ async def csv_to_geojson(
         file_path: str, inspection: dict, geo: dict[str, Any]
     ) -> Iterator[dict[str, Any]]:
         for row in generate_records(file_path, inspection, cast_json=False, as_dict=True):
-            if "geometry" in geo:
+            if "geojson" in geo:
                 yield {
                     "type": "Feature",
                     # empty geometry cells can happen, we keep them but they won't be displayable
                     "geometry": (
-                        json.loads(row[geo["geometry"]])
-                        if row[geo["geometry"]] is not None
-                        else None
+                        json.loads(row[geo["geojson"]]) if row[geo["geojson"]] is not None else None
                     ),
-                    "properties": {col: row[col] for col in row.keys() if col != geo["geometry"]},
+                    "properties": {col: row[col] for col in row.keys() if col != geo["geojson"]},
                 }
 
             elif "latlon" in geo:
@@ -188,45 +186,47 @@ async def csv_to_geojson(
 
             else:
                 # skipping row if lat or lon is NaN
-                if any(coord is None for coord in (row[geo["lon"]], row[geo["lat"]])):
+                if any(coord is None for coord in (row[geo["longitude"]], row[geo["latitude"]])):
                     continue
                 yield {
                     "type": "Feature",
                     "geometry": {
                         "type": "Point",
                         # these columns are precast by csv-detective
-                        "coordinates": [row[geo["lon"]], row[geo["lat"]]],
+                        "coordinates": [row[geo["longitude"]], row[geo["latitude"]]],
                     },
                     "properties": {
-                        col: row[col] for col in row.keys() if col not in [geo["lon"], geo["lat"]]
+                        col: row[col]
+                        for col in row.keys()
+                        if col not in [geo["longitude"], geo["latitude"]]
                     },
                 }
 
     geo = {}
     for column, detection in inspection["columns"].items():
         # see csv-detective's geo formats:
-        # https://github.com/datagouv/csv-detective/tree/master/csv_detective/detect_fields/geo
-        if "geojson" in detection["format"]:
-            geo["geometry"] = column
-            break
-        if "latlon" in detection["format"]:
-            geo["latlon"] = column
-            break
-        if "lonlat" in detection["format"]:
-            geo["lonlat"] = column
-            break
-        if "latitude" in detection["format"]:
-            geo["lat"] = column
-        if "longitude" in detection["format"]:
-            geo["lon"] = column
-    # priority is given to geometry, then latlon, then latitude + longitude
-    if "geometry" in geo:
-        geo = {"geometry": geo["geometry"]}
-    if "latlon" in geo:
-        geo = {"latlon": geo["latlon"]}
-    if "lonlat" in geo:
-        geo = {"lonlat": geo["lonlat"]}
-    if not geo or (("lat" in geo and "lon" not in geo) or ("lon" in geo and "lat" not in geo)):
+        # https://github.com/datagouv/csv-detective/tree/main/csv_detective/formats
+        # geo looks like {fmt: (col, score), ...}
+        for fmt in ["geojson", "latlon", "lonlat", "latitude", "longitude"]:
+            # loop through the columns, for each geo format store the column that scored the highest
+            if fmt in detection["format"]:
+                if not geo.get(fmt):
+                    geo[fmt] = (column, detection["score"])
+                elif geo[fmt][1] < detection["score"]:
+                    geo[fmt] = (column, detection["score"])
+    # priority is given to geojson, then latlon, then lonlat, then latitude + longitude
+    if "geojson" in geo:
+        geo = {"geojson": geo["geojson"][0]}
+    elif "latlon" in geo:
+        geo = {"latlon": geo["latlon"][0]}
+    elif "lonlat" in geo:
+        geo = {"lonlat": geo["lonlat"][0]}
+    elif "latitude" in geo and "longitude" in geo:
+        geo = {
+            "latitude": geo["latitude"][0],
+            "longitude": geo["longitude"][0],
+        }
+    else:
         log.debug("No geographical columns found, skipping")
         return None
 

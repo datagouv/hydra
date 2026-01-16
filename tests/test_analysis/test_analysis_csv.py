@@ -588,6 +588,18 @@ async def test_validation(
             {"lat": "latitude_wgs", "long": "longitude_wgs"},
             True,
         ),
+        # the table has latitude and longitude in separate columns
+        # and columns that look like they could be lat/lon too
+        (
+            {
+                "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
+                "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
+                "latin": [10.0 * k * (-1) ** k for k in range(1, 6)],
+                "longueur": [20.0 * k * (-1) ** k for k in range(1, 6)],
+            },
+            {"lat": "latitude_wgs", "long": "longitude_wgs"},
+            True,
+        ),
     ),
 )
 async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
@@ -607,7 +619,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
     sep = ";"
     columns = other_columns | geo_columns
     file = sep.join(columns) + "\n"
-    for _ in range(5):
+    for _ in range(len(other_columns["nombre"])):
         file += sep.join(str(val) for val in [data[_] for data in columns.values()]) + "\n"
 
     with NamedTemporaryFile(delete=False) as fp:
@@ -685,7 +697,18 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                     assert feat["geometry"] is None
                 else:
                     assert isinstance(feat["geometry"], dict)
-                assert all(col in feat["properties"] for col in other_columns)
+                assert all(
+                    col in feat["properties"]
+                    for col in list(other_columns.keys())
+                    + [
+                        # this is only for the test with misleading geo columns
+                        # checking that the two ambiguous columns are in the properties
+                        col
+                        for col in geo_columns
+                        if col not in expected_formats
+                    ]
+                )
+                assert not any(col in feat["properties"] for col in expected_formats)
             assert (
                 geojson_url
                 == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
