@@ -103,6 +103,15 @@ async def has_check_changed(check_data: dict, last_check_data: dict | None) -> b
         or current_headers.get("content-type") != last_check_headers.get("content-type")
     )
 
+    # Check if CORS headers have changed
+    current_cors_headers = check_data.get("cors_headers")
+    last_check_cors_headers = None
+    if last_check_data:
+        cors_headers_value = last_check_data.get("cors_headers")
+        if cors_headers_value:
+            last_check_cors_headers = json.loads(cors_headers_value)
+    cors_has_changed = last_check_data and current_cors_headers != last_check_cors_headers
+
     # TODO: Instead of computing criterions here, store payload and compare with previous one.
     # It would make debugging easier.
     criterions = {
@@ -111,6 +120,7 @@ async def has_check_changed(check_data: dict, last_check_data: dict | None) -> b
         "status_no_longer_available": status_no_longer_available,
         "timeout_has_changed": timeout_has_changed,
         "content_has_changed": content_has_changed,
+        "cors_has_changed": cors_has_changed,
     }
 
     return any(criterions.values())
