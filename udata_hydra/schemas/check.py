@@ -11,6 +11,9 @@ class CheckSchema(Schema):
     created_at = fields.DateTime()
     check_status = fields.Integer(data_key="status")
     headers = fields.Function(lambda obj: json.loads(obj["headers"]) if obj["headers"] else {})
+    cors_headers = fields.Function(
+        lambda obj: json.loads(obj["cors_headers"]) if obj["cors_headers"] else None
+    )
     timeout = fields.Boolean()
     response_time = fields.Float()
     error = fields.Str()

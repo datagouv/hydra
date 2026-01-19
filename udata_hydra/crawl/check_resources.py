@@ -16,7 +16,7 @@ from udata_hydra.crawl.helpers import (
 )
 from udata_hydra.crawl.preprocess_check_data import preprocess_check_data
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import UdataPayload, queue, send
+from udata_hydra.utils import queue
 from udata_hydra.utils.http import CORS_HEADER_FIELDS, CORS_HEADER_PREFIX
 
 RESOURCE_RESPONSE_STATUSES = {
@@ -115,6 +115,29 @@ async def check_resource(
                 )
             resp.raise_for_status()
 
+            # Collect CORS headers via an OPTIONS preflight request before preprocessing check data.
+            # Only store successful CORS probe results (status 200-399, no errors) in the database.
+            # This filters out failed probes, timeouts, and non-permissive CORS configurations
+            cors_probe_result: dict | None = await probe_cors(session, url)
+            cors_headers: dict | None = None
+            if cors_probe_result and not cors_probe_result.get("error"):
+                status: int | None = cors_probe_result.get("status")
+                if status is not None:
+                    try:
+                        # Only store CORS headers for successful preflight responses (2xx, 3xx status codes)
+                        if 200 <= int(status) < 400:
+                            cors_headers = {
+                                "status": int(status),
+                                "error": cors_probe_result.get("error"),
+                                **{
+                                    field: cors_probe_result.get(field)
+                                    for field in CORS_HEADER_FIELDS
+                                },
+                            }
+                    except (TypeError, ValueError):
+                        # Skip invalid status values (should not happen, but handle gracefully)
+                        pass
+
             # Preprocess the check data. If it has changed, it will be sent to udata
             new_check, last_check = await preprocess_check_data(
                 dataset_id=resource["dataset_id"],
@@ -124,21 +147,11 @@ async def check_resource(
                     "domain": domain,
                     "status": resp.status,
                     "headers": convert_headers(resp.headers),
+                    "cors_headers": cors_headers,
                     "timeout": False,
                     "response_time": end - start,
                 },
             )
-
-            if cors_probe := await probe_cors(session, url):
-                cors_payload = build_cors_payload(cors_probe)
-                if cors_payload:
-                    queue.enqueue(
-                        send,
-                        dataset_id=resource["dataset_id"],
-                        resource_id=str(resource["resource_id"]),
-                        document=UdataPayload(cors_payload),
-                        _priority="high",
-                    )
 
             # Update resource status to TO_ANALYSE_RESOURCE
             await Resource.update(
@@ -283,22 +296,3 @@ async def probe_cors(session, url: str) -> dict | None:
         error: str = getattr(exc, "message", None) or str(exc)
         status: int | None = getattr(exc, "status", None)
         return {"status": status, "error": fix_surrogates(error)}
-
-
-def build_cors_payload(raw: dict) -> dict:
-    """Shape a successful CORS preflight response into udata extras while ignoring failures or non-permissive replies."""
-    if not raw or raw.get("error"):
-        return {}
-    status: int | str | None = raw.get("status")
-    if status is None:
-        return {}
-    try:
-        status_int = int(status)
-    except (TypeError, ValueError):
-        return {}
-    if not (200 <= status_int < 400):
-        return {}
-    payload = {"check:cors:status": status_int, "check:cors:error": raw.get("error")}
-    for field in CORS_HEADER_FIELDS:
-        payload[f"check:cors:{field}"] = raw.get(field)
-    return payload
