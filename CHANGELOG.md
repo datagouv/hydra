@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.4.5 (2026-01-12)
+
+- chore(rq): set failure ttl to 10 days ([#372](https://github.com/datagouv/hydra/pull/372))
+- chore: clean remaining pmtiles files ([#371](https://github.com/datagouv/hydra/pull/371))
+- fix: fix tag_version.sh to work with MacOS ([#367](https://github.com/datagouv/hydra/pull/367))
+
+
+## 2.4.4 (2025-11-27)
+
+- Add binary type support ([#364](https://github.com/datagouv/hydra/pull/364))
+- Bring `tables_index` update closer to db insertion ([#366](https://github.com/datagouv/hydra/pull/366))
+- Change how we spot tables to delete ([#358](https://github.com/datagouv/hydra/pull/358))
+- Handle empty geometry cells ([#365](https://github.com/datagouv/hydra/pull/365))
+- Revert "feat: better logs for CLI commands run by crons ([#354](https://github.com/datagouv/hydra/pull/354))" ([#355](https://github.com/datagouv/hydra/pull/355))
+- chore: remove parallel tests executors and add minimum test coverage of 80% ([#356](https://github.com/datagouv/hydra/pull/356))
+- docs: fix README
+- docs: fix README ([#352](https://github.com/datagouv/hydra/pull/352))
+- feat: add parsing_table index on checks ([#357](https://github.com/datagouv/hydra/pull/357))
+- feat: add resource_id index on tables_index ([#353](https://github.com/datagouv/hydra/pull/353))
+- feat: add total resources and deleted resources in crawler status health check ([#362](https://github.com/datagouv/hydra/pull/362))
+- feat: better logs for CLI commands run by crons ([#354](https://github.com/datagouv/hydra/pull/354))
+- feat: optimize cleanup of stuck status resources ([#363](https://github.com/datagouv/hydra/pull/363))
+- fix: resolve async/await compatibility issues with Typer CLI ([#361](https://github.com/datagouv/hydra/pull/361))
+- refactor: replace Minicli dependency with Typer ([#233](https://github.com/datagouv/hydra/pull/233))
+
+
 ## 2.4.3 (2025-10-21)
 
 - fix: fix entrypoint ([#350](https://github.com/datagouv/hydra/pull/350))

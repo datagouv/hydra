@@ -1,18 +1,36 @@
 import json
-from io import BytesIO
+from typing import Iterator
 
-import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+PYTHON_TYPE_TO_PA = {
+    "string": pa.string(),
+    "float": pa.float64(),
+    "int": pa.int64(),
+    "bool": pa.bool_(),
+    "json": pa.string(),
+    "date": pa.date32(),
+    "datetime": pa.date64(),
+    "binary": pa.binary(),
+}
 
 
 def save_as_parquet(
-    df: pd.DataFrame,
+    records: Iterator[list],
+    columns: dict[str, dict],
     output_filename: str | None = None,
-) -> tuple[str, BytesIO | None]:
-    bytes = df.to_parquet(
-        f"{output_filename}.parquet" if output_filename else None,
-        compression="zstd",  # best compression to date
+) -> tuple[str, pa.Table]:
+    # the "output_filename = None" case is only used in tests
+    table = pa.Table.from_pylist(
+        [{c: v for c, v in zip(columns, values)} for values in records],
+        schema=pa.schema(
+            [pa.field(c, PYTHON_TYPE_TO_PA[columns[c]["python_type"]]) for c in columns]
+        ),
     )
-    return f"{output_filename}.parquet", bytes
+    if output_filename:
+        pq.write_table(table, f"{output_filename}.parquet", compression="zstd")
+    return f"{output_filename}.parquet", table
 
 
 async def detect_parquet_from_headers(check: dict) -> bool:

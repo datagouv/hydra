@@ -20,7 +20,9 @@ from udata_hydra.utils import (
     ParseException,
     Timer,
     handle_parse_exception,
+    remove_remainders,
 )
+from udata_hydra.utils.casting import generate_records
 from udata_hydra.utils.minio import MinIOClient
 
 DEFAULT_GEOJSON_FILEPATH = Path("converted_from_csv.geojson")
@@ -78,6 +80,7 @@ async def analyse_geojson(
             )
             timer.mark("geojson-to-pmtiles")
         except Exception as e:
+            remove_remainders(resource_id, ["pmtiles", "pmtiles-journal"])
             raise ParseException(
                 message=str(e),
                 step="pmtiles_export",
@@ -109,19 +112,19 @@ async def analyse_geojson(
 
 
 async def csv_to_geojson(
-    df: pd.DataFrame,
+    file_path: str,
     inspection: dict,
     output_file_path: Path,
     upload_to_minio: bool = True,
 ) -> tuple[int, str | None] | None:
     """
-    Convert a CSV DataFrame to GeoJSON format and optionally upload to MinIO.
+    Convert a CSV file to GeoJSON format and optionally upload to MinIO.
 
     Detects geographical columns (geometry, latlon, lonlat, or lat/lon) and converts
     CSV data to GeoJSON features. Rows with NaN values in geographical columns are skipped.
 
     Args:
-        df: Pandas DataFrame containing the CSV data.
+        file_path: Target CSV file to convert.
         inspection: CSV detective analysis results with column format detection.
         output_file_path: Path where the GeoJSON file should be saved.
         upload_to_minio: Whether to upload to MinIO (default: True).
@@ -138,28 +141,24 @@ async def csv_to_geojson(
         # using the geojson standard: longitude before latitude
         return [float(lon), float(lat)]
 
-    def prevent_nan(value):
-        # convenience to prevent downstream crash (NaN in json or PMtiles)
-        if pd.isna(value):
-            return None
-        return value
-
-    def get_features(df: pd.DataFrame, geo: dict[str, Any]) -> Iterator[dict[str, Any]]:
-        for _, row in df.iterrows():
-            if "geometry" in geo:
+    def get_features(
+        file_path: str, inspection: dict, geo: dict[str, Any]
+    ) -> Iterator[dict[str, Any]]:
+        for row in generate_records(file_path, inspection, cast_json=False, as_dict=True):
+            if "geojson" in geo:
                 yield {
                     "type": "Feature",
-                    # json is not pre-cast by csv-detective
-                    "geometry": json.loads(row[geo["geometry"]]),
-                    "properties": {
-                        col: prevent_nan(row[col]) for col in df.columns if col != geo["geometry"]
-                    },
+                    # empty geometry cells can happen, we keep them but they won't be displayable
+                    "geometry": (
+                        json.loads(row[geo["geojson"]]) if row[geo["geojson"]] is not None else None
+                    ),
+                    "properties": {col: row[col] for col in row.keys() if col != geo["geojson"]},
                 }
 
             elif "latlon" in geo:
                 # ending up here means we either have the exact lat,lon format, or NaN
                 # skipping row if NaN
-                if pd.isna(row[geo["latlon"]]):
+                if row[geo["latlon"]] is None:
                     continue
                 yield {
                     "type": "Feature",
@@ -167,15 +166,13 @@ async def csv_to_geojson(
                         "type": "Point",
                         "coordinates": cast_latlon(row[geo["latlon"]]),
                     },
-                    "properties": {
-                        col: prevent_nan(row[col]) for col in df.columns if col != geo["latlon"]
-                    },
+                    "properties": {col: row[col] for col in row.keys() if col != geo["latlon"]},
                 }
 
             elif "lonlat" in geo:
                 # ending up here means we either have the exact lon,lat format, or NaN
                 # skipping row if NaN
-                if pd.isna(row[geo["lonlat"]]):
+                if row[geo["lonlat"]] is None:
                     continue
                 yield {
                     "type": "Feature",
@@ -184,59 +181,58 @@ async def csv_to_geojson(
                         # inverting lon and lat to match the standard
                         "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
                     },
-                    "properties": {
-                        col: prevent_nan(row[col]) for col in df.columns if col != geo["lonlat"]
-                    },
+                    "properties": {col: row[col] for col in row.keys() if col != geo["lonlat"]},
                 }
 
             else:
                 # skipping row if lat or lon is NaN
-                if any(pd.isna(coord) for coord in (row[geo["lon"]], row[geo["lat"]])):
+                if any(coord is None for coord in (row[geo["longitude"]], row[geo["latitude"]])):
                     continue
                 yield {
                     "type": "Feature",
                     "geometry": {
                         "type": "Point",
                         # these columns are precast by csv-detective
-                        "coordinates": [row[geo["lon"]], row[geo["lat"]]],
+                        "coordinates": [row[geo["longitude"]], row[geo["latitude"]]],
                     },
                     "properties": {
-                        col: prevent_nan(row[col])
-                        for col in df.columns
-                        if col not in [geo["lon"], geo["lat"]]
+                        col: row[col]
+                        for col in row.keys()
+                        if col not in [geo["longitude"], geo["latitude"]]
                     },
                 }
 
     geo = {}
     for column, detection in inspection["columns"].items():
         # see csv-detective's geo formats:
-        # https://github.com/datagouv/csv-detective/tree/master/csv_detective/detect_fields/geo
-        if "geojson" in detection["format"]:
-            geo["geometry"] = column
-            break
-        if "latlon" in detection["format"]:
-            geo["latlon"] = column
-            break
-        if "lonlat" in detection["format"]:
-            geo["lonlat"] = column
-            break
-        if "latitude" in detection["format"]:
-            geo["lat"] = column
-        if "longitude" in detection["format"]:
-            geo["lon"] = column
-    # priority is given to geometry, then latlon, then latitude + longitude
-    if "geometry" in geo:
-        geo = {"geometry": geo["geometry"]}
-    if "latlon" in geo:
-        geo = {"latlon": geo["latlon"]}
-    if "lonlat" in geo:
-        geo = {"lonlat": geo["lonlat"]}
-    if not geo or (("lat" in geo and "lon" not in geo) or ("lon" in geo and "lat" not in geo)):
+        # https://github.com/datagouv/csv-detective/tree/main/csv_detective/formats
+        # geo looks like {fmt: (col, score), ...}
+        for fmt in ["geojson", "latlon", "lonlat", "latitude", "longitude"]:
+            # loop through the columns, for each geo format store the column that scored the highest
+            if fmt in detection["format"]:
+                if not geo.get(fmt):
+                    geo[fmt] = (column, detection["score"])
+                elif geo[fmt][1] < detection["score"]:
+                    geo[fmt] = (column, detection["score"])
+    # priority is given to geojson, then latlon, then lonlat, then latitude + longitude
+    if "geojson" in geo:
+        geo = {"geojson": geo["geojson"][0]}
+    elif "latlon" in geo:
+        geo = {"latlon": geo["latlon"][0]}
+    elif "lonlat" in geo:
+        geo = {"lonlat": geo["lonlat"][0]}
+    elif "latitude" in geo and "longitude" in geo:
+        geo = {
+            "latitude": geo["latitude"][0],
+            "longitude": geo["longitude"][0],
+        }
+    else:
         log.debug("No geographical columns found, skipping")
         return None
 
     template = {"type": "FeatureCollection"}
-    template["features"] = streamable_list(get_features(df, geo))
+
+    template["features"] = streamable_list(get_features(file_path, inspection, geo))
 
     with output_file_path.open("w") as f:
         json.dump(template, f, indent=4, ensure_ascii=False, default=str)
@@ -276,6 +272,7 @@ async def geojson_to_pmtiles(
         "--maximum-zoom=g",  # guess
         "-o",
         str(output_file_path),
+        "--force",  # don't crash if output file already exists, override it
         "--coalesce-densest-as-needed",
         "--extend-zooms-if-still-dropping",
         str(input_file_path),
@@ -289,7 +286,9 @@ async def geojson_to_pmtiles(
 
     if upload_to_minio:
         log.debug(f"Sending PMTiles file {output_file_path} to MinIO")
-        pmtiles_url = minio_client_pmtiles.send_file(str(output_file_path), delete_source=False)
+        pmtiles_url = minio_client_pmtiles.send_file(
+            str(output_file_path), delete_source=config.REMOVE_GENERATED_FILES
+        )
     else:
         pmtiles_url = None
 
@@ -297,11 +296,10 @@ async def geojson_to_pmtiles(
 
 
 async def csv_to_geojson_and_pmtiles(
-    df: pd.DataFrame,
+    file_path: str,
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
-    cleanup: bool = True,
 ) -> tuple[Path, int, str | None, Path, int, str | None] | None:
     if not config.CSV_TO_GEOJSON:
         log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
@@ -321,7 +319,7 @@ async def csv_to_geojson_and_pmtiles(
         pmtiles_filepath = DEFAULT_PMTILES_FILEPATH
 
     # Convert CSV to GeoJSON
-    result = await csv_to_geojson(df, inspection, geojson_filepath, upload_to_minio=True)
+    result = await csv_to_geojson(file_path, inspection, geojson_filepath, upload_to_minio=True)
     if result is None:
         return None
     geojson_size, geojson_url = result
@@ -349,9 +347,8 @@ async def csv_to_geojson_and_pmtiles(
         },
     )
 
-    if cleanup:
+    if config.REMOVE_GENERATED_FILES:
         geojson_filepath.unlink()
-        pmtiles_filepath.unlink()
 
     # returning only for tests purposes
     return geojson_filepath, geojson_size, geojson_url, pmtiles_filepath, pmtiles_size, pmtiles_url

@@ -39,7 +39,6 @@ async def test_geojson_to_pmtiles_invalid_geometry():
     test_pmtiles_path = Path(f"{RESOURCE_ID}.pmtiles")
     with pytest.raises(Exception):
         await geojson_to_pmtiles(Path("tests/data/invalid.geojson"), test_pmtiles_path)
-    test_pmtiles_path.unlink(missing_ok=True)
 
 
 @pytest.mark.asyncio
@@ -52,9 +51,14 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
     mocked_minio = MagicMock()
     mocked_minio.fput_object.return_value = None
     mocked_minio.bucket_exists.return_value = True
+    # Make sure that we don't crash even if output pmtiles already exists
+    Path(f"{RESOURCE_ID}.pmtiles").touch()
     with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
         mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
-    with patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client):
+    with (
+        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client),
+        patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
+    ):
         mock_os = mocker.patch("udata_hydra.utils.minio.os")
         mock_os.path = os.path
         mock_os.remove.return_value = None
@@ -138,7 +142,7 @@ async def test_csv_to_geojson_big_file(
 
         # Test the performance of csv_to_geojson with the real file
         result = await csv_to_geojson(
-            df=df,
+            file_path=str(csv_path),
             inspection=inspection,
             output_file_path=test_geojson_path,
             upload_to_minio=False,
@@ -206,7 +210,10 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
         mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
 
-    with patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client):
+    with (
+        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client),
+        patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
+    ):
         mock_os = mocker.patch("udata_hydra.utils.minio.os")
         mock_os.path = os.path
         mock_os.remove.return_value = None
