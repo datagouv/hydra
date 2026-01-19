@@ -32,7 +32,7 @@ requires-python = ">=3.11,<3.14"
 license = { text = "MIT" }
 readme = "README.md"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "aiohttp-devtools>=1.0.post0",
     "aioresponses>=0.7.3",
