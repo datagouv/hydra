@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
 from asyncpg.exceptions import UndefinedTableError
 

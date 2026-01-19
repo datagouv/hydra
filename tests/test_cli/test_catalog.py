@@ -1,4 +1,4 @@
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
 
 from tests.conftest import RESOURCE_ID
