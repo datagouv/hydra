@@ -6,7 +6,7 @@ from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
 from unittest.mock import ANY, patch
 
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
 from aiohttp import ClientSession, RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
