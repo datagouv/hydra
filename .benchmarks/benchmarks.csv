@@ -190,3 +190,4 @@ datetime,test_name,input_file,ci,execution_time_seconds,commit_author,commit_id,
 2026-01-19T10:27:43Z,test_csv_to_geojson_big_file,H_01_1990-1999.csv.gz,circleci,715.59,bolinocroustibat,66c7cc5,large,36,8192,3.11
 2026-01-19T10:31:07Z,test_geojson_to_pmtiles_big_file,H_01_1990-1999.csv.gz,circleci,204.01,bolinocroustibat,66c7cc5,large,36,8192,3.11
 2026-01-19T11:23:03Z,test_analyse_csv_big_file,20190618-annuaire-diagnostiqueurs.csv,circleci,54.17,bolinocroustibat,66c7cc5,large,36,8192,3.11
+2026-01-19T11:35:11Z,test_csv_to_geojson_big_file,H_01_1990-1999.csv.gz,circleci,726.93,bolinocroustibat,66c7cc5,large,36,8192,3.11
