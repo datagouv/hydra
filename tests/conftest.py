@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 
 import asyncpg
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
 import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
