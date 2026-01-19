@@ -92,7 +92,7 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 
 ## 🧪 Tests
 
-To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
+To run the tests, you need to launch the test database with `docker compose --profile test up -d`.
 
 Make sure the dependencies are installed (including dev dependencies) with `uv sync` (see Installation section above).
 
@@ -513,14 +513,17 @@ The payload should look something like:
 
 ## 🛠️ Development
 
-### 🐳 docker compose
+### 🐳 Docker compose
 
-Multiple docker-compose files are provided:
-- a minimal `docker-compose.yml` with two PostgreSQL containers (one for catalog and metadata, the other for converted CSV to database)
-- `docker-compose.broker.yml` adds a Redis broker
-- `docker-compose.test.yml` launches a test DB, needed to run tests
+A single `docker-compose.yml` file is provided with profiles to manage different environments:
+- Default services: `database` and `database-csv` (PostgreSQL containers for catalog/metadata and CSV conversion)
+- `test` profile: `test-database` (ephemeral test database)
+- `broker` profile: `broker` (Redis broker)
 
-NB: you can launch compose from multiple files like this: `docker compose -f docker-compose.yml -f docker-compose.test.yml up`
+Usage:
+- Development: `docker compose up -d` (or `docker compose --profile broker up -d` if Redis is needed)
+- Tests: `docker compose --profile test up -d` (broker not needed, queue functionality is mocked)
+- Broker only: `docker compose --profile broker up -d`
 
 ### 📝 Logging & Debugging
 
