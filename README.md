@@ -94,7 +94,7 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 
 To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
 
-Make sure the dev dependencies are installed with `uv sync --extra dev` or `pip3 install -e .[dev]`.
+Make sure the dependencies are installed (including dev dependencies) with `uv sync` (see Installation section above).
 
 Then you can run the tests with `uv run pytest`.
 
