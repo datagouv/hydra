@@ -31,7 +31,14 @@ DATASET_ID = "601ddcfc85a59c3a45c2435a"
 NOT_EXISTING_RESOURCE_ID = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
 pytestmark = pytest.mark.asyncio
 
-nest_asyncio.apply()
+# nest_asyncio2 skips _patch_loop() in Python 3.14 when no event loop is running
+# at import time (get_event_loop() raises RuntimeError, returning None).
+# Passing an explicit temporary loop forces _patch_loop() to run, which patches
+# the loop class so all subsequent event loops (including those created by
+# pytest-asyncio per test) have the nested run_until_complete support.
+_bootstrap_loop = asyncio.new_event_loop()
+nest_asyncio.apply(_bootstrap_loop)
+_bootstrap_loop.close()
 
 log = logging.getLogger("udata-hydra")
 
