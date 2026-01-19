@@ -1810,7 +1810,7 @@ dependencies = [
     { name = "typer" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "aiohttp-devtools" },
     { name = "aioresponses" },
@@ -1827,36 +1827,39 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.10.3" },
-    { name = "aiohttp-devtools", marker = "extra == 'dev'", specifier = ">=1.0.post0" },
-    { name = "aioresponses", marker = "extra == 'dev'", specifier = ">=0.7.3" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "coloredlogs", specifier = ">=15.0.1" },
     { name = "csv-detective", specifier = "==0.10.2" },
     { name = "dateparser", specifier = ">=1.1.7" },
-    { name = "gunicorn", marker = "extra == 'dev'", specifier = ">=20.1.0" },
     { name = "humanfriendly", specifier = ">=10.0" },
     { name = "json-stream", specifier = ">=2.3.3" },
     { name = "marshmallow", specifier = ">=3.14.1" },
     { name = "minio", specifier = ">=7.2.8" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.0" },
-    { name = "nest-asyncio", marker = "extra == 'dev'", specifier = ">=1.5.5" },
     { name = "progressist", specifier = ">=0.1.0" },
     { name = "pyarrow", specifier = ">=16.1.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.1.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.7.0" },
     { name = "python-magic", specifier = ">=0.4.25" },
     { name = "python-slugify", specifier = ">=8.0.4" },
     { name = "redis", specifier = ">=4.1.4" },
     { name = "rq", specifier = ">=1.11.1" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9.3" },
     { name = "sentry-sdk", specifier = ">=2.10.0" },
     { name = "sqlalchemy", specifier = ">=1.4.46" },
     { name = "tippecanoe", specifier = ">=2.72.0" },
     { name = "typer", specifier = ">=0.15.1" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "aiohttp-devtools", specifier = ">=1.0.post0" },
+    { name = "aioresponses", specifier = ">=0.7.3" },
+    { name = "gunicorn", specifier = ">=20.1.0" },
+    { name = "mypy", specifier = ">=1.11.0" },
+    { name = "nest-asyncio", specifier = ">=1.5.5" },
+    { name = "pytest", specifier = ">=8.3.0" },
+    { name = "pytest-asyncio", specifier = ">=1.1.0" },
+    { name = "pytest-cov", specifier = ">=5.0.0" },
+    { name = "pytest-mock", specifier = ">=3.7.0" },
+    { name = "ruff", specifier = ">=0.9.3" },
+]
 
 [[package]]
 name = "unidecode"

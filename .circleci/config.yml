@@ -51,9 +51,9 @@ jobs:
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ .Environment.BASE_BRANCH }}
             - << pipeline.parameters.cache-prefix >>-{{ arch }}-
       - run:
-          name: Install Python dependencies with uv
+          name: Install Python dependencies
           command: |
-            uv sync --frozen --extra dev
+            uv sync --frozen
       - save_cache:
           key: << pipeline.parameters.cache-prefix >>-{{ arch }}-{{ checksum "pyproject.toml" }}-{{ checksum "uv.lock" }}
           paths:
