@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.5.0 (2026-01-20)
+
+- Adapt to the new `csv-detective` output ([#369](https://github.com/datagouv/hydra/pull/369))
+- Better pick latitude/longitude columns when there are multiple options ([#376](https://github.com/datagouv/hydra/pull/376))
+- chore: move pyproject optional-dependencies to dependency-groups ([#368](https://github.com/datagouv/hydra/pull/368))
+- Fix stable resource URL syntax ([#375](https://github.com/datagouv/hydra/pull/375))
+- fix: unlink pmtiles once only ([#373](https://github.com/datagouv/hydra/pull/373))
+- Move file cleanup condition to the config ([#374](https://github.com/datagouv/hydra/pull/374))
+- refactor: refactor docker-compose files to use profiles ([#370](https://github.com/datagouv/hydra/pull/370))
+- Upgrade `csv-detective` ([#377](https://github.com/datagouv/hydra/pull/377))
+
+
 ## 2.4.5 (2026-01-12)
 
 - chore(rq): set failure ttl to 10 days ([#372](https://github.com/datagouv/hydra/pull/372))
