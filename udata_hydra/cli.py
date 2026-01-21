@@ -21,7 +21,12 @@ from udata_hydra.analysis.csv import analyse_csv, csv_detective_routine
 from udata_hydra.analysis.geojson import analyse_geojson, csv_to_geojson, geojson_to_pmtiles
 from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.analysis.resource import analyse_resource
-from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
+from udata_hydra.crawl.check_resources import (
+    check_resource as crawl_check_resource,
+)
+from udata_hydra.crawl.check_resources import (
+    probe_cors,
+)
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
@@ -250,6 +255,50 @@ def check_resource(
     return _make_async_wrapper(_check_resource)(
         resource_id=resource_id, method=method, force_analysis=force_analysis
     )
+
+
+async def _probe_cors_cli(
+    url: str | None = typer.Option(
+        None, help="URL to probe; mutually exclusive with --resource-id"
+    ),
+    resource_id: str | None = typer.Option(
+        None,
+        "--resource-id",
+        help="Fetch the resource URL from the catalog instead of passing --url",
+    ),
+):
+    """Trigger a standalone CORS preflight using the crawler helper."""
+    if not url and not resource_id:
+        raise typer.BadParameter("Provide either --url or --resource-id")
+    if resource_id:
+        resource: asyncpg.Record | None = await Resource.get(resource_id)
+        if not resource:
+            log.error(f"Resource {resource_id} not found in catalog")
+            return
+        url = url or resource["url"]
+    assert url  # for mypy / type checkers
+
+    async with aiohttp.ClientSession(timeout=None) as session:
+        probe_result = await probe_cors(session, url)
+    if not probe_result:
+        log.warning("CORS probe skipped: CORS_PROBE_ORIGIN not configured")
+        return
+    log.info(f"CORS probe result: {probe_result}")
+
+
+@cli.command(name="probe-cors")
+def probe_cors_cli(
+    url: str | None = typer.Option(
+        None, help="URL to probe; mutually exclusive with --resource-id"
+    ),
+    resource_id: str | None = typer.Option(
+        None,
+        "--resource-id",
+        help="Fetch the resource URL from the catalog instead of passing --url",
+    ),
+):
+    """Trigger a standalone CORS preflight using the crawler helper."""
+    return _make_async_wrapper(_probe_cors_cli)(url=url, resource_id=resource_id)
 
 
 async def _analyse_resource_cli(resource_id: str):

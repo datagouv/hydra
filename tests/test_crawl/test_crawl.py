@@ -73,7 +73,16 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
     rmock.head(rurl, **params)
     # mock for head fallback
     rmock.get(rurl, **params)
-    rmock.put(udata_url)
+    rmock.options(
+        rurl,
+        status=204,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
+        },
+        repeat=True,
+    )
+    rmock.put(udata_url, repeat=True)
     await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
 
@@ -97,7 +106,8 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
         assert not res["error"]
 
     # test webhook results from mock
-    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    payloads = [req.kwargs["json"] for req in rmock.requests[("PUT", URL(udata_url))]]
+    webhook = next(p for p in payloads if "check:id" in p)
     assert webhook.get("check:date")
     datetime.fromisoformat(webhook["check:date"])
     if exception or status == 500:
@@ -115,6 +125,48 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
         assert webhook.get("check:timeout")
     else:
         assert webhook.get("check:timeout") is False
+
+    # CORS headers
+    expect_cors = status and status < 400 and not timeout and not exception
+    if expect_cors:
+        assert webhook.get("check:cors:status") == 204
+        assert webhook.get("check:cors:allow-origin") == "*"
+    else:
+        assert webhook.get("check:cors:status") is None
+
+
+async def test_cors_probe_sends_payload(setup_catalog, rmock, db, analysis_mock, udata_url):
+    rurl = RESOURCE_URL
+    rmock.head(
+        rurl,
+        status=200,
+        headers={"Content-Length": "10", "X-Do": "you"},
+    )
+    rmock.get(
+        rurl,
+        status=200,
+        headers={"Content-Length": "10", "X-Do": "you"},
+    )
+    rmock.options(
+        rurl,
+        status=204,
+        headers={
+            "Access-Control-Allow-Origin": "https://data.gouv.fr",
+            "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization,Content-Type",
+        },
+    )
+    rmock.put(udata_url, repeat=True)
+
+    await start_checks(iterations=1)
+
+    # CORS headers
+    payloads = [req.kwargs["json"] for req in rmock.requests[("PUT", URL(udata_url))]]
+    check_payload = next(p for p in payloads if "check:id" in p)
+    assert check_payload.get("check:cors:status") == 204
+    assert check_payload.get("check:cors:allow-origin") == "https://data.gouv.fr"
+    assert check_payload.get("check:cors:allow-methods") == "GET,HEAD,OPTIONS"
+    assert check_payload.get("check:cors:allow-headers") == "Authorization,Content-Type"
 
 
 async def test_excluded_clause(setup_catalog, mocker, rmock, produce_mock):
@@ -269,17 +321,42 @@ async def test_analyse_resource_from_crawl(setup_catalog, rmock, db, udata_url):
     rmock.head(rurl, status=200, headers={"Content-Length": "200"})
     # mock for download
     rmock.get(rurl, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+    rmock.options(
+        rurl,
+        status=204,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
+        },
+    )
     # mock for check and analysis results
     rmock.put(udata_url, status=200, repeat=True)
 
     await start_checks(iterations=1)
 
     assert len(rmock.requests[("PUT", URL(udata_url))]) == 2
+
+    # Verify CORS headers are included in the check payload
+    payloads = [req.kwargs["json"] for req in rmock.requests[("PUT", URL(udata_url))]]
+    check_payload = next(p for p in payloads if "check:id" in p)
+    assert check_payload.get("check:cors:status") == 204
+    assert check_payload.get("check:cors:allow-origin") == "*"
+    assert check_payload.get("check:cors:allow-methods") == "GET,HEAD,OPTIONS"
+
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 1
     assert res[0]["url"] == rurl
     assert res[0]["checksum"] is not None
     assert res[0]["status"] is not None
+    # Verify CORS headers are stored in DB
+    assert res[0]["cors_headers"] is not None
+    cors_headers = (
+        json.loads(res[0]["cors_headers"])
+        if isinstance(res[0]["cors_headers"], str)
+        else res[0]["cors_headers"]
+    )
+    assert cors_headers["status"] == 204
+    assert cors_headers["allow-origin"] == "*"
 
 
 async def test_change_analysis_last_modified_header(setup_catalog, rmock, udata_url):
