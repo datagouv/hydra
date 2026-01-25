@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
 from aiohttp import ClientSession
 from yarl import URL

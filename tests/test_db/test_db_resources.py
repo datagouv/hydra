@@ -1,5 +1,5 @@
 import asyncpg
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
 
 from tests.conftest import DATABASE_URL, DATASET_ID, RESOURCE_ID, RESOURCE_URL
