@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.6.0 (2026-01-30)
+
+- feat: CORS probe ([#359](https://github.com/datagouv/hydra/pull/359))
+
+
 ## 2.5.0 (2026-01-20)
 
 - Adapt to the new `csv-detective` output ([#369](https://github.com/datagouv/hydra/pull/369))
