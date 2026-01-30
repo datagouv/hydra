@@ -145,7 +145,7 @@ class Resource:
 
     @staticmethod
     def get_excluded_clause() -> str:
-        """Return the WHERE clause to get only resources from the check which:
+        """Return the WHERE clause to get only resources from the checks which:
         - don't have a URL in the excluded URLs patterns
         - are not deleted
         - are not currently being crawled or analysed (i.e. resources with no status, or status 'BACKOFF')
