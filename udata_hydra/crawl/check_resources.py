@@ -187,11 +187,12 @@ async def check_resource(
 
         return RESOURCE_RESPONSE_STATUSES["TIMEOUT"]
 
-    # TODO: debug AssertionError, should be caught in DB now
-    # File "[...]aiohttp/connector.py", line 991, in _create_direct_connection
-    # assert port is not None
-    # UnicodeError: encoding with 'idna' codec failed (UnicodeError: label too long)
-    # eg http://%20Localisation%20des%20acc%C3%A8s%20des%20offices%20de%20tourisme
+    # Catch HTTP/HTTPS errors and related exceptions:
+    # - ClientError: covers all aiohttp client exceptions (connection, SSL, DNS, etc.)
+    # - AssertionError: can occur in aiohttp connector (e.g., "assert port is not None" in connector.py:991)
+    # - UnicodeError: can occur when encoding domain names with IDNA codec (e.g., "label too long")
+    #   Example problematic URL: http://%20Localisation%20des%20acc%C3%A8s%20des%20offices%20de%20tourisme
+    # All errors are logged and saved to the database via preprocess_check_data()
     except (
         aiohttp.client_exceptions.ClientError,
         AssertionError,
