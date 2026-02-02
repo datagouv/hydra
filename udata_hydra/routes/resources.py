@@ -102,3 +102,75 @@ async def delete_resource(request: web.Request) -> web.Response:
     await Resource.delete(resource_id=resource_id)
 
     return web.HTTPNoContent()
+
+
+async def get_resources_stats(request: web.Request) -> web.Response:
+    """Endpoint to get statistics about resources (CORS headers, etc.)."""
+    # CORS stats: external resources (not on data.gouv.fr) that have at least one check with CORS probe (OPTIONS).
+    q = """
+        -- External resources only; count how many have ≥1 check with CORS data and coverage %.
+        SELECT
+            COUNT(DISTINCT resource_id) FILTER (WHERE has_cors_check) AS resources_with_cors_data,
+            COUNT(DISTINCT resource_id) FILTER (WHERE NOT has_cors_check) AS resources_without_cors_data,
+            ROUND(
+                COUNT(DISTINCT resource_id) FILTER (WHERE has_cors_check) * 100.0 / NULLIF(COUNT(DISTINCT resource_id), 0),
+                2
+            ) AS coverage_percentage
+        FROM (
+            SELECT
+                c.resource_id,
+                BOOL_OR(ch.cors_headers IS NOT NULL) AS has_cors_check
+            FROM catalog c
+            LEFT JOIN checks ch ON c.resource_id = ch.resource_id
+            WHERE c.url NOT LIKE '%data.gouv.fr%'
+            AND c.deleted = False
+            GROUP BY c.resource_id
+        ) resources_summary
+    """
+    row = await request.app["pool"].fetchrow(q)
+    q_dist = """
+        -- Among external resources with ≥1 CORS check, classify by allow-origin and aggregate counts/percentages.
+        SELECT
+            access_status,
+            COUNT(*) AS unique_resources_count,
+            ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS percentage
+        FROM (
+            SELECT
+                c.resource_id,
+                CASE
+                    WHEN BOOL_OR(ch.cors_headers->>'allow-origin' = '*') THEN 'Accessible (Wildcard *)'
+                    WHEN BOOL_OR(ch.cors_headers->>'allow-origin' ILIKE '%data.gouv.fr%') THEN 'Accessible (Specific Whitelist)'
+                    WHEN BOOL_AND(ch.cors_headers->>'allow-origin' IS NULL OR ch.cors_headers->>'allow-origin' = '') THEN 'Blocked (Missing Header)'
+                    ELSE 'Blocked (Other Domain Only)'
+                END AS access_status
+            FROM catalog c
+            INNER JOIN checks ch ON c.resource_id = ch.resource_id
+            WHERE c.url NOT LIKE '%data.gouv.fr%'
+            AND c.deleted = False
+            AND ch.cors_headers IS NOT NULL
+            GROUP BY c.resource_id
+        ) unique_resources_summary
+        GROUP BY access_status
+        ORDER BY access_status
+    """
+    rows_dist = await request.app["pool"].fetch(q_dist)
+    allow_origin_distribution = [
+        {
+            "access_status": r["access_status"],
+            "unique_resources_count": r["unique_resources_count"],
+            "percentage": float(r["percentage"]) if r["percentage"] is not None else None,
+        }
+        for r in rows_dist
+    ]
+    return web.json_response(
+        {
+            "cors": {
+                "external_resources_with_cors_data": row["resources_with_cors_data"] or 0,
+                "external_resources_without_cors_data": row["resources_without_cors_data"] or 0,
+                "external_resources_cors_coverage_percentage": float(row["coverage_percentage"])
+                if row["coverage_percentage"] is not None
+                else None,
+                "external_resources_allow_origin_distribution": allow_origin_distribution,
+            }
+        }
+    )
