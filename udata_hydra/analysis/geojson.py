@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-import pandas as pd
 import tippecanoe
 from asyncpg import Record
 from json_stream import streamable_list
