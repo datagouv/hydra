@@ -109,8 +109,7 @@ async def analyse_wfs(check: dict) -> WfsMetadata | None:
                 # Extract CRS options
                 crs_options = getattr(layer, "crsOptions", []) or []
                 if crs_options:
-                    # Convert CRS objects to strings
-                    crs_strings = [str(crs) for crs in crs_options]
+                    crs_strings = [crs.getcode() for crs in crs_options]
                     # owslib merges DefaultCRS (first position) and OtherCRS in the same list
                     feature_type["default_crs"] = crs_strings[0] if crs_strings else None
                     feature_type["other_crs"] = crs_strings[1:] if len(crs_strings) > 1 else []

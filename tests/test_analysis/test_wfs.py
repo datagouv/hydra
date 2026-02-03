@@ -71,8 +71,13 @@ class TestWfsAnalysis:
     async def test_analyse_wfs_success(self, setup_catalog, db, fake_check):
         check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
 
+        mock_crs_4326 = MagicMock()
+        mock_crs_4326.getcode.return_value = "EPSG:4326"
+        mock_crs_3857 = MagicMock()
+        mock_crs_3857.getcode.return_value = "EPSG:3857"
+
         mock_layer = MagicMock()
-        mock_layer.crsOptions = ["EPSG:4326", "EPSG:3857"]
+        mock_layer.crsOptions = [mock_crs_4326, mock_crs_3857]
 
         mock_get_feature = MagicMock()
         mock_get_feature.parameters = {
@@ -145,8 +150,11 @@ class TestWfsAnalysis:
     async def test_analyse_wfs_fallback_version(self, setup_catalog, db, fake_check):
         check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
 
+        mock_crs_4326 = MagicMock()
+        mock_crs_4326.getcode.return_value = "EPSG:4326"
+
         mock_layer = MagicMock()
-        mock_layer.crsOptions = ["EPSG:4326"]
+        mock_layer.crsOptions = [mock_crs_4326]
 
         mock_wfs = MagicMock()
         mock_wfs.contents = {"layer1": mock_layer}
