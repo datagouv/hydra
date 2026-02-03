@@ -11,7 +11,7 @@ dependencies = [
     "aiohttp>=3.10.3",
     "asyncpg>=0.29.0",
     "coloredlogs>=15.0.1",
-    "csv-detective==0.10.3",
+    "csv-detective==0.10.4.dev2",
     "dateparser>=1.1.7",
     "humanfriendly>=10.0",
     "json-stream>=2.3.3",
