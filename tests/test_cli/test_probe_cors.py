@@ -1,6 +1,6 @@
 import logging
 
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
 
 from udata_hydra.cli import probe_cors_cli

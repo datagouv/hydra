@@ -1,6 +1,6 @@
 import hashlib
 
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
 
 from udata_hydra import context
