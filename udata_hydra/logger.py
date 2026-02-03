@@ -34,6 +34,7 @@ def setup_logging() -> logging.Logger:
     # silence urllib3 a bit
     logging.getLogger("urllib3").setLevel("INFO")
     logging.getLogger("asyncio").setLevel("INFO")
+    logging.getLogger("owslib").setLevel("INFO")
     context["inited"] = True
     return log
 

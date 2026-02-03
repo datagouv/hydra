@@ -13,6 +13,7 @@ from .http import UdataPayload, get_request_params, send
 from .parquet import detect_parquet_from_headers
 from .queue import enqueue
 from .timer import Timer
+from .wfs import detect_wfs_from_url
 
 __all__ = [
     "token_auth_middleware",
@@ -32,4 +33,5 @@ __all__ = [
     "detect_parquet_from_headers",
     "enqueue",
     "Timer",
+    "detect_wfs_from_url",
 ]

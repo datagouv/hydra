@@ -61,5 +61,10 @@ async def notify_udata(resource: Record, check: dict) -> None:
     if config.CSV_TO_GEOJSON and check.get("geojson_url"):
         payload["document"]["analysis:parsing:geojson_url"] = check.get("geojson_url")
         payload["document"]["analysis:parsing:geojson_size"] = check.get("geojson_size")
+    if config.WFS_ANALYSIS_ENABLED and check.get("wfs_metadata"):
+        wfs_metadata = check.get("wfs_metadata")
+        if isinstance(wfs_metadata, str):
+            wfs_metadata = json.loads(wfs_metadata)
+        payload["document"]["analysis:parsing:wfs_metadata"] = wfs_metadata
     payload["document"] = UdataPayload(payload["document"])
     queue.enqueue(send, _priority="high", **payload)
