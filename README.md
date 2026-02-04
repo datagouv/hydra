@@ -205,6 +205,7 @@ The API serves the following endpoints:
 
 *Related to resources:*
 - `GET` on `/api/resources/{resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
+- `GET` on `/api/resources/stats` to get statistics about resources (counts, statuses, CORS coverage for external resources)
 - `POST` on `/api/resources` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
 - `PUT` on `/api/resources/{resource_id}` to update a resource in the DB "catalog" table
 - `DELETE` on `/api/resources/{resource_id}` to delete a resource in the DB "catalog" table
@@ -349,6 +350,32 @@ $ curl -s "http://localhost:8000/api/checks/aggregate?group_by=domain&created_at
 ]
 ```
 
+#### Get resources stats
+
+```bash
+$ curl -s "http://localhost:8000/api/resources/stats" | json_pp
+{
+   "total_count" : 100,
+   "deleted_count" : 3,
+   "statuses_count" : {
+      "null" : 85,
+      "BACKOFF" : 2,
+      "CRAWLING_URL" : 1,
+      ...
+   },
+   "cors" : {
+      "external_resources_with_cors_data" : 42,
+      "external_resources_without_cors_data" : 55,
+      "external_resources_cors_coverage_percentage" : 43.3,
+      "external_resources_allow_origin_distribution" : [
+         { "access_status" : "Accessible (Wildcard *)", "unique_resources_count" : 15, "percentage" : 35.71 },
+         { "access_status" : "Accessible (Specific Whitelist)", "unique_resources_count" : 20, "percentage" : 47.62 },
+         ...
+      ]
+   }
+}
+```
+
 #### Adding a resource exception
 
 ```bash
@@ -396,22 +423,17 @@ $ curl  -X DELETE http://localhost:8000/api/resources-exceptions/f868cca6-8da1-4
 ```bash
 $ curl -s "http://localhost:8000/api/status/crawler" | json_pp
 {
-   "fresh_checks_percentage" : 0.4,
-   "pending_checks" : 142153,
-   "total" : 142687,
-   "fresh_checks" : 534,
-   "checks_percentage" : 0.4,
-   "resources_statuses_count": {
-      "null": 195339,
-      "BACKOFF": 0,
-      "CRAWLING_URL": 0,
-      "TO_ANALYSE_RESOURCE": 1,
-      "ANALYSING_RESOURCE": 0,
-      "TO_ANALYSE_CSV": 0,
-      "ANALYSING_CSV": 0,
-      "INSERTING_IN_DB": 0,
-      "CONVERTING_TO_PARQUET": 0
-  }
+   "checks" : {
+      "in_progress_count" : 5,
+      "in_progress_percentage" : 4.76,
+      "needs_check_count" : 60,
+      "needs_check_percentage" : 63.16,
+      "up_to_date_check_count" : 35,
+      "up_to_date_check_percentage" : 36.84
+   },
+   "resources" : {
+      "total_eligible_count" : 95
+   }
 }
 ```
 
