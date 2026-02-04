@@ -52,7 +52,6 @@ async def analyse_wfs(check: dict) -> WfsMetadata | None:
 
     log.debug(f"Starting WFS analysis for {url}")
 
-    # Update resource status to ANALYSING_WFS
     resource: Record | None = None
     if resource_id:
         resource = await Resource.update(str(resource_id), {"status": "ANALYSING_WFS"})
@@ -150,6 +149,5 @@ async def analyse_wfs(check: dict) -> WfsMetadata | None:
     finally:
         if resource and check_id:
             await helpers.notify_udata(resource, check)
-        # Reset resource status to None
         if resource_id:
             await Resource.update(str(resource_id), {"status": None})
