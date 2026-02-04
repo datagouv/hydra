@@ -8,13 +8,13 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.wfs import analyse_wfs
-from udata_hydra.utils.wfs import detect_wfs_from_url
+from udata_hydra.utils.wfs import detect_wfs
 
 log = logging.getLogger("udata-hydra")
 
 
 class TestWfsDetection:
-    """Tests for WFS URL detection"""
+    """Tests for WFS detection"""
 
     @pytest.mark.parametrize("url,expected", [
         ("https://example.com/geoserver?SERVICE=WFS&REQUEST=GetCapabilities", True),
@@ -30,11 +30,24 @@ class TestWfsDetection:
     ])
     def test_detect_wfs_from_url(self, url, expected):
         check = {"url": url}
-        assert detect_wfs_from_url(check) is expected
+        assert detect_wfs(check) is expected
 
     def test_detect_missing_url(self):
         check = {}
-        assert detect_wfs_from_url(check) is False
+        assert detect_wfs(check) is False
+
+    @pytest.mark.parametrize("resource_format,expected", [
+        ("wfs", True),
+        ("WFS", True),
+        ("ogc:wfs", True),
+        ("OGC:WFS", True),
+        ("wms", False),
+        ("csv", False),
+        (None, False),
+    ])
+    def test_detect_wfs_from_format(self, resource_format, expected):
+        check = {"url": "https://example.com/data"}
+        assert detect_wfs(check, resource_format) is expected
 
 
 @pytest.mark.asyncio

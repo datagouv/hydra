@@ -25,7 +25,7 @@ from udata_hydra.utils import (
     detect_geojson_from_headers,
     detect_parquet_from_headers,
     detect_tabular_from_headers,
-    detect_wfs_from_url,
+    detect_wfs,
     download_resource,
     queue,
     send,
@@ -99,7 +99,7 @@ async def analyse_resource(
             if is_parquet:
                 file_format = "parquet"
         if not is_geojson and not is_parquet:
-            is_wfs = config.WFS_ANALYSIS_ENABLED and detect_wfs_from_url(check)
+            is_wfs = config.WFS_ANALYSIS_ENABLED and detect_wfs(check, row["format"])
             if is_wfs:
                 file_format = "wfs"
 
