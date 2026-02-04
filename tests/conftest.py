@@ -278,6 +278,7 @@ async def fake_check():
         pmtiles_url=False,
         geojson_url=False,
         url=None,
+        cors_headers=None,
     ) -> dict:
         _url = url or f"https://example.com/resource-{resource}"
         data = {
@@ -305,6 +306,8 @@ async def fake_check():
             "geojson_url": "https://example.org/file.geojson" if pmtiles_url else None,
             "geojson_size": 1024 if geojson_url else None,
         }
+        if cors_headers is not None:
+            data["cors_headers"] = cors_headers
         check: dict = await Check.insert(data=data, returning="*")
         data["id"] = check["id"]
         if check.get("dataset_id"):

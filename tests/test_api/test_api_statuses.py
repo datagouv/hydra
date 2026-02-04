@@ -3,6 +3,8 @@ NB: we can't use pytest-aiohttp helpers because
 it will interfere with the rest of our async code
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 pytestmark = pytest.mark.asyncio
@@ -47,6 +49,14 @@ async def test_get_crawler_status(setup_catalog, client, fake_check):
     assert resp.status == 200
     data = await resp.json()
     assert data == expected_data
+
+    # Outdated check (next_check_at in the past) → needs_check, not up_to_date
+    await fake_check(next_check_at=datetime.now(timezone.utc) - timedelta(hours=1))
+    resp = await client.get("/api/status/crawler")
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["checks"]["needs_check_count"] == 1
+    assert data["checks"]["up_to_date_check_count"] == 0
 
 
 async def test_get_stats(setup_catalog, client, fake_check):

@@ -187,6 +187,7 @@ async def test_delete_resource(client, api_headers, api_headers_wrong_token):
 
 
 async def test_get_ressources_stats(setup_catalog, client, fake_check):
+    await fake_check(cors_headers={"allow-origin": "data.gouv.fr", "status": 204})
     expected_resources_statuses_count = {s: 0 for s in Resource.STATUSES if s}
     expected_resources_statuses_count["null"] = 1
     expected_data = {
@@ -194,10 +195,16 @@ async def test_get_ressources_stats(setup_catalog, client, fake_check):
         "deleted_count": 0,
         "statuses_count": expected_resources_statuses_count,
         "cors": {
-            "external_resources_with_cors_data": 0,
-            "external_resources_without_cors_data": 1,
-            "external_resources_cors_coverage_percentage": 0.0,
-            "external_resources_allow_origin_distribution": [],
+            "external_resources_with_cors_data": 1,
+            "external_resources_without_cors_data": 0,
+            "external_resources_cors_coverage_percentage": 100.0,
+            "external_resources_allow_origin_distribution": [
+                {
+                    "access_status": "Accessible (Specific Whitelist)",
+                    "unique_resources_count": 1,
+                    "percentage": 100.0,
+                },
+            ],
         },
     }
     resp = await client.get("/api/resources/stats")
