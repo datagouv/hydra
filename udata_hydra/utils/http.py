@@ -46,7 +46,7 @@ class UdataPayload:
             "pmtiles_url",
             "geojson_size",
             "geojson_url",
-            "wfs_metadata",
+            "ogc_metadata",
         ],
     }
 

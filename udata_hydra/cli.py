@@ -22,7 +22,7 @@ from udata_hydra.analysis.csv import analyse_csv, csv_detective_routine
 from udata_hydra.analysis.geojson import analyse_geojson, csv_to_geojson, geojson_to_pmtiles
 from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.analysis.resource import analyse_resource
-from udata_hydra.analysis.wfs import analyse_wfs
+from udata_hydra.analysis.ogc import analyse_ogc
 from udata_hydra.crawl.check_resources import (
     check_resource as crawl_check_resource,
 )
@@ -613,12 +613,12 @@ def analyse_parquet_cli(
     )
 
 
-async def _analyse_wfs_cli(
+async def _analyse_ogc_cli(
     check_id: str | None = None,
     url: str | None = None,
     resource_id: str | None = None,
 ):
-    """Trigger a WFS analysis from a check_id, an url or a resource_id
+    """Trigger an OGC analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
     """
     check = await _find_check(check_id=check_id, url=url, resource_id=resource_id)
@@ -629,27 +629,27 @@ async def _analyse_wfs_cli(
     if not check:
         return
 
-    # Temporarily enable WFS analysis for CLI
-    config.override(WFS_ANALYSIS_ENABLED=True)
+    # Temporarily enable OGC analysis for CLI
+    config.override(OGC_ANALYSIS_ENABLED=True)
 
-    result = await analyse_wfs(check=check)
+    result = await analyse_ogc(check=check)
     if result:
-        log.info("WFS analysis completed successfully.")
+        log.info("OGC analysis completed successfully.")
         log.debug(json.dumps(result, indent=2, default=str, ensure_ascii=False))
     else:
-        log.warning("WFS analysis returned no results")
+        log.warning("OGC analysis returned no results")
 
 
-@cli.command(name="analyse-wfs")
-def analyse_wfs_cli(
+@cli.command(name="analyse-ogc")
+def analyse_ogc_cli(
     check_id: str | None = typer.Option(None, help="Check ID to analyze"),
-    url: str | None = typer.Option(None, help="WFS endpoint URL to analyze"),
+    url: str | None = typer.Option(None, help="OGC endpoint URL to analyze"),
     resource_id: str | None = typer.Option(None, help="Resource ID to analyze"),
 ):
-    """Trigger a WFS analysis from a check_id, an url or a resource_id
+    """Trigger an OGC analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
     """
-    return _make_async_wrapper(_analyse_wfs_cli)(
+    return _make_async_wrapper(_analyse_ogc_cli)(
         check_id=check_id, url=url, resource_id=resource_id
     )
 

@@ -7,14 +7,14 @@ from owslib.util import ServiceException
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from tests.conftest import RESOURCE_ID
-from udata_hydra.analysis.wfs import analyse_wfs
-from udata_hydra.utils.wfs import detect_wfs
+from udata_hydra.analysis.ogc import analyse_ogc
+from udata_hydra.utils.ogc import detect_ogc
 
 log = logging.getLogger("udata-hydra")
 
 
-class TestWfsDetection:
-    """Tests for WFS detection"""
+class TestOgcDetection:
+    """Tests for OGC service detection"""
 
     @pytest.mark.parametrize("url,expected", [
         ("https://example.com/geoserver?SERVICE=WFS&REQUEST=GetCapabilities", True),
@@ -30,11 +30,11 @@ class TestWfsDetection:
     ])
     def test_detect_wfs_from_url(self, url, expected):
         check = {"url": url}
-        assert detect_wfs(check) is expected
+        assert detect_ogc(check) is expected
 
     def test_detect_missing_url(self):
         check = {}
-        assert detect_wfs(check) is False
+        assert detect_ogc(check) is False
 
     @pytest.mark.parametrize("resource_format,expected", [
         ("wfs", True),
@@ -47,18 +47,18 @@ class TestWfsDetection:
     ])
     def test_detect_wfs_from_format(self, resource_format, expected):
         check = {"url": "https://example.com/data"}
-        assert detect_wfs(check, resource_format) is expected
+        assert detect_ogc(check, resource_format) is expected
 
 
 @pytest.mark.asyncio
-class TestWfsAnalysis:
-    """Tests for WFS analysis"""
+class TestOgcAnalysis:
+    """Tests for OGC analysis"""
 
     async def test_analyse_wfs_disabled(self, setup_catalog, fake_check):
-        with patch("udata_hydra.analysis.wfs.config") as mock_config:
-            mock_config.WFS_ANALYSIS_ENABLED = False
+        with patch("udata_hydra.analysis.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = False
             check = await fake_check()
-            result = await analyse_wfs(check)
+            result = await analyse_ogc(check)
             assert result is None
 
     async def test_analyse_wfs_success(self, setup_catalog, db, fake_check):
@@ -82,14 +82,15 @@ class TestWfsAnalysis:
         mock_wfs.getOperationByName.return_value = mock_get_feature
 
         with (
-            patch("udata_hydra.analysis.wfs.config") as mock_config,
-            patch("udata_hydra.analysis.wfs.WebFeatureService", return_value=mock_wfs),
-            patch("udata_hydra.analysis.wfs.helpers.notify_udata", new_callable=AsyncMock) as mock_notify,
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch("udata_hydra.analysis.ogc.WebFeatureService", return_value=mock_wfs),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock) as mock_notify,
         ):
-            mock_config.WFS_ANALYSIS_ENABLED = True
-            result = await analyse_wfs(check)
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            result = await analyse_ogc(check)
 
         expected_metadata = {
+            "format": "wfs",
             # first version tested
             "version": "2.0.0",
             "feature_types": [
@@ -105,7 +106,7 @@ class TestWfsAnalysis:
 
         # Verify metadata was stored in the database
         res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
-        assert json.loads(res["wfs_metadata"]) == expected_metadata
+        assert json.loads(res["ogc_metadata"]) == expected_metadata
         assert res["parsing_started_at"] is not None
         assert res["parsing_finished_at"] is not None
 
@@ -116,15 +117,15 @@ class TestWfsAnalysis:
         check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
 
         with (
-            patch("udata_hydra.analysis.wfs.config") as mock_config,
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
             patch(
-                "udata_hydra.analysis.wfs.WebFeatureService",
+                "udata_hydra.analysis.ogc.WebFeatureService",
                 side_effect=RequestsConnectionError("Connection failed"),
             ),
-            patch("udata_hydra.analysis.wfs.helpers.notify_udata", new_callable=AsyncMock) as mock_notify,
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock) as mock_notify,
         ):
-            mock_config.WFS_ANALYSIS_ENABLED = True
-            result = await analyse_wfs(check)
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            result = await analyse_ogc(check)
 
         assert result is None
 
@@ -162,12 +163,12 @@ class TestWfsAnalysis:
             return mock_wfs
 
         with (
-            patch("udata_hydra.analysis.wfs.config") as mock_config,
-            patch("udata_hydra.analysis.wfs.WebFeatureService", side_effect=wfs_side_effect),
-            patch("udata_hydra.analysis.wfs.helpers.notify_udata", new_callable=AsyncMock),
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch("udata_hydra.analysis.ogc.WebFeatureService", side_effect=wfs_side_effect),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
         ):
-            mock_config.WFS_ANALYSIS_ENABLED = True
-            result = await analyse_wfs(check)
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            result = await analyse_ogc(check)
 
         assert result is not None
         # second version tested
@@ -181,14 +182,15 @@ class TestWfsAnalysis:
         mock_wfs.getOperationByName.return_value = None
 
         with (
-            patch("udata_hydra.analysis.wfs.config") as mock_config,
-            patch("udata_hydra.analysis.wfs.WebFeatureService", return_value=mock_wfs),
-            patch("udata_hydra.analysis.wfs.helpers.notify_udata", new_callable=AsyncMock),
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch("udata_hydra.analysis.ogc.WebFeatureService", return_value=mock_wfs),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
         ):
-            mock_config.WFS_ANALYSIS_ENABLED = True
-            result = await analyse_wfs(check)
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            result = await analyse_ogc(check)
 
         assert result == {
+            "format": "wfs",
             "version": "2.0.0",
             "feature_types": [],
             "output_formats": [],

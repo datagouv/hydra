@@ -1,4 +1,4 @@
--- Add WFS metadata column to checks table
+-- Add OGC metadata column to checks table
 
 ALTER TABLE checks
-    ADD COLUMN wfs_metadata JSONB;
+    ADD COLUMN ogc_metadata JSONB;

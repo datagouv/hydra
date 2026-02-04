@@ -12,7 +12,7 @@ from udata_hydra import config, context
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.analysis.geojson import analyse_geojson
 from udata_hydra.analysis.parquet import analyse_parquet
-from udata_hydra.analysis.wfs import analyse_wfs
+from udata_hydra.analysis.ogc import analyse_ogc
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -25,7 +25,7 @@ from udata_hydra.utils import (
     detect_geojson_from_headers,
     detect_parquet_from_headers,
     detect_tabular_from_headers,
-    detect_wfs,
+    detect_ogc,
     download_resource,
     queue,
     send,
@@ -78,9 +78,9 @@ async def analyse_resource(
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
     change_status, change_payload = await detect_resource_change_on_early_hints(resource)
 
-    # could it be a CSV, parquet, GeoJSON or WFS?
+    # could it be a CSV, parquet, GeoJSON or OGC service (WFS)?
     # If we get hints, we will analyse the file further depending on change status
-    is_tabular, is_geojson, is_parquet, is_wfs = False, False, False, False
+    is_tabular, is_geojson, is_parquet, is_ogc = False, False, False, False
     is_tabular, file_format = detect_tabular_from_headers(check)
     if not is_tabular:
         # getting the format from the catalog in priority
@@ -99,9 +99,9 @@ async def analyse_resource(
             if is_parquet:
                 file_format = "parquet"
         if not is_geojson and not is_parquet:
-            is_wfs = config.WFS_ANALYSIS_ENABLED and detect_wfs(check, row["format"])
-            if is_wfs:
-                file_format = "wfs"
+            is_ogc = config.OGC_ANALYSIS_ENABLED and detect_ogc(check, row["format"])
+            if is_ogc:
+                file_format = "ogc"
 
     max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
 
@@ -192,10 +192,10 @@ async def analyse_resource(
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
-        elif is_wfs:
-            await Resource.update(resource_id, data={"status": "TO_ANALYSE_WFS"})
+        elif is_ogc:
+            await Resource.update(resource_id, data={"status": "TO_ANALYSE_OGC"})
             queue.enqueue(
-                analyse_wfs,
+                analyse_ogc,
                 check=check,
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),

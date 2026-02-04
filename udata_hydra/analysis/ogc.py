@@ -20,18 +20,20 @@ class WfsFeatureType(TypedDict):
     other_crs: list[str]
 
 
-class WfsMetadata(TypedDict):
+class OgcMetadata(TypedDict):
+    format: str
     version: str
     feature_types: list[WfsFeatureType]
     output_formats: list[str]
 
 
-async def analyse_wfs(check: dict) -> WfsMetadata | None:
+async def analyse_ogc(check: dict) -> OgcMetadata | None:
     """
-    Analyse a WFS endpoint and extract metadata.
+    Analyse an OGC endpoint and extract metadata.
 
-    Connects to the WFS service, retrieves GetCapabilities, and extracts:
-    - Service version
+    Currently supports WFS. Connects to the service, retrieves GetCapabilities,
+    and extracts:
+    - Service format and version
     - Available feature types with their CRS options
     - Supported output formats
 
@@ -42,21 +44,21 @@ async def analyse_wfs(check: dict) -> WfsMetadata | None:
     Returns:
         The extracted metadata dictionary, or None if analysis is disabled or fails
     """
-    if not config.WFS_ANALYSIS_ENABLED:
-        log.debug("WFS_ANALYSIS_ENABLED turned off, skipping.")
+    if not config.OGC_ANALYSIS_ENABLED:
+        log.debug("OGC_ANALYSIS_ENABLED turned off, skipping.")
         return None
 
     url = check["url"]
     resource_id = check.get("resource_id")
     check_id = check.get("id")
 
-    log.debug(f"Starting WFS analysis for {url}")
+    log.debug(f"Starting OGC analysis for {url}")
 
     resource: Record | None = None
     if resource_id:
-        resource = await Resource.update(str(resource_id), {"status": "ANALYSING_WFS"})
+        resource = await Resource.update(str(resource_id), {"status": "ANALYSING_OGC"})
 
-    metadata: WfsMetadata | None = None
+    metadata: OgcMetadata | None = None
     try:
         if check_id:
             check = await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
@@ -67,7 +69,7 @@ async def analyse_wfs(check: dict) -> WfsMetadata | None:
         connection_error = None
         for v in ["2.0.0", "1.1.0", "1.0.0"]:
             try:
-                wfs = WebFeatureService(url, version=v, timeout=config.WFS_GETCAPABILITIES_TIMEOUT)
+                wfs = WebFeatureService(url, version=v, timeout=config.OGC_GETCAPABILITIES_TIMEOUT)
                 version = v
                 break
             except Exception as e:
@@ -87,6 +89,7 @@ async def analyse_wfs(check: dict) -> WfsMetadata | None:
         # Extract service metadata
         try:
             metadata = {
+                "format": "wfs",
                 "version": version,
                 "feature_types": [],
                 "output_formats": [],
@@ -128,12 +131,12 @@ async def analyse_wfs(check: dict) -> WfsMetadata | None:
                 check_id,
                 {
                     "parsing_finished_at": datetime.now(timezone.utc),
-                    "wfs_metadata": metadata,
+                    "ogc_metadata": metadata,
                 },
             )
 
         log.debug(
-            f"WFS analysis complete for {url}: "
+            f"OGC analysis complete for {url}: "
             f"{len(metadata['feature_types'])} feature types found"
         )
 
@@ -143,7 +146,7 @@ async def analyse_wfs(check: dict) -> WfsMetadata | None:
         if check_id:
             check = await handle_parse_exception(e, None, check)
         else:
-            log.error(f"WFS analysis failed for {url}: {e}")
+            log.error(f"OGC analysis failed for {url}: {e}")
         return None
 
     finally:
