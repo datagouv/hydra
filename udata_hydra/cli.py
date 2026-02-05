@@ -629,8 +629,9 @@ async def _analyse_ogc_cli(
     if not check:
         return
 
-    # Temporarily enable OGC analysis for CLI
-    config.override(OGC_ANALYSIS_ENABLED=True)
+    if not config.OGC_ANALYSIS_ENABLED:
+        log.warning("Temporarily enabling OGC analysis for CLI")
+        config.override(OGC_ANALYSIS_ENABLED=True)
 
     result = await analyse_ogc(check=check)
     if result:

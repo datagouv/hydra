@@ -11,8 +11,8 @@ from dateparser import parse as date_parser
 from udata_hydra import config, context
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.analysis.geojson import analyse_geojson
-from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.analysis.ogc import analyse_ogc
+from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -23,9 +23,9 @@ from udata_hydra.utils import (
     UdataPayload,
     compute_checksum_from_file,
     detect_geojson_from_headers,
+    detect_ogc,
     detect_parquet_from_headers,
     detect_tabular_from_headers,
-    detect_ogc,
     download_resource,
     queue,
     send,

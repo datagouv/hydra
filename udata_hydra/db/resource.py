@@ -27,6 +27,8 @@ class Resource:
         "CONVERTING_TO_GEOJSON": "csv is currently being converted to geojson",
         "TO_ANALYSE_PARQUET": "parquet resource content to be analysed",
         "ANALYSING_PARQUET": "retrieving parquet column metadata",
+        "TO_ANALYSE_OGC": "OGC service to be analysed",
+        "ANALYSING_OGC": "retrieving OGC service metadata",
     }
 
     @classmethod
