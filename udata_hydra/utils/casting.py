@@ -34,11 +34,21 @@ def generate_records(
             if line:
                 if not as_dict:
                     yield [
-                        smart_cast(_type, value, cast_json=cast_json, failsafe=False)
+                        smart_cast(
+                            _type,
+                            value if isinstance(value, str) or value is None else str(value),
+                            cast_json=cast_json,
+                            failsafe=False,
+                        )
                         for _type, value in zip(columns.values(), line)
                     ]
                 else:
                     yield {
-                        col: smart_cast(_type, value, cast_json=cast_json, failsafe=False)
+                        col: smart_cast(
+                            _type,
+                            value if isinstance(value, str) or value is None else str(value),
+                            cast_json=cast_json,
+                            failsafe=False,
+                        )
                         for (col, _type), value in zip(columns.items(), line)
                     }
