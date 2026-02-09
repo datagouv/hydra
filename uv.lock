@@ -447,7 +447,7 @@ wheels = [
 
 [[package]]
 name = "csv-detective"
-version = "0.10.2"
+version = "0.10.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dateparser" },
@@ -466,7 +466,7 @@ dependencies = [
     { name = "xlrd" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/6a/89e190786647892c3a456068ede77bd080208ae20feb4e6867783a659737/csv_detective-0.10.2-py3-none-any.whl", hash = "sha256:9fd8fe1bc555ef530f8ad1126a41526cd55b31002f601269851cfb6e6082c66c", size = 148930, upload-time = "2026-01-16T16:02:16.564Z" },
+    { url = "https://files.pythonhosted.org/packages/35/6b/48bc17d779529c835b66d77a3f67975e579e5e13bd1258dd8a8bf1bd416b/csv_detective-0.10.4-py3-none-any.whl", hash = "sha256:cd1087be2e3c6568d03b8e9b6257615ed6027fe7e3113c0b716308ffc131927f", size = 150506, upload-time = "2026-02-09T11:37:03.918Z" },
 ]
 
 [[package]]
@@ -963,12 +963,12 @@ wheels = [
 ]
 
 [[package]]
-name = "nest-asyncio"
-version = "1.6.0"
+name = "nest-asyncio2"
+version = "1.7.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/83/f8/51569ac65d696c8ecbee95938f89d4abf00f47d58d48f6fbabfe8f0baefe/nest_asyncio-1.6.0.tar.gz", hash = "sha256:6f172d5449aca15afd6c646851f4e31e02c598d553a667e38cafa997cfec55fe", size = 7418, upload-time = "2024-01-21T14:25:19.227Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2d/eb/ecf8bbf9d22a4e8f7be1628336fe0202da7660790053aa28abeb6c15eb14/nest_asyncio2-1.7.1.tar.gz", hash = "sha256:a1fe5bbbd20894dcceb1842322d74992c5834d5ab692af2c4f59a9a4fcf75fe8", size = 13797, upload-time = "2025-11-20T20:46:07.085Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a0/c4/c2971a3ba4c6103a3d10c4b0f24f461ddc027f0f09763220cf35ca1401b3/nest_asyncio-1.6.0-py3-none-any.whl", hash = "sha256:87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c", size = 5195, upload-time = "2024-01-21T14:25:17.223Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/48/c1f1ddcfd04bba60470235c2f83733ecff43ebe068dc7715aab60bc92ad8/nest_asyncio2-1.7.1-py3-none-any.whl", hash = "sha256:f83bc1744c3cfa7d47fd29431e5e168db6cb76eda1bb20108955c32f60d7eddf", size = 7504, upload-time = "2025-11-20T20:46:05.704Z" },
 ]
 
 [[package]]
@@ -1816,7 +1816,7 @@ dev = [
     { name = "aioresponses" },
     { name = "gunicorn" },
     { name = "mypy" },
-    { name = "nest-asyncio" },
+    { name = "nest-asyncio2" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -1829,7 +1829,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.10.3" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "coloredlogs", specifier = ">=15.0.1" },
-    { name = "csv-detective", specifier = "==0.10.2" },
+    { name = "csv-detective", specifier = "==0.10.4" },
     { name = "dateparser", specifier = ">=1.1.7" },
     { name = "humanfriendly", specifier = ">=10.0" },
     { name = "json-stream", specifier = ">=2.3.3" },
@@ -1853,7 +1853,7 @@ dev = [
     { name = "aioresponses", specifier = ">=0.7.3" },
     { name = "gunicorn", specifier = ">=20.1.0" },
     { name = "mypy", specifier = ">=1.11.0" },
-    { name = "nest-asyncio", specifier = ">=1.5.5" },
+    { name = "nest-asyncio2", specifier = ">=1.7.1" },
     { name = "pytest", specifier = ">=8.3.0" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
     { name = "pytest-cov", specifier = ">=5.0.0" },

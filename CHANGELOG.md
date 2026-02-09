@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.6.1 (2026-02-09)
+
+- Upgrade `csv-detective` ([#384](https://github.com/datagouv/hydra/pull/384))
+- Upgrade `csv-detective` ([#388](https://github.com/datagouv/hydra/pull/388))
+- Upgrade `csv-detective` to 0.10.4 ([#389](https://github.com/datagouv/hydra/pull/389))
+- Upgrade `csv-detective` to v0.10.3 ([#380](https://github.com/datagouv/hydra/pull/380))
+- chore: use nest-asyncio2 ([#379](https://github.com/datagouv/hydra/pull/379))
+- ci: use latest debian version for docker containers in CI ([#351](https://github.com/datagouv/hydra/pull/351))
+- clean: remove useless import
+- docs: refactor deprecated comment and remove TODO ([#383](https://github.com/datagouv/hydra/pull/383))
+- feat: add `/resources/stats` route and endpoint with CORS stats ([#381](https://github.com/datagouv/hydra/pull/381))
+- fix: fix typo in comment
+
+
+## 2.6.0 (2026-01-30)
+
+- feat: CORS probe ([#359](https://github.com/datagouv/hydra/pull/359))
+
+
+## 2.5.0 (2026-01-20)
+
+- Adapt to the new `csv-detective` output ([#369](https://github.com/datagouv/hydra/pull/369))
+- Better pick latitude/longitude columns when there are multiple options ([#376](https://github.com/datagouv/hydra/pull/376))
+- chore: move pyproject optional-dependencies to dependency-groups ([#368](https://github.com/datagouv/hydra/pull/368))
+- Fix stable resource URL syntax ([#375](https://github.com/datagouv/hydra/pull/375))
+- fix: unlink pmtiles once only ([#373](https://github.com/datagouv/hydra/pull/373))
+- Move file cleanup condition to the config ([#374](https://github.com/datagouv/hydra/pull/374))
+- refactor: refactor docker-compose files to use profiles ([#370](https://github.com/datagouv/hydra/pull/370))
+- Upgrade `csv-detective` ([#377](https://github.com/datagouv/hydra/pull/377))
+
+
 ## 2.4.5 (2026-01-12)
 
 - chore(rq): set failure ttl to 10 days ([#372](https://github.com/datagouv/hydra/pull/372))

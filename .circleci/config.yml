@@ -32,7 +32,7 @@ parameters:
 jobs:
   install:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-trixie
     steps:
       - checkout
       - run:
@@ -65,7 +65,7 @@ jobs:
 
   lint:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-trixie
     steps:
       - attach_workspace:
           at: .
@@ -80,8 +80,8 @@ jobs:
 
   tests:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
-      - image: cimg/postgres:15.13
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-trixie
+      - image: cimg/postgres:15.14
         environment:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
@@ -105,7 +105,7 @@ jobs:
 
   build:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm  # needs git for setuptools_scm
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-trixie  # needs git for setuptools_scm
     steps:
       - attach_workspace:
           at: .
@@ -143,7 +143,7 @@ jobs:
 
   publish:
     docker:
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-trixie
     steps:
       - attach_workspace:
           at: .
@@ -216,7 +216,7 @@ jobs:
   benchmark:
     docker:
       # Can't use a slim image here as we need libmagik to run the tests and git for commits
-      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-bookworm
+      - image: ghcr.io/astral-sh/uv:python<< pipeline.parameters.python-version >>-trixie
       - image: cimg/postgres:15.13
         environment:
           POSTGRES_DB: postgres
