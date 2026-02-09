@@ -18,7 +18,6 @@ log = logging.getLogger("udata-hydra")
 class WfsFeatureType(TypedDict):
     name: str
     default_crs: str | None
-    other_crs: list[str]
 
 
 class OgcMetadata(TypedDict):
@@ -108,16 +107,12 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
                 feature_type: WfsFeatureType = {
                     "name": name,
                     "default_crs": None,
-                    "other_crs": [],
                 }
 
-                # Extract CRS options
+                # Extract default CRS
                 crs_options = getattr(layer, "crsOptions", []) or []
                 if crs_options:
-                    crs_strings = [crs.getcode() for crs in crs_options]
-                    # owslib merges DefaultCRS (first position) and OtherCRS in the same list
-                    feature_type["default_crs"] = crs_strings[0] if crs_strings else None
-                    feature_type["other_crs"] = crs_strings[1:] if len(crs_strings) > 1 else []
+                    feature_type["default_crs"] = crs_options[0].getcode()
 
                 metadata["feature_types"].append(feature_type)
 

@@ -66,11 +66,8 @@ class TestOgcAnalysis:
 
         mock_crs_4326 = MagicMock()
         mock_crs_4326.getcode.return_value = "EPSG:4326"
-        mock_crs_3857 = MagicMock()
-        mock_crs_3857.getcode.return_value = "EPSG:3857"
-
         mock_layer = MagicMock()
-        mock_layer.crsOptions = [mock_crs_4326, mock_crs_3857]
+        mock_layer.crsOptions = [mock_crs_4326]
 
         mock_get_feature = MagicMock()
         mock_get_feature.parameters = {
@@ -97,7 +94,6 @@ class TestOgcAnalysis:
                 {
                     "name": "test:layer",
                     "default_crs": "EPSG:4326",
-                    "other_crs": ["EPSG:3857"],
                 }
             ],
             "output_formats": ["application/json", "text/xml"],
