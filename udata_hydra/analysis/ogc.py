@@ -10,6 +10,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import ParseException, handle_parse_exception
+from udata_hydra.utils.ogc import detect_feature_type_name
 
 log = logging.getLogger("udata-hydra")
 
@@ -25,6 +26,7 @@ class OgcMetadata(TypedDict):
     version: str
     feature_types: list[WfsFeatureType]
     output_formats: list[str]
+    detected_feature_type_name: str | None
 
 
 async def analyse_ogc(check: dict) -> OgcMetadata | None:
@@ -93,6 +95,7 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
                 "version": version,
                 "feature_types": [],
                 "output_formats": [],
+                "detected_feature_type_name": None,
             }
 
             # Get global output formats from GetFeature operation parameters
@@ -117,6 +120,18 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
                     feature_type["other_crs"] = crs_strings[1:] if len(crs_strings) > 1 else []
 
                 metadata["feature_types"].append(feature_type)
+
+            # Detect feature type name from URL params or resource title
+            resource_title = None
+            if resource_id:
+                resource_record = await Resource.get(str(resource_id), "title")
+                if resource_record:
+                    resource_title = resource_record["title"]
+            candidate = detect_feature_type_name(url, resource_title)
+            # Only keep the candidate if it matches one of the feature type names
+            if candidate and metadata["feature_types"]:
+                if candidate in [ft["name"] for ft in metadata["feature_types"]]:
+                    metadata["detected_feature_type_name"] = candidate
         except Exception as e:
             raise ParseException(
                 message=str(e),

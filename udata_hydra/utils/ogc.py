@@ -1,6 +1,9 @@
+import re
 from urllib.parse import parse_qs, urlparse
 
 from udata_hydra import config
+
+VALID_FEATURE_TYPE_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-.:]{1,100}$")
 
 
 def detect_ogc(check: dict, resource_format: str | None = None) -> bool:
@@ -46,3 +49,23 @@ def detect_ogc(check: dict, resource_format: str | None = None) -> bool:
             return True
 
     return False
+
+
+def is_valid_feature_type_name(name: str) -> bool:
+    """Check if a string looks like a valid OGC feature type name."""
+    return bool(VALID_FEATURE_TYPE_NAME_PATTERN.match(name))
+
+
+def detect_feature_type_name(url: str, resource_title: str | None = None) -> str | None:
+    """Detect feature type name from URL params (typeName/typeNames/typename) or resource title."""
+    parsed = urlparse(url)
+    query_params = parse_qs(parsed.query)
+    # Case-insensitive param lookup for typename/typeName/typeNames
+    for key, values in query_params.items():
+        if key.lower() in ("typename", "typenames"):
+            if values and is_valid_feature_type_name(values[0]):
+                return values[0]
+    # Fallback: resource title
+    if resource_title and is_valid_feature_type_name(resource_title):
+        return resource_title
+    return None

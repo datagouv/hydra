@@ -153,16 +153,17 @@ async def _load_catalog(
                     """
                     INSERT INTO catalog (
                         dataset_id, resource_id, url, type, format,
-                        harvest_modified_at, deleted, priority, status
+                        harvest_modified_at, title, deleted, priority, status
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NULL)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, FALSE, NULL)
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,
                         deleted = FALSE,
                         type = $4,
                         format = $5,
-                        harvest_modified_at = $6;
+                        harvest_modified_at = $6,
+                        title = $7;
                 """,
                     row["dataset.id"],
                     row["id"],
@@ -173,6 +174,7 @@ async def _load_catalog(
                     datetime.fromisoformat(row["harvest.modified_at"]).replace(tzinfo=timezone.utc)
                     if row["harvest.modified_at"]
                     else None,
+                    row["title"],
                 )
         log.info("Resources catalog successfully upserted into DB.")
         cleaned_count: int = await Resource.clean_up_statuses()

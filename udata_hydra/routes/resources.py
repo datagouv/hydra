@@ -52,6 +52,7 @@ async def create_resource(request: web.Request) -> web.Response:
         type=document["type"],
         format=document["format"],
         priority=True,
+        title=document["title"],
     )
 
     return web.json_response(ResourceDocumentSchema().dump(dict(document)), status=201)
@@ -83,6 +84,7 @@ async def update_resource(request: web.Request) -> web.Response:
         url=document["url"],
         type=document["type"],
         format=document["format"],
+        title=document["title"],
     )
 
     return web.json_response(ResourceDocumentSchema().dump(document), status=200)

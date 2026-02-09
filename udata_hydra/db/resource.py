@@ -46,6 +46,7 @@ class Resource:
         url: str,
         type: str,
         format: str,
+        title: str,
         status: str | None = None,
         priority: bool = True,
     ) -> Record | None:
@@ -56,8 +57,8 @@ class Resource:
         async with pool.acquire() as connection:
             # Insert new resource in catalog table and mark as high priority for crawling
             q = """
-                    INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, status, priority)
-                    VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7)
+                    INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, status, priority, title)
+                    VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8)
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,
@@ -65,10 +66,11 @@ class Resource:
                         format = $5,
                         deleted = FALSE,
                         status = $6,
-                        priority = $7
+                        priority = $7,
+                        title = $8
                     RETURNING *;"""
             return await connection.fetchrow(
-                q, dataset_id, resource_id, url, type, format, status, priority
+                q, dataset_id, resource_id, url, type, format, status, priority, title
             )
 
     @classmethod
@@ -97,6 +99,7 @@ class Resource:
         url: str,
         type: str,
         format: str,
+        title: str,
         status: str | None = None,
         priority: bool = True,  # Make resource high priority by default for crawling
     ) -> Record | None:
@@ -109,13 +112,13 @@ class Resource:
             if await Resource.get(resource_id):
                 q = """
                         UPDATE catalog
-                        SET dataset_id = $1, url = $3, type = $4, format=$5, status = $6, priority = $7
+                        SET dataset_id = $1, url = $3, type = $4, format=$5, status = $6, priority = $7, title = $8
                         WHERE resource_id = $2
                         RETURNING *;"""
             else:
                 q = """
-                        INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, status, priority)
-                        VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7)
+                        INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, status, priority, title)
+                        VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8)
                         ON CONFLICT (resource_id) DO UPDATE SET
                             dataset_id = $1,
                             url = $3,
@@ -123,10 +126,11 @@ class Resource:
                             format = $5,
                             deleted = FALSE,
                             status = $6,
-                            priority = $7
+                            priority = $7,
+                            title = $8
                         RETURNING *;"""
             return await connection.fetchrow(
-                q, dataset_id, resource_id, url, type, format, status, priority
+                q, dataset_id, resource_id, url, type, format, status, priority, title
             )
 
     @classmethod

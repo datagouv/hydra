@@ -8,7 +8,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.ogc import analyse_ogc
-from udata_hydra.utils.ogc import detect_ogc
+from udata_hydra.utils.ogc import detect_feature_type_name, detect_ogc, is_valid_feature_type_name
 
 log = logging.getLogger("udata-hydra")
 
@@ -101,6 +101,7 @@ class TestOgcAnalysis:
                 }
             ],
             "output_formats": ["application/json", "text/xml"],
+            "detected_feature_type_name": None,
         }
         assert result == expected_metadata
 
@@ -194,4 +195,95 @@ class TestOgcAnalysis:
             "version": "2.0.0",
             "feature_types": [],
             "output_formats": [],
+            "detected_feature_type_name": None,
         }
+
+    async def test_analyse_wfs_detected_feature_type_name_from_url(self, setup_catalog, db, fake_check):
+        """Feature type name from typeName URL param should be detected when it matches a feature type."""
+        check = await fake_check(
+            url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=ns:my_layer"
+        )
+
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = []
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {"ns:my_layer": mock_layer}
+        mock_wfs.getOperationByName.return_value = None
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch("udata_hydra.analysis.ogc.WebFeatureService", return_value=mock_wfs),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            result = await analyse_ogc(check)
+
+        assert result is not None
+        assert result["detected_feature_type_name"] == "ns:my_layer"
+
+    async def test_analyse_wfs_detected_feature_type_name_not_in_feature_types(
+        self, setup_catalog, db, fake_check
+    ):
+        """Feature type name from URL should be discarded if it doesn't match any feature type."""
+        check = await fake_check(
+            url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=ns:unknown"
+        )
+
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = []
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {"ns:other_layer": mock_layer}
+        mock_wfs.getOperationByName.return_value = None
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch("udata_hydra.analysis.ogc.WebFeatureService", return_value=mock_wfs),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            result = await analyse_ogc(check)
+
+        assert result is not None
+        assert result["detected_feature_type_name"] is None
+
+
+class TestFeatureTypeNameDetection:
+    """Tests for feature type name detection utilities"""
+
+    @pytest.mark.parametrize("name,expected", [
+        ("my_layer", True),
+        ("ns:my_layer", True),
+        ("Layer-1.0", True),
+        ("a" * 100, True),
+        ("a" * 101, False),
+        ("", False),
+        ("layer with spaces", False),
+        ("layer/path", False),
+        ("layer<script>", False),
+    ])
+    def test_is_valid_feature_type_name(self, name, expected):
+        assert is_valid_feature_type_name(name) is expected
+
+    @pytest.mark.parametrize("url,title,expected", [
+        # typeName param (various cases)
+        ("https://example.com/wfs?typeName=ns:layer", None, "ns:layer"),
+        ("https://example.com/wfs?TYPENAME=ns:layer", None, "ns:layer"),
+        ("https://example.com/wfs?TypeName=ns:layer", None, "ns:layer"),
+        # typeNames param
+        ("https://example.com/wfs?typeNames=ns:layer", None, "ns:layer"),
+        ("https://example.com/wfs?TYPENAMES=ns:layer", None, "ns:layer"),
+        # No param, fallback to title
+        ("https://example.com/wfs", "my_layer", "my_layer"),
+        # No param, invalid title
+        ("https://example.com/wfs", "My Layer With Spaces", None),
+        # No param, no title
+        ("https://example.com/wfs", None, None),
+        # Invalid param value
+        ("https://example.com/wfs?typeName=invalid layer!", None, None),
+        # Param takes precedence over title
+        ("https://example.com/wfs?typeName=ns:layer", "other_layer", "ns:layer"),
+    ])
+    def test_detect_feature_type_name(self, url, title, expected):
+        assert detect_feature_type_name(url, title) == expected
