@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.6.1 (2026-02-09)
+
+- Upgrade `csv-detective` ([#384](https://github.com/datagouv/hydra/pull/384))
+- Upgrade `csv-detective` ([#388](https://github.com/datagouv/hydra/pull/388))
+- Upgrade `csv-detective` to 0.10.4 ([#389](https://github.com/datagouv/hydra/pull/389))
+- Upgrade `csv-detective` to v0.10.3 ([#380](https://github.com/datagouv/hydra/pull/380))
+- chore: use nest-asyncio2 ([#379](https://github.com/datagouv/hydra/pull/379))
+- ci: use latest debian version for docker containers in CI ([#351](https://github.com/datagouv/hydra/pull/351))
+- clean: remove useless import
+- docs: refactor deprecated comment and remove TODO ([#383](https://github.com/datagouv/hydra/pull/383))
+- feat: add `/resources/stats` route and endpoint with CORS stats ([#381](https://github.com/datagouv/hydra/pull/381))
+- fix: fix typo in comment
+
+
 ## 2.6.0 (2026-01-30)
 
 - feat: CORS probe ([#359](https://github.com/datagouv/hydra/pull/359))
