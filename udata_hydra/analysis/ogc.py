@@ -10,12 +10,12 @@ from udata_hydra.analysis import helpers
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import ParseException, handle_parse_exception
-from udata_hydra.utils.ogc import detect_feature_type_name
+from udata_hydra.utils.ogc import detect_layer_name
 
 log = logging.getLogger("udata-hydra")
 
 
-class WfsFeatureType(TypedDict):
+class OgcLayer(TypedDict):
     name: str
     default_crs: str | None
 
@@ -23,9 +23,9 @@ class WfsFeatureType(TypedDict):
 class OgcMetadata(TypedDict):
     format: str
     version: str
-    feature_types: list[WfsFeatureType]
+    layers: list[OgcLayer]
     output_formats: list[str]
-    detected_feature_type_name: str | None
+    detected_layer_name: str | None
 
 
 async def analyse_ogc(check: dict) -> OgcMetadata | None:
@@ -35,7 +35,7 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
     Currently supports WFS. Connects to the service, retrieves GetCapabilities,
     and extracts:
     - Service format and version
-    - Available feature types with their CRS options
+    - Available layers with their CRS options
     - Supported output formats
 
     Args:
@@ -92,9 +92,9 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
             metadata = {
                 "format": "wfs",
                 "version": version,
-                "feature_types": [],
+                "layers": [],
                 "output_formats": [],
-                "detected_feature_type_name": None,
+                "detected_layer_name": None,
             }
 
             # Get global output formats from GetFeature operation parameters
@@ -102,9 +102,9 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
             if get_feature_op and (output_formats := get_feature_op.parameters.get("outputFormat")):
                 metadata["output_formats"] = list(output_formats.get("values") or [])
 
-            # Extract feature type information
+            # Extract layer information
             for name, layer in wfs.contents.items():
-                feature_type: WfsFeatureType = {
+                ogc_layer: OgcLayer = {
                     "name": name,
                     "default_crs": None,
                 }
@@ -112,21 +112,21 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
                 # Extract default CRS
                 crs_options = getattr(layer, "crsOptions", []) or []
                 if crs_options:
-                    feature_type["default_crs"] = crs_options[0].getcode()
+                    ogc_layer["default_crs"] = crs_options[0].getcode()
 
-                metadata["feature_types"].append(feature_type)
+                metadata["layers"].append(ogc_layer)
 
-            # Detect feature type name from URL params or resource title
+            # Detect layer name from URL params or resource title
             resource_title = None
             if resource_id:
                 resource_record = await Resource.get(str(resource_id), "title")
                 if resource_record:
                     resource_title = resource_record["title"]
-            candidate = detect_feature_type_name(url, resource_title)
-            # Only keep the candidate if it matches one of the feature type names
-            if candidate and metadata["feature_types"]:
-                if candidate in [ft["name"] for ft in metadata["feature_types"]]:
-                    metadata["detected_feature_type_name"] = candidate
+            candidate = detect_layer_name(url, resource_title)
+            # Only keep the candidate if it matches one of the layer names
+            if candidate and metadata["layers"]:
+                if candidate in [layer["name"] for layer in metadata["layers"]]:
+                    metadata["detected_layer_name"] = candidate
         except Exception as e:
             raise ParseException(
                 message=str(e),
@@ -147,7 +147,7 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
 
         log.debug(
             f"OGC analysis complete for {url}: "
-            f"{len(metadata['feature_types'])} feature types found"
+            f"{len(metadata['layers'])} layers found"
         )
 
         return metadata
