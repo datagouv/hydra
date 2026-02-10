@@ -194,9 +194,10 @@ async def setup_catalog_with_resource_exception(setup_catalog):
     await Resource.insert(
         dataset_id=DATASET_ID,
         resource_id=RESOURCE_EXCEPTION_ID,
+        url="http://example.com/",
         type="main",
         format="csv",
-        url="http://example.com/",
+        title="Exception resource",
     )
     await ResourceException.insert(
         resource_id=RESOURCE_EXCEPTION_ID,
@@ -244,6 +245,7 @@ async def insert_fake_resource():
             url=RESOURCE_URL,
             type="main",
             format="csv",
+            title="Fake resource",
             status=status,
             priority=True,
         )
