@@ -910,18 +910,20 @@ async def _insert_resource_into_catalog(resource_id: str):
         await conn.execute(
             """
             INSERT INTO catalog (
-                dataset_id, resource_id, url, harvest_modified_at,
+                dataset_id, resource_id, url, title, harvest_modified_at,
                 deleted, priority, status
             )
-            VALUES ($1, $2, $3, $4, FALSE, FALSE, NULL)
+            VALUES ($1, $2, $3, $4, $5, FALSE, FALSE, NULL)
             ON CONFLICT (resource_id) DO UPDATE SET
                 dataset_id = $1,
                 url = $3,
+                title = $4,
                 deleted = FALSE;
             """,
             resource["dataset_id"],
             resource["resource"]["id"],
             resource["resource"]["url"],
+            resource["resource"].get("title"),
             # force timezone info to UTC (catalog data should be in UTC)
             datetime.fromisoformat(resource["resource"]["harvest"]["modified_at"]).replace(
                 tzinfo=timezone.utc
