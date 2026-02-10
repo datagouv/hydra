@@ -125,8 +125,16 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
             candidate = detect_layer_name(url, resource_title)
             # Only keep the candidate if it matches one of the layer names
             if candidate and metadata["layers"]:
-                if candidate in [layer["name"] for layer in metadata["layers"]]:
+                layer_names = [layer["name"] for layer in metadata["layers"]]
+                if candidate in layer_names:
+                    # Exact match (including namespace)
                     metadata["detected_layer_name"] = candidate
+                else:
+                    # Try matching against local name (without namespace prefix),
+                    # but only if there's exactly one match to avoid ambiguity
+                    matches = [n for n in layer_names if n.split(":")[-1] == candidate]
+                    if len(matches) == 1:
+                        metadata["detected_layer_name"] = matches[0]
         except Exception as e:
             raise ParseException(
                 message=str(e),

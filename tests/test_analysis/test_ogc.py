@@ -244,6 +244,58 @@ class TestOgcAnalysis:
         assert result is not None
         assert result["detected_layer_name"] is None
 
+    async def test_analyse_wfs_detected_layer_name_namespace_fallback(
+        self, setup_catalog, db, fake_check
+    ):
+        """Layer name without namespace should match a namespaced layer if unambiguous."""
+        check = await fake_check(
+            url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=my_layer"
+        )
+
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = []
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {"ns:my_layer": mock_layer}
+        mock_wfs.getOperationByName.return_value = None
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch("udata_hydra.analysis.ogc.WebFeatureService", return_value=mock_wfs),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            result = await analyse_ogc(check)
+
+        assert result is not None
+        assert result["detected_layer_name"] == "ns:my_layer"
+
+    async def test_analyse_wfs_detected_layer_name_namespace_ambiguous(
+        self, setup_catalog, db, fake_check
+    ):
+        """Layer name without namespace should not match if multiple namespaced layers share the same local name."""
+        check = await fake_check(
+            url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=my_layer"
+        )
+
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = []
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {"ns1:my_layer": mock_layer, "ns2:my_layer": mock_layer}
+        mock_wfs.getOperationByName.return_value = None
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch("udata_hydra.analysis.ogc.WebFeatureService", return_value=mock_wfs),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            result = await analyse_ogc(check)
+
+        assert result is not None
+        assert result["detected_layer_name"] is None
+
 
 class TestLayerNameDetection:
     """Tests for layer name detection utilities"""
