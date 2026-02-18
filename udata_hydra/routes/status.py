@@ -90,7 +90,7 @@ async def get_crawler_status(request: web.Request) -> web.Response:
 
 
 async def get_worker_status(request: web.Request) -> web.Response:
-    res = {"queued": {q: len(context.queue(q)) for q in QUEUES}}
+    res = {"queued": {q: (len(q_obj) if (q_obj := context.queue(q)) else 0) for q in QUEUES}}
     return web.json_response(res)
 
 

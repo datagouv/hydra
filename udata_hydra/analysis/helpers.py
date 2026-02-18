@@ -17,7 +17,7 @@ def get_python_type(column: dict) -> str:
 
 
 async def read_or_download_file(
-    check: dict,
+    check: Record | dict,
     file_path: str | None,
     file_format: str,
     exception: Record | None,
