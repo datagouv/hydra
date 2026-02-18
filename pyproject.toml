@@ -76,13 +76,7 @@ markers = [
 addopts = "--cov=udata_hydra --cov-report term-missing --cov-branch --cov-fail-under=80"
 
 [tool.ty]
-# Ty does not support "ignore diagnostics when the definition is in site-packages".
-# It already excludes .venv from type-checked files; diagnostics are still reported in our code
-# when we call external APIs (pytest, aiohttp, etc.) whose stubs don't match.
-# Relax rules in tests that often fire for those external-call patterns.
-[[tool.ty.overrides]]
-include = ["tests/**"]
-[tool.ty.overrides.rules]
+[tool.ty.rules]
 invalid-argument-type = "ignore"
 parameter-already-assigned = "ignore"
 
