@@ -199,7 +199,7 @@ async def test_last_modified_header(args):
 )
 async def test_harvest(args):
     previous_check, current_check, resource, expected_result = args
-    data = [current_check, previous_check] if previous_check else [current_check]
+    data = (current_check, previous_check) if previous_check else (current_check)
     res = await detect_resource_change_from_harvest(data, resource)
     assert res == expected_result
 
