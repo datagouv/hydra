@@ -18,7 +18,7 @@ def get_python_type(column: dict) -> str:
 
 async def read_or_download_file(
     check: dict,
-    file_path: str,
+    file_path: str | None,
     file_format: str,
     exception: Record | None,
 ) -> IO[bytes]:
@@ -35,8 +35,10 @@ async def read_or_download_file(
         return tmp_file
 
 
-async def notify_udata(resource: Record, check: dict) -> None:
+async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:
     """Notify udata of the result of a parsing"""
+    if check is None or resource is None:
+        return
     payload = {
         "resource_id": check["resource_id"],
         "dataset_id": resource["dataset_id"],

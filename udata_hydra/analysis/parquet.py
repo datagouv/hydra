@@ -49,7 +49,7 @@ RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin"
 
 
 async def analyse_parquet(
-    check: dict,
+    check: Record | dict,
     file_path: str | None = None,
     debug_insert: bool = False,
 ) -> None:
@@ -76,6 +76,7 @@ async def analyse_parquet(
     assert any(_ is not None for _ in (check["id"], url))
 
     table_name, tmp_file = None, None
+    current_check: Record | None = None
     try:
         tmp_file = await helpers.read_or_download_file(
             check=check,
@@ -86,7 +87,9 @@ async def analyse_parquet(
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         timer.mark("download-file")
 
-        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
+        current_check = await Check.update(
+            check["id"], {"parsing_started_at": datetime.now(timezone.utc)}
+        )
 
         # open the file and read the metadata
         try:
@@ -122,7 +125,7 @@ async def analyse_parquet(
                 step="parquet_analysis",
                 resource_id=resource_id,
                 url=url,
-                check_id=check["id"],
+                check_id=current_check["id"] if current_check else None,
             ) from e
         timer.mark("parquet-analysis")
 
@@ -134,21 +137,24 @@ async def analyse_parquet(
             resource_id=resource_id,
             debug_insert=debug_insert,
         )
-        check = await Check.update(check["id"], {"parsing_table": table_name})
+        if current_check is not None:
+            current_check = await Check.update(current_check["id"], {"parsing_table": table_name})
         timer.mark("parquet-to-db")
 
-        check = await Check.update(
-            check["id"],
-            {
-                "parsing_finished_at": datetime.now(timezone.utc),
-            },
-        )
-        await parquet_to_db_index(table_name, inspection, check, dataset_id)
+        if current_check is not None:
+            current_check = await Check.update(
+                current_check["id"],
+                {
+                    "parsing_finished_at": datetime.now(timezone.utc),
+                },
+            )
+        if current_check is not None:
+            await parquet_to_db_index(table_name, inspection, current_check, dataset_id or "")
 
     except (ParseException, IOException) as e:
-        check = await handle_parse_exception(e, table_name, check)
+        current_check = await handle_parse_exception(e, table_name, current_check)
     finally:
-        await helpers.notify_udata(resource, check)
+        await helpers.notify_udata(resource, current_check)
         timer.stop()
         if tmp_file is not None:
             tmp_file.close()

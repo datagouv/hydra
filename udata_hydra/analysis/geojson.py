@@ -3,7 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, cast
 
 import tippecanoe
 from asyncpg import Record
@@ -38,7 +38,7 @@ minio_client_geojson = MinIOClient(
 
 
 async def analyse_geojson(
-    check: dict,
+    check: Record | dict,
     file_path: str | None = None,
 ) -> None:
     """Launch GeoJSON analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
@@ -59,6 +59,7 @@ async def analyse_geojson(
     assert any(_ is not None for _ in (check["id"], url))
 
     tmp_file = None
+    current_check: Record | None = None
     try:
         tmp_file = await helpers.read_or_download_file(
             check=check,
@@ -68,7 +69,9 @@ async def analyse_geojson(
         )
         timer.mark("download-file")
 
-        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
+        current_check = await Check.update(
+            check["id"], {"parsing_started_at": datetime.now(timezone.utc)}
+        )
 
         # Convert to PMTiles
         try:
@@ -85,22 +88,23 @@ async def analyse_geojson(
                 step="pmtiles_export",
                 resource_id=resource_id,
                 url=url,
-                check_id=check["id"],
+                check_id=current_check["id"] if current_check else None,
             ) from e
 
-        check = await Check.update(
-            check["id"],
-            {
-                "parsing_finished_at": datetime.now(timezone.utc),
-                "pmtiles_url": pmtiles_url,
-                "pmtiles_size": pmtiles_size,
-            },
-        )
+        if current_check is not None:
+            current_check = await Check.update(
+                current_check["id"],
+                {
+                    "parsing_finished_at": datetime.now(timezone.utc),
+                    "pmtiles_url": pmtiles_url,
+                    "pmtiles_size": pmtiles_size,
+                },
+            )
 
     except (ParseException, IOException) as e:
-        check = await handle_parse_exception(e, None, check)
+        current_check = await handle_parse_exception(e, None, current_check)
     finally:
-        await helpers.notify_udata(resource, check)
+        await helpers.notify_udata(resource, current_check)
         timer.stop()
         if tmp_file is not None:
             tmp_file.close()
@@ -144,6 +148,7 @@ async def csv_to_geojson(
         file_path: str, inspection: dict, geo: dict[str, Any]
     ) -> Iterator[dict[str, Any]]:
         for row in generate_records(file_path, inspection, cast_json=False, as_dict=True):
+            row = cast(dict[str, Any], row)
             if "geojson" in geo:
                 yield {
                     "type": "Feature",
@@ -323,13 +328,14 @@ async def csv_to_geojson_and_pmtiles(
         return None
     geojson_size, geojson_url = result
 
-    await Check.update(
-        check_id,
-        {
-            "geojson_url": geojson_url,
-            "geojson_size": geojson_size,
-        },
-    )
+    if check_id is not None:
+        await Check.update(
+            check_id,
+            {
+                "geojson_url": geojson_url,
+                "geojson_size": geojson_size,
+            },
+        )
 
     # Update resource status for PMTiles conversion
     if resource_id:
@@ -338,13 +344,14 @@ async def csv_to_geojson_and_pmtiles(
     # Convert GeoJSON to PMTiles
     pmtiles_size, pmtiles_url = await geojson_to_pmtiles(geojson_filepath, pmtiles_filepath)
 
-    await Check.update(
-        check_id,
-        {
-            "pmtiles_url": pmtiles_url,
-            "pmtiles_size": pmtiles_size,
-        },
-    )
+    if check_id is not None:
+        await Check.update(
+            check_id,
+            {
+                "pmtiles_url": pmtiles_url,
+                "pmtiles_size": pmtiles_size,
+            },
+        )
 
     if config.REMOVE_GENERATED_FILES:
         geojson_filepath.unlink()

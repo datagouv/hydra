@@ -111,7 +111,7 @@ class IOException(ExceptionWithSentryDetails):
 
 
 async def handle_parse_exception(
-    e: IOException | ParseException, table_name: str | None, check: Record | None
+    e: IOException | ParseException, table_name: str | None, check: Record | dict | None
 ) -> Record | None:
     """Specific IO/ParseException handling. Store error in :check: if in a check context. Also cleanup :table_name: if needed."""
     if table_name is not None and (check and not check.get("parsing_table")):
