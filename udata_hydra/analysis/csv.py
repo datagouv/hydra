@@ -216,7 +216,7 @@ async def analyse_csv(
             )
 
     except (ParseException, IOException) as e:
-        current_check = await handle_parse_exception(e, table_name, current_check)
+        current_check = await handle_parse_exception(e, table_name, current_check or check)
     finally:
         await helpers.notify_udata(resource, current_check)
         timer.stop()
