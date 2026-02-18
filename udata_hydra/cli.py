@@ -12,6 +12,7 @@ from typing import Any, Coroutine
 
 import aiohttp
 import asyncpg
+import pandas as pd
 import typer
 from asyncpg import Record
 from humanfriendly import parse_size
@@ -476,7 +477,7 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
     log.info("Analyzing CSV structure...")
     try:
         # csv_detective handles encoding detection automatically
-        inspection, df = csv_detective_routine(
+        routine_result = csv_detective_routine(
             file_path=str(csv_path),
             output_profile=True,
             output_df=True,
@@ -485,9 +486,18 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
             save_results=False,
             verbose=True,
         )
+        inspection = routine_result[0] if isinstance(routine_result, tuple) else routine_result
+        df = (
+            routine_result[1]
+            if isinstance(routine_result, tuple) and len(routine_result) > 1
+            else None
+        )
 
-        log.info(f"CSV analysis complete. Found {len(df)} rows and {len(df.columns)} columns")
-        log.info(f"Columns: {list(df.columns)}")
+        if isinstance(df, pd.DataFrame):
+            log.info(f"CSV analysis complete. Found {len(df)} rows and {len(df.columns)} columns")
+            log.info(f"Columns: {list(df.columns)}")
+        else:
+            log.info("CSV analysis complete.")
 
         # Show column formats for debugging
         log.info("Column formats detected:")
@@ -500,7 +510,7 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
         try:
             # Convert to GeoJSON (no MinIO upload, no database updates)
             result = await csv_to_geojson(
-                df=df,
+                file_path=str(csv_path),
                 inspection=inspection,
                 output_file_path=geojson_filepath,
                 upload_to_minio=False,
