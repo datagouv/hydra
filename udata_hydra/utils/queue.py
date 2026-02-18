@@ -15,4 +15,5 @@ def enqueue(fn, *args, **kwargs):
     priority = kwargs.pop("_priority", "default")
     exception = kwargs.pop("_exception", False)
     failure_ttl = config.RQ_DEFAULT_FAILURE_TTL
-    return context.queue(priority, exception).enqueue(fn, *args, **kwargs, failure_ttl=failure_ttl)
+    q = context.queue(priority, exception)
+    return q.enqueue(fn, *args, **kwargs, failure_ttl=failure_ttl) if q is not None else None

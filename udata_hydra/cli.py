@@ -8,6 +8,7 @@ from asyncio import run as aiorun
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Any, Coroutine
 
 import aiohttp
 import asyncpg
@@ -782,7 +783,7 @@ async def _purge_checks(
 def purge_checks(
     retention_days: int = typer.Option(60, help="Number of days to keep checks"),
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
-) -> None:
+) -> Coroutine[Any, Any, None]:
     """Delete outdated checks that are more than `retention_days` days old"""
     return _make_async_wrapper(_purge_checks)(retention_days=retention_days, quiet=quiet)
 
@@ -854,7 +855,7 @@ async def _purge_csv_tables(
 def purge_csv_tables(
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
     hard_delete: bool = False,
-) -> None:
+) -> Coroutine[Any, Any, None]:
     """Delete converted CSV tables for resources url no longer in catalog"""
     return _make_async_wrapper(_purge_csv_tables)(quiet=quiet, hard_delete=hard_delete)
 
@@ -1028,7 +1029,7 @@ def purge_selected_csv_tables(
     retention_days: int | None = None,
     retention_tables: int | None = None,
     quiet: bool = False,
-) -> None:
+) -> Coroutine[Any, Any, None]:
     """Delete converted CSV tables either:
     - if they're more than retention_days days old
     - if they're not in the top retention_tables most recent
