@@ -84,7 +84,6 @@ addopts = "--cov=udata_hydra --cov-report term-missing --cov-branch --cov-fail-u
 include = ["tests/**"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
-too-many-positional-arguments = "ignore"
 not-subscriptable = "ignore"
 not-iterable = "ignore"
 
