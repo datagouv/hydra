@@ -224,6 +224,7 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
 
     # Assert foreign key is now None
     resource = await Resource.get(resource_id=RESOURCE_ID)
+    assert resource is not None
     assert resource["last_check"] is None
 
     # Test crawl is triggered
@@ -268,7 +269,7 @@ async def test_analyse_resource(setup_catalog, mocker, fake_check):
     check = await fake_check()
     await analyse_resource(check=check, last_check=None)
     result: Record | None = await Check.get_by_id(check["id"])
-
+    assert result is not None
     assert result["error"] is None
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
     assert result["filesize"] == len(SIMPLE_CSV_CONTENT)
@@ -728,6 +729,7 @@ async def test_wrong_url_in_catalog(
     setup_catalog, rmock, produce_mock, url_changed, catalog_content
 ):
     r = await Resource.get(RESOURCE_ID)
+    assert r is not None
     not_found_url = r["url"]
     new_url = "https://example.com/has-been-modified-lately"
     rmock.head(
@@ -856,6 +858,7 @@ async def test_no_change_update_check(fake_check, setup_catalog, produce_mock, r
     )
     # the file has not changed since last check
     r = await Resource.get(resource_id=RESOURCE_ID)
+    assert r is not None
     rmock.head(RESOURCE_URL, repeat=True, headers={"last-modified": last_modified})
     async with ClientSession() as session:
         await check_resource(url=r["url"], resource=r, session=session, force_analysis=False)

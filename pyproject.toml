@@ -84,7 +84,6 @@ addopts = "--cov=udata_hydra --cov-report term-missing --cov-branch --cov-fail-u
 include = ["tests/**"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
-not-subscriptable = "ignore"
 
 [tool.ruff]
 lint = { extend-select = ["I"] } # ["I"] is to also sort imports with an isort rule
