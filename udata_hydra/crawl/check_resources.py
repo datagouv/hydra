@@ -152,6 +152,9 @@ async def check_resource(
                     "response_time": end - start,
                 },
             )
+            if last_check is None:
+                # new  resource => we want to analyze quickly
+                worker_priority = "high"
 
             # Update resource status to TO_ANALYSE_RESOURCE
             await Resource.update(
