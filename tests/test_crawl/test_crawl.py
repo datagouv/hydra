@@ -809,7 +809,7 @@ async def test_reset_statuses(fake_check, db, setup_catalog, check_duration):
                 "check": ANY,
                 "last_check": ANY,
                 "force_analysis": False,
-                "worker_priority": "default",
+                "worker_priority": "high",
             },
             None,
         ),
