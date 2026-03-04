@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from aiohttp import web
 
@@ -10,6 +11,7 @@ from udata_hydra.utils import token_auth_middleware
 async def app_factory() -> web.Application:
     async def app_startup(app):
         app["pool"] = await context.pool()
+        app["started_at"] = datetime.now(datetime.UTC)
 
     async def app_cleanup(app):
         if "pool" in app:
