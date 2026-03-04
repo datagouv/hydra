@@ -162,6 +162,7 @@ async def get_health(request: web.Request) -> web.Response:
         {
             "version": config.APP_VERSION,
             "environment": config.ENVIRONMENT or "unknown",
+            "uptime_since": request.app["started_at"].isoformat(),
             "csv_analysis": config.CSV_ANALYSIS,
             "csv_to_db": config.CSV_TO_DB,
             "csv_to_parquet": config.CSV_TO_PARQUET,
