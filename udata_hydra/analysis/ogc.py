@@ -25,7 +25,7 @@ class OgcMetadata(TypedDict):
     version: str
     layers: list[OgcLayer]
     output_formats: list[str]
-    detected_layer_name: str | None
+    detected_layer: OgcLayer | None
 
 
 async def analyse_ogc(check: dict) -> OgcMetadata | None:
@@ -94,7 +94,7 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
                 "version": version,
                 "layers": [],
                 "output_formats": [],
-                "detected_layer_name": None,
+                "detected_layer": None,
             }
 
             # Get global output formats from GetFeature operation parameters
@@ -125,16 +125,22 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
             candidate = detect_layer_name(url, resource_title)
             # Only keep the candidate if it matches one of the layer names
             if candidate and metadata["layers"]:
-                layer_names = [layer["name"] for layer in metadata["layers"]]
-                if candidate in layer_names:
-                    # Exact match (including namespace)
-                    metadata["detected_layer_name"] = candidate
+                # Exact match (including namespace)
+                exact = next(
+                    (layer for layer in metadata["layers"] if layer["name"] == candidate), None
+                )
+                if exact:
+                    metadata["detected_layer"] = exact
                 else:
                     # Try matching against local name (without namespace prefix),
                     # but only if there's exactly one match to avoid ambiguity
-                    matches = [n for n in layer_names if n.split(":")[-1] == candidate]
+                    matches = [
+                        layer
+                        for layer in metadata["layers"]
+                        if layer["name"].split(":")[-1] == candidate
+                    ]
                     if len(matches) == 1:
-                        metadata["detected_layer_name"] = matches[0]
+                        metadata["detected_layer"] = matches[0]
         except Exception as e:
             raise ParseException(
                 message=str(e),
@@ -153,10 +159,7 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
                 },
             )
 
-        log.debug(
-            f"OGC analysis complete for {url}: "
-            f"{len(metadata['layers'])} layers found"
-        )
+        log.debug(f"OGC analysis complete for {url}: {len(metadata['layers'])} layers found")
 
         return metadata
 

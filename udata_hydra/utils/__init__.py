@@ -10,10 +10,10 @@ from .file import (
 )
 from .geojson import detect_geojson_from_headers
 from .http import UdataPayload, get_request_params, send
+from .ogc import detect_ogc
 from .parquet import detect_parquet_from_headers
 from .queue import enqueue
 from .timer import Timer
-from .ogc import detect_ogc
 
 __all__ = [
     "token_auth_middleware",

@@ -20,9 +20,9 @@ from progressist import ProgressBar
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, csv_detective_routine
 from udata_hydra.analysis.geojson import analyse_geojson, csv_to_geojson, geojson_to_pmtiles
+from udata_hydra.analysis.ogc import analyse_ogc
 from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.analysis.resource import analyse_resource
-from udata_hydra.analysis.ogc import analyse_ogc
 from udata_hydra.crawl.check_resources import (
     check_resource as crawl_check_resource,
 )
