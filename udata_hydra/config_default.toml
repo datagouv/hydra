@@ -63,6 +63,7 @@ MAX_FILESIZE_ALLOWED.xlsx = 13107200   # /8
 MAX_FILESIZE_ALLOWED.ods = 10485760    # /10
 MAX_FILESIZE_ALLOWED.geojson = 104857600
 MAX_FILESIZE_ALLOWED.parquet = 52428800
+MAX_FILESIZE_ALLOWED.ogc = 1048576     # 1 MB
 
 # -- CSV analysis settings -- #
 SQL_INDEXES_TYPES_SUPPORTED = ["index"]
@@ -106,3 +107,8 @@ MINIO_GEOJSON_FOLDER = "" # no trailing slash
 
 # -- Parquet analysis settings -- #
 PARQUET_TO_DB = false
+
+# -- OGC analysis settings -- #
+OGC_ANALYSIS_ENABLED = false
+OGC_FORMATS = ["wfs"]
+OGC_GETCAPABILITIES_TIMEOUT = 30  # in seconds
