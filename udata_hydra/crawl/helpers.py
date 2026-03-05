@@ -21,7 +21,7 @@ async def get_content_type_from_header(headers: dict) -> str:
     return content_type
 
 
-def convert_headers(headers: CIMultiDictProxy[str] | dict[str, Any] | Any) -> dict:
+def convert_headers(headers: CIMultiDictProxy[str] | dict | Any) -> dict:
     """Convert headers from aiohttp CIMultiDict type to dict type.
 
     :warning: this will only take the first value for a given header key but multidict is not json serializable

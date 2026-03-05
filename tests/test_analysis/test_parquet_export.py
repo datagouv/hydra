@@ -1,5 +1,4 @@
 from io import BytesIO
-from typing import Iterator, cast
 from unittest.mock import MagicMock, patch
 
 import pyarrow.parquet as pq
@@ -29,13 +28,12 @@ pytestmark = pytest.mark.asyncio
 async def test_save_as_parquet(file_and_count):
     filename, expected_count = file_and_count
     file_path = f"tests/data/{filename}"
-    raw = csv_detective_routine(
+    inspection = csv_detective_routine(
         file_path=file_path,
         output_profile=True,
         num_rows=-1,
         save_results=False,
     )
-    inspection = raw[0] if isinstance(raw, tuple) else raw
     assert inspection
     columns = inspection["columns"]
     columns = {
@@ -43,7 +41,7 @@ async def test_save_as_parquet(file_and_count):
         for c, v in columns.items()
     }
     _, table = save_as_parquet(
-        records=cast(Iterator[list], generate_records(file_path, inspection)),
+        records=generate_records(file_path, inspection),
         columns=inspection["columns"],
         output_filename=None,
     )
@@ -63,13 +61,12 @@ async def test_save_as_parquet(file_and_count):
 async def test_csv_to_parquet(mocker, parquet_config):
     async def execute_csv_to_parquet() -> tuple[str, int] | None:
         file_path = "tests/data/catalog.csv"
-        raw = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=file_path,
             output_profile=True,
             num_rows=-1,
             save_results=False,
         )
-        inspection = raw[0] if isinstance(raw, tuple) else raw
         assert inspection
         return await csv_to_parquet(file_path, inspection=inspection, resource_id=RESOURCE_ID)
 

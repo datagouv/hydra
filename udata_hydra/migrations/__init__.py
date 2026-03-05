@@ -54,8 +54,7 @@ class Migrator:
                     log.warning(f"Error while applying {name} ({e}), skipping and registering")
             await self.register(name)
         else:
-            created = existing["created_at"] if isinstance(existing, dict) else None
-            log.debug(f"Skipping {name}, already applied at {created}")
+            log.debug(f"Skipping {name}, already applied at {existing['created_at']}")
 
     async def migrate(self):
         migrations_path = Path(__file__).parent / self.db_name

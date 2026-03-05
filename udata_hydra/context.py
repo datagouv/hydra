@@ -1,5 +1,4 @@
 import logging
-from typing import cast
 from unittest.mock import MagicMock
 
 import asyncpg
@@ -17,7 +16,7 @@ context = {
 
 def monitor() -> MagicMock:
     if "monitor" in context:
-        return cast(MagicMock, context["monitor"])
+        return context["monitor"]  # type: ignore[return-value]
     monitor = MagicMock()
     monitor.set_status = lambda x: log.debug(x)
     monitor.init = lambda **kwargs: log.debug(f"Starting udata-hydra... {kwargs}")

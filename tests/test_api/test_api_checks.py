@@ -6,7 +6,6 @@ it will interfere with the rest of our async code
 import hashlib
 import json
 from datetime import datetime
-from typing import Any, cast
 
 import pytest
 from aiohttp import RequestInfo
@@ -172,7 +171,7 @@ async def test_create_check_wrongly(
             429,
             False,
             ClientResponseError(
-                cast(Any, RequestInfo(url="", method="", headers={}, real_url="")),
+                RequestInfo(url="", method="", headers={}, real_url=""),
                 history=(),
                 message="client error",
                 status=429,

@@ -94,7 +94,9 @@ async def has_check_changed(check_data: dict, last_check_data: dict | None) -> b
     )
     current_headers = check_data.get("headers", {})
     last_check_headers = (
-        json.loads(last_check_data.get("headers") or "{}") if last_check_data else {}
+        json.loads(last_check_data.get("headers"))
+        if last_check_data and last_check_data.get("headers")
+        else {}
     )
     content_has_changed = last_check_data and (
         current_headers.get("content-length") != last_check_headers.get("content-length")

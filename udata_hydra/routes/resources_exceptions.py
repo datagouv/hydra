@@ -51,9 +51,7 @@ async def create_resource_exception(request: web.Request) -> web.Response:
     except UniqueViolationError:
         raise web.HTTPBadRequest(text="Resource exception already exists")
 
-    if resource_exception is None:
-        raise web.HTTPBadRequest(text="Resource exception could not be created")
-    return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)), status=201)
+    return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)), status=201)  # type: ignore[arg-type]
 
 
 async def update_resource_exception(request: web.Request) -> web.Response:
@@ -86,9 +84,7 @@ async def update_resource_exception(request: web.Request) -> web.Response:
         comment=comment,
     )
 
-    if resource_exception is None:
-        raise web.HTTPNotFound(text="Resource exception could not be updated")
-    return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)))
+    return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)))  # type: ignore[arg-type]
 
 
 async def delete_resource_exception(request: web.Request) -> web.Response:

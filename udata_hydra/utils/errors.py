@@ -70,7 +70,7 @@ class ExceptionWithSentryDetails(Exception):
         """
         # Only capture if we have a traceback (exception is being raised)
         if getattr(self, "__traceback__", None) is not None:
-            if getattr(sentry_sdk.Hub.current, "client", None):
+            if sentry_sdk.Hub.current.client:  # type: ignore[union-attr]
                 with sentry_sdk.new_scope() as scope:
                     scope.set_tags(
                         {

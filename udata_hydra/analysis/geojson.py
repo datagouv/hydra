@@ -3,7 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator, cast
+from typing import Any, Iterator
 
 import tippecanoe
 from asyncpg import Record
@@ -59,7 +59,6 @@ async def analyse_geojson(
     assert any(_ is not None for _ in (check["id"], url))
 
     tmp_file = None
-    current_check: Record | None = None
     try:
         tmp_file = await helpers.read_or_download_file(
             check=check,
@@ -69,9 +68,7 @@ async def analyse_geojson(
         )
         timer.mark("download-file")
 
-        current_check = await Check.update(
-            check["id"], {"parsing_started_at": datetime.now(timezone.utc)}
-        )
+        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore[assignment]
 
         # Convert to PMTiles
         try:
@@ -88,23 +85,22 @@ async def analyse_geojson(
                 step="pmtiles_export",
                 resource_id=resource_id,
                 url=url,
-                check_id=current_check["id"] if current_check else None,
+                check_id=check["id"],
             ) from e
 
-        if current_check is not None:
-            current_check = await Check.update(
-                current_check["id"],
-                {
-                    "parsing_finished_at": datetime.now(timezone.utc),
-                    "pmtiles_url": pmtiles_url,
-                    "pmtiles_size": pmtiles_size,
-                },
-            )
+        check = await Check.update(  # type: ignore[assignment]
+            check["id"],
+            {
+                "parsing_finished_at": datetime.now(timezone.utc),
+                "pmtiles_url": pmtiles_url,
+                "pmtiles_size": pmtiles_size,
+            },
+        )
 
     except (ParseException, IOException) as e:
-        current_check = await handle_parse_exception(e, None, current_check)
+        check = await handle_parse_exception(e, None, check)  # type: ignore[assignment]
     finally:
-        await helpers.notify_udata(resource, current_check)
+        await helpers.notify_udata(resource, check)
         timer.stop()
         if tmp_file is not None:
             tmp_file.close()
@@ -148,7 +144,6 @@ async def csv_to_geojson(
         file_path: str, inspection: dict, geo: dict[str, Any]
     ) -> Iterator[dict[str, Any]]:
         for row in generate_records(file_path, inspection, cast_json=False, as_dict=True):
-            row = cast(dict[str, Any], row)
             if "geojson" in geo:
                 yield {
                     "type": "Feature",
@@ -156,7 +151,7 @@ async def csv_to_geojson(
                     "geometry": (
                         json.loads(row[geo["geojson"]]) if row[geo["geojson"]] is not None else None
                     ),
-                    "properties": {col: row[col] for col in row.keys() if col != geo["geojson"]},
+                    "properties": {col: row[col] for col in row.keys() if col != geo["geojson"]},  # type: ignore[union-attr]
                 }
 
             elif "latlon" in geo:
@@ -170,7 +165,7 @@ async def csv_to_geojson(
                         "type": "Point",
                         "coordinates": cast_latlon(row[geo["latlon"]]),
                     },
-                    "properties": {col: row[col] for col in row.keys() if col != geo["latlon"]},
+                    "properties": {col: row[col] for col in row.keys() if col != geo["latlon"]},  # type: ignore[union-attr]
                 }
 
             elif "lonlat" in geo:
@@ -185,7 +180,7 @@ async def csv_to_geojson(
                         # inverting lon and lat to match the standard
                         "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
                     },
-                    "properties": {col: row[col] for col in row.keys() if col != geo["lonlat"]},
+                    "properties": {col: row[col] for col in row.keys() if col != geo["lonlat"]},  # type: ignore[union-attr]
                 }
 
             else:
@@ -201,7 +196,7 @@ async def csv_to_geojson(
                     },
                     "properties": {
                         col: row[col]
-                        for col in row.keys()
+                        for col in row.keys()  # type: ignore[union-attr]
                         if col not in [geo["longitude"], geo["latitude"]]
                     },
                 }
@@ -328,14 +323,13 @@ async def csv_to_geojson_and_pmtiles(
         return None
     geojson_size, geojson_url = result
 
-    if check_id is not None:
-        await Check.update(
-            check_id,
-            {
-                "geojson_url": geojson_url,
-                "geojson_size": geojson_size,
-            },
-        )
+    await Check.update(
+        check_id,
+        {
+            "geojson_url": geojson_url,
+            "geojson_size": geojson_size,
+        },
+    )
 
     # Update resource status for PMTiles conversion
     if resource_id:
@@ -344,14 +338,13 @@ async def csv_to_geojson_and_pmtiles(
     # Convert GeoJSON to PMTiles
     pmtiles_size, pmtiles_url = await geojson_to_pmtiles(geojson_filepath, pmtiles_filepath)
 
-    if check_id is not None:
-        await Check.update(
-            check_id,
-            {
-                "pmtiles_url": pmtiles_url,
-                "pmtiles_size": pmtiles_size,
-            },
-        )
+    await Check.update(
+        check_id,
+        {
+            "pmtiles_url": pmtiles_url,
+            "pmtiles_size": pmtiles_size,
+        },
+    )
 
     if config.REMOVE_GENERATED_FILES:
         geojson_filepath.unlink()

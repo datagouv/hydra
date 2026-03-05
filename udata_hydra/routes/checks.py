@@ -70,11 +70,7 @@ async def create_check(request: web.Request) -> web.Response:
     # Get URL from resource_id
     try:
         resource: Record | None = await Resource.get(resource_id)
-        if resource is None:
-            raise web.HTTPNotFound(text=f"Couldn't find URL for resource {resource_id}")
-        url: str = resource["url"]
-    except web.HTTPNotFound:
-        raise
+        url: str = resource["url"]  # type: ignore[index]
     except Exception:
         raise web.HTTPNotFound(text=f"Couldn't find URL for resource {resource_id}")
 

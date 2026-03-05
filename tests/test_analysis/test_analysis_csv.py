@@ -120,12 +120,11 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"{header}\n{line}".encode("utf-8"))
         fp.seek(0)
-        raw = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
             num_rows=-1,
             save_results=False,
         )
-        inspection = raw[0] if isinstance(raw, tuple) else raw
         assert inspection["separator"] == separator
         await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
     res = list(await db.fetch("SELECT * FROM test_table"))
@@ -165,13 +164,12 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"json;date;datetime;aware_datetime\n{line}".encode("utf-8"))
         fp.seek(0)
-        raw = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
             encoding="utf-8",
             num_rows=-1,
             save_results=False,
         )
-        inspection = raw[0] if isinstance(raw, tuple) else raw
         await csv_to_db(fp.name, inspection=inspection, table_name="test_table", debug_insert=True)
     res = list(await db.fetch("SELECT * FROM test_table"))
     assert len(res) == 1
@@ -186,13 +184,12 @@ async def test_basic_sql_injection(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"int,{injection}\n1,test".encode("utf-8"))
         fp.seek(0)
-        raw = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
             sep=",",
             num_rows=-1,
             save_results=False,
         )
-        inspection = raw[0] if isinstance(raw, tuple) else raw
         await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res[injection] == "test"
@@ -202,12 +199,11 @@ async def test_percentage_column(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write("int,% mon pourcent\n1,test".encode("utf-8"))
         fp.seek(0)
-        raw = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
             num_rows=-1,
             save_results=False,
         )
-        inspection = raw[0] if isinstance(raw, tuple) else raw
         await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["% mon pourcent"] == "test"
@@ -217,12 +213,11 @@ async def test_reserved_column_name(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write("int,xmin\n1,test".encode("utf-8"))
         fp.seek(0)
-        raw = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
             num_rows=-1,
             save_results=False,
         )
-        inspection = raw[0] if isinstance(raw, tuple) else raw
         await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
     res = await db.fetchrow("SELECT * FROM test_table")
     assert res["xmin__hydra_renamed"] == "test"
@@ -638,13 +633,12 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
     with NamedTemporaryFile(delete=False) as fp:
         fp.write(file.encode("utf-8"))
         fp.seek(0)
-        raw = csv_detective_routine(
+        inspection = csv_detective_routine(
             file_path=fp.name,
             output_profile=True,
             num_rows=-1,
             save_results=False,
         )
-        inspection = raw[0] if isinstance(raw, tuple) else raw
 
     if expected_formats:
         for col in expected_formats:

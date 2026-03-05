@@ -5,7 +5,6 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Iterator, cast
 
 from asyncpg import Record
 from asyncpg.exceptions import UndefinedTableError
@@ -109,7 +108,6 @@ async def analyse_csv(
     assert any(_ is not None for _ in (check["id"], url))
 
     table_name, tmp_file = None, None
-    current_check: Record | None = None
     try:
         _, file_format = detect_tabular_from_headers(check)
         tmp_file = await helpers.read_or_download_file(
@@ -121,16 +119,14 @@ async def analyse_csv(
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         timer.mark("download-file")
 
-        current_check = await Check.update(
-            check["id"], {"parsing_started_at": datetime.now(timezone.utc)}
-        )
+        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore[assignment]
 
         # Launch csv-detective against given file
         try:
             previous_analysis: dict | None = await get_previous_analysis(resource_id=resource_id)
             if previous_analysis:
                 await Resource.update(resource_id, {"status": "VALIDATING_CSV"})
-                raw_inspection = validate_then_detect(
+                csv_inspection = validate_then_detect(
                     file_path=tmp_file.name,
                     previous_analysis=previous_analysis,
                     output_profile=True,
@@ -138,22 +134,19 @@ async def analyse_csv(
                     save_results=False,
                 )
             else:
-                raw_inspection = csv_detective_routine(
+                csv_inspection = csv_detective_routine(
                     file_path=tmp_file.name,
                     output_profile=True,
                     num_rows=-1,
                     save_results=False,
                 )
-            csv_inspection = (
-                raw_inspection[0] if isinstance(raw_inspection, tuple) else raw_inspection
-            )
         except Exception as e:
             raise ParseException(
                 message=str(e),
                 step="csv_detective",
                 resource_id=resource_id,
                 url=url,
-                check_id=current_check["id"] if current_check else None,
+                check_id=check["id"],
             ) from e
         timer.mark("csv-inspection")
 
@@ -165,18 +158,16 @@ async def analyse_csv(
             resource_id=resource_id,
             debug_insert=debug_insert,
         )
-        if current_check is not None:
-            current_check = await Check.update(current_check["id"], {"parsing_table": table_name})
+        check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
         timer.mark("csv-to-db")
-        if current_check is not None:
-            await csv_to_db_index(table_name, csv_inspection, current_check, dataset_id or "")
+        await csv_to_db_index(table_name, csv_inspection, check, dataset_id)
 
         try:
             await csv_to_parquet(
                 file_path=tmp_file.name,
                 inspection=csv_inspection,
                 resource_id=resource_id,
-                check_id=current_check["id"] if current_check else None,
+                check_id=check["id"],
             )
             timer.mark("csv-to-parquet")
         except Exception as e:
@@ -186,7 +177,7 @@ async def analyse_csv(
                 step="parquet_export",
                 resource_id=resource_id,
                 url=url,
-                check_id=current_check["id"] if current_check else None,
+                check_id=check["id"],
             ) from e
 
         try:
@@ -194,7 +185,7 @@ async def analyse_csv(
                 file_path=tmp_file.name,
                 inspection=csv_inspection,
                 resource_id=resource_id,
-                check_id=current_check["id"] if current_check else None,
+                check_id=check["id"],
             )
             timer.mark("csv-to-geojson-pmtiles")
         except Exception as e:
@@ -204,21 +195,20 @@ async def analyse_csv(
                 step="geojson_export",
                 resource_id=resource_id,
                 url=url,
-                check_id=current_check["id"] if current_check else None,
+                check_id=check["id"],
             ) from e
 
-        if current_check is not None:
-            current_check = await Check.update(
-                current_check["id"],
-                {
-                    "parsing_finished_at": datetime.now(timezone.utc),
-                },
-            )
+        check = await Check.update(  # type: ignore[assignment]
+            check["id"],
+            {
+                "parsing_finished_at": datetime.now(timezone.utc),
+            },
+        )
 
     except (ParseException, IOException) as e:
-        current_check = await handle_parse_exception(e, table_name, current_check or check)
+        check = await handle_parse_exception(e, table_name, check)  # type: ignore[assignment]
     finally:
-        await helpers.notify_udata(resource, current_check)
+        await helpers.notify_udata(resource, check)
         timer.stop()
         if tmp_file is not None:
             tmp_file.close()
@@ -344,21 +334,20 @@ async def csv_to_parquet(
 
     # save the file as parquet and store it on Minio instance
     parquet_file, _ = save_as_parquet(
-        records=cast(Iterator[list], generate_records(file_path, inspection, cast_json=False)),
+        records=generate_records(file_path, inspection, cast_json=False),
         columns=inspection["columns"],
         output_filename=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
     parquet_url: str = minio_client.send_file(parquet_file)
 
-    if check_id is not None:
-        await Check.update(
-            check_id,
-            {
-                "parquet_url": parquet_url,
-                "parquet_size": parquet_size,
-            },
-        )
+    await Check.update(
+        check_id,
+        {
+            "parquet_url": parquet_url,
+            "parquet_size": parquet_size,
+        },
+    )
     # returning only for tests purposes
     return parquet_url, parquet_size
 

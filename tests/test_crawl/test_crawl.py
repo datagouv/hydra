@@ -4,7 +4,6 @@ import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
-from typing import Any, cast
 from unittest.mock import ANY, patch
 
 import nest_asyncio2 as nest_asyncio
@@ -55,7 +54,7 @@ async def mock_download_resource(url, headers, max_size_allowed):
             429,
             False,
             ClientResponseError(
-                cast(Any, RequestInfo(url="", method="", headers={})),
+                RequestInfo(url="", method="", headers={}),
                 history=(),
                 message="client error",
                 status=429,
