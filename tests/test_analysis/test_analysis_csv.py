@@ -235,10 +235,7 @@ async def test_error_reporting_csv_detective(
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
-    assert (
-        res["parsing_error"]
-        == "csv_detective:Could not detect the file's encoding. Consider specifying it in the routine call."
-    )
+    assert res["parsing_error"] == "csv_detective:Could not accurately retrieve headers position"
     assert res["parsing_finished_at"]
 
 
@@ -378,7 +375,7 @@ default_kwargs = {
     "separator": ",",
     "header": ["a", "epci"],
     "rows": [["1", "13002526500013"], ["5", "38271817900023"]],
-    "encoding": "ASCII",
+    "encoding": "ascii",
     "columns": {
         "a": {"score": 1.0, "format": "int", "python_type": "int"},
         "epci": {"score": 1.5, "format": "siret", "python_type": "string"},
