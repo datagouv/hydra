@@ -78,7 +78,7 @@ minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MIN
 
 
 async def analyse_csv(
-    check: dict,
+    check: Record | dict,
     file_path: str | None = None,
     debug_insert: bool = False,
 ) -> None:
@@ -119,7 +119,7 @@ async def analyse_csv(
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         timer.mark("download-file")
 
-        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
+        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore[assignment]
 
         # Launch csv-detective against given file
         try:
@@ -158,7 +158,7 @@ async def analyse_csv(
             resource_id=resource_id,
             debug_insert=debug_insert,
         )
-        check = await Check.update(check["id"], {"parsing_table": table_name})
+        check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
         timer.mark("csv-to-db")
         await csv_to_db_index(table_name, csv_inspection, check, dataset_id)
 
@@ -198,7 +198,7 @@ async def analyse_csv(
                 check_id=check["id"],
             ) from e
 
-        check = await Check.update(
+        check = await Check.update(  # type: ignore[assignment]
             check["id"],
             {
                 "parsing_finished_at": datetime.now(timezone.utc),
@@ -206,7 +206,7 @@ async def analyse_csv(
         )
 
     except (ParseException, IOException) as e:
-        check = await handle_parse_exception(e, table_name, check)
+        check = await handle_parse_exception(e, table_name, check)  # type: ignore[assignment]
     finally:
         await helpers.notify_udata(resource, check)
         timer.stop()
@@ -443,7 +443,7 @@ async def csv_to_db(
 
 
 async def csv_to_db_index(
-    table_name: str, inspection: dict, check: Record, dataset_id: str
+    table_name: str, inspection: dict, check: Record | dict, dataset_id: str
 ) -> None:
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")

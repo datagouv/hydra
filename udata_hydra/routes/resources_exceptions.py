@@ -41,7 +41,7 @@ async def create_resource_exception(request: web.Request) -> web.Response:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
     try:
-        resource_exception: Record = await ResourceException.insert(
+        resource_exception: Record | None = await ResourceException.insert(
             resource_id=resource_id,
             table_indexes=table_indexes,
             comment=comment,
@@ -51,7 +51,7 @@ async def create_resource_exception(request: web.Request) -> web.Response:
     except UniqueViolationError:
         raise web.HTTPBadRequest(text="Resource exception already exists")
 
-    return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)), status=201)
+    return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)), status=201)  # type: ignore[arg-type]
 
 
 async def update_resource_exception(request: web.Request) -> web.Response:
@@ -78,13 +78,13 @@ async def update_resource_exception(request: web.Request) -> web.Response:
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
-    resource_exception: Record = await ResourceException.update(
+    resource_exception: Record | None = await ResourceException.update(
         resource_id=resource_id,
         table_indexes=table_indexes,
         comment=comment,
     )
 
-    return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)))
+    return web.json_response(ResourceExceptionSchema().dump(dict(resource_exception)))  # type: ignore[arg-type]
 
 
 async def delete_resource_exception(request: web.Request) -> web.Response:

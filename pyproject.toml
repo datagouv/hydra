@@ -45,6 +45,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "pytest-mock>=3.7.0",
     "ruff>=0.9.3",
+    "ty>=0.0.17",
 ]
 
 [project.scripts]
@@ -75,6 +76,11 @@ markers = [
     "catalog_harvested: use catalog_harvested.csv as source",
 ]
 addopts = "--cov=udata_hydra --cov-report term-missing --cov-branch --cov-fail-under=80"
+
+[tool.ty]
+[tool.ty.rules]
+invalid-argument-type = "ignore"
+parameter-already-assigned = "ignore"
 
 [tool.ruff]
 lint = { extend-select = ["I"] } # ["I"] is to also sort imports with an isort rule

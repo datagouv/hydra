@@ -34,6 +34,7 @@ async def test_analyse_csv_on_catalog(
 
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
     assert resource["status"] is None
     assert resource["status_since"] is None
 
@@ -42,6 +43,7 @@ async def test_analyse_csv_on_catalog(
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
     assert resource["status"] is None
     assert isinstance(resource["status_since"], datetime)
 
@@ -78,6 +80,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
 
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
     assert resource["status"] is None
 
     # Analyse the CSV
@@ -85,6 +88,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
     assert resource["status"] is None
 
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
@@ -231,6 +235,7 @@ async def test_error_reporting_csv_detective(
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
     assert resource["status"] is None
 
     res = await db.fetchrow("SELECT * FROM checks")
@@ -252,6 +257,7 @@ async def test_error_reporting_parsing(
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
     assert resource["status"] is None
 
     res = await db.fetchrow("SELECT * FROM checks")
@@ -278,6 +284,7 @@ async def test_analyse_csv_send_udata_webhook(
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
     assert resource["status"] is None
 
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
@@ -315,6 +322,7 @@ async def test_forced_analysis(
     )
     url = check["url"]
     resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
     rmock.head(
         url,
         status=200,
@@ -763,6 +771,7 @@ async def test_too_long_column_name(
     with patch("udata_hydra.config.NAMEDATALEN", max_len):
         await analyse_csv(check=check)
     updated_check = await Check.get_by_id(check["id"])
+    assert updated_check is not None
     # analysis failed
     assert updated_check["parsing_error"].startswith("scan_column_names:")
     # table was not created
@@ -810,5 +819,6 @@ async def test_crash_after_db_insertion(
     assert rows[0]["parsing_table"] == table_name
     # yet we have the error where we should
     updated_check = await Check.get_by_id(check["id"])
+    assert updated_check is not None
     assert updated_check["parsing_error"] is not None
     assert updated_check["parquet_url"] is None
