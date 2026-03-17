@@ -110,12 +110,19 @@ async def analyse_csv(
     table_name, tmp_file = None, None
     try:
         _, file_format = detect_tabular_from_headers(check)
-        tmp_file = await helpers.read_or_download_file(
-            check=check,
-            file_path=file_path,
-            file_format=file_format,
-            exception=exception,
-        )
+        try:
+            tmp_file = await helpers.read_or_download_file(
+                check=check,
+                file_path=file_path,
+                file_format=file_format,
+                exception=exception,
+            )
+        except FileNotFoundError as e:
+            raise IOException(
+                f"Temporary file not found: {file_path}",
+                resource_id=resource_id,
+                url=url,
+            ) from e
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         timer.mark("download-file")
 
