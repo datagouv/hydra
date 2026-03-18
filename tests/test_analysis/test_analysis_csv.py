@@ -812,3 +812,43 @@ async def test_crash_after_db_insertion(
     updated_check = await Check.get_by_id(check["id"])
     assert updated_check["parsing_error"] is not None
     assert updated_check["parquet_url"] is None
+
+
+async def test_file_with_nan(
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+    produce_mock,
+):
+    check = await fake_check()
+    url = check["url"]
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    rmock.get(
+        url,
+        status=200,
+        headers={
+            "content-type": "application/csv",
+            "content-length": "100",
+        },
+        body=("a,b,c\n1,1.0,inf\n2,nan,2.0\n3,3.0,3.0\n").encode("utf-8"),
+        repeat=True,
+    )
+    await analyse_csv(check=check)
+    # it should all be fine
+    rows = await db.fetch(f'SELECT * FROM "{table_name}"')
+    assert dict(rows[0])["c"] == float("inf")
+    assert dict(rows[1])["b"] is None
+    profile = json.loads(
+        list(
+            await db.fetch(
+                "SELECT * FROM tables_index WHERE resource_id = $1", check["resource_id"]
+            )
+        )[0]["csv_detective"]
+    )["profile"]
+    for col in ["a", "b"]:
+        # NaN doesn't prevent the operations
+        assert all(profile[col][method] is not None for method in ["min", "max", "mean", "std"])
+    # inf does for max, mean and std
+    assert all(profile["c"][method] is None for method in ["max", "mean", "std"])
+    assert profile["c"]["min"] is not None
