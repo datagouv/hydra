@@ -462,7 +462,7 @@ wheels = [
 
 [[package]]
 name = "csv-detective"
-version = "0.11.0"
+version = "0.11.1.dev3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "charset-normalizer" },
@@ -481,7 +481,7 @@ dependencies = [
     { name = "xlrd" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/85/41/e1e7ed0f504e4fbcc4ed71a6a793876626a74d24e9d6e86c5fde7c819dc1/csv_detective-0.11.0-py3-none-any.whl", hash = "sha256:9010c11d11d16d416d3b139a591eed63a985e2bf69903275fcd28c06674f55cb", size = 153356, upload-time = "2026-03-09T11:57:08.832Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/63/2f1bb765c8f2b688704a2bcde8457d591525d9b816e8e1bff6efa47110aa/csv_detective-0.11.1.dev3-py3-none-any.whl", hash = "sha256:d5bafaf82140060c46efdccba6f82de39c00b820ae27c31a4a82a90e78cddb3e", size = 154125, upload-time = "2026-03-18T14:51:50.374Z" },
 ]
 
 [[package]]
@@ -554,15 +554,14 @@ wheels = [
 
 [[package]]
 name = "frformat"
-version = "0.4.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "python-stdnum" },
     { name = "shapely" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4d/f0/9210c7ee771eed14906761e45d7ba5b190c7d8b6f6cfdf8e5efebe083203/frformat-0.4.0.tar.gz", hash = "sha256:af536e6594f3f539acbbe6b6e5026175922e83a1db4d8b93e2cac3020bad5d1c", size = 821652, upload-time = "2024-11-12T10:19:51.925Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/f6/1414cdd4cce067e2e88ca8e62c8051f8d3f32957e2f847c6791bec32c98f/frformat-0.4.0-py3-none-any.whl", hash = "sha256:bdd62e03bec7c56a4bc388a90296eadfe2186b8f8f186a92911a101d23bffa35", size = 834870, upload-time = "2024-11-12T10:19:49.661Z" },
+    { url = "https://files.pythonhosted.org/packages/41/6e/297b9511d5b84beb4daeef8e4eb45c0b362cdde5d5000da16a959eed3f76/frformat-0.5.0-py3-none-any.whl", hash = "sha256:f7f8763598b702ad62e33d4587f669a9f8cd92dd86cf24efa8524fd8d92b88f0", size = 804201, upload-time = "2026-03-17T16:26:39.108Z" },
 ]
 
 [[package]]
@@ -1937,7 +1936,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.10.3" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "coloredlogs", specifier = ">=15.0.1" },
-    { name = "csv-detective", specifier = "==0.11.0" },
+    { name = "csv-detective", specifier = "==0.11.1.dev3" },
     { name = "dateparser", specifier = ">=1.1.7" },
     { name = "humanfriendly", specifier = ">=10.0" },
     { name = "json-stream", specifier = ">=2.3.3" },
