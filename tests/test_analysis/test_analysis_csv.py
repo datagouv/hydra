@@ -839,9 +839,13 @@ async def test_file_with_nan(
     rows = await db.fetch(f'SELECT * FROM "{table_name}"')
     assert dict(rows[0])["c"] == float("inf")
     assert dict(rows[1])["b"] is None
-    profile = json.loads(list(
-        await db.fetch("SELECT * FROM tables_index WHERE resource_id = $1", check["resource_id"])
-    )[0]["csv_detective"])["profile"]
+    profile = json.loads(
+        list(
+            await db.fetch(
+                "SELECT * FROM tables_index WHERE resource_id = $1", check["resource_id"]
+            )
+        )[0]["csv_detective"]
+    )["profile"]
     for col in ["a", "b"]:
         # NaN doesn't prevent the operations
         assert all(profile[col][method] is not None for method in ["min", "max", "mean", "std"])
