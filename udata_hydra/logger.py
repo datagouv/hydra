@@ -39,6 +39,15 @@ def setup_logging() -> logging.Logger:
     return log
 
 
+class OwsLibPyprojFilter(logging.Filter):
+    """Drop the 'pyproj not installed' warning emitted by OWSLib."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "pyproj not installed" not in record.getMessage()
+
+logging.getLogger("owslib.feature.wfs100").addFilter(OwsLibPyprojFilter())
+
+
 def stop_sentry() -> None:
     """Stop sentry collection programatically"""
     client = sentry_sdk.get_client()
