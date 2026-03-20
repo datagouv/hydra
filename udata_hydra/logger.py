@@ -45,6 +45,7 @@ class OwsLibPyprojFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         return "pyproj not installed" not in record.getMessage()
 
+
 logging.getLogger("owslib.feature.wfs100").addFilter(OwsLibPyprojFilter())
 
 
