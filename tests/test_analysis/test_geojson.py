@@ -104,7 +104,7 @@ async def test_csv_to_geojson_big_file(
     """Test performance with a CSV file containing geographical data"""
 
     if not input_file:
-        pytest.skip("No input_file provided, skipping performance test")
+        pytest.skip(reason="No input_file provided, skipping performance test")
 
     csv_path = "tests/data" / Path(input_file)
     test_geojson_path = csv_path.parent / f"{csv_path.stem}.geojson"
@@ -179,7 +179,7 @@ async def test_csv_to_geojson_big_file(
             log.info(f"Output GeoJSON size: {geojson_size} bytes")
             log.info(f"Features converted: {len(geojson_data['features'])}")
         else:
-            pytest.skip("CSV file does not contain geographical data, skipping test")
+            pytest.skip(reason="CSV file does not contain geographical data, skipping test")
 
 
 @pytest.mark.asyncio
@@ -190,7 +190,7 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     :input_file: Path to the GeoJSON file to test (mandatory)
     """
     if not input_file:
-        pytest.skip("No input_file provided, skipping performance test")
+        pytest.skip(reason="No input_file provided, skipping performance test")
 
     geojson_path = "tests/data" / Path(input_file)
     test_pmtiles_path = geojson_path.parent / f"{geojson_path.stem}.pmtiles"

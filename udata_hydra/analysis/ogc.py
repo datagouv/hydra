@@ -28,7 +28,7 @@ class OgcMetadata(TypedDict):
     detected_layer: OgcLayer | None
 
 
-async def analyse_ogc(check: dict) -> OgcMetadata | None:
+async def analyse_ogc(check: dict | Record) -> OgcMetadata | None:
     """
     Analyse an OGC endpoint and extract metadata.
 
@@ -62,7 +62,7 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
     metadata: OgcMetadata | None = None
     try:
         if check_id:
-            check = await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
+            check = await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore
 
         # Try connecting with version fallback
         wfs = None
@@ -157,7 +157,7 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
                     "parsing_finished_at": datetime.now(timezone.utc),
                     "ogc_metadata": metadata,
                 },
-            )
+            )  # type: ignore
 
         log.debug(f"OGC analysis complete for {url}: {len(metadata['layers'])} layers found")
 
@@ -165,7 +165,7 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
 
     except ParseException as e:
         if check_id:
-            check = await handle_parse_exception(e, None, check)
+            check = await handle_parse_exception(e, None, check)  # type: ignore
         else:
             log.error(f"OGC analysis failed for {url}: {e}")
         return None
