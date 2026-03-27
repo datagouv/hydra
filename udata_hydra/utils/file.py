@@ -29,7 +29,9 @@ def compute_checksum_from_file(filename: str) -> str:
 
 def extract_gzip(file_path: str) -> IO[bytes]:
     with gzip.open(file_path, "rb") as gz_file:
-        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, mode="wb", delete=False
+        ) as temp_file:
             temp_file.write(gz_file.read())
     return temp_file
 
@@ -89,7 +91,10 @@ async def download_resource(
         "application/gzip",
     ]:
         # It's compressed - extract and determine extension from URL
+        gzip_tmp_file_name = tmp_file.name
         tmp_file = extract_gzip(tmp_file.name)
+        # Remove the gzip original temporary file
+        os.remove(gzip_tmp_file_name)
 
         # Extract any extension before .gz using regex
         match = re.search(r"\.([^.]+)\.gz$", url)
