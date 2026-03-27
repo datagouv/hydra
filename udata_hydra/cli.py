@@ -483,7 +483,6 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
         inspection, df = csv_detective_routine(
             file_path=str(csv_path),
             output_profile=True,
-            output_df=True,
             cast_json=False,
             num_rows=-1,
             save_results=False,
