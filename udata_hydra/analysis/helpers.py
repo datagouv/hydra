@@ -38,7 +38,7 @@ async def read_or_download_file(
 async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:
     """Notify udata of the result of a parsing"""
     if check is None or resource is None:
-        return
+        raise ValueError("Tried to notify udata without resource nor URL")
     payload = {
         "resource_id": check["resource_id"],
         "dataset_id": resource["dataset_id"],
