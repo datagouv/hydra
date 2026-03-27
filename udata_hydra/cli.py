@@ -486,8 +486,8 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
             verbose=True,
         )
 
-        log.info(f"CSV analysis complete. Found {len(df)} rows and {len(df.columns)} columns")  # type: ignore[union-attr]
-        log.info(f"Columns: {list(df.columns)}")  # type: ignore[union-attr]
+        log.info(f"CSV analysis complete. Found {inspection['total_lines']} rows and {len(inspection['headers'])} columns")  # type: ignore[union-attr]
+        log.info(f"Columns: {inspection['headers']}")  # type: ignore[union-attr]
 
         # Show column formats for debugging
         log.info("Column formats detected:")
