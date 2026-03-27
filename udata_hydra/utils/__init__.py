@@ -10,6 +10,7 @@ from .file import (
 )
 from .geojson import detect_geojson_from_headers
 from .http import UdataPayload, get_request_params, send
+from .ogc import detect_ogc
 from .parquet import detect_parquet_from_headers
 from .queue import enqueue
 from .timer import Timer
@@ -32,4 +33,5 @@ __all__ = [
     "detect_parquet_from_headers",
     "enqueue",
     "Timer",
+    "detect_ogc",
 ]

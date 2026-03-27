@@ -11,6 +11,7 @@ from asyncpg.exceptions import UndefinedTableError
 from csv_detective import routine as csv_detective_routine
 from csv_detective import validate_then_detect
 from csv_detective.detection.engine import engine_to_file
+from csv_detective.utils import sanitize_for_json
 from progressist import ProgressBar
 from slugify import slugify
 from sqlalchemy import (
@@ -448,11 +449,20 @@ async def csv_to_db_index(
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)"
-    await db.execute(
-        q,
-        table_name,
-        json.dumps(inspection, default=str),
-        check.get("resource_id"),
-        dataset_id,
-        check.get("url"),
-    )
+    try:
+        await db.execute(
+            q,
+            table_name,
+            json.dumps(sanitize_for_json(inspection), default=str),
+            check.get("resource_id"),
+            dataset_id,
+            check.get("url"),
+        )
+    except Exception as e:
+        raise ParseException(
+            message=str(e),
+            step="tables_index_insertion",
+            resource_id=check.get("resource_id"),
+            url=check.get("url"),
+            check_id=check["id"],
+        ) from e

@@ -371,24 +371,18 @@ workflows:
     jobs:
       - install:
           filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
             branches:
               ignore: << pipeline.parameters.benchmark-branch >>
       - lint:
           requires:
             - install
           filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
             branches:
               ignore: << pipeline.parameters.benchmark-branch >>
       - tests:
           requires:
             - install
           filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
             branches:
               ignore: << pipeline.parameters.benchmark-branch >>
       - build:
@@ -396,8 +390,6 @@ workflows:
             - tests
             - lint
           filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
             branches:
               ignore: << pipeline.parameters.benchmark-branch >>
       - publish:
@@ -407,10 +399,6 @@ workflows:
             branches:
               only:
                 - << pipeline.parameters.publish-branch >>
-                - /[0-9]+(\.[0-9]+)+/
-                - /rc[0-9]+/
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
           context: org-global
       - trigger-gitlab-pipeline:
           requires:
