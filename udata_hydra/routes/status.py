@@ -7,83 +7,103 @@ from udata_hydra.db.resource import Resource
 from udata_hydra.worker import QUEUES
 
 
+async def get_resources_status_counts(request: web.Request) -> dict[str | None, int]:
+    status_counts: dict = {status: 0 for status in Resource.STATUSES}
+    status_counts[None] = 0
+
+    q = """
+        SELECT COALESCE(status, 'NULL') AS status, COUNT(*) AS count
+        FROM catalog
+        GROUP BY COALESCE(status, 'NULL');
+    """
+    rows = await request.app["pool"].fetch(q)
+
+    for row in rows:
+        status = row["status"] if row["status"] != "NULL" else None
+        status_counts[status] = row["count"]
+
+    return status_counts
+
+
 async def get_crawler_status(request: web.Request) -> web.Response:
-    # Count outdated checks (checks that need to be refreshed, filtered by excluded patterns)
+    # Combined query: count resources with no check, with a check, and outdated checks
+    # (filtered by excluded patterns) - all in a single query for better performance
     now = datetime.now(timezone.utc)
     q = f"""
         SELECT
+            COALESCE(SUM(CASE WHEN catalog.last_check IS NULL THEN 1 ELSE 0 END), 0) AS count_never_checked,
+            COALESCE(SUM(CASE WHEN catalog.last_check IS NOT NULL THEN 1 ELSE 0 END), 0) AS count_checked,
             COALESCE(SUM(CASE WHEN checks.next_check_at <= $1 THEN 1 ELSE 0 END), 0) AS count_outdated
-        FROM catalog, checks
-        WHERE {Resource.get_excluded_clause()}
-        AND catalog.last_check = checks.id
-    """
-    stats_checks: dict = await request.app["pool"].fetchrow(q, now)
-
-    # Count total resources and deleted resources (all resources in catalog, no filters)
-    q_total = """
-        SELECT
-            COALESCE(COUNT(*), 0) AS total_resources,
-            COALESCE(SUM(CASE WHEN catalog.deleted = True THEN 1 ELSE 0 END), 0) AS deleted_resources
         FROM catalog
-    """
-    stats_resources: dict = await request.app["pool"].fetchrow(q_total)
-
-    # Count resources with no check and resources with a check (filtered by excluded patterns)
-    q = f"""
-        SELECT
-            COALESCE(SUM(CASE WHEN catalog.deleted = False AND last_check IS NULL THEN 1 ELSE 0 END), 0) AS count_never_checked,
-            COALESCE(SUM(CASE WHEN catalog.deleted = False AND last_check IS NOT NULL THEN 1 ELSE 0 END), 0) AS count_checked
-        FROM catalog
+        LEFT JOIN checks ON catalog.last_check = checks.id
         WHERE {Resource.get_excluded_clause()}
     """
-    stats_check_status: dict = await request.app["pool"].fetchrow(q)
-    count_pending_checks: int = (
-        stats_check_status["count_never_checked"] + stats_checks["count_outdated"]
+    stats_combined: dict = await request.app["pool"].fetchrow(q, now)
+
+    # Count resources in progress (have a status that is not NULL and not 'BACKOFF')
+    # Build excluded patterns clause similar to get_excluded_clause() but without status filter
+    excluded_patterns_clause = " AND ".join(
+        [f"catalog.url NOT LIKE '{p}'" for p in (config.EXCLUDED_PATTERNS or [])]
+        + [
+            "catalog.deleted = False",
+            "catalog.status IS NOT NULL",
+            "catalog.status != 'BACKOFF'",
+        ]
     )
-    # all w/ a check, minus those with an outdated checked
-    count_fresh_checks: int = stats_check_status["count_checked"] - stats_checks["count_outdated"]
-    # Total resources eligible for checks (filtered by excluded patterns, non-deleted)
-    total_resources_filtered: int = (
-        stats_check_status["count_never_checked"] + stats_check_status["count_checked"]
+    q_in_progress = f"""
+        SELECT
+            COALESCE(COUNT(*), 0) AS count_in_progress
+        FROM catalog
+        WHERE {excluded_patterns_clause}
+    """
+    stats_in_progress: dict = await request.app["pool"].fetchrow(q_in_progress)
+
+    # Resources that need a check (never checked + outdated checks)
+    needs_check_count: int = (
+        stats_combined["count_never_checked"] + stats_combined["count_outdated"]
     )
-    if total_resources_filtered > 0:
-        rate_checked: float = round(
-            stats_check_status["count_checked"] / total_resources_filtered * 100, 1
+    # Resources with up-to-date checks (all with a check, minus those with an outdated check)
+    up_to_date_check_count: int = stats_combined["count_checked"] - stats_combined["count_outdated"]
+    # Total resources eligible for checks (filtered by excluded patterns, non-deleted, not in progress)
+    total_eligible_resources: int = (
+        stats_combined["count_never_checked"] + stats_combined["count_checked"]
+    )
+    # Total resources including in-progress ones
+    total_resources_with_in_progress: int = (
+        total_eligible_resources + stats_in_progress["count_in_progress"]
+    )
+
+    # Calculate percentages
+    needs_check_percentage: float | None
+    up_to_date_check_percentage: float | None
+    if total_eligible_resources > 0:
+        needs_check_percentage = round(needs_check_count / total_eligible_resources * 100, 1)
+        up_to_date_check_percentage = round(
+            up_to_date_check_count / total_eligible_resources * 100, 1
         )
-        rate_checked_fresh: float = round(count_fresh_checks / total_resources_filtered * 100, 1)
     else:
-        rate_checked, rate_checked_fresh = None, None
+        needs_check_percentage, up_to_date_check_percentage = None, None
 
-    async def get_resources_status_counts(request: web.Request) -> dict[str | None, int]:
-        status_counts: dict = {status: 0 for status in Resource.STATUSES}
-        status_counts[None] = 0
-
-        q = """
-            SELECT COALESCE(status, 'NULL') AS status, COUNT(*) AS count
-            FROM catalog
-            GROUP BY COALESCE(status, 'NULL');
-        """
-        rows = await request.app["pool"].fetch(q)
-
-        for row in rows:
-            status = row["status"] if row["status"] != "NULL" else None
-            status_counts[status] = row["count"]
-
-        return status_counts
+    in_progress_percentage: float | None
+    if total_resources_with_in_progress > 0:
+        in_progress_percentage = round(
+            stats_in_progress["count_in_progress"] / total_resources_with_in_progress * 100, 1
+        )
+    else:
+        in_progress_percentage = None
 
     return web.json_response(
         {
             "checks": {
-                "pending_count": count_pending_checks,
-                "fresh_count": count_fresh_checks,
-                "checked_percentage": rate_checked,
-                "fresh_percentage": rate_checked_fresh,
+                "in_progress_count": stats_in_progress["count_in_progress"],
+                "in_progress_percentage": in_progress_percentage,
+                "needs_check_count": needs_check_count,
+                "needs_check_percentage": needs_check_percentage,
+                "up_to_date_check_count": up_to_date_check_count,
+                "up_to_date_check_percentage": up_to_date_check_percentage,
             },
             "resources": {
-                "total_count": stats_resources["total_resources"],
-                "total_filtered_count": total_resources_filtered,
-                "deleted_count": stats_resources["deleted_resources"],
-                "statuses_count": await get_resources_status_counts(request),
+                "total_eligible_count": total_eligible_resources,
             },
         }
     )
