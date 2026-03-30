@@ -103,6 +103,7 @@ class TestOgcAnalysis:
             ) as mock_notify,
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
             result = await analyse_ogc(check, format="wfs")
 
         expected_metadata = {
@@ -151,6 +152,7 @@ class TestOgcAnalysis:
             ) as mock_notify,
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
             result = await analyse_ogc(check, format="wfs")
 
         assert result is None
@@ -203,6 +205,7 @@ class TestOgcAnalysis:
             patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
             result = await analyse_ogc(check, format="wfs")
 
         assert result is not None
@@ -226,6 +229,7 @@ class TestOgcAnalysis:
             patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
             result = await analyse_ogc(check, format="wfs")
 
         assert result == {
@@ -259,6 +263,7 @@ class TestOgcAnalysis:
             patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
             result = await analyse_ogc(check, format="wfs")
 
         assert result is not None
@@ -289,6 +294,7 @@ class TestOgcAnalysis:
             patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
             result = await analyse_ogc(check, format="wfs")
 
         assert result is not None
@@ -319,6 +325,7 @@ class TestOgcAnalysis:
             patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
             result = await analyse_ogc(check, format="wfs")
 
         assert result is not None
@@ -349,6 +356,7 @@ class TestOgcAnalysis:
             patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
             result = await analyse_ogc(check, format="wfs")
 
         assert result is not None
@@ -384,6 +392,7 @@ class TestOgcAnalysis:
             ) as mock_notify,
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
             result = await analyse_ogc(check, format="wms")
 
         expected_metadata = {
@@ -426,6 +435,7 @@ class TestOgcAnalysis:
             patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
             result = await analyse_ogc(check, format="wms")
 
         assert result == {
