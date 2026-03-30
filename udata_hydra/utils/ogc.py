@@ -6,7 +6,7 @@ from udata_hydra import config
 VALID_LAYER_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-.:]{1,100}$")
 
 
-def detect_ogc(check: dict, resource_format: str | None = None) -> bool:
+def detect_ogc(check: dict, resource_format: str | None = None) -> tuple[bool, str]:
     """
     Detect if a resource is an OGC service based on resource format and URL patterns.
 
@@ -29,11 +29,11 @@ def detect_ogc(check: dict, resource_format: str | None = None) -> bool:
     if resource_format:
         normalized = resource_format.lower().replace("ogc:", "")
         if normalized in ogc_formats:
-            return True
+            return True, normalized
 
     url = check.get("url", "")
     if not url:
-        return False
+        return False, ""
 
     parsed = urlparse(url)
     query_params = parse_qs(parsed.query.lower())
@@ -42,13 +42,13 @@ def detect_ogc(check: dict, resource_format: str | None = None) -> bool:
     for fmt in ogc_formats:
         # Check for SERVICE={fmt} query parameter (case-insensitive)
         if fmt in query_params.get("service", []):
-            return True
+            return True, fmt
 
         # Check for "/{fmt}" as a path segment (e.g. /geoserver/wfs)
         if fmt in path_segments:
-            return True
+            return True, fmt
 
-    return False
+    return False, ""
 
 
 def is_valid_layer_name(name: str) -> bool:
