@@ -3,7 +3,9 @@ from datetime import datetime, timezone
 from typing import TypedDict
 
 from asyncpg import Record
+from owslib.crs import Crs
 from owslib.wfs import WebFeatureService
+from owslib.wms import WebMapService
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
@@ -13,6 +15,17 @@ from udata_hydra.utils import ParseException, handle_parse_exception
 from udata_hydra.utils.ogc import detect_layer_name
 
 log = logging.getLogger("udata-hydra")
+
+SERVICE_MAPPING = {
+    "wfs": {
+        "service": WebFeatureService,
+        "versions": ["2.0.0", "1.1.0", "1.0.0"],
+    },
+    "wms": {
+        "service": WebMapService,
+        "versions": ["1.3.0", "1.1.1"],
+    },
+}
 
 
 class OgcLayer(TypedDict):
@@ -28,11 +41,11 @@ class OgcMetadata(TypedDict):
     detected_layer: OgcLayer | None
 
 
-async def analyse_ogc(check: dict) -> OgcMetadata | None:
+async def analyse_ogc(check: dict, format: str) -> OgcMetadata | None:
     """
     Analyse an OGC endpoint and extract metadata.
 
-    Currently supports WFS. Connects to the service, retrieves GetCapabilities,
+    Currently supports WFS and WMS. Connects to the service, retrieves GetCapabilities,
     and extracts:
     - Service format and version
     - Available layers with their CRS options
@@ -47,6 +60,12 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
     """
     if not config.OGC_ANALYSIS_ENABLED:
         log.debug("OGC_ANALYSIS_ENABLED turned off, skipping.")
+        return None
+
+    if format not in config.OGC_FORMATS:
+        log.debug(
+            f"Only supported OGC service formats configured are : OGC_FORMATS={config.OGC_FORMATS}"
+        )
         return None
 
     url = check["url"]
@@ -65,23 +84,25 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
             check = await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})
 
         # Try connecting with version fallback
-        wfs = None
+        web_service = None
         version = None
         connection_error = None
-        for v in ["2.0.0", "1.1.0", "1.0.0"]:
+        for v in SERVICE_MAPPING[format]["versions"]:
             try:
-                wfs = WebFeatureService(url, version=v, timeout=config.OGC_GETCAPABILITIES_TIMEOUT)
+                web_service = SERVICE_MAPPING[format]["service"](
+                    url, version=v, timeout=config.OGC_GETCAPABILITIES_TIMEOUT
+                )
                 version = v
                 break
             except Exception as e:
                 connection_error = e
                 continue
 
-        if wfs is None or version is None:
+        if web_service is None or version is None:
             raise ParseException(
-                message=f"Could not connect to WFS service with any supported version. "
+                message=f"Could not connect to {format} service with any supported version. "
                 f"Latest error was: {connection_error}",
-                step="wfs_connection",
+                step="ogc_service_connection",
                 resource_id=str(resource_id) if resource_id else None,
                 url=url,
                 check_id=check_id,
@@ -90,29 +111,36 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
         # Extract service metadata
         try:
             metadata = {
-                "format": "wfs",
+                "format": format,
                 "version": version,
                 "layers": [],
                 "output_formats": [],
                 "detected_layer": None,
             }
 
-            # Get global output formats from GetFeature operation parameters
-            get_feature_op = wfs.getOperationByName("GetFeature")
-            if get_feature_op and (output_formats := get_feature_op.parameters.get("outputFormat")):
-                metadata["output_formats"] = list(output_formats.get("values") or [])
+            if format == "wfs":
+                # Get global output formats from GetFeature operation parameters
+                get_feature_op = web_service.getOperationByName("GetFeature")
+                if get_feature_op and (
+                    output_formats := get_feature_op.parameters.get("outputFormat")
+                ):
+                    metadata["output_formats"] = list(output_formats.get("values") or [])
 
             # Extract layer information
-            for name, layer in wfs.contents.items():
+            for name, layer in web_service.contents.items():
                 ogc_layer: OgcLayer = {
                     "name": name,
                     "default_crs": None,
                 }
 
-                # Extract default CRS
+                # Extract default CRS (ie. the first CRS in the list)
                 crs_options = getattr(layer, "crsOptions", []) or []
                 if crs_options:
-                    ogc_layer["default_crs"] = crs_options[0].getcode()
+                    ogc_layer["default_crs"] = (
+                        crs_options[0].getcode()
+                        if isinstance(crs_options[0], Crs)
+                        else crs_options[0]
+                    )
 
                 metadata["layers"].append(ogc_layer)
 
@@ -144,7 +172,7 @@ async def analyse_ogc(check: dict) -> OgcMetadata | None:
         except Exception as e:
             raise ParseException(
                 message=str(e),
-                step="wfs_parsing",
+                step="ogc_service_parsing",
                 resource_id=str(resource_id) if resource_id else None,
                 url=url,
                 check_id=check_id,
