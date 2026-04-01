@@ -266,7 +266,7 @@ async def detect_resource_change_from_checksum(
 
 
 async def detect_resource_change_from_last_modified_header(
-    data: dict,
+    data: list,
 ) -> tuple[Change, dict | None]:
     # last modified header check
 
@@ -291,7 +291,7 @@ async def detect_resource_change_from_last_modified_header(
 
 
 async def detect_resource_change_from_content_length_header(
-    data: dict,
+    data: list,
 ) -> tuple[Change, dict | None]:
     # content-length variation between current and last check
     if len(data) <= 1 or not data[0].get("content_length"):

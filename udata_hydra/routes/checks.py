@@ -35,7 +35,7 @@ async def get_all_checks(request: web.Request) -> web.Response:
 
 
 async def get_checks_aggregate(request: web.Request) -> web.Response:
-    created_at: str = request.query.get("created_at")
+    created_at: str | None = request.query.get("created_at")
     if not created_at:
         raise web.HTTPBadRequest(
             text="Missing mandatory 'created_at' param. You can use created_at=today to filter on today checks."
@@ -46,7 +46,7 @@ async def get_checks_aggregate(request: web.Request) -> web.Response:
     else:
         created_at_date: date = date.fromisoformat(created_at)
 
-    column: str = request.query.get("group_by")
+    column: str | None = request.query.get("group_by")
     if not column:
         raise web.HTTPBadRequest(text="Missing mandatory 'group_by' param.")
     data: list | None = await Check.get_group_by_for_date(column, created_at_date)
@@ -70,7 +70,7 @@ async def create_check(request: web.Request) -> web.Response:
     # Get URL from resource_id
     try:
         resource: Record | None = await Resource.get(resource_id)
-        url: str = resource["url"]
+        url: str = resource["url"]  # type: ignore[index]
     except Exception:
         raise web.HTTPNotFound(text=f"Couldn't find URL for resource {resource_id}")
 
