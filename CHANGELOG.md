@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.0 (2026-03-12)
+
+- Only cast strings from loaded file ([#390](https://github.com/datagouv/hydra/pull/390))
+- feat: add uptime_since to /api/health/ ([#394](https://github.com/datagouv/hydra/pull/394))
+- feat: parse wfs for meta and layers infos ([#385](https://github.com/datagouv/hydra/pull/385))
+
+
 ## 2.6.1 (2026-02-09)
 
 - Upgrade `csv-detective` ([#384](https://github.com/datagouv/hydra/pull/384))

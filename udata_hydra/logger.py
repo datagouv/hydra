@@ -34,8 +34,19 @@ def setup_logging() -> logging.Logger:
     # silence urllib3 a bit
     logging.getLogger("urllib3").setLevel("INFO")
     logging.getLogger("asyncio").setLevel("INFO")
+    logging.getLogger("owslib").setLevel("INFO")
     context["inited"] = True
     return log
+
+
+class OwsLibPyprojFilter(logging.Filter):
+    """Drop the 'pyproj not installed' warning emitted by OWSLib."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "pyproj not installed" not in record.getMessage()
+
+
+logging.getLogger("owslib.feature.wfs100").addFilter(OwsLibPyprojFilter())
 
 
 def stop_sentry() -> None:

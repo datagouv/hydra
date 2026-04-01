@@ -61,5 +61,10 @@ async def notify_udata(resource: Record, check: dict) -> None:
     if config.CSV_TO_GEOJSON and check.get("geojson_url"):
         payload["document"]["analysis:parsing:geojson_url"] = check.get("geojson_url")
         payload["document"]["analysis:parsing:geojson_size"] = check.get("geojson_size")
+    if config.OGC_ANALYSIS_ENABLED and check.get("ogc_metadata"):
+        ogc_metadata = check.get("ogc_metadata")
+        if isinstance(ogc_metadata, str):
+            ogc_metadata = json.loads(ogc_metadata)
+        payload["document"]["analysis:parsing:ogc_metadata"] = ogc_metadata
     payload["document"] = UdataPayload(payload["document"])
     queue.enqueue(send, _priority="high", **payload)
