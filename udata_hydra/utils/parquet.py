@@ -33,6 +33,42 @@ def save_as_parquet(
     return f"{output_filename}.parquet", table
 
 
+RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
+
+
+async def save_as_parquet_from_db(
+    table_name: str,
+    inspection: dict,
+    output_filename: str | None = None,
+) -> tuple[str, pa.Table]:
+    """Build a Parquet file by reading directly from the PostgreSQL CSV table,
+    avoiding a second read + cast pass over the original file."""
+    from udata_hydra import context
+
+    db = await context.pool("csv")
+
+    original_cols = list(inspection["columns"].keys())
+    db_cols = [f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c for c in original_cols]
+    cols_sql = ", ".join(f'"{c}"' for c in db_cols)
+
+    rows = await db.fetch(f'SELECT {cols_sql} FROM "{table_name}"')
+
+    schema = pa.schema(
+        [
+            pa.field(c, PYTHON_TYPE_TO_PA[inspection["columns"][c]["python_type"]])
+            for c in original_cols
+        ]
+    )
+    table = pa.Table.from_pylist(
+        [{orig: row[db_col] for orig, db_col in zip(original_cols, db_cols)} for row in rows],
+        schema=schema,
+    )
+
+    if output_filename:
+        pq.write_table(table, f"{output_filename}.parquet", compression="zstd")
+    return f"{output_filename}.parquet", table
+
+
 async def detect_parquet_from_headers(check: dict) -> bool:
     headers: dict = json.loads(check["headers"] or "{}")
     # most parquet files are exposed with "application/octet-stream"
