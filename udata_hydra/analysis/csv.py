@@ -169,7 +169,7 @@ async def analyse_csv(
                 inspection=csv_inspection,
                 resource_id=resource_id,
                 check_id=check["id"],
-                table_name=table_name if config.CSV_TO_DB else None,
+                table_name=table_name if config.CSV_TO_DB and config.PARQUET_FROM_DB else None,
             )
             timer.mark("csv-to-parquet")
         except Exception as e:
