@@ -8,11 +8,12 @@ from csv_detective import routine as csv_detective_routine
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.csv import (
     RESERVED_COLS,
+    csv_to_db,
     csv_to_parquet,
     generate_records,
 )
 from udata_hydra.utils.minio import MinIOClient
-from udata_hydra.utils.parquet import save_as_parquet
+from udata_hydra.utils.parquet import save_as_parquet, save_as_parquet_from_db
 
 pytestmark = pytest.mark.asyncio
 
@@ -48,6 +49,36 @@ async def test_save_as_parquet(file_and_count):
     assert len(table) == expected_count
     fake_file = BytesIO()
     pq.write_table(table, fake_file)
+
+
+async def test_save_as_parquet_from_db(clean_db):
+    file_path = "tests/data/catalog.csv"
+    table_name = "test_parquet_from_db"
+    inspection = csv_detective_routine(
+        file_path=file_path,
+        output_profile=True,
+        num_rows=-1,
+        save_results=False,
+    )
+    assert inspection
+
+    await csv_to_db(file_path, inspection=inspection, table_name=table_name)
+
+    _, table_from_db = await save_as_parquet_from_db(
+        table_name=table_name,
+        inspection=inspection,
+        output_filename=None,
+    )
+
+    _, table_from_csv = save_as_parquet(
+        records=generate_records(file_path, inspection),
+        columns=inspection["columns"],
+        output_filename=None,
+    )
+
+    assert table_from_db.num_rows == table_from_csv.num_rows
+    assert table_from_db.schema == table_from_csv.schema
+    assert table_from_db.to_pydict() == table_from_csv.to_pydict()
 
 
 @pytest.mark.parametrize(
