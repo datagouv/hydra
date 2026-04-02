@@ -170,33 +170,22 @@ async def csv_to_geojson(
                     "properties": {col: row[col] for col in row.keys() if col != geo["geojson"]},  # type: ignore[union-attr]
                 }
 
-            elif "latlon" in geo:
-                # ending up here means we either have the exact lat,lon format, or NaN
-                # skipping row if NaN
-                if row[geo["latlon"]] is None:
+            elif "latlon" in geo or "lonlat" in geo:
+                pair_key = "latlon" if "latlon" in geo else "lonlat"
+                pair_col = geo[pair_key]
+                if row[pair_col] is None:
                     continue
+                coords = _cast_latlon(row[pair_col])
+                # latlon already returns [lon, lat]; lonlat needs inversion
+                if pair_key == "lonlat":
+                    coords = coords[::-1]
                 yield {
                     "type": "Feature",
                     "geometry": {
                         "type": "Point",
-                        "coordinates": _cast_latlon(row[geo["latlon"]]),
+                        "coordinates": coords,
                     },
-                    "properties": {col: row[col] for col in row.keys() if col != geo["latlon"]},  # type: ignore[union-attr]
-                }
-
-            elif "lonlat" in geo:
-                # ending up here means we either have the exact lon,lat format, or NaN
-                # skipping row if NaN
-                if row[geo["lonlat"]] is None:
-                    continue
-                yield {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        # inverting lon and lat to match the standard
-                        "coordinates": _cast_latlon(row[geo["lonlat"]])[::-1],
-                    },
-                    "properties": {col: row[col] for col in row.keys() if col != geo["lonlat"]},  # type: ignore[union-attr]
+                    "properties": {col: row[col] for col in row.keys() if col != pair_col},  # type: ignore[union-attr]
                 }
 
             else:
@@ -301,23 +290,17 @@ def _build_feature_sql(
         col = _db_col_name(geo["geojson"])
         geometry_sql = f"({_quote_ident(col)})::json"
         where = ""
-    elif "latlon" in geo:
-        col = _db_col_name(geo["latlon"])
+    elif "latlon" in geo or "lonlat" in geo:
+        pair_key = "latlon" if "latlon" in geo else "lonlat"
+        col = _db_col_name(geo[pair_key])
+        # latlon = "lat,lon" → GeoJSON needs [lon, lat] so swap indices
+        # lonlat = "lon,lat" → already in GeoJSON order
+        lon_idx, lat_idx = ("2", "1") if pair_key == "latlon" else ("1", "2")
         geometry_sql = f"""json_build_object(
                 'type', 'Point',
                 'coordinates', json_build_array(
-                    (split_part({_clean_pair_sql(col)}, ',', 2))::float,
-                    (split_part({_clean_pair_sql(col)}, ',', 1))::float
-                )
-            )"""
-        where = f"WHERE {_quote_ident(col)} IS NOT NULL"
-    elif "lonlat" in geo:
-        col = _db_col_name(geo["lonlat"])
-        geometry_sql = f"""json_build_object(
-                'type', 'Point',
-                'coordinates', json_build_array(
-                    (split_part({_clean_pair_sql(col)}, ',', 1))::float,
-                    (split_part({_clean_pair_sql(col)}, ',', 2))::float
+                    (split_part({_clean_pair_sql(col)}, ',', {lon_idx}))::float,
+                    (split_part({_clean_pair_sql(col)}, ',', {lat_idx}))::float
                 )
             )"""
         where = f"WHERE {_quote_ident(col)} IS NOT NULL"
