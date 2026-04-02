@@ -36,6 +36,9 @@ def save_as_parquet(
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
 
 
+BATCH_SIZE = 50_000
+
+
 async def save_as_parquet_from_db(
     table_name: str,
     inspection: dict,
@@ -45,13 +48,11 @@ async def save_as_parquet_from_db(
     avoiding a second read + cast pass over the original file."""
     from udata_hydra import context
 
-    db = await context.pool("csv")
+    pool = await context.pool("csv")
 
     original_cols = list(inspection["columns"].keys())
     db_cols = [f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c for c in original_cols]
     cols_sql = ", ".join(f'"{c}"' for c in db_cols)
-
-    rows = await db.fetch(f'SELECT {cols_sql} FROM "{table_name}"')
 
     schema = pa.schema(
         [
@@ -59,14 +60,32 @@ async def save_as_parquet_from_db(
             for c in original_cols
         ]
     )
-    table = pa.Table.from_pylist(
-        [{orig: row[db_col] for orig, db_col in zip(original_cols, db_cols)} for row in rows],
-        schema=schema,
-    )
+
+    parquet_path = f"{output_filename}.parquet"
+    writer = pq.ParquetWriter(parquet_path, schema, compression="zstd") if output_filename else None
+
+    try:
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                stmt = await conn.prepare(f'SELECT {cols_sql} FROM "{table_name}"')
+                cursor = await stmt.cursor()
+                while batch := await cursor.fetch(BATCH_SIZE):
+                    table = pa.table(
+                        {
+                            orig: [row[db_col] for row in batch]
+                            for orig, db_col in zip(original_cols, db_cols)
+                        },
+                        schema=schema,
+                    )
+                    if writer:
+                        writer.write_table(table)
+    finally:
+        if writer:
+            writer.close()
 
     if output_filename:
-        pq.write_table(table, f"{output_filename}.parquet", compression="zstd")
-    return f"{output_filename}.parquet", table
+        return parquet_path, pq.read_table(parquet_path)
+    return parquet_path, table
 
 
 async def detect_parquet_from_headers(check: dict) -> bool:
