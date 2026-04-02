@@ -872,7 +872,13 @@ async def test_csv_to_geojson_from_db_with_quote_in_column_name(db, clean_db):
 
     sep = ";"
     columns = {
-        "l'adresse": ["10 rue de la Paix", "5 avenue Foch", "3 bd Raspail", "1 place Vendôme", "8 rue Rivoli"],
+        "l'adresse": [
+            "10 rue de la Paix",
+            "5 avenue Foch",
+            "3 bd Raspail",
+            "1 place Vendôme",
+            "8 rue Rivoli",
+        ],
         "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
         "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
     }
