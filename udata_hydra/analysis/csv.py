@@ -169,7 +169,7 @@ async def analyse_csv(
                 inspection=csv_inspection,
                 resource_id=resource_id,
                 check_id=check["id"],
-                table_name=table_name if config.CSV_TO_DB and config.PARQUET_FROM_DB else None,
+                table_name=table_name if config.CSV_TO_DB and config.DB_TO_PARQUET else None,
             )
             timer.mark("csv-to-parquet")
         except Exception as e:
@@ -321,8 +321,8 @@ async def csv_to_parquet(
         parquet_url: URL of the parquet file.
         parquet_size: size of the parquet file.
     """
-    if not config.CSV_TO_PARQUET:
-        log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
+    if not config.CSV_TO_PARQUET and not config.DB_TO_PARQUET:
+        log.debug("CSV_TO_PARQUET and DB_TO_PARQUET turned off, skipping parquet export.")
         return
 
     if int(inspection.get("total_lines", 0)) < config.MIN_LINES_FOR_PARQUET:
@@ -340,7 +340,7 @@ async def csv_to_parquet(
         # Update resource status to CONVERTING_TO_PARQUET
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
 
-    if table_name:
+    if config.DB_TO_PARQUET and table_name:
         parquet_file, _ = await save_as_parquet_from_db(
             table_name=table_name,
             inspection=inspection,
