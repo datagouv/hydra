@@ -299,6 +299,7 @@ async def csv_to_geojson_and_pmtiles(
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
+    timer: Timer | None = None,
 ) -> tuple[Path, int, str | None, Path, int, str | None] | None:
     if not config.CSV_TO_GEOJSON:
         log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
@@ -322,6 +323,8 @@ async def csv_to_geojson_and_pmtiles(
     if result is None:
         return None
     geojson_size, geojson_url = result
+    if timer:
+        timer.mark("csv-to-geojson")
 
     await Check.update(
         check_id,
@@ -337,6 +340,8 @@ async def csv_to_geojson_and_pmtiles(
 
     # Convert GeoJSON to PMTiles
     pmtiles_size, pmtiles_url = await geojson_to_pmtiles(geojson_filepath, pmtiles_filepath)
+    if timer:
+        timer.mark("geojson-to-pmtiles")
 
     await Check.update(
         check_id,

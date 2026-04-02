@@ -187,8 +187,8 @@ async def analyse_csv(
                 inspection=csv_inspection,
                 resource_id=resource_id,
                 check_id=check["id"],
+                timer=timer,
             )
-            timer.mark("csv-to-geojson-pmtiles")
         except Exception as e:
             remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
             raise ParseException(
