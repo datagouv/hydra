@@ -862,6 +862,54 @@ async def test_csv_to_geojson_from_db_with_reserved_column(db, clean_db):
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
+async def test_csv_to_geojson_from_db_with_quote_in_column_name(db, clean_db):
+    """A CSV with a single quote in a column name should not break the SQL query."""
+    output_path = Path(f"{RESOURCE_ID}.geojson")
+    try:
+        output_path.unlink()
+    except FileNotFoundError:
+        pass
+
+    sep = ";"
+    columns = {
+        "l'adresse": ["10 rue de la Paix", "5 avenue Foch", "3 bd Raspail", "1 place Vendôme", "8 rue Rivoli"],
+        "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
+        "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
+    }
+    file = sep.join(columns) + "\n"
+    for i in range(5):
+        file += sep.join(str(val) for val in [data[i] for data in columns.values()]) + "\n"
+
+    with NamedTemporaryFile(delete=False) as fp:
+        fp.write(file.encode("utf-8"))
+        fp.seek(0)
+        inspection = csv_detective_routine(
+            file_path=fp.name,
+            output_profile=True,
+            num_rows=-1,
+            save_results=False,
+        )
+
+    table_name = "test_geojson_quote_col"
+    with patch("udata_hydra.config.CSV_TO_DB", True):
+        await csv_to_db(fp.name, inspection, table_name)
+
+    result = await csv_to_geojson_from_db(
+        table_name, inspection, output_path, upload_to_minio=False
+    )
+    assert result is not None
+
+    with open(output_path) as f:
+        geojson = json.load(f)
+
+    assert len(geojson["features"]) == 5
+    for feat in geojson["features"]:
+        assert "l'adresse" in feat["properties"]
+
+    output_path.unlink()
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+
+
 @pytest.mark.parametrize(
     "params",
     (

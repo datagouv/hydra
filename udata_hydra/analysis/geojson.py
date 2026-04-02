@@ -275,18 +275,27 @@ def _db_col_name(col: str) -> str:
     return f"{col}__hydra_renamed" if col.lower() in RESERVED_COLS else col
 
 
-def _build_feature_sql(table_name: str, geo: dict[str, str], columns: list[str]) -> str:
+def _build_feature_sql(
+    table_name: str, geo: dict[str, str], columns: list[str]
+) -> tuple[str, list[str]]:
     """Build a SQL query that generates GeoJSON features directly in PostgreSQL.
 
     Column names in `columns` and `geo` are the original CSV names. They are
     mapped to their actual DB names (handling RESERVED_COLS renaming) for the
-    SQL identifiers, while the original names are kept as JSON keys so the
-    GeoJSON output matches what the CSV path produces.
+    SQL identifiers, while the original names are passed as query parameters
+    for the JSON keys so the GeoJSON output matches what the CSV path produces.
+
+    Returns (query, params) where params are the original column names used as
+    JSON keys via $1, $2… placeholders.
     """
     property_cols = [c for c in columns if c not in geo.values()]
-    properties_args = ", ".join(
-        f"'{col}', {_quote_ident(_db_col_name(col))}" for col in property_cols
-    )
+    params: list[str] = []
+    properties_fragments = []
+    for col in property_cols:
+        params.append(col)
+        placeholder = f"${len(params)}::text"
+        properties_fragments.append(f"{placeholder}, {_quote_ident(_db_col_name(col))}")
+    properties_args = ", ".join(properties_fragments)
 
     if "geojson" in geo:
         col = _db_col_name(geo["geojson"])
@@ -321,7 +330,7 @@ def _build_feature_sql(table_name: str, geo: dict[str, str], columns: list[str])
             )"""
         where = f"WHERE {_quote_ident(lat_col)} IS NOT NULL AND {_quote_ident(lon_col)} IS NOT NULL"
 
-    return f"""
+    query = f"""
         SELECT json_build_object(
             'type', 'Feature',
             'geometry', {geometry_sql},
@@ -330,6 +339,7 @@ def _build_feature_sql(table_name: str, geo: dict[str, str], columns: list[str])
         FROM {_quote_ident(table_name)}
         {where}
     """
+    return query, params
 
 
 async def csv_to_geojson_from_db(
@@ -345,12 +355,12 @@ async def csv_to_geojson_from_db(
         return None
 
     columns = list(inspection["columns"].keys())
-    query = _build_feature_sql(table_name, geo, columns)
+    query, params = _build_feature_sql(table_name, geo, columns)
 
     db = await context.pool("csv")
     async with db.acquire() as conn:
         async with conn.transaction():
-            cursor = conn.cursor(query)
+            cursor = conn.cursor(query, *params)
 
             with output_file_path.open("w") as f:
                 f.write('{"type": "FeatureCollection", "features": [\n')
