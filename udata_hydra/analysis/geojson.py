@@ -421,8 +421,8 @@ async def csv_to_geojson_and_pmtiles(
     timer: Timer | None = None,
     table_name: str | None = None,
 ) -> tuple[Path, int, str | None, Path, int, str | None] | None:
-    if not config.CSV_TO_GEOJSON:
-        log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
+    if not config.CSV_TO_GEOJSON and not config.DB_TO_GEOJSON:
+        log.debug("CSV_TO_GEOJSON and DB_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
         return None
 
     log.debug(
@@ -438,8 +438,8 @@ async def csv_to_geojson_and_pmtiles(
         geojson_filepath = DEFAULT_GEOJSON_FILEPATH
         pmtiles_filepath = DEFAULT_PMTILES_FILEPATH
 
-    # Convert to GeoJSON — from DB if available, otherwise from CSV file
-    if table_name:
+    # Convert to GeoJSON — from DB if available and enabled, otherwise from CSV file
+    if config.DB_TO_GEOJSON and table_name:
         result = await csv_to_geojson_from_db(
             table_name,
             inspection,
