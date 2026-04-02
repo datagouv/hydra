@@ -34,7 +34,7 @@ from sqlalchemy.schema import CreateIndex, CreateTable, Index
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
-from udata_hydra.db import compute_insert_query
+from udata_hydra.db import RESERVED_COLS, compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -74,7 +74,6 @@ PYTHON_TYPE_TO_PG = {
     "binary": LargeBinary,
 }
 
-RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
 minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MINIO_PARQUET_FOLDER)
 
 

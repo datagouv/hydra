@@ -11,6 +11,7 @@ from json_stream import streamable_list
 
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
+from udata_hydra.db import RESERVED_COLS
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -269,18 +270,30 @@ def _detect_geo_columns(inspection: dict) -> dict[str, str] | None:
     return None
 
 
+def _db_col_name(col: str) -> str:
+    """Map a CSV column name to its actual PostgreSQL column name."""
+    return f"{col}__hydra_renamed" if col.lower() in RESERVED_COLS else col
+
+
 def _build_feature_sql(table_name: str, geo: dict[str, str], columns: list[str]) -> str:
-    """Build a SQL query that generates GeoJSON features directly in PostgreSQL."""
+    """Build a SQL query that generates GeoJSON features directly in PostgreSQL.
+
+    Column names in `columns` and `geo` are the original CSV names. They are
+    mapped to their actual DB names (handling RESERVED_COLS renaming) for the
+    SQL identifiers, while the original names are kept as JSON keys so the
+    GeoJSON output matches what the CSV path produces.
+    """
     property_cols = [c for c in columns if c not in geo.values()]
-    properties_args = ", ".join(f"'{col}', {_quote_ident(col)}" for col in property_cols)
+    properties_args = ", ".join(
+        f"'{col}', {_quote_ident(_db_col_name(col))}" for col in property_cols
+    )
 
     if "geojson" in geo:
-        col = geo["geojson"]
+        col = _db_col_name(geo["geojson"])
         geometry_sql = f"({_quote_ident(col)})::json"
         where = ""
     elif "latlon" in geo:
-        # latlon = "lat,lon" → GeoJSON needs [lon, lat]
-        col = geo["latlon"]
+        col = _db_col_name(geo["latlon"])
         geometry_sql = f"""json_build_object(
                 'type', 'Point',
                 'coordinates', json_build_array(
@@ -290,7 +303,7 @@ def _build_feature_sql(table_name: str, geo: dict[str, str], columns: list[str])
             )"""
         where = f"WHERE {_quote_ident(col)} IS NOT NULL"
     elif "lonlat" in geo:
-        col = geo["lonlat"]
+        col = _db_col_name(geo["lonlat"])
         geometry_sql = f"""json_build_object(
                 'type', 'Point',
                 'coordinates', json_build_array(
@@ -300,8 +313,8 @@ def _build_feature_sql(table_name: str, geo: dict[str, str], columns: list[str])
             )"""
         where = f"WHERE {_quote_ident(col)} IS NOT NULL"
     else:
-        lon_col = geo["longitude"]
-        lat_col = geo["latitude"]
+        lon_col = _db_col_name(geo["longitude"])
+        lat_col = _db_col_name(geo["latitude"])
         geometry_sql = f"""json_build_object(
                 'type', 'Point',
                 'coordinates', json_build_array({_quote_ident(lon_col)}, {_quote_ident(lat_col)})
