@@ -188,6 +188,7 @@ async def analyse_csv(
                 resource_id=resource_id,
                 check_id=check["id"],
                 timer=timer,
+                table_name=table_name if config.CSV_TO_DB else None,
             )
         except Exception as e:
             remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])

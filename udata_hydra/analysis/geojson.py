@@ -9,7 +9,7 @@ import tippecanoe
 from asyncpg import Record
 from json_stream import streamable_list
 
-from udata_hydra import config
+from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -28,6 +28,28 @@ DEFAULT_GEOJSON_FILEPATH = Path("converted_from_csv.geojson")
 DEFAULT_PMTILES_FILEPATH = Path("converted_from_geojson.pmtiles")
 
 log = logging.getLogger("udata-hydra")
+
+
+# latlon/lonlat columns can contain values like "[48.8566, 2.3522]" or "48.8566 , 2.3522"
+# Both versions below strip spaces and brackets, then split on comma.
+
+
+def _cast_latlon(latlon: str) -> list[float]:
+    """Python version — used when reading from CSV."""
+    lat, lon = latlon.replace(" ", "").replace("[", "").replace("]", "").split(",")
+    # GeoJSON standard: longitude before latitude
+    return [float(lon), float(lat)]
+
+
+def _quote_ident(name: str) -> str:
+    """Escape a PostgreSQL identifier to prevent SQL injection."""
+    return '"' + name.replace('"', '""') + '"'
+
+
+def _clean_pair_sql(col: str) -> str:
+    """SQL version — used when reading from PostgreSQL."""
+    return f"replace(replace(replace({_quote_ident(col)}, ' ', ''), '[', ''), ']', '')"
+
 
 minio_client_pmtiles = MinIOClient(
     bucket=config.MINIO_PMTILES_BUCKET, folder=config.MINIO_PMTILES_FOLDER
@@ -133,13 +155,6 @@ async def csv_to_geojson(
         geojson_url: URL of the GeoJSON file on MinIO. None if it was not uploaded to MinIO.
     """
 
-    def cast_latlon(latlon: str) -> list[float]:
-        # we can safely do this as the detection was successful
-        # removing potential blank and brackets
-        lat, lon = latlon.replace(" ", "").replace("[", "").replace("]", "").split(",")
-        # using the geojson standard: longitude before latitude
-        return [float(lon), float(lat)]
-
     def get_features(
         file_path: str, inspection: dict, geo: dict[str, Any]
     ) -> Iterator[dict[str, Any]]:
@@ -163,7 +178,7 @@ async def csv_to_geojson(
                     "type": "Feature",
                     "geometry": {
                         "type": "Point",
-                        "coordinates": cast_latlon(row[geo["latlon"]]),
+                        "coordinates": _cast_latlon(row[geo["latlon"]]),
                     },
                     "properties": {col: row[col] for col in row.keys() if col != geo["latlon"]},  # type: ignore[union-attr]
                 }
@@ -178,7 +193,7 @@ async def csv_to_geojson(
                     "geometry": {
                         "type": "Point",
                         # inverting lon and lat to match the standard
-                        "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
+                        "coordinates": _cast_latlon(row[geo["lonlat"]])[::-1],
                     },
                     "properties": {col: row[col] for col in row.keys() if col != geo["lonlat"]},  # type: ignore[union-attr]
                 }
@@ -201,6 +216,35 @@ async def csv_to_geojson(
                     },
                 }
 
+    geo = _detect_geo_columns(inspection)
+    if geo is None:
+        log.debug("No geographical columns found, skipping")
+        return None
+
+    template = {"type": "FeatureCollection"}
+
+    template["features"] = streamable_list(get_features(file_path, inspection, geo))
+
+    with output_file_path.open("w") as f:
+        json.dump(template, f, indent=4, ensure_ascii=False, default=str)
+
+    geojson_size: int = os.path.getsize(output_file_path)
+
+    if upload_to_minio:
+        log.debug(f"Sending GeoJSON file {output_file_path} to MinIO")
+        geojson_url = minio_client_geojson.send_file(str(output_file_path), delete_source=False)
+    else:
+        geojson_url = None
+
+    return geojson_size, geojson_url
+
+
+def _detect_geo_columns(inspection: dict) -> dict[str, str] | None:
+    """Detect geographical columns from csv-detective inspection results.
+
+    Returns a dict like {"latitude": "col_name", "longitude": "col_name"}
+    or {"geojson": "col_name"} etc, or None if no geo columns found.
+    """
     geo = {}
     for column, detection in inspection["columns"].items():
         # see csv-detective's geo formats:
@@ -215,26 +259,95 @@ async def csv_to_geojson(
                     geo[fmt] = (column, detection["score"])
     # priority is given to geojson, then latlon, then lonlat, then latitude + longitude
     if "geojson" in geo:
-        geo = {"geojson": geo["geojson"][0]}
+        return {"geojson": geo["geojson"][0]}
     elif "latlon" in geo:
-        geo = {"latlon": geo["latlon"][0]}
+        return {"latlon": geo["latlon"][0]}
     elif "lonlat" in geo:
-        geo = {"lonlat": geo["lonlat"][0]}
+        return {"lonlat": geo["lonlat"][0]}
     elif "latitude" in geo and "longitude" in geo:
-        geo = {
-            "latitude": geo["latitude"][0],
-            "longitude": geo["longitude"][0],
-        }
+        return {"latitude": geo["latitude"][0], "longitude": geo["longitude"][0]}
+    return None
+
+
+def _build_feature_sql(table_name: str, geo: dict[str, str], columns: list[str]) -> str:
+    """Build a SQL query that generates GeoJSON features directly in PostgreSQL."""
+    property_cols = [c for c in columns if c not in geo.values()]
+    properties_args = ", ".join(f"'{col}', {_quote_ident(col)}" for col in property_cols)
+
+    if "geojson" in geo:
+        col = geo["geojson"]
+        geometry_sql = f"({_quote_ident(col)})::json"
+        where = ""
+    elif "latlon" in geo:
+        # latlon = "lat,lon" → GeoJSON needs [lon, lat]
+        col = geo["latlon"]
+        geometry_sql = f"""json_build_object(
+                'type', 'Point',
+                'coordinates', json_build_array(
+                    (split_part({_clean_pair_sql(col)}, ',', 2))::float,
+                    (split_part({_clean_pair_sql(col)}, ',', 1))::float
+                )
+            )"""
+        where = f"WHERE {_quote_ident(col)} IS NOT NULL"
+    elif "lonlat" in geo:
+        col = geo["lonlat"]
+        geometry_sql = f"""json_build_object(
+                'type', 'Point',
+                'coordinates', json_build_array(
+                    (split_part({_clean_pair_sql(col)}, ',', 1))::float,
+                    (split_part({_clean_pair_sql(col)}, ',', 2))::float
+                )
+            )"""
+        where = f"WHERE {_quote_ident(col)} IS NOT NULL"
     else:
+        lon_col = geo["longitude"]
+        lat_col = geo["latitude"]
+        geometry_sql = f"""json_build_object(
+                'type', 'Point',
+                'coordinates', json_build_array({_quote_ident(lon_col)}, {_quote_ident(lat_col)})
+            )"""
+        where = f"WHERE {_quote_ident(lat_col)} IS NOT NULL AND {_quote_ident(lon_col)} IS NOT NULL"
+
+    return f"""
+        SELECT json_build_object(
+            'type', 'Feature',
+            'geometry', {geometry_sql},
+            'properties', json_build_object({properties_args})
+        )::text
+        FROM {_quote_ident(table_name)}
+        {where}
+    """
+
+
+async def csv_to_geojson_from_db(
+    table_name: str,
+    inspection: dict,
+    output_file_path: Path,
+    upload_to_minio: bool = True,
+) -> tuple[int, str | None] | None:
+    """Generate a GeoJSON file by streaming features directly from PostgreSQL."""
+    geo = _detect_geo_columns(inspection)
+    if geo is None:
         log.debug("No geographical columns found, skipping")
         return None
 
-    template = {"type": "FeatureCollection"}
+    columns = list(inspection["columns"].keys())
+    query = _build_feature_sql(table_name, geo, columns)
 
-    template["features"] = streamable_list(get_features(file_path, inspection, geo))
+    db = await context.pool("csv")
+    async with db.acquire() as conn:
+        async with conn.transaction():
+            cursor = conn.cursor(query)
 
-    with output_file_path.open("w") as f:
-        json.dump(template, f, indent=4, ensure_ascii=False, default=str)
+            with output_file_path.open("w") as f:
+                f.write('{"type": "FeatureCollection", "features": [\n')
+                first = True
+                async for row in cursor:
+                    if not first:
+                        f.write(",\n")
+                    f.write(row[0])
+                    first = False
+                f.write("\n]}")
 
     geojson_size: int = os.path.getsize(output_file_path)
 
@@ -300,6 +413,7 @@ async def csv_to_geojson_and_pmtiles(
     resource_id: str | None = None,
     check_id: int | None = None,
     timer: Timer | None = None,
+    table_name: str | None = None,
 ) -> tuple[Path, int, str | None, Path, int, str | None] | None:
     if not config.CSV_TO_GEOJSON:
         log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
@@ -318,8 +432,16 @@ async def csv_to_geojson_and_pmtiles(
         geojson_filepath = DEFAULT_GEOJSON_FILEPATH
         pmtiles_filepath = DEFAULT_PMTILES_FILEPATH
 
-    # Convert CSV to GeoJSON
-    result = await csv_to_geojson(file_path, inspection, geojson_filepath, upload_to_minio=True)
+    # Convert to GeoJSON — from DB if available, otherwise from CSV file
+    if table_name:
+        result = await csv_to_geojson_from_db(
+            table_name,
+            inspection,
+            geojson_filepath,
+            upload_to_minio=True,
+        )
+    else:
+        result = await csv_to_geojson(file_path, inspection, geojson_filepath, upload_to_minio=True)
     if result is None:
         return None
     geojson_size, geojson_url = result
