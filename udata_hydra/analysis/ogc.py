@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from asyncpg import Record
 from owslib.crs import Crs
@@ -28,6 +28,9 @@ SERVICE_MAPPING = {
 }
 
 
+OgcFormat = Literal["wfs", "wms"]
+
+
 class OgcLayer(TypedDict):
     name: str
     default_crs: str | None
@@ -41,7 +44,7 @@ class OgcMetadata(TypedDict):
     detected_layer: OgcLayer | None
 
 
-async def analyse_ogc(check: dict, format: str) -> OgcMetadata | None:
+async def analyse_ogc(check: dict, format: OgcFormat) -> OgcMetadata | None:
     """
     Analyse an OGC endpoint and extract metadata.
 
@@ -49,7 +52,7 @@ async def analyse_ogc(check: dict, format: str) -> OgcMetadata | None:
     and extracts:
     - Service format and version
     - Available layers with their CRS options
-    - Supported output formats
+    - Supported output formats for WFS
 
     Args:
         check: Dictionary containing at least "url" key. "id" and "resource_id" are optional
@@ -64,7 +67,7 @@ async def analyse_ogc(check: dict, format: str) -> OgcMetadata | None:
 
     if format not in config.OGC_FORMATS:
         log.debug(
-            f"Only supported OGC service formats configured are : OGC_FORMATS={config.OGC_FORMATS}"
+            f"Only OGC service formats activated in config are : OGC_FORMATS={config.OGC_FORMATS}"
         )
         return None
 

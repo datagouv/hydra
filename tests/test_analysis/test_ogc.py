@@ -8,8 +8,7 @@ from owslib.util import ServiceException
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from tests.conftest import RESOURCE_ID
-from udata_hydra.analysis import ogc
-from udata_hydra.analysis.ogc import SERVICE_MAPPING, analyse_ogc
+from udata_hydra.analysis.ogc import analyse_ogc
 from udata_hydra.utils.ogc import detect_layer_name, detect_ogc, is_valid_layer_name
 
 log = logging.getLogger("udata-hydra")
