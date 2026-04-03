@@ -1,10 +1,17 @@
 import json
+import logging
+import os
+import tempfile
+from pathlib import Path
 from typing import IO
 
+import aiohttp
 from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.utils import UdataPayload, download_resource, queue, send
+
+log = logging.getLogger("udata-hydra")
 
 
 def get_python_type(column: dict) -> str:
@@ -35,6 +42,22 @@ async def read_or_download_file(
         return tmp_file
 
 
+async def download_url_to_tempfile(url: str, suffix: str = "") -> Path:
+    """Download a URL to a named temporary file and return its path."""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            resp.raise_for_status()
+            body = await resp.read()
+    fd, raw_path = tempfile.mkstemp(suffix=suffix)
+    path = Path(raw_path)
+    try:
+        os.write(fd, body)
+    finally:
+        os.close(fd)
+    log.debug(f"Downloaded {url} to {path} ({len(body)} bytes)")
+    return path
+
+
 async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:
     """Notify udata of the result of a parsing"""
     if check is None or resource is None:
@@ -60,7 +83,7 @@ async def notify_udata(resource: Record | None, check: Record | dict | None) -> 
     if config.GEOJSON_TO_PMTILES and check.get("pmtiles_url"):
         payload["document"]["analysis:parsing:pmtiles_url"] = check.get("pmtiles_url")
         payload["document"]["analysis:parsing:pmtiles_size"] = check.get("pmtiles_size")
-    if config.CSV_TO_GEOJSON and check.get("geojson_url"):
+    if config.DB_TO_GEOJSON and check.get("geojson_url"):
         payload["document"]["analysis:parsing:geojson_url"] = check.get("geojson_url")
         payload["document"]["analysis:parsing:geojson_size"] = check.get("geojson_size")
     if config.OGC_ANALYSIS_ENABLED and check.get("ogc_metadata"):
