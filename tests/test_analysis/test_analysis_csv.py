@@ -1069,10 +1069,10 @@ async def test_analyse_csv_split_geo_rq_chain(
     mocked_minio.fput_object.return_value = None
     mocked_minio.bucket_exists.return_value = True
 
-    async def fake_download(dl_url: str, suffix: str = "") -> str:
+    async def fake_download(dl_url: str, suffix: str = "") -> Path:
         p = Path(f"{RESOURCE_ID}.geojson")
         assert p.is_file()
-        return str(p.resolve())
+        return p.resolve()
 
     with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
         geo_client = MinIOClient(bucket="geojson_bucket", folder="geojson_folder")

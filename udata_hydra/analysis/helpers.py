@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import tempfile
+from pathlib import Path
 from typing import IO
 
 import aiohttp
@@ -48,18 +49,19 @@ async def read_or_download_file(
         return tmp_file
 
 
-async def download_url_to_tempfile(url: str, suffix: str = "") -> str:
-    """Download a URL to a named temporary file and return its filesystem path."""
+async def download_url_to_tempfile(url: str, suffix: str = "") -> Path:
+    """Download a URL to a named temporary file and return its path."""
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             resp.raise_for_status()
             body = await resp.read()
-    fd, path = tempfile.mkstemp(suffix=suffix)
+    fd, raw_path = tempfile.mkstemp(suffix=suffix)
+    path = Path(raw_path)
     try:
         os.write(fd, body)
     finally:
         os.close(fd)
-    log.debug("Downloaded %s to %s (%s bytes)", url, path, len(body))
+    log.debug(f"Downloaded {url} to {path} ({len(body)} bytes)")
     return path
 
 
