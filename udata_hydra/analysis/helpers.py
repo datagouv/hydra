@@ -88,7 +88,7 @@ async def notify_udata(resource: Record | None, check: Record | dict | None) -> 
     if config.GEOJSON_TO_PMTILES and check.get("pmtiles_url"):
         payload["document"]["analysis:parsing:pmtiles_url"] = check.get("pmtiles_url")
         payload["document"]["analysis:parsing:pmtiles_size"] = check.get("pmtiles_size")
-    if (config.CSV_TO_GEOJSON or config.DB_TO_GEOJSON) and check.get("geojson_url"):
+    if config.DB_TO_GEOJSON and check.get("geojson_url"):
         payload["document"]["analysis:parsing:geojson_url"] = check.get("geojson_url")
         payload["document"]["analysis:parsing:geojson_size"] = check.get("geojson_size")
     if config.OGC_ANALYSIS_ENABLED and check.get("ogc_metadata"):

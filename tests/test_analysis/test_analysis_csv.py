@@ -646,7 +646,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
             assert expected_formats[col] in inspection["columns"][col]["format"]
 
     with (
-        patch("udata_hydra.config.CSV_TO_GEOJSON", patched_config),
+        patch("udata_hydra.config.DB_TO_GEOJSON", patched_config),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):
         if not patched_config or expected_formats is None:
@@ -1079,7 +1079,6 @@ async def test_analyse_csv_split_geo_rq_chain(
         pmtiles_client = MinIOClient(bucket="pmtiles_bucket", folder="pmtiles_folder")
 
     with (
-        patch("udata_hydra.config.CSV_TO_GEOJSON", True),
         patch("udata_hydra.config.DB_TO_GEOJSON", True),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
         patch("udata_hydra.analysis.geojson.minio_client_geojson", new=geo_client),
@@ -1113,7 +1112,7 @@ async def test_analyse_csv_skips_geo_rq_when_csv_to_db_disabled(
     rmock.get(url, status=200, body="a,b\n1,2\n")
     enq = mocker.patch("udata_hydra.analysis.csv.queue.enqueue")
     with (
-        patch("udata_hydra.config.CSV_TO_GEOJSON", True),
+        patch("udata_hydra.config.DB_TO_GEOJSON", True),
         patch("udata_hydra.config.CSV_TO_DB", False),
     ):
         await analyse_csv(check=check)
@@ -1135,10 +1134,7 @@ async def test_split_geo_chain_skips_pmtiles_without_geo_columns(
     rmock.get(url, status=200, body="a,b,c\n1,2,3\n")
     to_pmtiles = mocker.patch("udata_hydra.analysis.geojson.task_geojson_to_pmtiles")
 
-    with (
-        patch("udata_hydra.config.CSV_TO_GEOJSON", True),
-        patch("udata_hydra.config.DB_TO_GEOJSON", True),
-    ):
+    with patch("udata_hydra.config.DB_TO_GEOJSON", True):
         await analyse_csv(check=check)
 
     to_pmtiles.assert_not_called()

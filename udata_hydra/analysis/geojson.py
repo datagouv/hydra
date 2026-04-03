@@ -442,10 +442,10 @@ async def export_geojson_for_csv_analysis(
     When ``table_name`` is set, reads features from PostgreSQL via ``csv_to_geojson_from_db``.
     Otherwise requires ``file_path`` for ``csv_to_geojson``.
 
-    Returns ``(geojson_size, geojson_url)`` or ``None`` when geo export is disabled or
+    Returns ``(geojson_size, geojson_url)`` or ``None`` when ``DB_TO_GEOJSON`` is false or
     there are no geographical columns.
     """
-    if not config.CSV_TO_GEOJSON and not config.DB_TO_GEOJSON:
+    if not config.DB_TO_GEOJSON:
         return None
 
     if resource_id:
@@ -517,8 +517,8 @@ async def csv_to_geojson_and_pmtiles(
     timer: Timer | None = None,
     table_name: str | None = None,
 ) -> tuple[Path, int, str | None, Path, int, str | None] | None:
-    if not config.CSV_TO_GEOJSON and not config.DB_TO_GEOJSON:
-        log.debug("CSV_TO_GEOJSON and DB_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
+    if not config.DB_TO_GEOJSON:
+        log.debug("DB_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
         return None
 
     log.debug(
@@ -576,8 +576,8 @@ async def task_csv_to_geojson(
     worker_exception: bool = False,
 ) -> None:
     """Generate GeoJSON from the CSV parsing table and enqueue PMTiles conversion."""
-    if not config.CSV_TO_GEOJSON and not config.DB_TO_GEOJSON:
-        log.debug("CSV_TO_GEOJSON and DB_TO_GEOJSON turned off, skipping geo job.")
+    if not config.DB_TO_GEOJSON:
+        log.debug("DB_TO_GEOJSON turned off, skipping geo job.")
         return
 
     record = await Check.get_by_id(check_id, with_deleted=True)
