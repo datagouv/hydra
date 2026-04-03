@@ -6,7 +6,8 @@ from marshmallow import Schema, fields
 class CheckSchema(Schema):
     check_id = fields.Integer(data_key="id")
     catalog_id = fields.Integer()
-    url = fields.Str()
+    catalog_url = fields.Str()
+    check_url = fields.Str()
     domain = fields.Str()
     created_at = fields.DateTime()
     check_status = fields.Integer(data_key="status")
