@@ -674,11 +674,11 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 )
             with (
                 patch(
-                    "udata_hydra.analysis.geojson.minio_client_geojson",
+                    "udata_hydra.analysis.csv_geojson.minio_client_geojson",
                     new=mocked_minio_client_geojson,
                 ),
                 patch(
-                    "udata_hydra.analysis.geojson.minio_client_pmtiles",
+                    "udata_hydra.analysis.pmtiles.minio_client_pmtiles",
                     new=mocked_minio_client_pmtiles,
                 ),
             ):
@@ -1081,8 +1081,8 @@ async def test_analyse_csv_split_geo_rq_chain(
     with (
         patch("udata_hydra.config.DB_TO_GEOJSON", True),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
-        patch("udata_hydra.analysis.geojson.minio_client_geojson", new=geo_client),
-        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=pmtiles_client),
+        patch("udata_hydra.analysis.csv_geojson.minio_client_geojson", new=geo_client),
+        patch("udata_hydra.analysis.pmtiles.minio_client_pmtiles", new=pmtiles_client),
         patch("udata_hydra.analysis.helpers.download_url_to_tempfile", new=fake_download),
     ):
         await analyse_csv(check=check)
