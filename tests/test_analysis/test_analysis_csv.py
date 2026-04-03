@@ -383,7 +383,7 @@ default_kwargs = {
     "separator": ",",
     "header": ["a", "epci"],
     "rows": [["1", "13002526500013"], ["5", "38271817900023"]],
-    "encoding": "ascii",
+    "encoding": "utf-8",
     "columns": {
         "a": {"score": 1.0, "format": "int", "python_type": "int"},
         "epci": {"score": 1.5, "format": "siret", "python_type": "string"},
