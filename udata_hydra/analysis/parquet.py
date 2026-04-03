@@ -15,7 +15,7 @@ from progressist import ProgressBar
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.csv import compute_create_table_query, csv_to_db_index
-from udata_hydra.db import compute_insert_query
+from udata_hydra.db import RESERVED_COLS, compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -44,8 +44,6 @@ PYARROW_TYPE_TO_PYTHON = {
     r"^timestamp\[\ws\]": "datetime",
     r"^timestamp\[\ws,": "datetime_aware",  # the rest of the field depends on the timezone
 }
-
-RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
 
 
 async def analyse_parquet(

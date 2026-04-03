@@ -14,7 +14,7 @@ from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
-from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
+from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles, csv_to_geojson_from_db
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -733,6 +733,187 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
             # Clean up files after tests
             geojson_filepath.unlink()
             pmtiles_filepath.unlink()
+
+
+@pytest.mark.parametrize(
+    "geo_columns,expected_geo_key",
+    (
+        # latlon format: "lat,lon" → GeoJSON coordinates should be [lon, lat]
+        (
+            {"coords": [f"{10.0 * k * (-1) ** k},{20.0 * k * (-1) ** k}" for k in range(1, 6)]},
+            "latlon",
+        ),
+        # separate latitude + longitude columns
+        (
+            {
+                "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
+                "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
+            },
+            "latitude",
+        ),
+    ),
+)
+async def test_csv_to_geojson_from_db(db, geo_columns, expected_geo_key, clean_db):
+    output_path = Path(f"{RESOURCE_ID}.geojson")
+    try:
+        output_path.unlink()
+    except FileNotFoundError:
+        pass
+
+    other_columns = {
+        "nombre": range(1, 6),
+        "score": [0.01, 1.2, 34.5, 678.9, 10],
+    }
+    sep = ";"
+    columns = other_columns | geo_columns
+    file = sep.join(columns) + "\n"
+    for i in range(len(other_columns["nombre"])):
+        file += sep.join(str(val) for val in [data[i] for data in columns.values()]) + "\n"
+
+    with NamedTemporaryFile(delete=False) as fp:
+        fp.write(file.encode("utf-8"))
+        fp.seek(0)
+        inspection = csv_detective_routine(
+            file_path=fp.name,
+            output_profile=True,
+            num_rows=-1,
+            save_results=False,
+        )
+
+    table_name = "test_geojson_from_db"
+    with patch("udata_hydra.config.CSV_TO_DB", True):
+        await csv_to_db(fp.name, inspection, table_name)
+
+    result = await csv_to_geojson_from_db(
+        table_name, inspection, output_path, upload_to_minio=False
+    )
+    assert result is not None
+    geojson_size, geojson_url = result
+    assert geojson_url is None
+    assert geojson_size > 0
+
+    with open(output_path) as f:
+        geojson = json.load(f)
+
+    assert geojson["type"] == "FeatureCollection"
+    assert len(geojson["features"]) == 5
+    for feat in geojson["features"]:
+        assert feat["type"] == "Feature"
+        assert feat["geometry"]["type"] == "Point"
+        coords = feat["geometry"]["coordinates"]
+        assert isinstance(coords[0], (int, float))
+        assert isinstance(coords[1], (int, float))
+        assert "nombre" in feat["properties"]
+        assert "score" in feat["properties"]
+        for geo_col in geo_columns:
+            assert geo_col not in feat["properties"]
+
+    output_path.unlink()
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+
+
+async def test_csv_to_geojson_from_db_with_reserved_column(db, clean_db):
+    """A CSV with a reserved PG column name (xmin) should still produce valid GeoJSON from DB."""
+    output_path = Path(f"{RESOURCE_ID}.geojson")
+    try:
+        output_path.unlink()
+    except FileNotFoundError:
+        pass
+
+    sep = ";"
+    columns = {
+        "xmin": range(1, 6),
+        "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
+        "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
+    }
+    file = sep.join(columns) + "\n"
+    for i in range(5):
+        file += sep.join(str(val) for val in [data[i] for data in columns.values()]) + "\n"
+
+    with NamedTemporaryFile(delete=False) as fp:
+        fp.write(file.encode("utf-8"))
+        fp.seek(0)
+        inspection = csv_detective_routine(
+            file_path=fp.name,
+            output_profile=True,
+            num_rows=-1,
+            save_results=False,
+        )
+
+    table_name = "test_geojson_reserved_col"
+    with patch("udata_hydra.config.CSV_TO_DB", True):
+        await csv_to_db(fp.name, inspection, table_name)
+
+    result = await csv_to_geojson_from_db(
+        table_name, inspection, output_path, upload_to_minio=False
+    )
+    assert result is not None
+    geojson_size, _ = result
+
+    with open(output_path) as f:
+        geojson = json.load(f)
+
+    assert len(geojson["features"]) == 5
+    expected_xmin_values = list(range(1, 6))
+    actual_xmin_values = [feat["properties"]["xmin"] for feat in geojson["features"]]
+    assert actual_xmin_values == expected_xmin_values
+
+    output_path.unlink()
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+
+
+async def test_csv_to_geojson_from_db_with_quote_in_column_name(db, clean_db):
+    """A CSV with a single quote in a column name should not break the SQL query."""
+    output_path = Path(f"{RESOURCE_ID}.geojson")
+    try:
+        output_path.unlink()
+    except FileNotFoundError:
+        pass
+
+    sep = ";"
+    columns = {
+        "l'adresse": [
+            "10 rue de la Paix",
+            "5 avenue Foch",
+            "3 bd Raspail",
+            "1 place Vendôme",
+            "8 rue Rivoli",
+        ],
+        "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
+        "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
+    }
+    file = sep.join(columns) + "\n"
+    for i in range(5):
+        file += sep.join(str(val) for val in [data[i] for data in columns.values()]) + "\n"
+
+    with NamedTemporaryFile(delete=False) as fp:
+        fp.write(file.encode("utf-8"))
+        fp.seek(0)
+        inspection = csv_detective_routine(
+            file_path=fp.name,
+            output_profile=True,
+            num_rows=-1,
+            save_results=False,
+        )
+
+    table_name = "test_geojson_quote_col"
+    with patch("udata_hydra.config.CSV_TO_DB", True):
+        await csv_to_db(fp.name, inspection, table_name)
+
+    result = await csv_to_geojson_from_db(
+        table_name, inspection, output_path, upload_to_minio=False
+    )
+    assert result is not None
+
+    with open(output_path) as f:
+        geojson = json.load(f)
+
+    assert len(geojson["features"]) == 5
+    for feat in geojson["features"]:
+        assert "l'adresse" in feat["properties"]
+
+    output_path.unlink()
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
 @pytest.mark.parametrize(
