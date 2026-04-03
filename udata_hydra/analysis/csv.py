@@ -201,7 +201,7 @@ async def analyse_csv(
                 check_id=check["id"],
             ) from e
 
-        if config.CSV_TO_GEOJSON or config.DB_TO_GEOJSON:
+        if config.DB_TO_GEOJSON:
             if not config.CSV_TO_DB:
                 log.debug(
                     "Skipping GeoJSON/PMTiles RQ jobs: CSV_TO_DB is false "
