@@ -60,19 +60,12 @@ async def analyse_geojson(
 
     tmp_file = None
     try:
-        try:
-            tmp_file = await helpers.read_or_download_file(
-                check=check,
-                file_path=file_path,
-                file_format="geojson",
-                exception=exception,
-            )
-        except FileNotFoundError as e:
-            raise IOException(
-                f"Temporary file not found: {file_path}",
-                resource_id=resource_id,
-                url=url,
-            ) from e
+        tmp_file = await helpers.read_or_download_file(
+            check=check,
+            file_path=file_path,
+            file_format="geojson",
+            exception=exception,
+        )
         timer.mark("download-file")
 
         check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})

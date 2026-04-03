@@ -77,19 +77,12 @@ async def analyse_parquet(
 
     table_name, tmp_file = None, None
     try:
-        try:
-            tmp_file = await helpers.read_or_download_file(
-                check=check,
-                file_path=file_path,
-                file_format="parquet",
-                exception=exception,
-            )
-        except FileNotFoundError as e:
-            raise IOException(
-                f"Temporary file not found: {file_path}",
-                resource_id=resource_id,
-                url=url,
-            ) from e
+        tmp_file = await helpers.read_or_download_file(
+            check=check,
+            file_path=file_path,
+            file_format="parquet",
+            exception=exception,
+        )
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         timer.mark("download-file")
 
