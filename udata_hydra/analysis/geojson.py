@@ -668,7 +668,7 @@ async def task_geojson_to_pmtiles(check_id: int) -> None:
     """Convert GeoJSON (from MinIO) to PMTiles and persist URLs on the check."""
     record = await Check.get_by_id(check_id, with_deleted=True)
     if not record:
-        log.error(f"task_geojson_to_pmtiles: check{check_id} not found")
+        log.error(f"task_geojson_to_pmtiles: check {check_id} not found")
         return
 
     check: dict = dict(record)
@@ -685,7 +685,7 @@ async def task_geojson_to_pmtiles(check_id: int) -> None:
     # Update resource status for PMTiles conversion
     await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
     pmtiles_path = Path(f"{resource_id}.pmtiles")
-    tmp_geo: str | None = None
+    tmp_geo: Path | None = None
 
     try:
         try:
@@ -693,7 +693,7 @@ async def task_geojson_to_pmtiles(check_id: int) -> None:
             await export_pmtiles_from_local_geojson(
                 resource_id=resource_id,
                 check_id=check_id,
-                geojson_filepath=Path(tmp_geo),
+                geojson_filepath=tmp_geo,
                 pmtiles_filepath=pmtiles_path,
                 timer=None,
                 unlink_geojson_after=False,
@@ -735,7 +735,7 @@ async def task_geojson_to_pmtiles(check_id: int) -> None:
         await Resource.update(resource_id, {"status": None})
         if tmp_geo is not None:
             try:
-                os.remove(tmp_geo)
+                tmp_geo.unlink(missing_ok=True)
             except OSError:
                 log.warning(f"Could not remove temp geojson {tmp_geo}")
         if pmtiles_path.is_file() and config.REMOVE_GENERATED_FILES:
