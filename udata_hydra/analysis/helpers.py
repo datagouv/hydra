@@ -4,7 +4,7 @@ from typing import IO
 from asyncpg import Record
 
 from udata_hydra import config
-from udata_hydra.utils import UdataPayload, download_resource, queue, send
+from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send
 
 
 def get_python_type(column: dict) -> str:
@@ -23,7 +23,14 @@ async def read_or_download_file(
     exception: Record | None,
 ) -> IO[bytes]:
     if file_path:
-        return open(file_path, "rb")
+        try:
+            return open(file_path, "rb")
+        except FileNotFoundError as e:
+            raise IOException(
+                f"Temporary file not found: {file_path}",
+                resource_id=check["resource_id"],
+                url=check["url"],
+            ) from e
     else:
         tmp_file, _ = await download_resource(
             url=check["url"],
