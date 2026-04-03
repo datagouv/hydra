@@ -1,11 +1,39 @@
+import asyncio
 import json
+import logging
 import uuid
 
+import aiohttp
 from aiohttp import web
 from asyncpg import Record
 
+from udata_hydra import config
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import ResourceDocumentSchema, ResourceSchema
+
+log = logging.getLogger(__name__)
+
+
+async def _immediate_check_resource(resource_id: str) -> None:
+    """Run check_resource in the background (same RQ tier as POST /api/checks)."""
+    from udata_hydra.crawl.check_resources import check_resource
+
+    try:
+        resource = await Resource.get(resource_id)
+        if resource is None or resource["status"] is not None:
+            return
+        async with aiohttp.ClientSession(
+            timeout=None,
+            headers={"user-agent": config.USER_AGENT_FULL},
+        ) as session:
+            await check_resource(
+                url=resource["url"],
+                resource=resource,
+                session=session,
+                worker_priority="high",
+            )
+    except Exception:
+        log.exception("Background check failed for resource %s", resource_id)
 
 
 async def get_resource(request: web.Request) -> web.Response:
@@ -56,6 +84,9 @@ async def create_resource(request: web.Request) -> web.Response:
         title=document["title"],
         instant_analysis=instant_analysis,
     )
+
+    if instant_analysis:
+        asyncio.create_task(_immediate_check_resource(resource_id))
 
     return web.json_response(ResourceDocumentSchema().dump(dict(document)), status=201)
 

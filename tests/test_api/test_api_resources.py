@@ -68,8 +68,11 @@ async def test_create_resource(
     assert text == "Missing document body"
 
 
-async def test_create_resource_instant_analysis(client, api_headers, udata_resource_payload, db):
-    """Optional webhook flag stores instant_analysis for high RQ tier (#386)."""
+async def test_create_resource_instant_analysis(
+    client, api_headers, udata_resource_payload, db, mocker
+):
+    """Optional webhook flag stores instant_analysis and schedules a background check (#386)."""
+    mock_create_task = mocker.patch("udata_hydra.routes.resources.asyncio.create_task")
     payload = {**udata_resource_payload, "instant_analysis": True}
     resp = await client.post(path="/api/resources/", headers=api_headers, json=payload)
     assert resp.status == 201
@@ -77,6 +80,17 @@ async def test_create_resource_instant_analysis(client, api_headers, udata_resou
     row = await db.fetchrow("SELECT instant_analysis FROM catalog WHERE resource_id = $1", rid)
     assert row is not None
     assert row["instant_analysis"] is True
+    mock_create_task.assert_called_once()
+
+
+async def test_create_resource_without_instant_analysis_no_background_task(
+    client, api_headers, udata_resource_payload, mocker
+):
+    mock_create_task = mocker.patch("udata_hydra.routes.resources.asyncio.create_task")
+    payload = {**udata_resource_payload}
+    resp = await client.post(path="/api/resources/", headers=api_headers, json=payload)
+    assert resp.status == 201
+    mock_create_task.assert_not_called()
 
 
 async def test_update_resource(client, api_headers, api_headers_wrong_token):
