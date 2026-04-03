@@ -1,4 +1,4 @@
-from marshmallow import Schema, fields
+from marshmallow import EXCLUDE, Schema, fields
 
 
 class ResourceDocumentSchema(Schema):
@@ -21,8 +21,12 @@ class ResourceDocumentSchema(Schema):
 
 
 class ResourceSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
     dataset_id = fields.Str(required=True)
     resource_id = fields.Str(required=True)
     status = fields.Str(required=False)
     status_since = fields.DateTime(required=False)
     document = fields.Nested(ResourceDocumentSchema(), allow_none=True)
+    instant_analysis = fields.Bool(required=False)

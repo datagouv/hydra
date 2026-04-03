@@ -798,11 +798,14 @@ async def test_reset_statuses(fake_check, db, setup_catalog, check_duration):
 
 
 @pytest.mark.parametrize(
+    "instant_analysis,expected_worker_priority", [(False, "default"), (True, "high")]
+)
+@pytest.mark.parametrize(
     "mock_function",
     [
         (
             "udata_hydra.crawl.check_resources.check_resource",
-            {"url": ANY, "resource": ANY, "session": ANY, "worker_priority": "default"},
+            {"url": ANY, "resource": ANY, "session": ANY},
             "ok",
         ),
         (
@@ -811,7 +814,6 @@ async def test_reset_statuses(fake_check, db, setup_catalog, check_duration):
                 "check": ANY,
                 "last_check": ANY,
                 "force_analysis": False,
-                "worker_priority": "default",
             },
             None,
         ),
@@ -826,16 +828,21 @@ async def test_new_resource_priority(
     produce_mock,
     api_headers,
     mock_function,
+    instant_analysis,
+    expected_worker_priority,
 ):
     func_path, kwargs, result = mock_function
+    kwargs = {**kwargs, "worker_priority": expected_worker_priority}
     # delete the catalog content, we only want to test the new resource
     await db.execute("DELETE FROM catalog")
     rurl = udata_resource_payload["document"]["url"]
     rmock.head(rurl, headers={"content-length": "1"})
-    res = await client.post(path="/api/resources", headers=api_headers, json=udata_resource_payload)
+    payload = {**udata_resource_payload, "instant_analysis": instant_analysis}
+    res = await client.post(path="/api/resources", headers=api_headers, json=payload)
     assert res.status == 201
     res = await db.fetch("SELECT * FROM catalog")
     assert len(res) == 1 and res[0]["priority"] is True
+    assert res[0]["instant_analysis"] is instant_analysis
     # we have to mock the functions separately, because they are intricated
     with patch(func_path) as mock_func:
         mock_func.return_value = result

@@ -46,27 +46,29 @@ async def select_batch_resources_to_check() -> list[Record]:
         # first resources that are prioritised
         q = f"""
             SELECT * FROM (
-                SELECT catalog.url, dataset_id, resource_id, priority
+                SELECT catalog.url, dataset_id, resource_id, priority,
+                    catalog.instant_analysis, catalog.status_since
                 FROM catalog
                 WHERE {excluded}
                 AND priority = True
             ) s
-            ORDER BY random() LIMIT {config.BATCH_SIZE}
+            ORDER BY instant_analysis DESC, status_since ASC NULLS LAST, random() LIMIT {config.BATCH_SIZE}
         """
         to_check: list[Record] = await select_rows_based_on_query(connection, q)
 
         # then resources with no last check
-        # (either because they have never been checked before, or because the last check has been deleted)
+        # (either because they have never been checked before, or because the last check was deleted)
         if len(to_check) < config.BATCH_SIZE:
             q = f"""
                 SELECT * FROM (
-                    SELECT catalog.url, dataset_id, resource_id, priority
+                    SELECT catalog.url, dataset_id, resource_id, priority,
+                        catalog.instant_analysis, catalog.status_since
                     FROM catalog
                     WHERE catalog.last_check IS NULL
                     AND {excluded}
                     AND priority = False
                 ) s
-                ORDER BY random() LIMIT {config.BATCH_SIZE}
+                ORDER BY instant_analysis DESC, status_since ASC NULLS LAST, random() LIMIT {config.BATCH_SIZE}
             """
             to_check += await select_rows_based_on_query(connection, q)
 
@@ -76,7 +78,8 @@ async def select_batch_resources_to_check() -> list[Record]:
             limit = config.BATCH_SIZE - len(to_check)
             q = f"""
             SELECT * FROM (
-                SELECT catalog.url, dataset_id, catalog.resource_id, catalog.priority
+                SELECT catalog.url, dataset_id, catalog.resource_id, catalog.priority,
+                    catalog.instant_analysis, catalog.status_since
                 FROM catalog, checks
                 WHERE catalog.last_check IS NOT NULL
                 AND catalog.last_check = checks.id
@@ -84,7 +87,7 @@ async def select_batch_resources_to_check() -> list[Record]:
                 AND {excluded}
                 AND catalog.priority = False
             ) s
-            ORDER BY random() LIMIT {limit}
+            ORDER BY instant_analysis DESC, status_since ASC NULLS LAST, random() LIMIT {limit}
             """
             to_check += await select_rows_based_on_query(connection, q, now)
 

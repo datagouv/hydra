@@ -32,6 +32,12 @@ log = logging.getLogger("udata-hydra")
 results: defaultdict = defaultdict(int)
 
 
+def _batch_worker_priority(row: Record) -> str:
+    if row.get("instant_analysis"):
+        return "high"
+    return "default" if row["priority"] else "low"
+
+
 async def check_batch_resources(to_parse: list[Record]) -> None:
     """Check a batch of resources"""
     context.monitor().set_status("Checking resources...")
@@ -46,7 +52,7 @@ async def check_batch_resources(to_parse: list[Record]) -> None:
                     url=row["url"],
                     resource=row,
                     session=session,
-                    worker_priority="default" if row["priority"] else "low",
+                    worker_priority=_batch_worker_priority(row),
                 )
             )
         for task in asyncio.as_completed(tasks):
