@@ -582,7 +582,7 @@ async def task_csv_to_geojson(
 
     record = await Check.get_by_id(check_id, with_deleted=True)
     if not record:
-        log.error("task_csv_to_geojson: check %s not found", check_id)
+        log.error(f"task_csv_to_geojson: check {check_id} not found")
         return
 
     check: dict = dict(record)
@@ -592,13 +592,13 @@ async def task_csv_to_geojson(
     parsing_table = check.get("parsing_table")
 
     if not parsing_table:
-        log.warning("task_csv_to_geojson: no parsing_table for check %s", check_id)
+        log.warning(f"task_csv_to_geojson: no parsing_table for check {check_id}")
         return
 
     inspection = await _load_csv_inspection_for_table(resource_id, parsing_table)
     if not inspection:
         log.error(
-            "task_csv_to_geojson: no tables_index row for resource=%s table=%s",
+            f"task_csv_to_geojson: no tables_index row for resource {resource_id} table {parsing_table}",
             resource_id,
             parsing_table,
         )
@@ -629,7 +629,7 @@ async def task_csv_to_geojson(
             ) from e
 
         if result is None:
-            log.debug("No geographical columns for %s, skipping geojson/PMTiles", resource_id)
+            log.debug(f"No geographical columns for {resource_id}, skipping geojson/PMTiles")
             return
 
         check = dict((await Check.get_by_id(check_id, with_deleted=True)) or check)
@@ -673,14 +673,14 @@ async def task_csv_to_geojson(
             try:
                 geojson_path.unlink()
             except OSError:
-                log.warning("Could not remove %s", geojson_path)
+                log.warning(f"Could not remove {geojson_path}")
 
 
 async def task_geojson_to_pmtiles(check_id: int) -> None:
     """Convert GeoJSON (from MinIO) to PMTiles and persist URLs on the check."""
     record = await Check.get_by_id(check_id, with_deleted=True)
     if not record:
-        log.error("task_geojson_to_pmtiles: check %s not found", check_id)
+        log.error(f"task_geojson_to_pmtiles: check{check_id} not found")
         return
 
     check: dict = dict(record)
@@ -690,7 +690,7 @@ async def task_geojson_to_pmtiles(check_id: int) -> None:
     geojson_url = check.get("geojson_url")
 
     if not geojson_url:
-        log.warning("task_geojson_to_pmtiles: no geojson_url for check %s", check_id)
+        log.warning(f"task_geojson_to_pmtiles: no geojson_url for check {check_id}")
         await Resource.update(resource_id, {"status": None})
         return
 
@@ -749,9 +749,9 @@ async def task_geojson_to_pmtiles(check_id: int) -> None:
             try:
                 os.remove(tmp_geo)
             except OSError:
-                log.warning("Could not remove temp geojson %s", tmp_geo)
+                log.warning(f"Could not remove temp geojson {tmp_geo}")
         if pmtiles_path.is_file() and config.REMOVE_GENERATED_FILES:
             try:
                 pmtiles_path.unlink()
             except OSError:
-                log.warning("Could not remove %s", pmtiles_path)
+                log.warning(f"Could not remove {pmtiles_path}")
