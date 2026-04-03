@@ -9,7 +9,7 @@ from asyncpg import Record
 from dateparser import parse as date_parser
 
 from udata_hydra import config, context
-from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.analysis.csv import task_analyse_csv
 from udata_hydra.analysis.geojson import analyse_geojson
 from udata_hydra.analysis.ogc import analyse_ogc
 from udata_hydra.analysis.parquet import analyse_parquet
@@ -168,9 +168,10 @@ async def analyse_resource(
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_CSV"})
             # Analyse CSV and create a table in the CSV database
             queue.enqueue(
-                analyse_csv,
+                task_analyse_csv,
                 check=check,
                 file_path=tmp_file.name,
+                worker_exception=bool(exception),
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
