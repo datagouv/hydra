@@ -284,7 +284,19 @@ def _build_feature_sql(
         params.append(col)
         placeholder = f"${len(params)}::text"
         properties_fragments.append(f"{placeholder}, {_quote_ident(_db_col_name(col))}")
-    properties_args = ", ".join(properties_fragments)
+
+    # PostgreSQL's json_build_object accepts max 100 arguments (50 key-value pairs).
+    # Split into chunks and merge with || when needed.
+    max_pairs = 50
+    chunks = [
+        properties_fragments[i : i + max_pairs]
+        for i in range(0, len(properties_fragments), max_pairs)
+    ]
+    if len(chunks) <= 1:
+        properties_sql = f"json_build_object({', '.join(properties_fragments)})"
+    else:
+        parts = [f"jsonb_build_object({', '.join(chunk)})" for chunk in chunks]
+        properties_sql = f"({' || '.join(parts)})::json"
 
     if "geojson" in geo:
         col = _db_col_name(geo["geojson"])
@@ -317,7 +329,7 @@ def _build_feature_sql(
         SELECT json_build_object(
             'type', 'Feature',
             'geometry', {geometry_sql},
-            'properties', json_build_object({properties_args})
+            'properties', {properties_sql}
         )::text
         FROM {_quote_ident(table_name)}
         {where}
