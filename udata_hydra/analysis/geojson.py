@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
@@ -267,7 +268,9 @@ async def geojson_to_pmtiles(
 
     log.debug(f"Converting GeoJSON file '{input_file_path}' to PMTiles file '{output_file_path}'")
 
+    tippecanoe_bin = config.TIPPECANOE_BIN or os.path.join(tippecanoe.BIN_DIR, "tippecanoe")
     command = [
+        tippecanoe_bin,
         "--maximum-zoom=g",  # guess
         "-o",
         str(output_file_path),
@@ -276,7 +279,7 @@ async def geojson_to_pmtiles(
         "--extend-zooms-if-still-dropping",
         str(input_file_path),
     ]
-    exit_code = tippecanoe._program("tippecanoe", *command)
+    exit_code = subprocess.call(command)
     if exit_code:
         raise ValueError(f"GeoJSON to PMTiles conversion failed with exit code {exit_code}")
     log.debug(f"Successfully converted {input_file_path} to {output_file_path}")
