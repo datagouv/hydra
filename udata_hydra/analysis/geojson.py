@@ -296,8 +296,6 @@ async def task_csv_to_geojson(
     if not inspection:
         log.error(
             f"task_csv_to_geojson: no tables_index row for resource {resource_id} table {parsing_table}",
-            resource_id,
-            parsing_table,
         )
         return
 
