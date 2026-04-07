@@ -92,6 +92,7 @@ MINIO_PWD = ""
 
 # -- Parquet conversion settings -- #
 CSV_TO_PARQUET = false
+DB_TO_PARQUET = false
 MIN_LINES_FOR_PARQUET = 200
 MINIO_PARQUET_BUCKET = ""
 MINIO_PARQUET_FOLDER = "" # no trailing slash
