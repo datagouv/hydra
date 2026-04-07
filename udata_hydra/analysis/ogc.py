@@ -142,7 +142,7 @@ async def analyse_ogc(check: dict | Record, format: OgcFormat) -> OgcMetadata | 
                     ogc_layer["default_crs"] = (
                         crs_options[0].getcode()
                         if isinstance(crs_options[0], Crs)
-                        else crs_options[0]
+                        else crs_options[0]  # crs_options[0] is already a str in the case of WMS
                     )
 
                 metadata["layers"].append(ogc_layer)
