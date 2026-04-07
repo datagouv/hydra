@@ -1083,7 +1083,7 @@ async def test_analyse_csv_split_geo_rq_chain(
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
         patch("udata_hydra.analysis.csv_geojson.minio_client_geojson", new=geo_client),
         patch("udata_hydra.analysis.pmtiles.minio_client_pmtiles", new=pmtiles_client),
-        patch("udata_hydra.analysis.helpers.download_url_to_tempfile", new=fake_download),
+        patch("udata_hydra.utils.file.download_url_to_tempfile", new=fake_download),
     ):
         await analyse_csv(check=check)
 

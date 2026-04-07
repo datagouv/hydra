@@ -5,6 +5,7 @@ from .file import (
     compute_checksum_from_file,
     download_file,
     download_resource,
+    download_url_to_tempfile,
     extract_gzip,
     remove_remainders,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "compute_checksum_from_file",
     "download_file",
     "download_resource",
+    "download_url_to_tempfile",
     "extract_gzip",
     "remove_remainders",
     "detect_geojson_from_headers",

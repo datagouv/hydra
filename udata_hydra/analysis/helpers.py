@@ -1,11 +1,7 @@
 import json
 import logging
-import os
-import tempfile
-from pathlib import Path
 from typing import IO
 
-import aiohttp
 from asyncpg import Record
 
 from udata_hydra import config
@@ -47,22 +43,6 @@ async def read_or_download_file(
             else int(config.MAX_FILESIZE_ALLOWED.get(file_format, "csv")),
         )
         return tmp_file
-
-
-async def download_url_to_tempfile(url: str, suffix: str = "") -> Path:
-    """Download a URL to a named temporary file and return its path."""
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            resp.raise_for_status()
-            body = await resp.read()
-    fd, raw_path = tempfile.mkstemp(suffix=suffix)
-    path = Path(raw_path)
-    try:
-        os.write(fd, body)
-    finally:
-        os.close(fd)
-    log.debug(f"Downloaded {url} to {path} ({len(body)} bytes)")
-    return path
 
 
 async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:

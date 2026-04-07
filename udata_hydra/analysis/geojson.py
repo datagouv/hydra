@@ -27,6 +27,7 @@ from udata_hydra.utils import (
     IOException,
     ParseException,
     Timer,
+    download_url_to_tempfile,
     handle_parse_exception,
     queue,
     remove_remainders,
@@ -396,7 +397,12 @@ async def task_geojson_to_pmtiles(check_id: int) -> None:
 
     try:
         try:
-            tmp_geo = await helpers.download_url_to_tempfile(geojson_url, suffix=".geojson")
+            tmp_geo = await download_url_to_tempfile(
+                geojson_url,
+                suffix=".geojson",
+                headers=json.loads(check.get("headers") or "{}"),
+                max_size_allowed=int(config.MAX_FILESIZE_ALLOWED.get("geojson", "csv")),
+            )
             await export_pmtiles_from_local_geojson(
                 resource_id=resource_id,
                 check_id=check_id,
@@ -419,7 +425,7 @@ async def task_geojson_to_pmtiles(check_id: int) -> None:
         if resource is not None and refreshed:
             await helpers.notify_udata(resource, dict(refreshed))
 
-    except (ParseException, OSError, aiohttp.ClientError) as e:
+    except (ParseException, OSError, aiohttp.ClientError, IOException) as e:
         if isinstance(e, ParseException):
             await handle_parse_exception(e, check.get("parsing_table"), check)
         else:
