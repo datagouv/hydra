@@ -4,7 +4,7 @@ from typing import IO
 from asyncpg import Record
 
 from udata_hydra import config
-from udata_hydra.utils import UdataPayload, download_resource, queue, send
+from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send
 
 
 def get_python_type(column: dict) -> str:
@@ -17,13 +17,20 @@ def get_python_type(column: dict) -> str:
 
 
 async def read_or_download_file(
-    check: dict,
-    file_path: str,
+    check: Record | dict,
+    file_path: str | None,
     file_format: str,
     exception: Record | None,
 ) -> IO[bytes]:
     if file_path:
-        return open(file_path, "rb")
+        try:
+            return open(file_path, "rb")
+        except FileNotFoundError as e:
+            raise IOException(
+                f"Temporary file not found: {file_path}",
+                resource_id=check["resource_id"],
+                url=check["url"],
+            ) from e
     else:
         tmp_file, _ = await download_resource(
             url=check["url"],
@@ -35,8 +42,10 @@ async def read_or_download_file(
         return tmp_file
 
 
-async def notify_udata(resource: Record, check: dict) -> None:
+async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:
     """Notify udata of the result of a parsing"""
+    if check is None or resource is None:
+        raise ValueError("Tried to notify udata without resource nor URL")
     payload = {
         "resource_id": check["resource_id"],
         "dataset_id": resource["dataset_id"],

@@ -9,6 +9,7 @@ from asyncio import run as aiorun
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Any, Coroutine
 
 import aiohttp
 import asyncpg
@@ -482,15 +483,16 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
         inspection, df = csv_detective_routine(
             file_path=str(csv_path),
             output_profile=True,
-            output_df=True,
             cast_json=False,
             num_rows=-1,
             save_results=False,
             verbose=True,
         )
 
-        log.info(f"CSV analysis complete. Found {len(df)} rows and {len(df.columns)} columns")
-        log.info(f"Columns: {list(df.columns)}")
+        log.info(
+            f"CSV analysis complete. Found {inspection['total_lines']} rows and {len(inspection['headers'])} columns"
+        )
+        log.info(f"Columns: {inspection['headers']}")
 
         # Show column formats for debugging
         log.info("Column formats detected:")
@@ -503,7 +505,7 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
         try:
             # Convert to GeoJSON (no MinIO upload, no database updates)
             result = await csv_to_geojson(
-                df=df,
+                file_path=str(csv_path),
                 inspection=inspection,
                 output_file_path=geojson_filepath,
                 upload_to_minio=False,
@@ -814,7 +816,7 @@ async def _purge_checks(
 def purge_checks(
     retention_days: int = typer.Option(60, help="Number of days to keep checks"),
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
-) -> None:
+) -> Coroutine[Any, Any, None]:
     """Delete outdated checks that are more than `retention_days` days old"""
     return _make_async_wrapper(_purge_checks)(retention_days=retention_days, quiet=quiet)
 
@@ -886,7 +888,7 @@ async def _purge_csv_tables(
 def purge_csv_tables(
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
     hard_delete: bool = False,
-) -> None:
+) -> Coroutine[Any, Any, None]:
     """Delete converted CSV tables for resources url no longer in catalog"""
     return _make_async_wrapper(_purge_csv_tables)(quiet=quiet, hard_delete=hard_delete)
 
@@ -1062,7 +1064,7 @@ def purge_selected_csv_tables(
     retention_days: int | None = None,
     retention_tables: int | None = None,
     quiet: bool = False,
-) -> None:
+) -> Coroutine[Any, Any, None]:
     """Delete converted CSV tables either:
     - if they're more than retention_days days old
     - if they're not in the top retention_tables most recent

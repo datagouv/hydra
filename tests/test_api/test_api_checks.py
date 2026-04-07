@@ -19,33 +19,22 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.mark.parametrize(
-    "query",
+    "query,expected",
     [
-        "url=https://example.com/resource-1",
-        f"resource_id={RESOURCE_ID}",
+        ("stupid=stupid", 400),
+        ("url=https://example.com/not-existing-resource", 404),
+        ("resource_id=aaaaaaaa-1111-bbbb-2222-cccccccccccc", 404),
+        ("url=https://example.com/resource-1", 200),
+        (f"resource_id={RESOURCE_ID}", 200),
     ],
 )
-async def test_get_latest_check(setup_catalog, client, query, fake_check, fake_resource_id):
+async def test_get_latest_check(setup_catalog, client, query, expected, fake_check):
     await fake_check(parsing_table=True, parquet_url=True)
 
-    # Test invalid query
-    stupid_query: str = "stupid=stupid"
-    resp = await client.get(f"/api/checks/latest?{stupid_query}")
-    assert resp.status == 400
-
-    # Test not existing resource url
-    not_existing_url_query: str = "url=https://example.com/not-existing-resource"
-    resp = await client.get(f"/api/checks/latest?{not_existing_url_query}")
-    assert resp.status == 404
-
-    # Test not existing resource_id
-    not_existing_resource_id_query: str = f"resource_id={fake_resource_id()}"
-    resp = await client.get(f"/api/checks/latest?{not_existing_resource_id_query}")
-    assert resp.status == 404
-
-    # Test existing resource
     resp = await client.get(f"/api/checks/latest?{query}")
-    assert resp.status == 200
+    assert resp.status == expected
+    if resp.status != 200:
+        return
     data: dict = await resp.json()
     assert data.pop("created_at")
     assert data.pop("id")
@@ -57,7 +46,8 @@ async def test_get_latest_check(setup_catalog, client, query, fake_check, fake_r
         "catalog_id": 1,
         "domain": "example.com",
         "error": None,
-        "url": url,
+        "check_url": url,
+        "catalog_url": url,
         "headers": {"x-do": "you"},
         "cors_headers": None,
         "timeout": False,
@@ -219,7 +209,7 @@ async def test_create_check(
     assert api_response.status == 201
     data: dict = await api_response.json()
     assert data["resource_id"] == resource_id
-    assert data["url"] == rurl
+    assert data["check_url"] == rurl
     assert data["status"] == resource_status
     assert data["timeout"] == resource_timeout
 

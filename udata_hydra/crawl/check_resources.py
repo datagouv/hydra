@@ -194,7 +194,7 @@ async def check_resource(
     #   Example problematic URL: http://%20Localisation%20des%20acc%C3%A8s%20des%20offices%20de%20tourisme
     # All errors are logged and saved to the database via preprocess_check_data()
     except (
-        aiohttp.client_exceptions.ClientError,
+        aiohttp.ClientError,
         AssertionError,
         UnicodeError,
     ) as e:
