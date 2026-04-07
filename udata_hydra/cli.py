@@ -618,6 +618,7 @@ def analyse_parquet_cli(
 
 
 async def _analyse_ogc_cli(
+    format: str,
     check_id: str | None = None,
     url: str | None = None,
     resource_id: str | None = None,
@@ -637,7 +638,7 @@ async def _analyse_ogc_cli(
         log.warning("Temporarily enabling OGC analysis for CLI")
         config.override(OGC_ANALYSIS_ENABLED=True)
 
-    result = await analyse_ogc(check=check)
+    result = await analyse_ogc(check=check, format=format)
     if result:
         log.info("OGC analysis completed successfully.")
         log.debug(json.dumps(result, indent=2, default=str, ensure_ascii=False))
@@ -647,6 +648,7 @@ async def _analyse_ogc_cli(
 
 @cli.command(name="analyse-ogc")
 def analyse_ogc_cli(
+    format: str = typer.Option("wfs", help="The OGC service format to analyse"),
     check_id: str | None = typer.Option(None, help="Check ID to analyze"),
     url: str | None = typer.Option(None, help="OGC endpoint URL to analyze"),
     resource_id: str | None = typer.Option(None, help="Resource ID to analyze"),
@@ -655,7 +657,7 @@ def analyse_ogc_cli(
     Try to get the check from the check ID, then from the URL
     """
     return _make_async_wrapper(_analyse_ogc_cli)(
-        check_id=check_id, url=url, resource_id=resource_id
+        format=format, check_id=check_id, url=url, resource_id=resource_id
     )
 
 
