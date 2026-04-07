@@ -90,9 +90,9 @@ async def analyse_ogc(check: dict | Record, format: OgcFormat) -> OgcMetadata | 
         web_service = None
         version = None
         connection_error = None
-        for v in SERVICE_MAPPING[format]["versions"]:
+        for v in SERVICE_MAPPING[format]["versions"]:  # type: ignore[not-iterable]
             try:
-                web_service = SERVICE_MAPPING[format]["service"](
+                web_service = SERVICE_MAPPING[format]["service"](  # type: ignore[call-non-callable]
                     url, version=v, timeout=config.OGC_GETCAPABILITIES_TIMEOUT
                 )
                 version = v
