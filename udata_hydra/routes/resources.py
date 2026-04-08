@@ -8,6 +8,7 @@ from aiohttp import web
 from asyncpg import Record
 
 from udata_hydra import config
+from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import ResourceDocumentSchema, ResourceSchema
 
@@ -16,8 +17,6 @@ log = logging.getLogger(__name__)
 
 async def _immediate_check_resource(resource_id: str) -> None:
     """Run check_resource in the background (same RQ tier as POST /api/checks)."""
-    from udata_hydra.crawl.check_resources import check_resource
-
     try:
         resource = await Resource.get(resource_id)
         if resource is None or resource["status"] is not None:
