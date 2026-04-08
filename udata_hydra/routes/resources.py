@@ -85,7 +85,10 @@ async def create_resource(request: web.Request) -> web.Response:
     )
 
     if instant_analysis:
-        asyncio.create_task(_immediate_check_resource(resource_id))
+        background_tasks = request.app["background_tasks"]
+        task = asyncio.create_task(_immediate_check_resource(resource_id))
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
 
     return web.json_response(ResourceDocumentSchema().dump(dict(document)), status=201)
 
