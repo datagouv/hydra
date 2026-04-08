@@ -98,10 +98,8 @@ async def analyse_resource(
             )
             if is_parquet:
                 file_format = "parquet"
-        if not is_geojson and not is_parquet:
-            is_ogc = config.OGC_ANALYSIS_ENABLED and detect_ogc(check, row["format"])
-            if is_ogc:
-                file_format = "ogc"
+        if not is_geojson and not is_parquet and config.OGC_ANALYSIS_ENABLED:
+            is_ogc, file_format = detect_ogc(check, row["format"])
 
     max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
 
@@ -197,6 +195,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_ogc,
                 check=check,
+                format=file_format,
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )

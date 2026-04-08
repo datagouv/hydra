@@ -100,7 +100,7 @@ async def analyse_parquet(
                     columns[col.name] = next(
                         pytype
                         for pyartype, pytype in PYARROW_TYPE_TO_PYTHON.items()
-                        if re.match(pyartype, col_type)
+                        if re.search(pyartype, col_type)
                     )
                 except StopIteration:
                     raise ValueError(f"Unknown pyarrow type: {col.type}")
