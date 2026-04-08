@@ -8,6 +8,7 @@ from datetime import datetime
 import pytest
 
 from tests.conftest import DATASET_ID, NOT_EXISTING_RESOURCE_ID, RESOURCE_ID, RESOURCE_URL
+from udata_hydra.routes import resources as resources_routes
 
 pytestmark = pytest.mark.asyncio
 
@@ -91,6 +92,18 @@ async def test_create_resource_without_instant_analysis_no_background_task(
     resp = await client.post(path="/api/resources/", headers=api_headers, json=payload)
     assert resp.status == 201
     mock_create_task.assert_not_called()
+
+
+async def test_immediate_check_clears_crawling_url_when_check_raises(setup_catalog, db, mocker):
+    mocker.patch.object(
+        resources_routes,
+        "check_resource",
+        side_effect=RuntimeError("simulated failure"),
+    )
+    await resources_routes._immediate_check_resource(RESOURCE_ID)
+    row = await db.fetchrow("SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID)
+    assert row is not None
+    assert row["status"] is None
 
 
 async def test_update_resource(client, api_headers, api_headers_wrong_token):

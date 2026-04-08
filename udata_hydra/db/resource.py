@@ -39,6 +39,26 @@ class Resource:
             return await connection.fetchrow(q)
 
     @classmethod
+    async def claim_for_crawl(cls, resource_id: str) -> Record | None:
+        """Mark the resource as CRAWLING_URL if it is eligible for batch selection.
+
+        Eligible means: not deleted and ``status`` is NULL or BACKOFF (same idea as
+        ``get_excluded_clause``). Returns the updated row, or None if missing / not eligible.
+        """
+        pool = await context.pool()
+        now = datetime.now(timezone.utc)
+        async with pool.acquire() as connection:
+            q = """
+                UPDATE catalog
+                SET status = 'CRAWLING_URL', status_since = $2
+                WHERE resource_id = $1
+                AND deleted = FALSE
+                AND (status IS NULL OR status = 'BACKOFF')
+                RETURNING *;
+            """
+            return await connection.fetchrow(q, resource_id, now)
+
+    @classmethod
     async def insert(
         cls,
         dataset_id: str,

@@ -17,9 +17,10 @@ log = logging.getLogger(__name__)
 
 async def _immediate_check_resource(resource_id: str) -> None:
     """Run check_resource in the background (same RQ tier as POST /api/checks)."""
+    resource: Record | None = None
     try:
-        resource = await Resource.get(resource_id)
-        if resource is None or resource["status"] is not None:
+        resource = await Resource.claim_for_crawl(resource_id)
+        if resource is None:
             return
         async with aiohttp.ClientSession(
             timeout=None,
@@ -32,7 +33,11 @@ async def _immediate_check_resource(resource_id: str) -> None:
                 worker_priority="high",
             )
     except Exception:
-        log.exception("Background check failed for resource %s", resource_id)
+        log.exception(f"Immediate resource check failed for {resource_id}")
+        if resource is not None:
+            row = await Resource.get(resource_id, "status")
+            if row is not None and row["status"] == "CRAWLING_URL":
+                await Resource.update(resource_id, {"status": None})
 
 
 async def get_resource(request: web.Request) -> web.Response:
