@@ -2,11 +2,12 @@ import re
 from urllib.parse import parse_qs, urlparse
 
 from udata_hydra import config
+from udata_hydra.types import FileFormatLiteral, OgcFormatLiteral
 
 VALID_LAYER_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-.:]{1,100}$")
 
 
-def detect_ogc(check: dict, resource_format: str | None = None) -> tuple[bool, str]:
+def detect_ogc(check: dict, resource_format: str | None = None) -> tuple[bool, FileFormatLiteral]:
     """
     Detect if a resource is an OGC service based on resource format and URL patterns.
 
@@ -23,7 +24,7 @@ def detect_ogc(check: dict, resource_format: str | None = None) -> tuple[bool, s
     Returns:
         True if the resource appears to be an OGC service, False otherwise
     """
-    ogc_formats: list[str] = config.OGC_FORMATS
+    ogc_formats: list[OgcFormatLiteral] = config.OGC_FORMATS
 
     # Check resource format from catalog
     if resource_format:
@@ -33,7 +34,7 @@ def detect_ogc(check: dict, resource_format: str | None = None) -> tuple[bool, s
 
     url = check.get("url", "")
     if not url:
-        return False, ""
+        return False, "unknown"
 
     parsed = urlparse(url)
     query_params = parse_qs(parsed.query.lower())
@@ -48,7 +49,7 @@ def detect_ogc(check: dict, resource_format: str | None = None) -> tuple[bool, s
         if fmt in path_segments:
             return True, fmt
 
-    return False, ""
+    return False, "unknown"
 
 
 def is_valid_layer_name(name: str) -> bool:

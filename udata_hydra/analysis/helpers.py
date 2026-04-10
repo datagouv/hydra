@@ -37,7 +37,9 @@ async def read_or_download_file(
             headers=json.loads(check.get("headers") or "{}"),
             max_size_allowed=None
             if exception
-            else int(config.MAX_FILESIZE_ALLOWED.get(file_format, "csv")),
+            else int(
+                config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED)
+            ),
         )
         return tmp_file
 
