@@ -104,9 +104,7 @@ async def analyse_resource(
     max_size_allowed = (
         None
         if exception
-        else int(
-            config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED)
-        )
+        else int(config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED))
     )
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos

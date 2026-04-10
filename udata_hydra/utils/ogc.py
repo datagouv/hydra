@@ -30,7 +30,7 @@ def detect_ogc(check: dict, resource_format: str | None = None) -> tuple[bool, F
     if resource_format:
         normalized = resource_format.lower().replace("ogc:", "")
         if normalized in ogc_formats:
-            return True, normalized
+            return True, normalized  # type: ignore[invalid-return-type]
 
     url = check.get("url", "")
     if not url:
