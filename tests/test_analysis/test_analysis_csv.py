@@ -1069,7 +1069,12 @@ async def test_analyse_csv_split_geo_rq_chain(
     mocked_minio.fput_object.return_value = None
     mocked_minio.bucket_exists.return_value = True
 
-    async def fake_download(dl_url: str, suffix: str = "") -> Path:
+    async def fake_download(
+        dl_url: str,
+        suffix: str = "",
+        headers: dict | None = None,
+        max_size_allowed: int | None = None,
+    ) -> Path:
         p = Path(f"{RESOURCE_ID}.geojson")
         assert p.is_file()
         return p.resolve()
@@ -1083,7 +1088,7 @@ async def test_analyse_csv_split_geo_rq_chain(
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
         patch("udata_hydra.analysis.csv_geojson.minio_client_geojson", new=geo_client),
         patch("udata_hydra.analysis.pmtiles.minio_client_pmtiles", new=pmtiles_client),
-        patch("udata_hydra.utils.file.download_url_to_tempfile", new=fake_download),
+        patch("udata_hydra.analysis.geojson.download_url_to_tempfile", new=fake_download),
     ):
         await analyse_csv(check=check)
 
