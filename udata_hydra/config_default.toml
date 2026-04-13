@@ -66,6 +66,8 @@ MAX_FILESIZE_ALLOWED.parquet = 52428800
 MAX_FILESIZE_ALLOWED.wms = 1048576     # 1 MB
 MAX_FILESIZE_ALLOWED.wfs = 1048576     # 1 MB
 
+DEFAULT_MAX_FILESIZE_ALLOWED = 52428800
+
 # -- CSV analysis settings -- #
 SQL_INDEXES_TYPES_SUPPORTED = ["index"]
 
@@ -103,7 +105,6 @@ MINIO_PMTILES_BUCKET = ""
 MINIO_PMTILES_FOLDER = "" # no trailing slash
 
 # -- Geojson conversion settings -- #
-CSV_TO_GEOJSON = false
 DB_TO_GEOJSON = false
 MINIO_GEOJSON_BUCKET = ""
 MINIO_GEOJSON_FOLDER = "" # no trailing slash

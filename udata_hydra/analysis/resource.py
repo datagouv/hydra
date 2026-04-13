@@ -9,7 +9,7 @@ from asyncpg import Record
 from dateparser import parse as date_parser
 
 from udata_hydra import config, context
-from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.analysis.csv import task_analyse_csv
 from udata_hydra.analysis.geojson import analyse_geojson
 from udata_hydra.analysis.ogc import analyse_ogc
 from udata_hydra.analysis.parquet import analyse_parquet
@@ -101,7 +101,11 @@ async def analyse_resource(
         if not is_geojson and not is_parquet and config.OGC_ANALYSIS_ENABLED:
             is_ogc, file_format = detect_ogc(check, row["format"])
 
-    max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
+    max_size_allowed = (
+        None
+        if exception
+        else int(config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED))
+    )
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
@@ -166,9 +170,10 @@ async def analyse_resource(
             await Resource.update(resource_id, data={"status": "TO_ANALYSE_CSV"})
             # Analyse CSV and create a table in the CSV database
             queue.enqueue(
-                analyse_csv,
+                task_analyse_csv,
                 check=check,
                 file_path=tmp_file.name,
+                worker_exception=bool(exception),
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )

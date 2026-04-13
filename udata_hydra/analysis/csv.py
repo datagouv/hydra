@@ -33,7 +33,7 @@ from sqlalchemy.schema import CreateIndex, CreateTable, Index
 
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
-from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
+from udata_hydra.analysis.geojson import task_csv_to_geojson
 from udata_hydra.db import RESERVED_COLS, compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -44,6 +44,7 @@ from udata_hydra.utils import (
     Timer,
     detect_tabular_from_headers,
     handle_parse_exception,
+    queue,
     remove_remainders,
 )
 from udata_hydra.utils.casting import generate_records
@@ -77,12 +78,32 @@ PYTHON_TYPE_TO_PG = {
 minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MINIO_PARQUET_FOLDER)
 
 
+async def task_analyse_csv(
+    check: Record | dict,
+    file_path: str | None = None,
+    debug_insert: bool = False,
+    worker_exception: bool = False,
+) -> None:
+    """RQ task: CSV analysis; forwards worker_exception to chained task_csv_to_geojson / task_geojson_to_pmtiles."""
+    await analyse_csv(
+        check,
+        file_path,
+        debug_insert,
+        worker_exception,
+    )
+
+
 async def analyse_csv(
     check: Record | dict,
     file_path: str | None = None,
     debug_insert: bool = False,
+    worker_exception: bool = False,
 ) -> None:
-    """Launch csv analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
+    """Launch csv analysis from a check or an URL (debug), using previously downloaded file at file_path if any.
+
+    worker_exception: when True (RQ crawl path for resources_exceptions), chained geo jobs use the same RQ
+    exception timeout as this run.
+    """
     if not config.CSV_ANALYSIS:
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
@@ -181,24 +202,20 @@ async def analyse_csv(
                 check_id=check["id"],
             ) from e
 
-        try:
-            await csv_to_geojson_and_pmtiles(
-                file_path=tmp_file.name,
-                inspection=csv_inspection,
-                resource_id=resource_id,
-                check_id=check["id"],
-                timer=timer,
-                table_name=table_name if config.CSV_TO_DB else None,
-            )
-        except Exception as e:
-            remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
-            raise ParseException(
-                message=str(e),
-                step="geojson_export",
-                resource_id=resource_id,
-                url=url,
-                check_id=check["id"],
-            ) from e
+        if config.DB_TO_GEOJSON:
+            if not config.CSV_TO_DB:
+                log.debug(
+                    "Skipping GeoJSON/PMTiles RQ jobs: CSV_TO_DB is false "
+                    "(geo export requires the parsing table in PostgreSQL)."
+                )
+            else:
+                queue.enqueue(
+                    task_csv_to_geojson,
+                    check["id"],
+                    worker_exception=worker_exception,
+                    _priority="low",
+                    _exception=worker_exception,
+                )
 
         check = await Check.update(  # type: ignore[assignment]
             check["id"],
