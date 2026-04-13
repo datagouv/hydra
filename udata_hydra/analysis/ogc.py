@@ -11,6 +11,7 @@ from udata_hydra import config
 from udata_hydra.analysis import helpers
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.types import OgcFormatLiteral
 from udata_hydra.utils import ParseException, handle_parse_exception
 from udata_hydra.utils.ogc import detect_layer_name
 
@@ -28,9 +29,6 @@ SERVICE_MAPPING = {
 }
 
 
-OgcFormat = Literal["wfs", "wms"]
-
-
 class OgcLayer(TypedDict):
     name: str
     default_crs: str | None
@@ -44,7 +42,7 @@ class OgcMetadata(TypedDict):
     detected_layer: OgcLayer | None
 
 
-async def analyse_ogc(check: dict | Record, format: OgcFormat) -> OgcMetadata | None:
+async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMetadata | None:
     """
     Analyse an OGC endpoint and extract metadata.
 
