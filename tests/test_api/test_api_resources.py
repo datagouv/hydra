@@ -8,6 +8,7 @@ from datetime import datetime
 import pytest
 
 from tests.conftest import DATASET_ID, NOT_EXISTING_RESOURCE_ID, RESOURCE_ID, RESOURCE_URL
+from udata_hydra.routes import resources as resources_routes
 
 pytestmark = pytest.mark.asyncio
 
@@ -29,6 +30,7 @@ async def test_get_resource(setup_catalog, client):
     assert data["resource_id"] == RESOURCE_ID
     assert data["status"] is None
     assert data["status_since"] is None
+    assert data["instant_analysis"] is False
 
 
 async def test_create_resource(
@@ -65,6 +67,43 @@ async def test_create_resource(
     assert resp.status == 400
     text = await resp.text()
     assert text == "Missing document body"
+
+
+async def test_create_resource_instant_analysis(
+    client, api_headers, udata_resource_payload, db, mocker
+):
+    """Optional webhook flag stores instant_analysis and schedules a background check (#386)."""
+    mock_create_task = mocker.patch("udata_hydra.routes.resources.asyncio.create_task")
+    payload = {**udata_resource_payload, "instant_analysis": True}
+    resp = await client.post(path="/api/resources/", headers=api_headers, json=payload)
+    assert resp.status == 201
+    rid = payload["resource_id"]
+    row = await db.fetchrow("SELECT instant_analysis FROM catalog WHERE resource_id = $1", rid)
+    assert row is not None
+    assert row["instant_analysis"] is True
+    mock_create_task.assert_called_once()
+
+
+async def test_create_resource_without_instant_analysis_no_background_task(
+    client, api_headers, udata_resource_payload, mocker
+):
+    mock_create_task = mocker.patch("udata_hydra.routes.resources.asyncio.create_task")
+    payload = {**udata_resource_payload}
+    resp = await client.post(path="/api/resources/", headers=api_headers, json=payload)
+    assert resp.status == 201
+    mock_create_task.assert_not_called()
+
+
+async def test_immediate_check_clears_crawling_url_when_check_raises(setup_catalog, db, mocker):
+    mocker.patch.object(
+        resources_routes,
+        "check_resource",
+        side_effect=RuntimeError("simulated failure"),
+    )
+    await resources_routes._immediate_check_resource(RESOURCE_ID)
+    row = await db.fetchrow("SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID)
+    assert row is not None
+    assert row["status"] is None
 
 
 async def test_update_resource(client, api_headers, api_headers_wrong_token):

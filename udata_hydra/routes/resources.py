@@ -1,11 +1,43 @@
+import asyncio
 import json
+import logging
 import uuid
 
+import aiohttp
 from aiohttp import web
 from asyncpg import Record
 
+from udata_hydra import config
+from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import ResourceDocumentSchema, ResourceSchema
+
+log = logging.getLogger(__name__)
+
+
+async def _immediate_check_resource(resource_id: str) -> None:
+    """Run check_resource in the background (same RQ tier as POST /api/checks)."""
+    resource: Record | None = None
+    try:
+        resource = await Resource.claim_for_crawl(resource_id)
+        if resource is None:
+            return
+        async with aiohttp.ClientSession(
+            timeout=None,
+            headers={"user-agent": config.USER_AGENT_FULL},
+        ) as session:
+            await check_resource(
+                url=resource["url"],
+                resource=resource,
+                session=session,
+                worker_priority="high",
+            )
+    except Exception:
+        log.exception(f"Immediate resource check failed for {resource_id}")
+        if resource is not None:
+            row = await Resource.get(resource_id, "status")
+            if row is not None and row["status"] == "CRAWLING_URL":
+                await Resource.update(resource_id, {"status": None})
 
 
 async def get_resource(request: web.Request) -> web.Response:
@@ -44,6 +76,7 @@ async def create_resource(request: web.Request) -> web.Response:
 
     dataset_id = valid_payload["dataset_id"]
     resource_id = valid_payload["resource_id"]
+    instant_analysis: bool = bool(valid_payload.get("instant_analysis", False))
 
     await Resource.insert(
         dataset_id=dataset_id,
@@ -53,7 +86,14 @@ async def create_resource(request: web.Request) -> web.Response:
         format=document["format"],
         priority=True,
         title=document["title"],
+        instant_analysis=instant_analysis,
     )
+
+    if instant_analysis:
+        background_tasks = request.app["background_tasks"]
+        task = asyncio.create_task(_immediate_check_resource(resource_id))
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
 
     return web.json_response(ResourceDocumentSchema().dump(dict(document)), status=201)
 
@@ -77,6 +117,9 @@ async def update_resource(request: web.Request) -> web.Response:
 
     dataset_id: str = valid_payload["dataset_id"]
     resource_id: str = valid_payload["resource_id"]
+    instant_analysis: bool | None = (
+        valid_payload["instant_analysis"] if "instant_analysis" in valid_payload else None
+    )
 
     await Resource.update_or_insert(
         dataset_id=dataset_id,
@@ -85,6 +128,7 @@ async def update_resource(request: web.Request) -> web.Response:
         type=document["type"],
         format=document["format"],
         title=document["title"],
+        instant_analysis=instant_analysis,
     )
 
     return web.json_response(ResourceDocumentSchema().dump(document), status=200)

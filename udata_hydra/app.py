@@ -12,6 +12,7 @@ async def app_factory() -> web.Application:
     async def app_startup(app):
         app["pool"] = await context.pool()
         app["started_at"] = datetime.now(timezone.utc)
+        app["background_tasks"] = set()
 
     async def app_cleanup(app):
         if "pool" in app:

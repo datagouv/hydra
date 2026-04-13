@@ -2,13 +2,46 @@ import asyncpg
 import nest_asyncio2 as nest_asyncio
 import pytest
 
-from tests.conftest import DATABASE_URL, DATASET_ID, RESOURCE_ID, RESOURCE_URL
+from tests.conftest import (
+    DATABASE_URL,
+    DATASET_ID,
+    NOT_EXISTING_RESOURCE_ID,
+    RESOURCE_ID,
+    RESOURCE_URL,
+)
 from udata_hydra.cli import load_catalog
 from udata_hydra.crawl import start_checks
+from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
 nest_asyncio.apply()
+
+
+async def test_claim_for_crawl_sets_crawling_url(setup_catalog):
+    row = await Resource.claim_for_crawl(RESOURCE_ID)
+    assert row is not None
+    assert row["status"] == "CRAWLING_URL"
+    assert row["status_since"] is not None
+
+
+async def test_claim_for_crawl_returns_none_when_already_crawling(setup_catalog):
+    assert await Resource.claim_for_crawl(RESOURCE_ID) is not None
+    assert await Resource.claim_for_crawl(RESOURCE_ID) is None
+
+
+async def test_claim_for_crawl_from_backoff(setup_catalog, db):
+    await db.execute(
+        "UPDATE catalog SET status = 'BACKOFF' WHERE resource_id = $1",
+        RESOURCE_ID,
+    )
+    row = await Resource.claim_for_crawl(RESOURCE_ID)
+    assert row is not None
+    assert row["status"] == "CRAWLING_URL"
+
+
+async def test_claim_for_crawl_missing_resource(setup_catalog):
+    assert await Resource.claim_for_crawl(NOT_EXISTING_RESOURCE_ID) is None
 
 
 async def test_catalog(setup_catalog, db):

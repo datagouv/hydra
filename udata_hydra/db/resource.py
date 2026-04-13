@@ -39,6 +39,26 @@ class Resource:
             return await connection.fetchrow(q)
 
     @classmethod
+    async def claim_for_crawl(cls, resource_id: str) -> Record | None:
+        """Mark the resource as CRAWLING_URL if it is eligible for batch selection.
+
+        Eligible means: not deleted and ``status`` is NULL or BACKOFF (same idea as
+        ``get_excluded_clause``). Returns the updated row, or None if missing / not eligible.
+        """
+        pool = await context.pool()
+        now = datetime.now(timezone.utc)
+        async with pool.acquire() as connection:
+            q = """
+                UPDATE catalog
+                SET status = 'CRAWLING_URL', status_since = $2
+                WHERE resource_id = $1
+                AND deleted = FALSE
+                AND (status IS NULL OR status = 'BACKOFF')
+                RETURNING *;
+            """
+            return await connection.fetchrow(q, resource_id, now)
+
+    @classmethod
     async def insert(
         cls,
         dataset_id: str,
@@ -49,6 +69,7 @@ class Resource:
         title: str,
         status: str | None = None,
         priority: bool = True,
+        instant_analysis: bool = False,
     ) -> Record | None:
         if status and status not in cls.STATUSES.keys():
             raise ValueError(f"Invalid status: {status}")
@@ -57,8 +78,8 @@ class Resource:
         async with pool.acquire() as connection:
             # Insert new resource in catalog table and mark as high priority for crawling
             q = """
-                    INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, status, priority, title)
-                    VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8)
+                    INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, status, priority, title, instant_analysis)
+                    VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8, $9)
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,
@@ -67,10 +88,20 @@ class Resource:
                         deleted = FALSE,
                         status = $6,
                         priority = $7,
-                        title = $8
+                        title = $8,
+                        instant_analysis = $9
                     RETURNING *;"""
             return await connection.fetchrow(
-                q, dataset_id, resource_id, url, type, format, status, priority, title
+                q,
+                dataset_id,
+                resource_id,
+                url,
+                type,
+                format,
+                status,
+                priority,
+                title,
+                instant_analysis,
             )
 
     @classmethod
@@ -102,6 +133,7 @@ class Resource:
         title: str,
         status: str | None = None,
         priority: bool = True,  # Make resource high priority by default for crawling
+        instant_analysis: bool | None = None,
     ) -> Record | None:
         if status and status not in cls.STATUSES.keys():
             raise ValueError(f"Invalid status: {status}")
@@ -110,27 +142,49 @@ class Resource:
         async with pool.acquire() as connection:
             # Check if resource is in catalog then insert or update into table
             if await Resource.get(resource_id):
+                if instant_analysis is not None:
+                    q = """
+                            UPDATE catalog
+                            SET dataset_id = $1, url = $3, type = $4, format=$5, status = $6, priority = $7, title = $8, instant_analysis = $9
+                            WHERE resource_id = $2
+                            RETURNING *;"""
+                    return await connection.fetchrow(
+                        q,
+                        dataset_id,
+                        resource_id,
+                        url,
+                        type,
+                        format,
+                        status,
+                        priority,
+                        title,
+                        instant_analysis,
+                    )
                 q = """
                         UPDATE catalog
                         SET dataset_id = $1, url = $3, type = $4, format=$5, status = $6, priority = $7, title = $8
                         WHERE resource_id = $2
                         RETURNING *;"""
-            else:
-                q = """
-                        INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, status, priority, title)
-                        VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8)
-                        ON CONFLICT (resource_id) DO UPDATE SET
-                            dataset_id = $1,
-                            url = $3,
-                            type = $4,
-                            format = $5,
-                            deleted = FALSE,
-                            status = $6,
-                            priority = $7,
-                            title = $8
-                        RETURNING *;"""
+                return await connection.fetchrow(
+                    q, dataset_id, resource_id, url, type, format, status, priority, title
+                )
+            ia = instant_analysis if instant_analysis is not None else False
+            q = """
+                    INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, status, priority, title, instant_analysis)
+                    VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8, $9)
+                    ON CONFLICT (resource_id) DO UPDATE SET
+                        dataset_id = $1,
+                        url = $3,
+                        type = $4,
+                        format = $5,
+                        deleted = FALSE,
+                        status = $6,
+                        priority = $7,
+                        title = $8,
+                        instant_analysis = $9
+                    RETURNING *;"""
             return await connection.fetchrow(
-                q, dataset_id, resource_id, url, type, format, status, priority, title
+                q, dataset_id, resource_id, url, type, format, status, priority, title, ia
             )
 
     @classmethod
