@@ -98,12 +98,14 @@ async def analyse_resource(
             )
             if is_parquet:
                 file_format = "parquet"
-        if not is_geojson and not is_parquet:
-            is_ogc = config.OGC_ANALYSIS_ENABLED and detect_ogc(check, row["format"])
-            if is_ogc:
-                file_format = "ogc"
+        if not is_geojson and not is_parquet and config.OGC_ANALYSIS_ENABLED:
+            is_ogc, file_format = detect_ogc(check, row["format"])
 
-    max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
+    max_size_allowed = (
+        None
+        if exception
+        else int(config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED))
+    )
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
@@ -197,6 +199,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_ogc,
                 check=check,
+                format=file_format,
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
@@ -266,7 +269,7 @@ async def detect_resource_change_from_checksum(
 
 
 async def detect_resource_change_from_last_modified_header(
-    data: dict,
+    data: list,
 ) -> tuple[Change, dict | None]:
     # last modified header check
 
@@ -291,7 +294,7 @@ async def detect_resource_change_from_last_modified_header(
 
 
 async def detect_resource_change_from_content_length_header(
-    data: dict,
+    data: list,
 ) -> tuple[Change, dict | None]:
     # content-length variation between current and last check
     if len(data) <= 1 or not data[0].get("content_length"):

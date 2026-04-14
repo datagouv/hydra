@@ -38,7 +38,7 @@ minio_client_geojson = MinIOClient(
 
 
 async def analyse_geojson(
-    check: dict,
+    check: Record | dict,
     file_path: str | None = None,
 ) -> None:
     """Launch GeoJSON analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
@@ -68,7 +68,7 @@ async def analyse_geojson(
         )
         timer.mark("download-file")
 
-        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
+        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore[assignment]
 
         # Convert to PMTiles
         try:
@@ -88,7 +88,7 @@ async def analyse_geojson(
                 check_id=check["id"],
             ) from e
 
-        check = await Check.update(
+        check = await Check.update(  # type: ignore[assignment]
             check["id"],
             {
                 "parsing_finished_at": datetime.now(timezone.utc),
@@ -98,7 +98,7 @@ async def analyse_geojson(
         )
 
     except (ParseException, IOException) as e:
-        check = await handle_parse_exception(e, None, check)
+        check = await handle_parse_exception(e, None, check)  # type: ignore[assignment]
     finally:
         await helpers.notify_udata(resource, check)
         timer.stop()
@@ -151,7 +151,7 @@ async def csv_to_geojson(
                     "geometry": (
                         json.loads(row[geo["geojson"]]) if row[geo["geojson"]] is not None else None
                     ),
-                    "properties": {col: row[col] for col in row.keys() if col != geo["geojson"]},
+                    "properties": {col: row[col] for col in row.keys() if col != geo["geojson"]},  # type: ignore[union-attr]
                 }
 
             elif "latlon" in geo:
@@ -165,7 +165,7 @@ async def csv_to_geojson(
                         "type": "Point",
                         "coordinates": cast_latlon(row[geo["latlon"]]),
                     },
-                    "properties": {col: row[col] for col in row.keys() if col != geo["latlon"]},
+                    "properties": {col: row[col] for col in row.keys() if col != geo["latlon"]},  # type: ignore[union-attr]
                 }
 
             elif "lonlat" in geo:
@@ -180,7 +180,7 @@ async def csv_to_geojson(
                         # inverting lon and lat to match the standard
                         "coordinates": cast_latlon(row[geo["lonlat"]])[::-1],
                     },
-                    "properties": {col: row[col] for col in row.keys() if col != geo["lonlat"]},
+                    "properties": {col: row[col] for col in row.keys() if col != geo["lonlat"]},  # type: ignore[union-attr]
                 }
 
             else:
@@ -196,7 +196,7 @@ async def csv_to_geojson(
                     },
                     "properties": {
                         col: row[col]
-                        for col in row.keys()
+                        for col in row.keys()  # type: ignore[union-attr]
                         if col not in [geo["longitude"], geo["latitude"]]
                     },
                 }
@@ -299,6 +299,7 @@ async def csv_to_geojson_and_pmtiles(
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
+    timer: Timer | None = None,
 ) -> tuple[Path, int, str | None, Path, int, str | None] | None:
     if not config.CSV_TO_GEOJSON:
         log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
@@ -322,6 +323,8 @@ async def csv_to_geojson_and_pmtiles(
     if result is None:
         return None
     geojson_size, geojson_url = result
+    if timer:
+        timer.mark("csv-to-geojson")
 
     await Check.update(
         check_id,
@@ -337,6 +340,8 @@ async def csv_to_geojson_and_pmtiles(
 
     # Convert GeoJSON to PMTiles
     pmtiles_size, pmtiles_url = await geojson_to_pmtiles(geojson_filepath, pmtiles_filepath)
+    if timer:
+        timer.mark("geojson-to-pmtiles")
 
     await Check.update(
         check_id,

@@ -36,6 +36,7 @@ async def test_exception_analysis(
 
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_EXCEPTION_ID)
+    assert resource is not None
     assert resource["status"] is None
 
     # Analyse the CSV
@@ -43,6 +44,7 @@ async def test_exception_analysis(
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_EXCEPTION_ID)
+    assert resource is not None
     assert resource["status"] is None
 
     # Check the table has been created in CSV DB, with the expected number of rows, and get the columns
