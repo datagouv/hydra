@@ -115,6 +115,7 @@ async def get_worker_status(request: web.Request) -> web.Response:
 
 
 async def get_stats(request: web.Request) -> web.Response:
+    """Aggregates for the latest HTTP check per crawler-eligible resource (GET /api/checks/stats)."""
     q = f"""
         SELECT count(*) AS count_checked
         FROM catalog

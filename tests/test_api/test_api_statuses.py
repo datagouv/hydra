@@ -60,7 +60,7 @@ async def test_get_crawler_status(setup_catalog, client, fake_check):
 
 
 async def test_get_stats(setup_catalog, client, fake_check):
-    resp = await client.get("/api/stats")
+    resp = await client.get("/api/checks/stats")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == {
@@ -76,7 +76,7 @@ async def test_get_stats(setup_catalog, client, fake_check):
     await fake_check()
     await fake_check(timeout=True, status=None)
     await fake_check(status=500, error="error")
-    resp = await client.get("/api/stats")
+    resp = await client.get("/api/checks/stats")
     assert resp.status == 200
     data = await resp.json()
     assert data == {

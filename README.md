@@ -202,6 +202,7 @@ The API serves the following endpoints:
 - `GET` on `/api/checks/latest?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
 - `GET` on `/api/checks/all?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
 - `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurrences grouped by a `column` for a specific `date`
+- `GET` on `/api/checks/stats` to get aggregates for the latest HTTP check per eligible resource (ok / error / timeout counts and HTTP status code distribution)
 
 *Related to resources:*
 - `GET` on `/api/resources/{resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
@@ -225,7 +226,6 @@ The API serves the following endpoints:
 *Related to some status and health check:*
 - `GET` on `/api/status/crawler` to get the crawling status
 - `GET` on `/api/status/worker` to get the worker status
-- `GET` on `/api/stats` to get the crawling stats
 - `GET` on `/api/health` to get the API version number and environment
 
 You may want to use a helper such as [Bruno](https://www.usebruno.com/) to handle API calls, in which case all the endpoints are ready to use [here](https://github.com/datagouv/api-calls).
@@ -457,10 +457,10 @@ $ curl -s "http://localhost:8000/api/status/worker" | json_pp
 }
 ```
 
-#### Get crawling stats
+#### Get checks stats (latest check per eligible resource)
 
 ```bash
-$ curl -s "http://localhost:8000/api/stats" | json_pp
+$ curl -s "http://localhost:8000/api/checks/stats" | json_pp
 {
    "status" : [
       {
