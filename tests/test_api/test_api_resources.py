@@ -194,20 +194,28 @@ async def test_get_ressources_stats(setup_catalog, client, fake_check):
         "total_count": 1,
         "deleted_count": 0,
         "statuses_count": expected_resources_statuses_count,
-        "cors": {
-            "external_resources_with_cors_data": 1,
-            "external_resources_without_cors_data": 0,
-            "external_resources_cors_coverage_percentage": 100.0,
-            "external_resources_allow_origin_distribution": [
-                {
-                    "access_status": "Accessible (Specific Whitelist)",
-                    "unique_resources_count": 1,
-                    "percentage": 100.0,
-                },
-            ],
-        },
     }
     resp = await client.get("/api/resources/stats")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == expected_data
+
+
+async def test_get_resources_stats_cors(setup_catalog, client, fake_check):
+    await fake_check(cors_headers={"allow-origin": "data.gouv.fr", "status": 204})
+    expected_cors = {
+        "external_resources_with_cors_data": 1,
+        "external_resources_without_cors_data": 0,
+        "external_resources_cors_coverage_percentage": 100.0,
+        "external_resources_allow_origin_distribution": [
+            {
+                "access_status": "Accessible (Specific Whitelist)",
+                "unique_resources_count": 1,
+                "percentage": 100.0,
+            },
+        ],
+    }
+    resp = await client.get("/api/resources/stats/cors")
+    assert resp.status == 200
+    data: dict = await resp.json()
+    assert data == expected_cors

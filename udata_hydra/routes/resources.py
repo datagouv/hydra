@@ -108,8 +108,7 @@ async def delete_resource(request: web.Request) -> web.Response:
 
 
 async def get_resources_stats(request: web.Request) -> web.Response:
-    """Endpoint to get statistics about resources (CORS headers, etc.)."""
-    # Count total resources and deleted resources (all resources in catalog, no filters)
+    """Aggregate statistics about resources in catalog (counts and crawler status breakdown)."""
     q_total = """
         SELECT
             COALESCE(COUNT(*), 0) AS total_resources,
@@ -117,8 +116,17 @@ async def get_resources_stats(request: web.Request) -> web.Response:
         FROM catalog
     """
     stats_resources: dict = await request.app["pool"].fetchrow(q_total)
+    return web.json_response(
+        {
+            "total_count": stats_resources["total_resources"],
+            "deleted_count": stats_resources["deleted_resources"],
+            "statuses_count": await get_resources_status_counts(request),
+        }
+    )
 
-    # CORS stats: external resources (not on data.gouv.fr) that have at least one check with CORS probe (OPTIONS).
+
+async def get_resources_stats_cors(request: web.Request) -> web.Response:
+    """CORS-related statistics for external resources (URLs not on data.gouv.fr)."""
     q = """
         -- External resources only; count how many have ≥1 check with CORS data and coverage %.
         SELECT
@@ -176,16 +184,11 @@ async def get_resources_stats(request: web.Request) -> web.Response:
     ]
     return web.json_response(
         {
-            "total_count": stats_resources["total_resources"],
-            "deleted_count": stats_resources["deleted_resources"],
-            "statuses_count": await get_resources_status_counts(request),
-            "cors": {
-                "external_resources_with_cors_data": row["resources_with_cors_data"] or 0,
-                "external_resources_without_cors_data": row["resources_without_cors_data"] or 0,
-                "external_resources_cors_coverage_percentage": float(row["coverage_percentage"])
-                if row["coverage_percentage"] is not None
-                else None,
-                "external_resources_allow_origin_distribution": allow_origin_distribution,
-            },
+            "external_resources_with_cors_data": row["resources_with_cors_data"] or 0,
+            "external_resources_without_cors_data": row["resources_without_cors_data"] or 0,
+            "external_resources_cors_coverage_percentage": float(row["coverage_percentage"])
+            if row["coverage_percentage"] is not None
+            else None,
+            "external_resources_allow_origin_distribution": allow_origin_distribution,
         }
     )

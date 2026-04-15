@@ -205,7 +205,8 @@ The API serves the following endpoints:
 
 *Related to resources:*
 - `GET` on `/api/resources/{resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
-- `GET` on `/api/resources/stats` to get statistics about resources (counts, statuses, CORS coverage for external resources)
+- `GET` on `/api/resources/stats` to get aggregate statistics about resources (counts and breakdown by catalog `status`)
+- `GET` on `/api/resources/stats/cors` to get CORS coverage statistics for external resources (URLs not on data.gouv.fr)
 - `POST` on `/api/resources` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
 - `PUT` on `/api/resources/{resource_id}` to update a resource in the DB "catalog" table
 - `DELETE` on `/api/resources/{resource_id}` to delete a resource in the DB "catalog" table
@@ -362,17 +363,23 @@ $ curl -s "http://localhost:8000/api/resources/stats" | json_pp
       "BACKOFF" : 2,
       "CRAWLING_URL" : 1,
       ...
-   },
-   "cors" : {
-      "external_resources_with_cors_data" : 42,
-      "external_resources_without_cors_data" : 55,
-      "external_resources_cors_coverage_percentage" : 43.3,
-      "external_resources_allow_origin_distribution" : [
-         { "access_status" : "Accessible (Wildcard *)", "unique_resources_count" : 15, "percentage" : 35.71 },
-         { "access_status" : "Accessible (Specific Whitelist)", "unique_resources_count" : 20, "percentage" : 47.62 },
-         ...
-      ]
    }
+}
+```
+
+#### Get resources CORS stats (external URLs)
+
+```bash
+$ curl -s "http://localhost:8000/api/resources/stats/cors" | json_pp
+{
+   "external_resources_with_cors_data" : 42,
+   "external_resources_without_cors_data" : 55,
+   "external_resources_cors_coverage_percentage" : 43.3,
+   "external_resources_allow_origin_distribution" : [
+      { "access_status" : "Accessible (Wildcard *)", "unique_resources_count" : 15, "percentage" : 35.71 },
+      { "access_status" : "Accessible (Specific Whitelist)", "unique_resources_count" : 20, "percentage" : 47.62 },
+      ...
+   ]
 }
 ```
 
