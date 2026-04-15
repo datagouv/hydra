@@ -29,8 +29,8 @@ DEFAULT_PMTILES_FILEPATH = Path("converted_from_geojson.pmtiles")
 
 log = logging.getLogger("udata-hydra")
 
-s3_client_pmtiles = S3Client(bucket=config.MINIO_PMTILES_BUCKET, folder=config.MINIO_PMTILES_FOLDER)
-s3_client_geojson = S3Client(bucket=config.MINIO_GEOJSON_BUCKET, folder=config.MINIO_GEOJSON_FOLDER)
+s3_client_pmtiles = S3Client(bucket=config.S3_PMTILES_BUCKET, folder=config.S3_PMTILES_FOLDER)
+s3_client_geojson = S3Client(bucket=config.S3_GEOJSON_BUCKET, folder=config.S3_GEOJSON_FOLDER)
 
 
 async def analyse_geojson(

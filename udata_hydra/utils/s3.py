@@ -12,11 +12,11 @@ _DEFAULT_BOTO_CONFIG = {"connect_timeout": 3600, "read_timeout": 3600}
 
 class S3Client:
     def __init__(self, bucket: str, folder: str):
-        self.user = config.MINIO_USER
-        self.password = config.MINIO_PWD
+        self.user = config.S3_ACCESS_KEY_ID
+        self.password = config.S3_SECRET_ACCESS_KEY
         self.bucket = bucket
         self.folder = folder
-        host = config.MINIO_URL or "test"
+        host = config.S3_ENDPOINT or "test"
         self._resource = boto3.resource(
             "s3",
             endpoint_url=f"https://{host}",
@@ -50,6 +50,6 @@ class S3Client:
             self._resource.Bucket(self.bucket).upload_file(file_path, key)
             if delete_source:
                 os.remove(file_path)
-            return f"https://{config.MINIO_URL}/{self.bucket}/{self.folder}/{file_name}"
+            return f"https://{config.S3_ENDPOINT}/{self.bucket}/{self.folder}/{file_name}"
         else:
             raise Exception(f"file '{file_path}' does not exists")

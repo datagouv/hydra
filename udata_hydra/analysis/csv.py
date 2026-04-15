@@ -75,7 +75,7 @@ PYTHON_TYPE_TO_PG = {
 }
 
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
-s3_client = S3Client(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MINIO_PARQUET_FOLDER)
+s3_client = S3Client(bucket=config.S3_PARQUET_BUCKET, folder=config.S3_PARQUET_FOLDER)
 
 
 async def analyse_csv(

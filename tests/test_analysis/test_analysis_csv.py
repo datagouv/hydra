@@ -652,12 +652,12 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 assert res is None
                 mock_func.assert_not_called()
         else:
-            minio_url = "my.minio.fr"
+            s3_endpoint = "s3.example.com"
             geojson_bucket = "geojson_bucket"
             geojson_folder = "geojson_folder"
             pmtiles_bucket = "pmtiles_bucket"
             pmtiles_folder = "pmtiles_folder"
-            mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
+            mocker.patch("udata_hydra.config.S3_ENDPOINT", s3_endpoint)
             mocked_resource = MagicMock()
             mocked_resource.meta.client.head_bucket.return_value = {}
             mocked_resource.Bucket.return_value = MagicMock()
@@ -712,7 +712,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 assert not any(col in feat["properties"] for col in expected_formats)
             assert (
                 geojson_url
-                == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
+                == f"https://{s3_endpoint}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
             )
             assert isinstance(geojson_size, int)
 
@@ -722,7 +722,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
             assert header == b"PMTiles"
             assert (
                 pmtiles_url
-                == f"https://{minio_url}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
+                == f"https://{s3_endpoint}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
             )
             assert isinstance(pmtiles_size, int)
 
