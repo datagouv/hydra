@@ -47,8 +47,8 @@ from udata_hydra.utils import (
     remove_remainders,
 )
 from udata_hydra.utils.casting import generate_records
-from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet, save_as_parquet_from_db
+from udata_hydra.utils.s3 import S3Client
 
 log = logging.getLogger("udata-hydra")
 
@@ -75,7 +75,7 @@ PYTHON_TYPE_TO_PG = {
 }
 
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
-minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MINIO_PARQUET_FOLDER)
+s3_client = S3Client(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MINIO_PARQUET_FOLDER)
 
 
 async def analyse_csv(
@@ -353,7 +353,7 @@ async def csv_to_parquet(
             output_filename=resource_id,
         )
     parquet_size: int = os.path.getsize(parquet_file)
-    parquet_url: str = minio_client.send_file(parquet_file)
+    parquet_url: str = s3_client.send_file(parquet_file)
 
     await Check.update(
         check_id,

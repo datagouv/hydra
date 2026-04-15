@@ -18,7 +18,7 @@ from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils.minio import MinIOClient
+from udata_hydra.utils.s3 import S3Client
 
 pytestmark = pytest.mark.asyncio
 
@@ -658,24 +658,20 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
             pmtiles_bucket = "pmtiles_bucket"
             pmtiles_folder = "pmtiles_folder"
             mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-            mocked_minio = MagicMock()
-            mocked_minio.fput_object.return_value = None
-            mocked_minio.bucket_exists.return_value = True
-            with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-                mocked_minio_client_geojson = MinIOClient(
-                    bucket=geojson_bucket, folder=geojson_folder
-                )
-                mocked_minio_client_pmtiles = MinIOClient(
-                    bucket=pmtiles_bucket, folder=pmtiles_folder
-                )
+            mocked_resource = MagicMock()
+            mocked_resource.meta.client.head_bucket.return_value = {}
+            mocked_resource.Bucket.return_value = MagicMock()
+            with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
+                mocked_s3_client_geojson = S3Client(bucket=geojson_bucket, folder=geojson_folder)
+                mocked_s3_client_pmtiles = S3Client(bucket=pmtiles_bucket, folder=pmtiles_folder)
             with (
                 patch(
-                    "udata_hydra.analysis.geojson.minio_client_geojson",
-                    new=mocked_minio_client_geojson,
+                    "udata_hydra.analysis.geojson.s3_client_geojson",
+                    new=mocked_s3_client_geojson,
                 ),
                 patch(
-                    "udata_hydra.analysis.geojson.minio_client_pmtiles",
-                    new=mocked_minio_client_pmtiles,
+                    "udata_hydra.analysis.geojson.s3_client_pmtiles",
+                    new=mocked_s3_client_pmtiles,
                 ),
             ):
                 result = await csv_to_geojson_and_pmtiles(fp.name, inspection, RESOURCE_ID)

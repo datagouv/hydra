@@ -13,7 +13,7 @@ from udata_hydra.analysis.geojson import (
     csv_to_geojson,
     geojson_to_pmtiles,
 )
-from udata_hydra.utils.minio import MinIOClient
+from udata_hydra.utils.s3 import S3Client
 from udata_hydra.utils.timer import Timer
 
 log = logging.getLogger("udata-hydra")
@@ -48,18 +48,18 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
     bucket = "bucket"
     folder = "folder"
     mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-    mocked_minio = MagicMock()
-    mocked_minio.fput_object.return_value = None
-    mocked_minio.bucket_exists.return_value = True
+    mocked_resource = MagicMock()
+    mocked_resource.meta.client.head_bucket.return_value = {}
+    mocked_resource.Bucket.return_value = MagicMock()
     # Make sure that we don't crash even if output pmtiles already exists
     Path(f"{RESOURCE_ID}.pmtiles").touch()
-    with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-        mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
+    with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
+        mocked_s3_client = S3Client(bucket=bucket, folder=folder)
     with (
-        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client),
+        patch("udata_hydra.analysis.geojson.s3_client_pmtiles", new=mocked_s3_client),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):
-        mock_os = mocker.patch("udata_hydra.utils.minio.os")
+        mock_os = mocker.patch("udata_hydra.utils.s3.os")
         mock_os.path = os.path
         mock_os.remove.return_value = None
         size, url = await geojson_to_pmtiles(
@@ -112,20 +112,20 @@ async def test_csv_to_geojson_big_file(
     # Create timer for performance measurement
     timer = Timer("csv-to-geojson-performance-test")
 
-    # Mock MinIO for the test
+    # Mock S3 for the test
     minio_url = "my.minio.fr"
     bucket = "bucket"
     folder = "folder"
     mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-    mocked_minio = MagicMock()
-    mocked_minio.fput_object.return_value = None
-    mocked_minio.bucket_exists.return_value = True
+    mocked_resource = MagicMock()
+    mocked_resource.meta.client.head_bucket.return_value = {}
+    mocked_resource.Bucket.return_value = MagicMock()
 
-    with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-        mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
+    with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
+        mocked_s3_client = S3Client(bucket=bucket, folder=folder)
 
-    with patch("udata_hydra.analysis.geojson.minio_client_geojson", new=mocked_minio_client):
-        mock_os = mocker.patch("udata_hydra.utils.minio.os")
+    with patch("udata_hydra.analysis.geojson.s3_client_geojson", new=mocked_s3_client):
+        mock_os = mocker.patch("udata_hydra.utils.s3.os")
         mock_os.path = os.path
         mock_os.remove.return_value = None
 
@@ -198,23 +198,23 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     # Create timer for performance measurement
     timer = Timer("geojson-to-pmtiles-performance-test")
 
-    # Mock MinIO for the test
+    # Mock S3 for the test
     minio_url = "my.minio.fr"
     bucket = "bucket"
     folder = "folder"
     mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-    mocked_minio = MagicMock()
-    mocked_minio.fput_object.return_value = None
-    mocked_minio.bucket_exists.return_value = True
+    mocked_resource = MagicMock()
+    mocked_resource.meta.client.head_bucket.return_value = {}
+    mocked_resource.Bucket.return_value = MagicMock()
 
-    with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-        mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
+    with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
+        mocked_s3_client = S3Client(bucket=bucket, folder=folder)
 
     with (
-        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client),
+        patch("udata_hydra.analysis.geojson.s3_client_pmtiles", new=mocked_s3_client),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):
-        mock_os = mocker.patch("udata_hydra.utils.minio.os")
+        mock_os = mocker.patch("udata_hydra.utils.s3.os")
         mock_os.path = os.path
         mock_os.remove.return_value = None
 
