@@ -1,12 +1,12 @@
 import re
-from typing import Coroutine
+from typing import Callable
 
 from aiohttp import web
 
 from udata_hydra import config
 
 
-def _is_exclude(request, exclude: tuple[str]) -> bool:
+def _is_exclude(request, exclude: tuple[str, ...]) -> bool:
     for pattern in exclude:
         if re.fullmatch(pattern, request.path):
             return True
@@ -16,9 +16,9 @@ def _is_exclude(request, exclude: tuple[str]) -> bool:
 def token_auth_middleware(
     request_property: str = "user",
     auth_scheme: str = "Bearer",
-    exclude_routes: tuple[str] = tuple(),
-    exclude_methods: tuple[str] = tuple(),
-) -> Coroutine:
+    exclude_routes: tuple[str, ...] = (),
+    exclude_methods: tuple[str, ...] = (),
+) -> Callable[..., object]:
     """Checks a auth token and adds a user in request.
 
     Token auth middleware that checks the "Authorization" http header for token and, if the token in the requet headers is valid, then middleware adds the user to request with key that contain the "request_property" variable, else it will raise an HTTPForbiddenexception.

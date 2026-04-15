@@ -1,7 +1,11 @@
 import json
 
+from asyncpg import Record
 
-def detect_tabular_from_headers(check: dict) -> tuple[bool, str]:
+from udata_hydra.types import FileFormatLiteral
+
+
+def detect_tabular_from_headers(check: Record | dict) -> tuple[bool, FileFormatLiteral]:
     """
     Determine from content-type header if file looks like:
         - a csv
@@ -40,4 +44,4 @@ def detect_tabular_from_headers(check: dict) -> tuple[bool, str]:
         # and "xlsx" in check.get("url", "")
         return True, "xlsx"
 
-    return False, "csv"
+    return False, "unknown"

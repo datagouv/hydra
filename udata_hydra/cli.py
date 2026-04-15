@@ -1,6 +1,7 @@
 import asyncio
 import csv
 import hashlib
+import json
 import logging
 import os
 import uuid
@@ -8,6 +9,7 @@ from asyncio import run as aiorun
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Any, Coroutine
 
 import aiohttp
 import asyncpg
@@ -19,6 +21,7 @@ from progressist import ProgressBar
 from udata_hydra import config
 from udata_hydra.analysis.csv import analyse_csv, csv_detective_routine
 from udata_hydra.analysis.geojson import analyse_geojson, csv_to_geojson, geojson_to_pmtiles
+from udata_hydra.analysis.ogc import analyse_ogc
 from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import (
@@ -67,6 +70,44 @@ def _make_async_wrapper(async_func):
     return wrapper
 
 
+async def _find_check(
+    check_id: str | None = None,
+    url: str | None = None,
+    resource_id: str | None = None,
+) -> dict | None:
+    """Look up an existing check by check_id, url or resource_id.
+    Returns the check as a dict, or None if not found (with an error logged).
+    """
+    assert check_id or url or resource_id
+
+    check = None
+
+    if check_id:
+        record = await Check.get_by_id(int(check_id), with_deleted=True)
+        check = dict(record) if record else None
+
+    if not check and url:
+        records = await Check.get_by_url(url)
+        if records:
+            if len(records) > 1:
+                log.warning(f"Multiple checks found for URL {url}, using the latest one")
+            check = dict(records[0])
+
+    if not check and resource_id:
+        record = await Check.get_by_resource_id(resource_id)
+        check = dict(record) if record else None
+
+    if not check:
+        if check_id:
+            log.error("Could not retrieve the specified check")
+        elif url:
+            log.error("Could not find a check linked to the specified URL")
+        elif resource_id:
+            log.error("Could not find a check linked to the specified resource ID")
+
+    return check
+
+
 async def _load_catalog(
     url: str | None = None,
     drop_meta: bool = False,
@@ -113,16 +154,17 @@ async def _load_catalog(
                     """
                     INSERT INTO catalog (
                         dataset_id, resource_id, url, type, format,
-                        harvest_modified_at, deleted, priority, status
+                        harvest_modified_at, title, deleted, priority, status
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NULL)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, FALSE, NULL)
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,
                         deleted = FALSE,
                         type = $4,
                         format = $5,
-                        harvest_modified_at = $6;
+                        harvest_modified_at = $6,
+                        title = $7;
                 """,
                     row["dataset.id"],
                     row["id"],
@@ -133,6 +175,7 @@ async def _load_catalog(
                     datetime.fromisoformat(row["harvest.modified_at"]).replace(tzinfo=timezone.utc)
                     if row["harvest.modified_at"]
                     else None,
+                    row["title"],
                 )
         log.info("Resources catalog successfully upserted into DB.")
         cleaned_count: int = await Resource.clean_up_statuses()
@@ -325,31 +368,10 @@ async def _analyse_csv_cli(
     """Trigger a csv analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
     """
-    assert check_id or url or resource_id
-
-    # Try to get check from different sources
-    check = None
-    tmp_resource_id = None
-
-    # Try to get check from check_id
-    if check_id:
-        record = await Check.get_by_id(int(check_id), with_deleted=True)
-        check = dict(record) if record else None
-
-    # Try to get check from URL
-    if not check and url:
-        records = await Check.get_by_url(url)
-        if records:
-            if len(records) > 1:
-                log.warning(f"Multiple checks found for URL {url}, using the latest one")
-            check = dict(records[0])
-
-    # Try to get check from resource_id
-    if not check and resource_id:
-        record = await Check.get_by_resource_id(resource_id)
-        check = dict(record) if record else None
+    check = await _find_check(check_id=check_id, url=url, resource_id=resource_id)
 
     # We cannot get a check, it's an external URL analysis, we need to create a temporary check
+    tmp_resource_id = None
     if not check and url:
         tmp_resource_id = str(uuid.uuid4())
         await _insert_url_into_catalog(url=url, resource_id=tmp_resource_id)
@@ -364,8 +386,7 @@ async def _analyse_csv_cli(
             returning="*",
         )
 
-    elif not check:
-        log.error("Could not find a check for the specified parameters")
+    if not check:
         return
 
     await analyse_csv(check=check, debug_insert=debug_insert)
@@ -418,26 +439,10 @@ async def _analyse_geojson_cli(
     """Trigger a GeoJSON analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
     """
-    assert check_id or url or resource_id
-    check = None
-    if check_id:
-        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)
-    if not check and url:
-        checks: list[Record] | None = await Check.get_by_url(url)
-        if checks and len(checks) > 1:
-            log.warning(f"Multiple checks found for URL {url}, using the latest one")
-        check = checks[0] if checks else None
-    if not check and resource_id:
-        check: Record | None = await Check.get_by_resource_id(resource_id)
+    check = await _find_check(check_id=check_id, url=url, resource_id=resource_id)
     if not check:
-        if check_id:
-            log.error("Could not retrieve the specified check")
-        elif url:
-            log.error("Could not find a check linked to the specified URL")
-        elif resource_id:
-            log.error("Could not find a check linked to the specified resource ID")
         return
-    await analyse_geojson(check=dict(check))
+    await analyse_geojson(check=check)
 
 
 @cli.command(name="analyse-geojson")
@@ -478,15 +483,16 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
         inspection, df = csv_detective_routine(
             file_path=str(csv_path),
             output_profile=True,
-            output_df=True,
             cast_json=False,
             num_rows=-1,
             save_results=False,
             verbose=True,
         )
 
-        log.info(f"CSV analysis complete. Found {len(df)} rows and {len(df.columns)} columns")
-        log.info(f"Columns: {list(df.columns)}")
+        log.info(
+            f"CSV analysis complete. Found {inspection['total_lines']} rows and {len(inspection['headers'])} columns"
+        )
+        log.info(f"Columns: {inspection['headers']}")
 
         # Show column formats for debugging
         log.info("Column formats detected:")
@@ -499,7 +505,7 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
         try:
             # Convert to GeoJSON (no MinIO upload, no database updates)
             result = await csv_to_geojson(
-                df=df,
+                file_path=str(csv_path),
                 inspection=inspection,
                 output_file_path=geojson_filepath,
                 upload_to_minio=False,
@@ -591,26 +597,10 @@ async def _analyse_parquet_cli(
     """Trigger a parquet analysis from a check_id, an url or a resource_id
     Try to get the check from the check ID, then from the URL
     """
-    assert check_id or url or resource_id
-    check = None
-    if check_id:
-        check: Record | None = await Check.get_by_id(int(check_id), with_deleted=True)
-    if not check and url:
-        checks: list[Record] | None = await Check.get_by_url(url)
-        if checks and len(checks) > 1:
-            log.warning(f"Multiple checks found for URL {url}, using the latest one")
-        check = checks[0] if checks else None
-    if not check and resource_id:
-        check: Record | None = await Check.get_by_resource_id(resource_id)
+    check = await _find_check(check_id=check_id, url=url, resource_id=resource_id)
     if not check:
-        if check_id:
-            log.error("Could not retrieve the specified check")
-        elif url:
-            log.error("Could not find a check linked to the specified URL")
-        elif resource_id:
-            log.error("Could not find a check linked to the specified resource ID")
         return
-    await analyse_parquet(check=dict(check))
+    await analyse_parquet(check=check)
 
 
 @cli.command(name="analyse-parquet")
@@ -624,6 +614,50 @@ def analyse_parquet_cli(
     """
     return _make_async_wrapper(_analyse_parquet_cli)(
         check_id=check_id, url=url, resource_id=resource_id
+    )
+
+
+async def _analyse_ogc_cli(
+    format: str,
+    check_id: str | None = None,
+    url: str | None = None,
+    resource_id: str | None = None,
+):
+    """Trigger an OGC analysis from a check_id, an url or a resource_id
+    Try to get the check from the check ID, then from the URL
+    """
+    check = await _find_check(check_id=check_id, url=url, resource_id=resource_id)
+
+    if not check and url:
+        check = {"id": None, "url": url, "resource_id": None}
+
+    if not check:
+        return
+
+    if not config.OGC_ANALYSIS_ENABLED:
+        log.warning("Temporarily enabling OGC analysis for CLI")
+        config.override(OGC_ANALYSIS_ENABLED=True)
+
+    result = await analyse_ogc(check=check, format=format)
+    if result:
+        log.info("OGC analysis completed successfully.")
+        log.debug(json.dumps(result, indent=2, default=str, ensure_ascii=False))
+    else:
+        log.warning("OGC analysis returned no results")
+
+
+@cli.command(name="analyse-ogc")
+def analyse_ogc_cli(
+    format: str = typer.Option("wfs", help="The OGC service format to analyse"),
+    check_id: str | None = typer.Option(None, help="Check ID to analyze"),
+    url: str | None = typer.Option(None, help="OGC endpoint URL to analyze"),
+    resource_id: str | None = typer.Option(None, help="Resource ID to analyze"),
+):
+    """Trigger an OGC analysis from a check_id, an url or a resource_id
+    Try to get the check from the check ID, then from the URL
+    """
+    return _make_async_wrapper(_analyse_ogc_cli)(
+        format=format, check_id=check_id, url=url, resource_id=resource_id
     )
 
 
@@ -782,7 +816,7 @@ async def _purge_checks(
 def purge_checks(
     retention_days: int = typer.Option(60, help="Number of days to keep checks"),
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
-) -> None:
+) -> Coroutine[Any, Any, None]:
     """Delete outdated checks that are more than `retention_days` days old"""
     return _make_async_wrapper(_purge_checks)(retention_days=retention_days, quiet=quiet)
 
@@ -854,7 +888,7 @@ async def _purge_csv_tables(
 def purge_csv_tables(
     quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
     hard_delete: bool = False,
-) -> None:
+) -> Coroutine[Any, Any, None]:
     """Delete converted CSV tables for resources url no longer in catalog"""
     return _make_async_wrapper(_purge_csv_tables)(quiet=quiet, hard_delete=hard_delete)
 
@@ -880,18 +914,20 @@ async def _insert_resource_into_catalog(resource_id: str):
         await conn.execute(
             """
             INSERT INTO catalog (
-                dataset_id, resource_id, url, harvest_modified_at,
+                dataset_id, resource_id, url, title, harvest_modified_at,
                 deleted, priority, status
             )
-            VALUES ($1, $2, $3, $4, FALSE, FALSE, NULL)
+            VALUES ($1, $2, $3, $4, $5, FALSE, FALSE, NULL)
             ON CONFLICT (resource_id) DO UPDATE SET
                 dataset_id = $1,
                 url = $3,
+                title = $4,
                 deleted = FALSE;
             """,
             resource["dataset_id"],
             resource["resource"]["id"],
             resource["resource"]["url"],
+            resource["resource"].get("title"),
             # force timezone info to UTC (catalog data should be in UTC)
             datetime.fromisoformat(resource["resource"]["harvest"]["modified_at"]).replace(
                 tzinfo=timezone.utc
@@ -1028,7 +1064,7 @@ def purge_selected_csv_tables(
     retention_days: int | None = None,
     retention_tables: int | None = None,
     quiet: bool = False,
-) -> None:
+) -> Coroutine[Any, Any, None]:
     """Delete converted CSV tables either:
     - if they're more than retention_days days old
     - if they're not in the top retention_tables most recent

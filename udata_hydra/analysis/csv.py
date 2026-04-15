@@ -11,6 +11,7 @@ from asyncpg.exceptions import UndefinedTableError
 from csv_detective import routine as csv_detective_routine
 from csv_detective import validate_then_detect
 from csv_detective.detection.engine import engine_to_file
+from csv_detective.utils import sanitize_for_json
 from progressist import ProgressBar
 from slugify import slugify
 from sqlalchemy import (
@@ -47,7 +48,7 @@ from udata_hydra.utils import (
 )
 from udata_hydra.utils.casting import generate_records
 from udata_hydra.utils.minio import MinIOClient
-from udata_hydra.utils.parquet import save_as_parquet
+from udata_hydra.utils.parquet import save_as_parquet, save_as_parquet_from_db
 
 log = logging.getLogger("udata-hydra")
 
@@ -78,7 +79,7 @@ minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MIN
 
 
 async def analyse_csv(
-    check: dict,
+    check: Record | dict,
     file_path: str | None = None,
     debug_insert: bool = False,
 ) -> None:
@@ -119,7 +120,7 @@ async def analyse_csv(
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
         timer.mark("download-file")
 
-        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})
+        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore[assignment]
 
         # Launch csv-detective against given file
         try:
@@ -158,7 +159,7 @@ async def analyse_csv(
             resource_id=resource_id,
             debug_insert=debug_insert,
         )
-        check = await Check.update(check["id"], {"parsing_table": table_name})
+        check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
         timer.mark("csv-to-db")
         await csv_to_db_index(table_name, csv_inspection, check, dataset_id)
 
@@ -168,6 +169,7 @@ async def analyse_csv(
                 inspection=csv_inspection,
                 resource_id=resource_id,
                 check_id=check["id"],
+                table_name=table_name if config.CSV_TO_DB and config.DB_TO_PARQUET else None,
             )
             timer.mark("csv-to-parquet")
         except Exception as e:
@@ -186,8 +188,8 @@ async def analyse_csv(
                 inspection=csv_inspection,
                 resource_id=resource_id,
                 check_id=check["id"],
+                timer=timer,
             )
-            timer.mark("csv-to-geojson-pmtiles")
         except Exception as e:
             remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
             raise ParseException(
@@ -198,7 +200,7 @@ async def analyse_csv(
                 check_id=check["id"],
             ) from e
 
-        check = await Check.update(
+        check = await Check.update(  # type: ignore[assignment]
             check["id"],
             {
                 "parsing_finished_at": datetime.now(timezone.utc),
@@ -206,7 +208,7 @@ async def analyse_csv(
         )
 
     except (ParseException, IOException) as e:
-        check = await handle_parse_exception(e, table_name, check)
+        check = await handle_parse_exception(e, table_name, check)  # type: ignore[assignment]
     finally:
         await helpers.notify_udata(resource, check)
         timer.stop()
@@ -300,21 +302,27 @@ async def csv_to_parquet(
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
+    table_name: str | None = None,
 ) -> tuple[str, int] | None:
     """
     Convert a csv file to parquet using inspection data.
 
+    If table_name is provided, reads directly from the PostgreSQL table
+    instead of re-reading and re-casting the CSV file.
+
     Args:
         file_path: CSV file path to convert.
         inspection: CSV detective report.
-        table_name: used to name the parquet file.
+        resource_id: used to name the parquet file.
+        check_id: check ID to update with parquet info.
+        table_name: if provided, read from this PostgreSQL table instead of file_path.
 
     Returns:
         parquet_url: URL of the parquet file.
         parquet_size: size of the parquet file.
     """
-    if not config.CSV_TO_PARQUET:
-        log.debug("CSV_TO_PARQUET turned off, skipping parquet export.")
+    if not config.CSV_TO_PARQUET and not config.DB_TO_PARQUET:
+        log.debug("CSV_TO_PARQUET and DB_TO_PARQUET turned off, skipping parquet export.")
         return
 
     if int(inspection.get("total_lines", 0)) < config.MIN_LINES_FOR_PARQUET:
@@ -332,12 +340,18 @@ async def csv_to_parquet(
         # Update resource status to CONVERTING_TO_PARQUET
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
 
-    # save the file as parquet and store it on Minio instance
-    parquet_file, _ = save_as_parquet(
-        records=generate_records(file_path, inspection, cast_json=False),
-        columns=inspection["columns"],
-        output_filename=resource_id,
-    )
+    if config.DB_TO_PARQUET and table_name:
+        parquet_file, _ = await save_as_parquet_from_db(
+            table_name=table_name,
+            inspection=inspection,
+            output_filename=resource_id,
+        )
+    else:
+        parquet_file, _ = save_as_parquet(
+            records=generate_records(file_path, inspection, cast_json=False),
+            columns=inspection["columns"],
+            output_filename=resource_id,
+        )
     parquet_size: int = os.path.getsize(parquet_file)
     parquet_url: str = minio_client.send_file(parquet_file)
 
@@ -443,16 +457,25 @@ async def csv_to_db(
 
 
 async def csv_to_db_index(
-    table_name: str, inspection: dict, check: Record, dataset_id: str
+    table_name: str, inspection: dict, check: Record | dict, dataset_id: str
 ) -> None:
     """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)"
-    await db.execute(
-        q,
-        table_name,
-        json.dumps(inspection, default=str),
-        check.get("resource_id"),
-        dataset_id,
-        check.get("url"),
-    )
+    try:
+        await db.execute(
+            q,
+            table_name,
+            json.dumps(sanitize_for_json(inspection), default=str),
+            check.get("resource_id"),
+            dataset_id,
+            check.get("url"),
+        )
+    except Exception as e:
+        raise ParseException(
+            message=str(e),
+            step="tables_index_insertion",
+            resource_id=check.get("resource_id"),
+            url=check.get("url"),
+            check_id=check["id"],
+        ) from e

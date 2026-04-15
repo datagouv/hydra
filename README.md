@@ -576,10 +576,16 @@ pre-commit install
 ```
 Once this is done, code formatting and linting, as well as import sorting, will be automatically checked before each commit.
 
-If you cannot use pre-commit, it is necessary to format, lint, and sort imports with [Ruff](https://docs.astral.sh/ruff/) before committing:
+If you cannot use pre-commit, it is necessary to format, lint, and sort imports with [Ruff](https://astral.sh/ruff/) for linting and formatting, and [ty](https://docs.astral.sh/ty/) for type checking. **Either running these commands manually or installing the pre-commit hook is required before submitting contributions.**
 ```bash
-uv run ruff check --fix . && uv run ruff format .
+# Lint (including import sorting) and format code
+uv run ruff check --fix && uv run ruff format
+
+# Type check (ty)
+uv run ty check
 ```
+
+By default `ty check` checks the project root; pass paths to check specific files or directories. See the [ty CLI reference](https://docs.astral.sh/ty/reference/cli/) for options.
 
 ### 🏷️ Releases and versioning
 

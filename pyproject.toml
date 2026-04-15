@@ -11,12 +11,13 @@ dependencies = [
     "aiohttp>=3.10.3",
     "asyncpg>=0.29.0",
     "coloredlogs>=15.0.1",
-    "csv-detective==0.10.4",
+    "csv-detective==0.11.2",
     "dateparser>=1.1.7",
     "humanfriendly>=10.0",
     "json-stream>=2.3.3",
     "marshmallow>=3.14.1",
     "minio>=7.2.8",
+    "owslib>=0.35.0",
     "progressist>=0.1.0",
     "pyarrow>=16.1.0",
     "python-magic>=0.4.25",
@@ -44,6 +45,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "pytest-mock>=3.7.0",
     "ruff>=0.9.3",
+    "ty>=0.0.17",
 ]
 
 [project.scripts]
@@ -59,6 +61,7 @@ module = [
     "botocore.*",
     "csv_detective.*",
     "humanfriendly.*",
+    "owslib.*",
     "sqlalchemy.*",
     "str2bool.*",
     "str2float.*",
@@ -73,6 +76,11 @@ markers = [
     "catalog_harvested: use catalog_harvested.csv as source",
 ]
 addopts = "--cov=udata_hydra --cov-report term-missing --cov-branch --cov-fail-under=80"
+
+[tool.ty]
+[tool.ty.rules]
+invalid-argument-type = "ignore"
+parameter-already-assigned = "ignore"
 
 [tool.ruff]
 lint = { extend-select = ["I"] } # ["I"] is to also sort imports with an isort rule

@@ -1,0 +1,492 @@
+import json
+import logging
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from owslib.crs import Crs
+from owslib.util import ServiceException
+from requests.exceptions import ConnectionError as RequestsConnectionError
+
+from tests.conftest import RESOURCE_ID
+from udata_hydra.analysis.ogc import analyse_ogc
+from udata_hydra.utils.ogc import detect_layer_name, detect_ogc, is_valid_layer_name
+
+log = logging.getLogger("udata-hydra")
+
+
+class TestOgcDetection:
+    """Tests for OGC service detection"""
+
+    @pytest.mark.parametrize(
+        "url,expected",
+        [
+            ("https://example.com/geoserver?SERVICE=WFS&REQUEST=GetCapabilities", (True, "wfs")),
+            ("https://example.com/geoserver?service=wfs&request=GetCapabilities", (True, "wfs")),
+            ("https://example.com/geoserver?Service=Wfs&Request=GetCapabilities", (True, "wfs")),
+            ("https://example.com/geoserver/wfs", (True, "wfs")),
+            ("https://example.com/geoserver/WFS", (True, "wfs")),
+            ("https://example.com/geoserver/wfs?request=GetCapabilities", (True, "wfs")),
+            ("https://example.com/geoserver?SERVICE=WMS&REQUEST=GetCapabilities", (True, "wms")),
+            ("https://example.com/geoserver?service=wms&request=GetCapabilities", (True, "wms")),
+            ("https://example.com/geoserver?Service=Wms&Request=GetCapabilities", (True, "wms")),
+            ("https://example.com/geoserver/wms", (True, "wms")),
+            ("https://example.com/geoserver/WMS", (True, "wms")),
+            ("https://example.com/geoserver/wms?request=GetCapabilities", (True, "wms")),
+            ("https://example.com/data/wfsx", (False, "unknown")),
+            ("https://example.com/data/file.csv", (False, "unknown")),
+            ("", (False, "unknown")),
+        ],
+    )
+    def test_detect_wfs_from_url(self, url, expected):
+        check = {"url": url}
+        assert detect_ogc(check) == expected
+
+    def test_detect_missing_url(self):
+        check = {}
+        assert detect_ogc(check) == (False, "unknown")
+
+    @pytest.mark.parametrize(
+        "resource_format,expected",
+        [
+            ("wfs", (True, "wfs")),
+            ("WFS", (True, "wfs")),
+            ("ogc:wfs", (True, "wfs")),
+            ("OGC:WFS", (True, "wfs")),
+            ("wms", (True, "wms")),
+            ("WMS", (True, "wms")),
+            ("ogc:wms", (True, "wms")),
+            ("OGC:WMS", (True, "wms")),
+            ("csv", (False, "unknown")),
+            (None, (False, "unknown")),
+        ],
+    )
+    def test_detect_wfs_from_format(self, resource_format, expected):
+        check = {"url": "https://example.com/data"}
+        assert detect_ogc(check, resource_format) == expected
+
+
+@pytest.mark.asyncio
+class TestOgcAnalysis:
+    """Tests for OGC analysis"""
+
+    async def test_analyse_ogc_disabled(self, setup_catalog, fake_check):
+        with patch("udata_hydra.analysis.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = False
+            check = await fake_check()
+            result = await analyse_ogc(check, format="wfs")
+            assert result is None
+
+    async def test_analyse_wfs_success(self, setup_catalog, db, fake_check):
+        check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
+
+        mock_crs_4326 = MagicMock(spec=Crs)
+        mock_crs_4326.getcode.return_value = "EPSG:4326"
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = [mock_crs_4326]
+
+        mock_get_feature = MagicMock()
+        mock_get_feature.parameters = {"outputFormat": {"values": ["application/json", "text/xml"]}}
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {"test:layer": mock_layer}
+        mock_wfs.getOperationByName.return_value = mock_get_feature
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch.dict(
+                "udata_hydra.analysis.ogc.SERVICE_MAPPING",
+                {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
+            ),
+            patch(
+                "udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock
+            ) as mock_notify,
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            result = await analyse_ogc(check, format="wfs")
+
+        expected_metadata = {
+            "format": "wfs",
+            # first version tested
+            "version": "2.0.0",
+            "layers": [
+                {
+                    "name": "test:layer",
+                    "default_crs": "EPSG:4326",
+                }
+            ],
+            "output_formats": ["application/json", "text/xml"],
+            "detected_layer": None,
+        }
+        assert result == expected_metadata
+
+        # Verify metadata was stored in the database
+        res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
+        assert json.loads(res["ogc_metadata"]) == expected_metadata
+        assert res["parsing_started_at"] is not None
+        assert res["parsing_finished_at"] is not None
+
+        # Verify notify_udata was called
+        mock_notify.assert_called_once()
+
+    async def test_analyse_wfs_connection_error(self, setup_catalog, db, fake_check):
+        check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch.dict(
+                "udata_hydra.analysis.ogc.SERVICE_MAPPING",
+                {
+                    "wfs": {
+                        "service": lambda *a, **kw: (_ for _ in ()).throw(
+                            RequestsConnectionError("Connection failed")
+                        ),
+                        "versions": ["2.0.0"],
+                    }
+                },
+                clear=False,
+            ),
+            patch(
+                "udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock
+            ) as mock_notify,
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            result = await analyse_ogc(check, format="wfs")
+
+        assert result is None
+
+        # Verify error was stored in the database via handle_parse_exception
+        res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
+        assert res["parsing_error"] is not None
+        assert "ogc_service_connection" in res["parsing_error"]
+        assert res["parsing_started_at"] is not None
+        assert res["parsing_finished_at"] is not None
+
+        # Verify notify_udata was called
+        mock_notify.assert_called_once()
+
+    async def test_analyse_wfs_fallback_version(self, setup_catalog, db, fake_check):
+        check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
+
+        mock_crs_4326 = MagicMock(spec=Crs)
+        mock_crs_4326.getcode.return_value = "EPSG:4326"
+
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = [mock_crs_4326]
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {"layer1": mock_layer}
+        mock_wfs.getOperationByName.return_value = None
+
+        call_count = 0
+
+        def wfs_side_effect(*args, **kwargs):
+            """First call will raise exception, second one passes"""
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise ServiceException("Version not supported")
+            return mock_wfs
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch.dict(
+                "udata_hydra.analysis.ogc.SERVICE_MAPPING",
+                {
+                    "wfs": {
+                        "service": lambda *a, **kw: wfs_side_effect(*a, **kw),
+                        "versions": ["2.0.0", "1.1.0", "1.0.0"],
+                    }
+                },
+                clear=False,
+            ),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            result = await analyse_ogc(check, format="wfs")
+
+        assert result is not None
+        # second version tested
+        assert result["version"] == "1.1.0"
+
+    async def test_analyse_wfs_empty_contents(self, setup_catalog, db, fake_check):
+        check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {}
+        mock_wfs.getOperationByName.return_value = None
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch.dict(
+                "udata_hydra.analysis.ogc.SERVICE_MAPPING",
+                {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
+                clear=False,
+            ),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            result = await analyse_ogc(check, format="wfs")
+
+        assert result == {
+            "format": "wfs",
+            "version": "2.0.0",
+            "layers": [],
+            "output_formats": [],
+            "detected_layer": None,
+        }
+
+    async def test_analyse_wfs_detected_layer_name_from_url(self, setup_catalog, db, fake_check):
+        """Layer name from typeName URL param should be detected when it matches a layer."""
+        check = await fake_check(
+            url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=ns:my_layer"
+        )
+
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = []
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {"ns:my_layer": mock_layer}
+        mock_wfs.getOperationByName.return_value = None
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch.dict(
+                "udata_hydra.analysis.ogc.SERVICE_MAPPING",
+                {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
+                clear=False,
+            ),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            result = await analyse_ogc(check, format="wfs")
+
+        assert result is not None
+        assert result["detected_layer"] == {"name": "ns:my_layer", "default_crs": None}
+
+    async def test_analyse_wfs_detected_layer_name_not_in_layers(
+        self, setup_catalog, db, fake_check
+    ):
+        """Layer name from URL should be discarded if it doesn't match any layer."""
+        check = await fake_check(
+            url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=ns:unknown"
+        )
+
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = []
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {"ns:other_layer": mock_layer}
+        mock_wfs.getOperationByName.return_value = None
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch.dict(
+                "udata_hydra.analysis.ogc.SERVICE_MAPPING",
+                {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
+                clear=False,
+            ),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            result = await analyse_ogc(check, format="wfs")
+
+        assert result is not None
+        assert result["detected_layer"] is None
+
+    async def test_analyse_wfs_detected_layer_name_namespace_fallback(
+        self, setup_catalog, db, fake_check
+    ):
+        """Layer name without namespace should match a namespaced layer if unambiguous."""
+        check = await fake_check(
+            url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=my_layer"
+        )
+
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = []
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {"ns:my_layer": mock_layer}
+        mock_wfs.getOperationByName.return_value = None
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch.dict(
+                "udata_hydra.analysis.ogc.SERVICE_MAPPING",
+                {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
+                clear=False,
+            ),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            result = await analyse_ogc(check, format="wfs")
+
+        assert result is not None
+        assert result["detected_layer"] == {"name": "ns:my_layer", "default_crs": None}
+
+    async def test_analyse_wfs_detected_layer_name_namespace_ambiguous(
+        self, setup_catalog, db, fake_check
+    ):
+        """Layer name without namespace should not match if multiple namespaced layers share the same local name."""
+        check = await fake_check(
+            url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=my_layer"
+        )
+
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = []
+
+        mock_wfs = MagicMock()
+        mock_wfs.contents = {"ns1:my_layer": mock_layer, "ns2:my_layer": mock_layer}
+        mock_wfs.getOperationByName.return_value = None
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch.dict(
+                "udata_hydra.analysis.ogc.SERVICE_MAPPING",
+                {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
+                clear=False,
+            ),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            result = await analyse_ogc(check, format="wfs")
+
+        assert result is not None
+        assert result["detected_layer"] is None
+
+    async def test_analyse_wms_disabled(self, setup_catalog, fake_check):
+        with patch("udata_hydra.analysis.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs"]
+            check = await fake_check()
+            result = await analyse_ogc(check, format="wms")
+            assert result is None
+
+    async def test_analyse_wms_success(self, setup_catalog, db, fake_check):
+        check = await fake_check(url="https://example.com/geoserver/wms?SERVICE=WMS")
+
+        mock_crs_4326 = MagicMock(spec=Crs)
+        mock_crs_4326.getcode.return_value = "EPSG:4326"
+        mock_layer = MagicMock()
+        mock_layer.crsOptions = [mock_crs_4326]
+
+        mock_wms = MagicMock()
+        mock_wms.contents = {"test:layer": mock_layer}
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch.dict(
+                "udata_hydra.analysis.ogc.SERVICE_MAPPING",
+                {"wms": {"service": lambda *a, **kw: mock_wms, "versions": ["1.3.0"]}},
+            ),
+            patch(
+                "udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock
+            ) as mock_notify,
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            result = await analyse_ogc(check, format="wms")
+
+        expected_metadata = {
+            "format": "wms",
+            # first version tested
+            "version": "1.3.0",
+            "layers": [
+                {
+                    "name": "test:layer",
+                    "default_crs": "EPSG:4326",
+                }
+            ],
+            "output_formats": [],
+            "detected_layer": None,
+        }
+        assert result == expected_metadata
+
+        # Verify metadata was stored in the database
+        res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
+        assert json.loads(res["ogc_metadata"]) == expected_metadata
+        assert res["parsing_started_at"] is not None
+        assert res["parsing_finished_at"] is not None
+
+        # Verify notify_udata was called
+        mock_notify.assert_called_once()
+
+    async def test_analyse_wms_empty_contents(self, setup_catalog, db, fake_check):
+        check = await fake_check(url="https://example.com/geoserver/wms?SERVICE=WMS")
+
+        mock_wms = MagicMock()
+        mock_wms.contents = {}
+
+        with (
+            patch("udata_hydra.analysis.ogc.config") as mock_config,
+            patch.dict(
+                "udata_hydra.analysis.ogc.SERVICE_MAPPING",
+                {"wms": {"service": lambda *a, **kw: mock_wms, "versions": ["1.3.0"]}},
+                clear=False,
+            ),
+            patch("udata_hydra.analysis.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            result = await analyse_ogc(check, format="wms")
+
+        assert result == {
+            "format": "wms",
+            "version": "1.3.0",
+            "layers": [],
+            "output_formats": [],
+            "detected_layer": None,
+        }
+
+
+class TestLayerNameDetection:
+    """Tests for layer name detection utilities"""
+
+    @pytest.mark.parametrize(
+        "name,expected",
+        [
+            ("my_layer", True),
+            ("ns:my_layer", True),
+            ("Layer-1.0", True),
+            ("a" * 100, True),
+            ("a" * 101, False),
+            ("", False),
+            ("layer with spaces", False),
+            ("layer/path", False),
+            ("layer<script>", False),
+        ],
+    )
+    def test_is_valid_layer_name(self, name, expected):
+        assert is_valid_layer_name(name) is expected
+
+    @pytest.mark.parametrize(
+        "url,title,expected",
+        [
+            # typeName param (various cases)
+            ("https://example.com/wfs?typeName=ns:layer", None, "ns:layer"),
+            ("https://example.com/wfs?TYPENAME=ns:layer", None, "ns:layer"),
+            ("https://example.com/wfs?TypeName=ns:layer", None, "ns:layer"),
+            # typeNames param
+            ("https://example.com/wfs?typeNames=ns:layer", None, "ns:layer"),
+            ("https://example.com/wfs?TYPENAMES=ns:layer", None, "ns:layer"),
+            # No param, fallback to title
+            ("https://example.com/wfs", "my_layer", "my_layer"),
+            # No param, invalid title
+            ("https://example.com/wfs", "My Layer With Spaces", None),
+            # No param, no title
+            ("https://example.com/wfs", None, None),
+            # Invalid param value
+            ("https://example.com/wfs?typeName=invalid layer!", None, None),
+            # Param takes precedence over title
+            ("https://example.com/wfs?typeName=ns:layer", "other_layer", "ns:layer"),
+        ],
+    )
+    def test_detect_layer_name(self, url, title, expected):
+        assert detect_layer_name(url, title) == expected
