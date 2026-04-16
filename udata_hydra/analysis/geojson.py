@@ -31,10 +31,6 @@ DEFAULT_PMTILES_FILEPATH = Path("converted_from_geojson.pmtiles")
 log = logging.getLogger("udata-hydra")
 
 
-# latlon/lonlat columns can contain values like "[48.8566, 2.3522]" or "48.8566 , 2.3522"
-# Both versions below strip spaces and brackets, then split on comma.
-
-
 def _cast_latlon(latlon: str) -> list[float]:
     """Python version — used when reading from CSV."""
     lat, lon = latlon.replace(" ", "").replace("[", "").replace("]", "").split(",")
@@ -173,6 +169,7 @@ async def csv_to_geojson(
             elif "latlon" in geo or "lonlat" in geo:
                 pair_key = "latlon" if "latlon" in geo else "lonlat"
                 pair_col = geo[pair_key]
+                # skipping row if geo data is None (NaN in original CSV)
                 if row[pair_col] is None:
                     continue
                 coords = _cast_latlon(row[pair_col])
@@ -280,10 +277,11 @@ def _build_feature_sql(
     property_cols = [c for c in columns if c not in geo.values()]
     params: list[str] = []
     properties_fragments = []
-    for col in property_cols:
+    for idx, col in enumerate(property_cols):
         params.append(col)
-        placeholder = f"${len(params)}::text"
-        properties_fragments.append(f"{placeholder}, {_quote_ident(_db_col_name(col))}")
+        # $N::text parameters are JSON *keys* (column names), not values.
+        # Values come from the quoted column identifiers and keep their native PG types.
+        properties_fragments.append(f"${idx + 1}::text, {_quote_ident(_db_col_name(col))}")
 
     # PostgreSQL's json_build_object accepts max 100 arguments (50 key-value pairs).
     # Split into chunks and merge with || when needed.
@@ -330,20 +328,34 @@ def _build_feature_sql(
             'type', 'Feature',
             'geometry', {geometry_sql},
             'properties', {properties_sql}
-        )::text
+        )::text AS feature_json
         FROM {_quote_ident(table_name)}
         {where}
     """
     return query, params
 
 
-async def csv_to_geojson_from_db(
+async def save_as_geojson_from_db(
     table_name: str,
     inspection: dict,
     output_file_path: Path,
     upload_to_minio: bool = True,
 ) -> tuple[int, str | None] | None:
-    """Generate a GeoJSON file by streaming features directly from PostgreSQL."""
+    """Generate a GeoJSON file by streaming features directly from PostgreSQL.
+
+    Uses a server-side cursor to avoid loading all features in memory.
+    Rows with NULL geographical columns are skipped.
+
+    Args:
+        table_name: Name of the PostgreSQL table containing the CSV data.
+        inspection: CSV detective analysis results with column format detection.
+        output_file_path: Path where the GeoJSON file should be saved.
+        upload_to_minio: Whether to upload to MinIO (default: True).
+
+    Returns:
+        geojson_size: Size of the GeoJSON file in bytes.
+        geojson_url: URL of the GeoJSON file on MinIO. None if not uploaded.
+    """
     geo = _detect_geo_columns(inspection)
     if geo is None:
         log.debug("No geographical columns found, skipping")
@@ -363,7 +375,7 @@ async def csv_to_geojson_from_db(
                 async for row in cursor:
                     if not first:
                         f.write(",\n")
-                    f.write(row[0])
+                    f.write(row["feature_json"])
                     first = False
                 f.write("\n]}")
 
@@ -452,7 +464,7 @@ async def csv_to_geojson_and_pmtiles(
 
     # Convert to GeoJSON — from DB if available and enabled, otherwise from CSV file
     if config.DB_TO_GEOJSON and table_name:
-        result = await csv_to_geojson_from_db(
+        result = await save_as_geojson_from_db(
             table_name,
             inspection,
             geojson_filepath,

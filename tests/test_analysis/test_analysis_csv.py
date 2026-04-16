@@ -14,7 +14,7 @@ from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
-from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles, csv_to_geojson_from_db
+from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles, save_as_geojson_from_db
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -753,7 +753,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
         ),
     ),
 )
-async def test_csv_to_geojson_from_db(db, geo_columns, expected_geo_key, clean_db):
+async def test_save_as_geojson_from_db(db, geo_columns, expected_geo_key, clean_db):
     output_path = Path(f"{RESOURCE_ID}.geojson")
     try:
         output_path.unlink()
@@ -784,7 +784,7 @@ async def test_csv_to_geojson_from_db(db, geo_columns, expected_geo_key, clean_d
     with patch("udata_hydra.config.CSV_TO_DB", True):
         await csv_to_db(fp.name, inspection, table_name)
 
-    result = await csv_to_geojson_from_db(
+    result = await save_as_geojson_from_db(
         table_name, inspection, output_path, upload_to_minio=False
     )
     assert result is not None
@@ -812,7 +812,7 @@ async def test_csv_to_geojson_from_db(db, geo_columns, expected_geo_key, clean_d
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
-async def test_csv_to_geojson_from_db_with_reserved_column(db, clean_db):
+async def test_save_as_geojson_from_db_with_reserved_column(db, clean_db):
     """A CSV with a reserved PG column name (xmin) should still produce valid GeoJSON from DB."""
     output_path = Path(f"{RESOURCE_ID}.geojson")
     try:
@@ -844,7 +844,7 @@ async def test_csv_to_geojson_from_db_with_reserved_column(db, clean_db):
     with patch("udata_hydra.config.CSV_TO_DB", True):
         await csv_to_db(fp.name, inspection, table_name)
 
-    result = await csv_to_geojson_from_db(
+    result = await save_as_geojson_from_db(
         table_name, inspection, output_path, upload_to_minio=False
     )
     assert result is not None
@@ -862,7 +862,7 @@ async def test_csv_to_geojson_from_db_with_reserved_column(db, clean_db):
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
-async def test_csv_to_geojson_from_db_with_quote_in_column_name(db, clean_db):
+async def test_save_as_geojson_from_db_with_quote_in_column_name(db, clean_db):
     """A CSV with a single quote in a column name should not break the SQL query."""
     output_path = Path(f"{RESOURCE_ID}.geojson")
     try:
@@ -900,7 +900,7 @@ async def test_csv_to_geojson_from_db_with_quote_in_column_name(db, clean_db):
     with patch("udata_hydra.config.CSV_TO_DB", True):
         await csv_to_db(fp.name, inspection, table_name)
 
-    result = await csv_to_geojson_from_db(
+    result = await save_as_geojson_from_db(
         table_name, inspection, output_path, upload_to_minio=False
     )
     assert result is not None

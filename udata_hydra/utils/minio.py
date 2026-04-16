@@ -18,7 +18,7 @@ class MinIOClient:
             config.MINIO_URL or "test",
             access_key=self.user or "test",
             secret_key=self.password or "test",
-            secure=True,
+            secure=config.MINIO_SECURE if config.MINIO_SECURE is not None else True,
         )
         if self.bucket:
             self.bucket_exists = self.client.bucket_exists(self.bucket)
