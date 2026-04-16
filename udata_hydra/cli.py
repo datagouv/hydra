@@ -408,8 +408,8 @@ async def _analyse_csv_cli(
                 await Check.delete(check["id"])
             await Resource.delete(resource_id=tmp_resource_id, hard_delete=True)
 
-            # Clean up MinIO files if any (parquet, etc.)
-            # Note: This would require additional MinIO cleanup logic
+            # Clean up S3 files if any (parquet, etc.)
+            # Note: This would require additional S3 cleanup logic
 
             log.info(f"Cleaned up temporary data for {url}")
         except Exception as e:
@@ -503,7 +503,7 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
         log.info("Converting to GeoJSON...")
 
         try:
-            # Convert to GeoJSON (no MinIO upload, no database updates)
+            # Convert to GeoJSON (no S3 upload, no database updates)
             result = await csv_to_geojson(
                 file_path=str(csv_path),
                 inspection=inspection,
@@ -563,7 +563,7 @@ async def _convert_geojson_to_pmtiles_cli(geojson_filepath: str):
     pmtiles_filepath = Path(f"{geojson_path.stem}.pmtiles")
 
     try:
-        # Convert to PMTiles (no MinIO upload, no database updates)
+        # Convert to PMTiles (no S3 upload, no database updates)
         pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
             input_file_path=geojson_path, output_file_path=pmtiles_filepath, upload_to_minio=False
         )

@@ -13,7 +13,7 @@ from udata_hydra.analysis.geojson import (
     csv_to_geojson,
     geojson_to_pmtiles,
 )
-from udata_hydra.utils.minio import MinIOClient
+from udata_hydra.utils.s3 import S3Client
 from udata_hydra.utils.timer import Timer
 
 log = logging.getLogger("udata-hydra")
@@ -44,24 +44,22 @@ async def test_geojson_to_pmtiles_invalid_geometry():
 @pytest.mark.asyncio
 async def test_geojson_to_pmtiles_valid_geometry(mocker):
     """Test handling of valid geometry"""
-    minio_url = "my.minio.fr"
+    s3_endpoint = "s3.example.com"
     bucket = "bucket"
     folder = "folder"
-    mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-    mocked_minio = MagicMock()
-    mocked_minio.fput_object.return_value = None
-    mocked_minio.bucket_exists.return_value = True
+    mocker.patch("udata_hydra.config.S3_ENDPOINT", s3_endpoint)
+    mocked_resource = MagicMock()
+    mocked_resource.meta.client.head_bucket.return_value = {}
+    mocked_resource.Bucket.return_value = MagicMock()
     # Make sure that we don't crash even if output pmtiles already exists
     Path(f"{RESOURCE_ID}.pmtiles").touch()
-    with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-        mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
+    with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
+        mocked_s3_client = S3Client(bucket=bucket, folder=folder)
     with (
-        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client),
+        patch("udata_hydra.analysis.geojson.s3_client_pmtiles", new=mocked_s3_client),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):
-        mock_os = mocker.patch("udata_hydra.utils.minio.os")
-        mock_os.path = os.path
-        mock_os.remove.return_value = None
+        mocker.patch("udata_hydra.utils.s3.Path.unlink", MagicMock())
         size, url = await geojson_to_pmtiles(
             Path("tests/data/valid.geojson"), Path(f"{RESOURCE_ID}.pmtiles")
         )
@@ -69,7 +67,7 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
     with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
-    assert url == f"https://{minio_url}/{bucket}/{folder}/{RESOURCE_ID}.pmtiles"
+    assert url == f"https://{s3_endpoint}/{bucket}/{folder}/{RESOURCE_ID}.pmtiles"
     # size slightly differs depending on the env
     assert 850 <= size <= 900
     os.remove(f"{RESOURCE_ID}.pmtiles")
@@ -112,22 +110,20 @@ async def test_csv_to_geojson_big_file(
     # Create timer for performance measurement
     timer = Timer("csv-to-geojson-performance-test")
 
-    # Mock MinIO for the test
-    minio_url = "my.minio.fr"
+    # Mock S3 for the test
+    s3_endpoint = "s3.example.com"
     bucket = "bucket"
     folder = "folder"
-    mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-    mocked_minio = MagicMock()
-    mocked_minio.fput_object.return_value = None
-    mocked_minio.bucket_exists.return_value = True
+    mocker.patch("udata_hydra.config.S3_ENDPOINT", s3_endpoint)
+    mocked_resource = MagicMock()
+    mocked_resource.meta.client.head_bucket.return_value = {}
+    mocked_resource.Bucket.return_value = MagicMock()
 
-    with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-        mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
+    with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
+        mocked_s3_client = S3Client(bucket=bucket, folder=folder)
 
-    with patch("udata_hydra.analysis.geojson.minio_client_geojson", new=mocked_minio_client):
-        mock_os = mocker.patch("udata_hydra.utils.minio.os")
-        mock_os.path = os.path
-        mock_os.remove.return_value = None
+    with patch("udata_hydra.analysis.geojson.s3_client_geojson", new=mocked_s3_client):
+        mocker.patch("udata_hydra.utils.s3.Path.unlink", MagicMock())
 
         # Analyze the CSV with csv_detective first
         inspection, df = csv_detective_routine(
@@ -198,25 +194,23 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     # Create timer for performance measurement
     timer = Timer("geojson-to-pmtiles-performance-test")
 
-    # Mock MinIO for the test
-    minio_url = "my.minio.fr"
+    # Mock S3 for the test
+    s3_endpoint = "s3.example.com"
     bucket = "bucket"
     folder = "folder"
-    mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-    mocked_minio = MagicMock()
-    mocked_minio.fput_object.return_value = None
-    mocked_minio.bucket_exists.return_value = True
+    mocker.patch("udata_hydra.config.S3_ENDPOINT", s3_endpoint)
+    mocked_resource = MagicMock()
+    mocked_resource.meta.client.head_bucket.return_value = {}
+    mocked_resource.Bucket.return_value = MagicMock()
 
-    with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-        mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
+    with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
+        mocked_s3_client = S3Client(bucket=bucket, folder=folder)
 
     with (
-        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client),
+        patch("udata_hydra.analysis.geojson.s3_client_pmtiles", new=mocked_s3_client),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):
-        mock_os = mocker.patch("udata_hydra.utils.minio.os")
-        mock_os.path = os.path
-        mock_os.remove.return_value = None
+        mocker.patch("udata_hydra.utils.s3.Path.unlink", MagicMock())
 
         # Test the performance of geojson_to_pmtiles with the real file
         result = await geojson_to_pmtiles(geojson_path, test_pmtiles_path)
@@ -227,7 +221,7 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     with test_pmtiles_path.open("rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
-    assert pmtiles_url == f"https://{minio_url}/{bucket}/{folder}/{geojson_path.stem}.pmtiles"
+    assert pmtiles_url == f"https://{s3_endpoint}/{bucket}/{folder}/{geojson_path.stem}.pmtiles"
 
     # The size should be significantly larger than the small test file
     assert pmtiles_size > 5000  # Should be much larger than the 850-900 range of small file

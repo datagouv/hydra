@@ -18,7 +18,7 @@ from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils.minio import MinIOClient
+from udata_hydra.utils.s3 import S3Client
 
 pytestmark = pytest.mark.asyncio
 
@@ -652,30 +652,26 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 assert res is None
                 mock_func.assert_not_called()
         else:
-            minio_url = "my.minio.fr"
+            s3_endpoint = "s3.example.com"
             geojson_bucket = "geojson_bucket"
             geojson_folder = "geojson_folder"
             pmtiles_bucket = "pmtiles_bucket"
             pmtiles_folder = "pmtiles_folder"
-            mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-            mocked_minio = MagicMock()
-            mocked_minio.fput_object.return_value = None
-            mocked_minio.bucket_exists.return_value = True
-            with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-                mocked_minio_client_geojson = MinIOClient(
-                    bucket=geojson_bucket, folder=geojson_folder
-                )
-                mocked_minio_client_pmtiles = MinIOClient(
-                    bucket=pmtiles_bucket, folder=pmtiles_folder
-                )
+            mocker.patch("udata_hydra.config.S3_ENDPOINT", s3_endpoint)
+            mocked_resource = MagicMock()
+            mocked_resource.meta.client.head_bucket.return_value = {}
+            mocked_resource.Bucket.return_value = MagicMock()
+            with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
+                mocked_s3_client_geojson = S3Client(bucket=geojson_bucket, folder=geojson_folder)
+                mocked_s3_client_pmtiles = S3Client(bucket=pmtiles_bucket, folder=pmtiles_folder)
             with (
                 patch(
-                    "udata_hydra.analysis.geojson.minio_client_geojson",
-                    new=mocked_minio_client_geojson,
+                    "udata_hydra.analysis.geojson.s3_client_geojson",
+                    new=mocked_s3_client_geojson,
                 ),
                 patch(
-                    "udata_hydra.analysis.geojson.minio_client_pmtiles",
-                    new=mocked_minio_client_pmtiles,
+                    "udata_hydra.analysis.geojson.s3_client_pmtiles",
+                    new=mocked_s3_client_pmtiles,
                 ),
             ):
                 result = await csv_to_geojson_and_pmtiles(fp.name, inspection, RESOURCE_ID)
@@ -716,7 +712,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 assert not any(col in feat["properties"] for col in expected_formats)
             assert (
                 geojson_url
-                == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
+                == f"https://{s3_endpoint}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
             )
             assert isinstance(geojson_size, int)
 
@@ -726,7 +722,7 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
             assert header == b"PMTiles"
             assert (
                 pmtiles_url
-                == f"https://{minio_url}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
+                == f"https://{s3_endpoint}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
             )
             assert isinstance(pmtiles_size, int)
 
