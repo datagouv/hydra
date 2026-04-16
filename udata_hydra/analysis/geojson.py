@@ -39,9 +39,9 @@ minio_client_geojson = MinIOClient(
 
 async def analyse_geojson(
     check: Record | dict,
-    file_path: str | None = None,
+    filename: str | None = None,
 ) -> None:
-    """Launch GeoJSON analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
+    """Launch GeoJSON analysis from a check or an URL (debug), using previously downloaded file if any"""
     if not config.GEOJSON_TO_PMTILES:
         log.debug("GEOJSON_TO_PMTILES turned off, skipping.")
         return
@@ -62,7 +62,7 @@ async def analyse_geojson(
     try:
         tmp_file = await helpers.read_or_download_file(
             check=check,
-            file_path=file_path,
+            filename=filename,
             file_format="geojson",
             exception=exception,
         )

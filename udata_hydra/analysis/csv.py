@@ -80,10 +80,10 @@ minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MIN
 
 async def analyse_csv(
     check: Record | dict,
-    file_path: str | None = None,
+    filename: str | None = None,
     debug_insert: bool = False,
 ) -> None:
-    """Launch csv analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
+    """Launch csv analysis from a check or an URL (debug), using previously downloaded file if any"""
     if not config.CSV_ANALYSIS:
         log.debug("CSV_ANALYSIS turned off, skipping.")
         return
@@ -113,7 +113,7 @@ async def analyse_csv(
         _, file_format = detect_tabular_from_headers(check)
         tmp_file = await helpers.read_or_download_file(
             check=check,
-            file_path=file_path,
+            filename=filename,
             file_format=file_format,
             exception=exception,
         )

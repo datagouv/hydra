@@ -172,7 +172,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_csv,
                 check=check,
-                file_path=tmp_file.name,
+                filename=os.path.basename(tmp_file.name),
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
@@ -181,7 +181,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_geojson,
                 check=check,
-                file_path=tmp_file.name,
+                filename=os.path.basename(tmp_file.name),
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
@@ -190,7 +190,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_parquet,
                 check=check,
-                file_path=tmp_file.name,
+                filename=os.path.basename(tmp_file.name),
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
