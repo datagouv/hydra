@@ -12,7 +12,10 @@ _cast_supports_date_format = "date_format" in inspect.signature(cast).parameters
 
 
 def smart_cast(
-    _type: str, value, cast_json: bool = True, failsafe: bool = False,
+    _type: str,
+    value,
+    cast_json: bool = True,
+    failsafe: bool = False,
     date_format: list[str] | None = None,
 ) -> Any:
     try:
@@ -36,8 +39,7 @@ def generate_records(
     # because we need the iterator multiple times, not possible to
     # handle db, parquet and geojson through the same iteration
     columns = {
-        col: (v["python_type"], v.get("date_format"))
-        for col, v in inspection["columns"].items()
+        col: (v["python_type"], v.get("date_format")) for col, v in inspection["columns"].items()
     }
     with Reader(file_path, inspection) as reader:
         for line in reader:
