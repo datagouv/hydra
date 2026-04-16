@@ -50,7 +50,7 @@ RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin"
 
 async def analyse_parquet(
     check: Record | dict,
-    file_path: str | None = None,
+    filename: str | None = None,
     debug_insert: bool = False,
 ) -> None:
     """Insert parquet file and metadata in db"""
@@ -79,7 +79,7 @@ async def analyse_parquet(
     try:
         tmp_file = await helpers.read_or_download_file(
             check=check,
-            file_path=file_path,
+            filename=filename,
             file_format="parquet",
             exception=exception,
         )
