@@ -236,7 +236,7 @@ async def csv_to_geojson(
 
     if upload_to_minio:
         log.debug(f"Sending GeoJSON file {output_file_path} to S3")
-        geojson_url = s3_client_geojson.send_file(str(output_file_path), delete_source=False)
+        geojson_url = s3_client_geojson.send_file(output_file_path, delete_source=False)
     else:
         geojson_url = None
 
@@ -282,7 +282,7 @@ async def geojson_to_pmtiles(
     if upload_to_minio:
         log.debug(f"Sending PMTiles file {output_file_path} to S3")
         pmtiles_url = s3_client_pmtiles.send_file(
-            str(output_file_path), delete_source=config.REMOVE_GENERATED_FILES
+            output_file_path, delete_source=config.REMOVE_GENERATED_FILES
         )
     else:
         pmtiles_url = None

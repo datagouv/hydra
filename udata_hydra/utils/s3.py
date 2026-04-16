@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 import boto3
 from botocore.config import Config
@@ -39,17 +39,18 @@ class S3Client:
 
     def send_file(
         self,
-        file_path: str,
+        file_path: str | Path,
         delete_source: bool = True,
     ) -> str:
         if self.bucket is None:
             raise AttributeError("A bucket has to be specified.")
-        if os.path.isfile(file_path):
-            file_name = os.path.basename(file_path)
+        path = Path(file_path)
+        if path.is_file():
+            file_name = path.name
             key = f"{self.folder}/{file_name}"
-            self._resource.Bucket(self.bucket).upload_file(file_path, key)
+            self._resource.Bucket(self.bucket).upload_file(str(path), key)
             if delete_source:
-                os.remove(file_path)
+                path.unlink()
             return f"https://{config.S3_ENDPOINT}/{self.bucket}/{self.folder}/{file_name}"
         else:
-            raise Exception(f"file '{file_path}' does not exists")
+            raise Exception(f"file '{path}' does not exists")

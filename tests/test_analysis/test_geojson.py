@@ -59,9 +59,7 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
         patch("udata_hydra.analysis.geojson.s3_client_pmtiles", new=mocked_s3_client),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):
-        mock_os = mocker.patch("udata_hydra.utils.s3.os")
-        mock_os.path = os.path
-        mock_os.remove.return_value = None
+        mocker.patch("udata_hydra.utils.s3.Path.unlink", MagicMock())
         size, url = await geojson_to_pmtiles(
             Path("tests/data/valid.geojson"), Path(f"{RESOURCE_ID}.pmtiles")
         )
@@ -125,9 +123,7 @@ async def test_csv_to_geojson_big_file(
         mocked_s3_client = S3Client(bucket=bucket, folder=folder)
 
     with patch("udata_hydra.analysis.geojson.s3_client_geojson", new=mocked_s3_client):
-        mock_os = mocker.patch("udata_hydra.utils.s3.os")
-        mock_os.path = os.path
-        mock_os.remove.return_value = None
+        mocker.patch("udata_hydra.utils.s3.Path.unlink", MagicMock())
 
         # Analyze the CSV with csv_detective first
         inspection, df = csv_detective_routine(
@@ -214,9 +210,7 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
         patch("udata_hydra.analysis.geojson.s3_client_pmtiles", new=mocked_s3_client),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):
-        mock_os = mocker.patch("udata_hydra.utils.s3.os")
-        mock_os.path = os.path
-        mock_os.remove.return_value = None
+        mocker.patch("udata_hydra.utils.s3.Path.unlink", MagicMock())
 
         # Test the performance of geojson_to_pmtiles with the real file
         result = await geojson_to_pmtiles(geojson_path, test_pmtiles_path)
