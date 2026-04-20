@@ -4,6 +4,11 @@ from asyncpg import Record
 
 from udata_hydra import context
 
+# PostgreSQL system columns and hydra's own __id that must be renamed when
+# a user CSV happens to use them as headers.  Shared across csv, parquet and
+# geojson modules.
+RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
+
 
 def convert_dict_values_to_json(data: dict) -> dict:
     """

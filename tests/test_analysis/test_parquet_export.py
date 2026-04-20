@@ -7,11 +7,11 @@ from csv_detective import routine as csv_detective_routine
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.csv import (
-    RESERVED_COLS,
     csv_to_db,
     csv_to_parquet,
     generate_records,
 )
+from udata_hydra.db import RESERVED_COLS
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet, save_as_parquet_from_db
 
