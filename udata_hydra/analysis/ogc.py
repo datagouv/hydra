@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 from asyncpg import Record
 from owslib.crs import Crs

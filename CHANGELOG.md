@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.8.0 (2026-04-14)
+
+-  feat: generate parquet from PostgreSQL table instead of re-reading CSV  ([#402](https://github.com/datagouv/hydra/pull/402))
+- Bump csv-detective to 0.11.2 ([#407](https://github.com/datagouv/hydra/pull/407))
+- chore: use TEMPORARY_DOWNLOAD_FOLDER config and clean up tmp files in extract_gzip ([#400](https://github.com/datagouv/hydra/pull/400))
+- chore(ogc): silence log warning ([#399](https://github.com/datagouv/hydra/pull/399))
+- clean: add integrated type checking ([#391](https://github.com/datagouv/hydra/pull/391))
+- feat: add detailed timer marks for geojson and pmtiles conversion steps ([#403](https://github.com/datagouv/hydra/pull/403))
+- feat(ogc): add support for WMS analysis ([#401](https://github.com/datagouv/hydra/pull/401))
+- Fix publish step in CI on release ([#398](https://github.com/datagouv/hydra/pull/398))
+- Fix tables_index insertion if `nan` or `inf` in profile ([#397](https://github.com/datagouv/hydra/pull/397))
+- Fix URL in checks ([#406](https://github.com/datagouv/hydra/pull/406))
+- fix: handle FileNotFoundError when temporary file is missing in analysis workers ([#395](https://github.com/datagouv/hydra/pull/395))
+- fix: use a default max size for unknown format ([#414](https://github.com/datagouv/hydra/pull/414))
+- Upgrade `csv-detective` to 0.11.0 ([#396](https://github.com/datagouv/hydra/pull/396))
+
+
 ## 2.7.0 (2026-03-12)
 
 - Only cast strings from loaded file ([#390](https://github.com/datagouv/hydra/pull/390))
