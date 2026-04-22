@@ -12,8 +12,8 @@ from udata_hydra.analysis.csv import (
     csv_to_parquet,
     generate_records,
 )
-from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.parquet import save_as_parquet, save_as_parquet_from_db
+from udata_hydra.utils.s3 import S3Client
 
 pytestmark = pytest.mark.asyncio
 
@@ -109,18 +109,17 @@ async def test_csv_to_parquet(mocker, parquet_config):
         assert not await execute_csv_to_parquet()
 
     else:
-        minio_url = "my.minio.fr"
+        s3_endpoint = "s3.example.com"
         bucket = "bucket"
-        folder = "folder"
-        mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-        mocked_minio = MagicMock()
-        mocked_minio.fput_object.return_value = None
-        mocked_minio.bucket_exists.return_value = True
-        with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-            mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
-        with patch("udata_hydra.analysis.csv.minio_client", new=mocked_minio_client):
+        mocker.patch("udata_hydra.config.S3_ENDPOINT", s3_endpoint)
+        mocked_resource = MagicMock()
+        mocked_resource.meta.client.head_bucket.return_value = {}
+        mocked_resource.Bucket.return_value = MagicMock()
+        with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
+            mocked_s3_client = S3Client(bucket=bucket)
+        with patch("udata_hydra.analysis.csv.s3_client", new=mocked_s3_client):
             result = await execute_csv_to_parquet()
             assert result is not None
             parquet_url, parquet_size = result
-        assert parquet_url == f"https://{minio_url}/{bucket}/{folder}/{RESOURCE_ID}.parquet"
+        assert parquet_url == f"https://{s3_endpoint}/{bucket}/{RESOURCE_ID}.parquet"
         assert isinstance(parquet_size, int)
