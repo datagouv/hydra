@@ -22,19 +22,15 @@ from udata_hydra.utils import (
     remove_remainders,
 )
 from udata_hydra.utils.casting import generate_records
-from udata_hydra.utils.minio import MinIOClient
+from udata_hydra.utils.s3 import S3Client
 
 DEFAULT_GEOJSON_FILEPATH = Path("converted_from_csv.geojson")
 DEFAULT_PMTILES_FILEPATH = Path("converted_from_geojson.pmtiles")
 
 log = logging.getLogger("udata-hydra")
 
-minio_client_pmtiles = MinIOClient(
-    bucket=config.MINIO_PMTILES_BUCKET, folder=config.MINIO_PMTILES_FOLDER
-)
-minio_client_geojson = MinIOClient(
-    bucket=config.MINIO_GEOJSON_BUCKET, folder=config.MINIO_GEOJSON_FOLDER
-)
+s3_client_pmtiles = S3Client(bucket=config.S3_PMTILES_BUCKET, prefix=config.S3_PMTILES_PREFIX)
+s3_client_geojson = S3Client(bucket=config.S3_GEOJSON_BUCKET, prefix=config.S3_GEOJSON_PREFIX)
 
 
 async def analyse_geojson(
@@ -114,10 +110,10 @@ async def csv_to_geojson(
     file_path: str,
     inspection: dict,
     output_file_path: Path,
-    upload_to_minio: bool = True,
+    upload_to_s3: bool = True,
 ) -> tuple[int, str | None] | None:
     """
-    Convert a CSV file to GeoJSON format and optionally upload to MinIO.
+    Convert a CSV file to GeoJSON format and optionally upload to S3.
 
     Detects geographical columns (geometry, latlon, lonlat, or lat/lon) and converts
     CSV data to GeoJSON features. Rows with NaN values in geographical columns are skipped.
@@ -126,11 +122,11 @@ async def csv_to_geojson(
         file_path: Target CSV file to convert.
         inspection: CSV detective analysis results with column format detection.
         output_file_path: Path where the GeoJSON file should be saved.
-        upload_to_minio: Whether to upload to MinIO (default: True).
+        upload_to_s3: Whether to upload to S3 (default: True).
 
     Returns:
         geojson_size: Size of the GeoJSON file in bytes.
-        geojson_url: URL of the GeoJSON file on MinIO. None if it was not uploaded to MinIO.
+        geojson_url: URL of the GeoJSON file on S3. None if it was not uploaded to S3.
     """
 
     def cast_latlon(latlon: str) -> list[float]:
@@ -238,9 +234,9 @@ async def csv_to_geojson(
 
     geojson_size: int = os.path.getsize(output_file_path)
 
-    if upload_to_minio:
-        log.debug(f"Sending GeoJSON file {output_file_path} to MinIO")
-        geojson_url = minio_client_geojson.send_file(str(output_file_path), delete_source=False)
+    if upload_to_s3:
+        log.debug(f"Sending GeoJSON file {output_file_path} to S3")
+        geojson_url = s3_client_geojson.send_file(output_file_path, delete_source=False)
     else:
         geojson_url = None
 
@@ -250,19 +246,19 @@ async def csv_to_geojson(
 async def geojson_to_pmtiles(
     input_file_path: Path,
     output_file_path: Path,
-    upload_to_minio: bool = True,
+    upload_to_s3: bool = True,
 ) -> tuple[int, str | None]:
     """
-    Convert a GeoJSON file to PMTiles file and optionally upload to MinIO.
+    Convert a GeoJSON file to PMTiles file and optionally upload to S3.
 
     Args:
         input_file_path: GeoJSON file path to convert.
         output_file_path: Path where the PMTiles file should be saved.
-        upload_to_minio: Whether to upload to MinIO (default: True).
+        upload_to_s3: Whether to upload to S3 (default: True).
 
     Returns:
         pmtiles_size: size of the PMTiles file.
-        pmtiles_url: URL of the PMTiles file on MinIO. None if it was not uploaded to MinIO.
+        pmtiles_url: URL of the PMTiles file on S3. None if it was not uploaded to S3.
     """
 
     log.debug(f"Converting GeoJSON file '{input_file_path}' to PMTiles file '{output_file_path}'")
@@ -283,10 +279,10 @@ async def geojson_to_pmtiles(
 
     pmtiles_size: int = os.path.getsize(output_file_path)
 
-    if upload_to_minio:
-        log.debug(f"Sending PMTiles file {output_file_path} to MinIO")
-        pmtiles_url = minio_client_pmtiles.send_file(
-            str(output_file_path), delete_source=config.REMOVE_GENERATED_FILES
+    if upload_to_s3:
+        log.debug(f"Sending PMTiles file {output_file_path} to S3")
+        pmtiles_url = s3_client_pmtiles.send_file(
+            output_file_path, delete_source=config.REMOVE_GENERATED_FILES
         )
     else:
         pmtiles_url = None
@@ -305,9 +301,7 @@ async def csv_to_geojson_and_pmtiles(
         log.debug("CSV_TO_GEOJSON turned off, skipping geojson/PMtiles export.")
         return None
 
-    log.debug(
-        f"Converting to geojson and PMtiles if relevant for {resource_id} and sending to MinIO."
-    )
+    log.debug(f"Converting to geojson and PMtiles if relevant for {resource_id} and sending to S3.")
 
     if resource_id:
         geojson_filepath = Path(f"{resource_id}.geojson")
@@ -319,7 +313,7 @@ async def csv_to_geojson_and_pmtiles(
         pmtiles_filepath = DEFAULT_PMTILES_FILEPATH
 
     # Convert CSV to GeoJSON
-    result = await csv_to_geojson(file_path, inspection, geojson_filepath, upload_to_minio=True)
+    result = await csv_to_geojson(file_path, inspection, geojson_filepath, upload_to_s3=True)
     if result is None:
         return None
     geojson_size, geojson_url = result
