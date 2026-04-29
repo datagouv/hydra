@@ -212,9 +212,7 @@ async def parquet_to_db(
         await Resource.update(resource_id, {"status": "INSERTING_IN_DB"})
 
     # build a `column_name: type` mapping and explicitely rename reserved column names
-    columns = {
-        db_col_name(c): helpers.get_python_type(v) for c, v in inspection["columns"].items()
-    }
+    columns = {db_col_name(c): helpers.get_python_type(v) for c, v in inspection["columns"].items()}
 
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
