@@ -11,9 +11,9 @@ from udata_hydra.analysis.csv import (
     csv_to_parquet,
     generate_records,
 )
-from udata_hydra.db import RESERVED_COLS
+from udata_hydra.db import db_col_name
 from udata_hydra.utils.minio import MinIOClient
-from udata_hydra.utils.parquet import save_as_parquet, save_as_parquet_from_db
+from udata_hydra.utils.parquet import db_to_parquet, save_as_parquet
 
 pytestmark = pytest.mark.asyncio
 
@@ -37,10 +37,7 @@ async def test_save_as_parquet(file_and_count):
     )
     assert inspection
     columns = inspection["columns"]
-    columns = {
-        f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: v["python_type"]
-        for c, v in columns.items()
-    }
+    columns = {db_col_name(c): v["python_type"] for c, v in columns.items()}
     _, table = save_as_parquet(
         records=generate_records(file_path, inspection),
         columns=inspection["columns"],
@@ -51,7 +48,7 @@ async def test_save_as_parquet(file_and_count):
     pq.write_table(table, fake_file)
 
 
-async def test_save_as_parquet_from_db(clean_db):
+async def test_db_to_parquet(clean_db):
     file_path = "tests/data/catalog.csv"
     table_name = "test_parquet_from_db"
     inspection = csv_detective_routine(
@@ -64,7 +61,7 @@ async def test_save_as_parquet_from_db(clean_db):
 
     await csv_to_db(file_path, inspection=inspection, table_name=table_name)
 
-    _, table_from_db = await save_as_parquet_from_db(
+    _, table_from_db = await db_to_parquet(
         table_name=table_name,
         inspection=inspection,
         output_filename=None,

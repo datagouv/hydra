@@ -34,7 +34,7 @@ from sqlalchemy.schema import CreateIndex, CreateTable, Index
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles
-from udata_hydra.db import RESERVED_COLS, compute_insert_query
+from udata_hydra.db import compute_insert_query, db_col_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -48,7 +48,7 @@ from udata_hydra.utils import (
 )
 from udata_hydra.utils.casting import generate_records
 from udata_hydra.utils.minio import MinIOClient
-from udata_hydra.utils.parquet import save_as_parquet, save_as_parquet_from_db
+from udata_hydra.utils.parquet import db_to_parquet, save_as_parquet
 
 log = logging.getLogger("udata-hydra")
 
@@ -341,7 +341,7 @@ async def csv_to_parquet(
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
 
     if config.DB_TO_PARQUET and table_name:
-        parquet_file, _ = await save_as_parquet_from_db(
+        parquet_file, _ = await db_to_parquet(
             table_name=table_name,
             inspection=inspection,
             output_filename=resource_id,
@@ -410,8 +410,7 @@ async def csv_to_db(
 
     # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {
-        f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: helpers.get_python_type(v)
-        for c, v in inspection["columns"].items()
+        db_col_name(c): helpers.get_python_type(v) for c, v in inspection["columns"].items()
     }
 
     q = f'DROP TABLE IF EXISTS "{table_name}"'

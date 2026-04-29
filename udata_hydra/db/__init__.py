@@ -10,6 +10,11 @@ from udata_hydra import context
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
 
 
+def db_col_name(col: str) -> str:
+    """Map a CSV column name to its actual PostgreSQL column name."""
+    return f"{col}__hydra_renamed" if col.lower() in RESERVED_COLS else col
+
+
 def convert_dict_values_to_json(data: dict) -> dict:
     """
     Convert values in dict that are dict to json for DB serialization

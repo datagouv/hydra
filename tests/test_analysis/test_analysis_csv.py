@@ -14,7 +14,7 @@ from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv, csv_to_db
-from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles, save_as_geojson_from_db
+from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles, db_to_geojson
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -736,29 +736,26 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
 
 
 @pytest.mark.parametrize(
-    "geo_columns,expected_geo_key",
+    "geo_columns",
     (
         # latlon format: "lat,lon" → GeoJSON coordinates should be [lon, lat]
-        (
-            {"coords": [f"{10.0 * k * (-1) ** k},{20.0 * k * (-1) ** k}" for k in range(1, 6)]},
-            "latlon",
-        ),
+        {"coords": [f"{10.0 * k * (-1) ** k},{20.0 * k * (-1) ** k}" for k in range(1, 6)]},
         # separate latitude + longitude columns
-        (
-            {
-                "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
-                "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
-            },
-            "latitude",
-        ),
+        {
+            "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
+            "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
+        },
     ),
 )
-async def test_save_as_geojson_from_db(db, geo_columns, expected_geo_key, clean_db):
+async def test_db_to_geojson(db, geo_columns, clean_db):
     output_path = Path(f"{RESOURCE_ID}.geojson")
     try:
         output_path.unlink()
     except FileNotFoundError:
         pass
+
+    expected_lats = [10.0 * k * (-1) ** k for k in range(1, 6)]
+    expected_lons = [20.0 * k * (-1) ** k for k in range(1, 6)]
 
     other_columns = {
         "nombre": range(1, 6),
@@ -784,7 +781,7 @@ async def test_save_as_geojson_from_db(db, geo_columns, expected_geo_key, clean_
     with patch("udata_hydra.config.CSV_TO_DB", True):
         await csv_to_db(fp.name, inspection, table_name)
 
-    result = await save_as_geojson_from_db(
+    result = await db_to_geojson(
         table_name, inspection, output_path, upload_to_minio=False
     )
     assert result is not None
@@ -797,12 +794,12 @@ async def test_save_as_geojson_from_db(db, geo_columns, expected_geo_key, clean_
 
     assert geojson["type"] == "FeatureCollection"
     assert len(geojson["features"]) == 5
-    for feat in geojson["features"]:
+    for i, feat in enumerate(geojson["features"]):
         assert feat["type"] == "Feature"
         assert feat["geometry"]["type"] == "Point"
         coords = feat["geometry"]["coordinates"]
-        assert isinstance(coords[0], (int, float))
-        assert isinstance(coords[1], (int, float))
+        assert coords[0] == pytest.approx(expected_lons[i])
+        assert coords[1] == pytest.approx(expected_lats[i])
         assert "nombre" in feat["properties"]
         assert "score" in feat["properties"]
         for geo_col in geo_columns:
@@ -812,7 +809,7 @@ async def test_save_as_geojson_from_db(db, geo_columns, expected_geo_key, clean_
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
-async def test_save_as_geojson_from_db_with_reserved_column(db, clean_db):
+async def test_db_to_geojson_with_reserved_column(db, clean_db):
     """A CSV with a reserved PG column name (xmin) should still produce valid GeoJSON from DB."""
     output_path = Path(f"{RESOURCE_ID}.geojson")
     try:
@@ -844,7 +841,7 @@ async def test_save_as_geojson_from_db_with_reserved_column(db, clean_db):
     with patch("udata_hydra.config.CSV_TO_DB", True):
         await csv_to_db(fp.name, inspection, table_name)
 
-    result = await save_as_geojson_from_db(
+    result = await db_to_geojson(
         table_name, inspection, output_path, upload_to_minio=False
     )
     assert result is not None
@@ -862,7 +859,7 @@ async def test_save_as_geojson_from_db_with_reserved_column(db, clean_db):
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
-async def test_save_as_geojson_from_db_with_quote_in_column_name(db, clean_db):
+async def test_db_to_geojson_with_quote_in_column_name(db, clean_db):
     """A CSV with a single quote in a column name should not break the SQL query."""
     output_path = Path(f"{RESOURCE_ID}.geojson")
     try:
@@ -900,7 +897,7 @@ async def test_save_as_geojson_from_db_with_quote_in_column_name(db, clean_db):
     with patch("udata_hydra.config.CSV_TO_DB", True):
         await csv_to_db(fp.name, inspection, table_name)
 
-    result = await save_as_geojson_from_db(
+    result = await db_to_geojson(
         table_name, inspection, output_path, upload_to_minio=False
     )
     assert result is not None
@@ -916,7 +913,7 @@ async def test_save_as_geojson_from_db_with_quote_in_column_name(db, clean_db):
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
-async def test_save_as_geojson_from_db_lonlat(db, clean_db):
+async def test_db_to_geojson_lonlat(db, clean_db):
     """lonlat format ("[lon, lat]") should produce correct GeoJSON coordinates [lon, lat]."""
     output_path = Path(f"{RESOURCE_ID}.geojson")
     try:
@@ -951,7 +948,7 @@ async def test_save_as_geojson_from_db_lonlat(db, clean_db):
     with patch("udata_hydra.config.CSV_TO_DB", True):
         await csv_to_db(fp.name, inspection, table_name)
 
-    result = await save_as_geojson_from_db(
+    result = await db_to_geojson(
         table_name, inspection, output_path, upload_to_minio=False
     )
     assert result is not None
@@ -971,7 +968,7 @@ async def test_save_as_geojson_from_db_lonlat(db, clean_db):
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
-async def test_save_as_geojson_from_db_geojson_column(db, clean_db):
+async def test_db_to_geojson_geojson_column(db, clean_db):
     """A column containing GeoJSON strings should produce valid geometry from DB."""
     output_path = Path(f"{RESOURCE_ID}.geojson")
     try:
@@ -1008,7 +1005,7 @@ async def test_save_as_geojson_from_db_geojson_column(db, clean_db):
     with patch("udata_hydra.config.CSV_TO_DB", True):
         await csv_to_db(fp.name, inspection, table_name)
 
-    result = await save_as_geojson_from_db(
+    result = await db_to_geojson(
         table_name, inspection, output_path, upload_to_minio=False
     )
     assert result is not None
@@ -1026,7 +1023,7 @@ async def test_save_as_geojson_from_db_geojson_column(db, clean_db):
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
-async def test_save_as_geojson_from_db_many_columns(db, clean_db):
+async def test_db_to_geojson_many_columns(db, clean_db):
     """More than 50 property columns should trigger json_build_object chunking."""
     output_path = Path(f"{RESOURCE_ID}.geojson")
     try:
@@ -1056,7 +1053,7 @@ async def test_save_as_geojson_from_db_many_columns(db, clean_db):
     with patch("udata_hydra.config.CSV_TO_DB", True):
         await csv_to_db(fp.name, inspection, table_name)
 
-    result = await save_as_geojson_from_db(
+    result = await db_to_geojson(
         table_name, inspection, output_path, upload_to_minio=False
     )
     assert result is not None
