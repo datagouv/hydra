@@ -4,6 +4,8 @@ from typing import Iterator
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from udata_hydra.db import db_col_name
+
 PYTHON_TYPE_TO_PA = {
     "string": pa.string(),
     "float": pa.float64(),
@@ -33,13 +35,10 @@ def save_as_parquet(
     return f"{output_filename}.parquet", table
 
 
-RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
-
-
 BATCH_SIZE = 50_000
 
 
-async def save_as_parquet_from_db(
+async def db_to_parquet(
     table_name: str,
     inspection: dict,
     output_filename: str | None = None,
@@ -51,7 +50,7 @@ async def save_as_parquet_from_db(
     pool = await context.pool("csv")
 
     original_cols = list(inspection["columns"].keys())
-    db_cols = [f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c for c in original_cols]
+    db_cols = [db_col_name(c) for c in original_cols]
     cols_sql = ", ".join(f'"{c}"' for c in db_cols)
 
     schema = pa.schema(
