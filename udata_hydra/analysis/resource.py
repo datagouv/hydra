@@ -101,7 +101,11 @@ async def analyse_resource(
         if not is_geojson and not is_parquet and config.OGC_ANALYSIS_ENABLED:
             is_ogc, file_format = detect_ogc(check, row["format"])
 
-    max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
+    max_size_allowed = (
+        None
+        if exception
+        else int(config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED))
+    )
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
@@ -168,7 +172,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_csv,
                 check=check,
-                file_path=tmp_file.name,
+                filename=os.path.basename(tmp_file.name),
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
@@ -177,7 +181,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_geojson,
                 check=check,
-                file_path=tmp_file.name,
+                filename=os.path.basename(tmp_file.name),
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
@@ -186,7 +190,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_parquet,
                 check=check,
-                file_path=tmp_file.name,
+                filename=os.path.basename(tmp_file.name),
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
