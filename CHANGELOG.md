@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.8.1 (2026-05-05)
+
+- clean: remove ununsed import
+- fix: use basename as param in jobs  ([#416](https://github.com/datagouv/hydra/pull/416))
+- refactor: separate stats endpoints into two, rename keys for more clarity ([#387](https://github.com/datagouv/hydra/pull/387))
+
+
 ## 2.8.0 (2026-04-14)
 
 -  feat: generate parquet from PostgreSQL table instead of re-reading CSV  ([#402](https://github.com/datagouv/hydra/pull/402))
