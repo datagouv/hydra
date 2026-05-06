@@ -365,14 +365,14 @@ async def db_to_geojson(
             cursor = conn.cursor(query, *params)
 
             with output_file_path.open("w") as f:
-                f.write('{"type": "FeatureCollection", "features": [\n')
+                f.write('{"type": "FeatureCollection", "features": [')
                 first = True
                 async for row in cursor:
                     if not first:
-                        f.write(",\n")
+                        f.write(",")
                     f.write(row["feature_json"])
                     first = False
-                f.write("\n]}")
+                f.write("]}")
 
     geojson_size: int = os.path.getsize(output_file_path)
 
