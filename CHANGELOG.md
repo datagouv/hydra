@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.9.0 (2026-05-06)
+
+- feat: generate GeoJSON from PostgreSQL instead of re-reading CSV ([#404](https://github.com/datagouv/hydra/pull/404))
+
+
 ## 2.8.1 (2026-05-05)
 
 - clean: remove ununsed import
