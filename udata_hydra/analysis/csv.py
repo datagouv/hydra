@@ -34,7 +34,7 @@ from sqlalchemy.schema import CreateIndex, CreateTable, Index
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.geojson import task_csv_to_geojson
-from udata_hydra.db import RESERVED_COLS, compute_insert_query
+from udata_hydra.db import compute_insert_query, db_col_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -49,7 +49,7 @@ from udata_hydra.utils import (
 )
 from udata_hydra.utils.casting import generate_records
 from udata_hydra.utils.minio import MinIOClient
-from udata_hydra.utils.parquet import save_as_parquet, save_as_parquet_from_db
+from udata_hydra.utils.parquet import db_to_parquet, save_as_parquet
 
 log = logging.getLogger("udata-hydra")
 
@@ -95,7 +95,7 @@ async def task_analyse_csv(
 
 async def analyse_csv(
     check: Record | dict,
-    file_path: str | None = None,
+    filename: str | None = None,
     debug_insert: bool = False,
     worker_exception: bool = False,
 ) -> None:
@@ -133,7 +133,7 @@ async def analyse_csv(
         _, file_format = detect_tabular_from_headers(check)
         tmp_file = await helpers.read_or_download_file(
             check=check,
-            file_path=file_path,
+            filename=filename,
             file_format=file_format,
             exception=exception,
         )
@@ -358,7 +358,7 @@ async def csv_to_parquet(
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
 
     if config.DB_TO_PARQUET and table_name:
-        parquet_file, _ = await save_as_parquet_from_db(
+        parquet_file, _ = await db_to_parquet(
             table_name=table_name,
             inspection=inspection,
             output_filename=resource_id,
@@ -426,10 +426,7 @@ async def csv_to_db(
         await Resource.update(resource_id, {"status": "INSERTING_IN_DB"})
 
     # build a `column_name: type` mapping and explicitely rename reserved column names
-    columns = {
-        f"{c}__hydra_renamed" if c.lower() in RESERVED_COLS else c: helpers.get_python_type(v)
-        for c, v in inspection["columns"].items()
-    }
+    columns = {db_col_name(c): helpers.get_python_type(v) for c, v in inspection["columns"].items()}
 
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")

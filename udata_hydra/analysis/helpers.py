@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from typing import IO
 
 from asyncpg import Record
@@ -21,26 +22,30 @@ def get_python_type(column: dict) -> str:
 
 async def read_or_download_file(
     check: Record | dict,
-    file_path: str | None,
+    filename: str | None,
     file_format: str,
     exception: Record | None,
 ) -> IO[bytes]:
-    if file_path:
+    if filename:
+        temp_dir = config.TEMPORARY_DOWNLOAD_FOLDER or "/tmp"
+        full_path = os.path.join(temp_dir, filename)
         try:
-            return open(file_path, "rb")
-        except FileNotFoundError as e:
+            return open(full_path, "rb")
+        except FileNotFoundError:
             raise IOException(
-                f"Temporary file not found: {file_path}",
+                f"Temporary file not found: {full_path}",
                 resource_id=check["resource_id"],
                 url=check["url"],
-            ) from e
+            )
     else:
         tmp_file, _ = await download_resource(
             url=check["url"],
             headers=json.loads(check.get("headers") or "{}"),
             max_size_allowed=None
             if exception
-            else int(config.MAX_FILESIZE_ALLOWED.get(file_format, "csv")),
+            else int(
+                config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED)
+            ),
         )
         return tmp_file
 

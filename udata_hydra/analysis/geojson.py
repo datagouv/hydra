@@ -12,7 +12,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.analysis.csv_geojson import (
     DEFAULT_GEOJSON_FILEPATH,
     csv_to_geojson,
-    csv_to_geojson_from_db,
+    db_to_geojson,
     minio_client_geojson,
 )
 from udata_hydra.analysis.pmtiles import (
@@ -41,7 +41,7 @@ __all__ = [
     "analyse_geojson",
     "csv_to_geojson",
     "csv_to_geojson_and_pmtiles",
-    "csv_to_geojson_from_db",
+    "db_to_geojson",
     "export_geojson_for_csv_analysis",
     "export_pmtiles_from_local_geojson",
     "geojson_to_pmtiles",
@@ -54,9 +54,9 @@ __all__ = [
 
 async def analyse_geojson(
     check: Record | dict,
-    file_path: str | None = None,
+    filename: str | None = None,
 ) -> None:
-    """Launch GeoJSON analysis from a check or an URL (debug), using previously downloaded file at file_path if any"""
+    """Launch GeoJSON analysis from a check or an URL (debug), using previously downloaded file if any"""
     if not config.GEOJSON_TO_PMTILES:
         log.debug("GEOJSON_TO_PMTILES turned off, skipping.")
         return
@@ -77,7 +77,7 @@ async def analyse_geojson(
     try:
         tmp_file = await helpers.read_or_download_file(
             check=check,
-            file_path=file_path,
+            filename=filename,
             file_format="geojson",
             exception=exception,
         )
@@ -131,14 +131,12 @@ async def export_geojson_for_csv_analysis(
     check_id: int | None,
     inspection: dict,
     geojson_filepath: Path,
-    file_path: str | None,
     table_name: str | None,
     timer: Timer | None = None,
 ) -> tuple[int, str | None] | None:
-    """Build GeoJSON from the parsing table (Hydra pipeline) or from a CSV file (CLI/tests).
+    """Build GeoJSON from the parsing table in PostgreSQL.
 
-    When ``table_name`` is set, reads features from PostgreSQL via ``csv_to_geojson_from_db``.
-    Otherwise requires ``file_path`` for ``csv_to_geojson``.
+    When ``table_name`` is set, reads features from PostgreSQL via ``db_to_geojson``.
 
     Returns ``(geojson_size, geojson_url)`` or ``None`` when ``DB_TO_GEOJSON`` is false or
     there are no geographical columns.
@@ -146,22 +144,19 @@ async def export_geojson_for_csv_analysis(
     if not config.DB_TO_GEOJSON:
         return None
 
+    if not table_name:
+        log.warning("export_geojson_for_csv_analysis: no table_name provided, skipping")
+        return None
+
     if resource_id:
-        # Update resource status for GeoJSON conversion
         await Resource.update(resource_id, {"status": "CONVERTING_TO_GEOJSON"})
 
-    # Convert to GeoJSON — from DB if available and enabled, otherwise from CSV file
-    if table_name:
-        result = await csv_to_geojson_from_db(
-            table_name,
-            inspection,
-            geojson_filepath,
-            upload_to_minio=True,
-        )
-    else:
-        if not file_path:
-            raise ValueError("file_path is required when no parsing table name is provided")
-        result = await csv_to_geojson(file_path, inspection, geojson_filepath, upload_to_minio=True)
+    result = await db_to_geojson(
+        table_name,
+        inspection,
+        geojson_filepath,
+        upload_to_minio=True,
+    )
 
     if result is None:
         return None
@@ -187,10 +182,8 @@ async def export_pmtiles_from_local_geojson(
 ) -> tuple[int, str | None]:
     """Run tippecanoe on a local GeoJSON path, upload PMTiles, update the check."""
     if resource_id:
-        # Update resource status for PMTiles conversion
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
 
-    # Convert GeoJSON to PMTiles
     pmtiles_size, pmtiles_url = await geojson_to_pmtiles(geojson_filepath, pmtiles_filepath)
     if timer:
         timer.mark("geojson-to-pmtiles")
@@ -235,7 +228,6 @@ async def csv_to_geojson_and_pmtiles(
         check_id=check_id,
         inspection=inspection,
         geojson_filepath=geojson_filepath,
-        file_path=file_path,
         table_name=table_name,
         timer=timer,
     )
@@ -252,7 +244,6 @@ async def csv_to_geojson_and_pmtiles(
         unlink_geojson_after=config.REMOVE_GENERATED_FILES,
     )
 
-    # returning only for tests purposes
     return geojson_filepath, geojson_size, geojson_url, pmtiles_filepath, pmtiles_size, pmtiles_url
 
 
@@ -310,7 +301,6 @@ async def task_csv_to_geojson(
                 check_id=check_id,
                 inspection=inspection,
                 geojson_filepath=geojson_path,
-                file_path=None,
                 table_name=parsing_table,
                 timer=None,
             )
@@ -330,7 +320,6 @@ async def task_csv_to_geojson(
 
         check = dict((await Check.get_by_id(check_id, with_deleted=True)) or check)
 
-        # Update resource status for PMTiles conversion
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
         queue.enqueue(
             task_geojson_to_pmtiles,
@@ -390,7 +379,6 @@ async def task_geojson_to_pmtiles(check_id: int) -> None:
         await Resource.update(resource_id, {"status": None})
         return
 
-    # Update resource status for PMTiles conversion
     await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
     pmtiles_path = Path(f"{resource_id}.pmtiles")
     tmp_geo: Path | None = None

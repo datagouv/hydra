@@ -32,9 +32,9 @@ class TestOgcDetection:
             ("https://example.com/geoserver/wms", (True, "wms")),
             ("https://example.com/geoserver/WMS", (True, "wms")),
             ("https://example.com/geoserver/wms?request=GetCapabilities", (True, "wms")),
-            ("https://example.com/data/wfsx", (False, "")),
-            ("https://example.com/data/file.csv", (False, "")),
-            ("", (False, "")),
+            ("https://example.com/data/wfsx", (False, "unknown")),
+            ("https://example.com/data/file.csv", (False, "unknown")),
+            ("", (False, "unknown")),
         ],
     )
     def test_detect_wfs_from_url(self, url, expected):
@@ -43,7 +43,7 @@ class TestOgcDetection:
 
     def test_detect_missing_url(self):
         check = {}
-        assert detect_ogc(check) == (False, "")
+        assert detect_ogc(check) == (False, "unknown")
 
     @pytest.mark.parametrize(
         "resource_format,expected",
@@ -56,8 +56,8 @@ class TestOgcDetection:
             ("WMS", (True, "wms")),
             ("ogc:wms", (True, "wms")),
             ("OGC:WMS", (True, "wms")),
-            ("csv", (False, "")),
-            (None, (False, "")),
+            ("csv", (False, "unknown")),
+            (None, (False, "unknown")),
         ],
     )
     def test_detect_wfs_from_format(self, resource_format, expected):
