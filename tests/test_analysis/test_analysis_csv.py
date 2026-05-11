@@ -656,6 +656,10 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 assert res is None
                 mock_func.assert_not_called()
         else:
+            table_name = "test_geojson_pmtiles"
+            with patch("udata_hydra.config.CSV_TO_DB", True):
+                await csv_to_db(fp.name, inspection, table_name)
+
             minio_url = "my.minio.fr"
             geojson_bucket = "geojson_bucket"
             geojson_folder = "geojson_folder"
@@ -672,17 +676,20 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 mocked_minio_client_pmtiles = MinIOClient(
                     bucket=pmtiles_bucket, folder=pmtiles_folder
                 )
-            with (
-                patch(
-                    "udata_hydra.analysis.csv_geojson.minio_client_geojson",
-                    new=mocked_minio_client_geojson,
-                ),
-                patch(
-                    "udata_hydra.analysis.pmtiles.minio_client_pmtiles",
-                    new=mocked_minio_client_pmtiles,
-                ),
-            ):
-                result = await csv_to_geojson_and_pmtiles(fp.name, inspection, RESOURCE_ID)
+            try:
+                with (
+                    patch(
+                        "udata_hydra.analysis.csv_geojson.minio_client_geojson",
+                        new=mocked_minio_client_geojson,
+                    ),
+                    patch(
+                        "udata_hydra.analysis.pmtiles.minio_client_pmtiles",
+                        new=mocked_minio_client_pmtiles,
+                    ),
+                ):
+                    result = await csv_to_geojson_and_pmtiles(
+                        fp.name, inspection, RESOURCE_ID, table_name=table_name
+                    )
                 assert result is not None, (
                     "Expected geographical data to be processed, but function returned None"
                 )
@@ -694,49 +701,44 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                     pmtiles_size,
                     pmtiles_url,
                 ) = result
-            # checking geojson
-            with open(f"{RESOURCE_ID}.geojson", "r") as f:
-                geojson = json.load(f)
-            assert all(key in geojson for key in ("type", "features"))
-            assert len(geojson["features"]) == 5
-            for idx, feat in enumerate(geojson["features"]):
-                assert feat["type"] == "Feature"
-                if "polyg" in columns and idx == len(geojson["features"]) - 1:
-                    # the last feature of the polyg data is missing, we should have None here
-                    assert feat["geometry"] is None
-                else:
-                    assert isinstance(feat["geometry"], dict)
-                assert all(
-                    col in feat["properties"]
-                    for col in list(other_columns.keys())
-                    + [
-                        # this is only for the test with misleading geo columns
-                        # checking that the two ambiguous columns are in the properties
-                        col
-                        for col in geo_columns
-                        if col not in expected_formats
-                    ]
+                # checking geojson
+                with open(f"{RESOURCE_ID}.geojson", "r") as f:
+                    geojson = json.load(f)
+                assert all(key in geojson for key in ("type", "features"))
+                assert len(geojson["features"]) == 5
+                for idx, feat in enumerate(geojson["features"]):
+                    assert feat["type"] == "Feature"
+                    if "polyg" in columns and idx == len(geojson["features"]) - 1:
+                        assert feat["geometry"] is None
+                    else:
+                        assert isinstance(feat["geometry"], dict)
+                    assert all(
+                        col in feat["properties"]
+                        for col in list(other_columns.keys())
+                        + [col for col in geo_columns if col not in expected_formats]
+                    )
+                    assert not any(col in feat["properties"] for col in expected_formats)
+                assert (
+                    geojson_url
+                    == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
                 )
-                assert not any(col in feat["properties"] for col in expected_formats)
-            assert (
-                geojson_url
-                == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
-            )
-            assert isinstance(geojson_size, int)
+                assert isinstance(geojson_size, int)
 
-            # checking PMTiles
-            with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
-                header = f.read(7)
-            assert header == b"PMTiles"
-            assert (
-                pmtiles_url
-                == f"https://{minio_url}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
-            )
-            assert isinstance(pmtiles_size, int)
+                # checking PMTiles
+                with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
+                    header = f.read(7)
+                assert header == b"PMTiles"
+                assert (
+                    pmtiles_url
+                    == f"https://{minio_url}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
+                )
+                assert isinstance(pmtiles_size, int)
 
-            # Clean up files after tests
-            geojson_filepath.unlink()
-            pmtiles_filepath.unlink()
+                # Clean up files after tests
+                geojson_filepath.unlink()
+                pmtiles_filepath.unlink()
+            finally:
+                await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
 @pytest.mark.parametrize(
@@ -1213,7 +1215,12 @@ async def test_analyse_csv_split_geo_rq_chain(
     mocked_minio.fput_object.return_value = None
     mocked_minio.bucket_exists.return_value = True
 
-    async def fake_download(dl_url: str, suffix: str = "") -> Path:
+    async def fake_download(
+        dl_url: str,
+        suffix: str = "",
+        headers: dict | None = None,
+        max_size_allowed: int | None = None,
+    ) -> Path:
         p = Path(f"{RESOURCE_ID}.geojson")
         assert p.is_file()
         return p.resolve()
@@ -1227,7 +1234,7 @@ async def test_analyse_csv_split_geo_rq_chain(
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
         patch("udata_hydra.analysis.csv_geojson.minio_client_geojson", new=geo_client),
         patch("udata_hydra.analysis.pmtiles.minio_client_pmtiles", new=pmtiles_client),
-        patch("udata_hydra.utils.file.download_url_to_tempfile", new=fake_download),
+        patch("udata_hydra.analysis.geojson.download_url_to_tempfile", new=fake_download),
     ):
         await analyse_csv(check=check)
 

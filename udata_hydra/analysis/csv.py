@@ -80,14 +80,14 @@ minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MIN
 
 async def task_analyse_csv(
     check: Record | dict,
-    file_path: str | None = None,
+    filename: str | None = None,
     debug_insert: bool = False,
     worker_exception: bool = False,
 ) -> None:
     """RQ task: CSV analysis; forwards worker_exception to chained task_csv_to_geojson / task_geojson_to_pmtiles."""
     await analyse_csv(
         check,
-        file_path,
+        filename,
         debug_insert,
         worker_exception,
     )
