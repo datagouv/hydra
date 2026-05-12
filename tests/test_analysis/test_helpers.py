@@ -29,8 +29,7 @@ async def test_read_or_download_filename_resolution(mocker):
             check=mock_check, filename=basename, file_format="csv", exception=None
         )
 
-        assert result.read() == b"test content"
-        result.close()
+        assert result.read_bytes() == b"test content"
 
     finally:
         # Clean up

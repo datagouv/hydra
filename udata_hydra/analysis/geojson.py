@@ -93,7 +93,7 @@ async def analyse_geojson(
         try:
             pmtiles_filepath = Path(f"{resource_id}.pmtiles")
             pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
-                input_file_path=Path(tmp_file.name),
+                input_file_path=tmp_file,
                 output_file_path=pmtiles_filepath,
             )
             timer.mark("geojson-to-pmtiles")
@@ -122,8 +122,7 @@ async def analyse_geojson(
         await helpers.notify_udata(resource, check)
         timer.stop()
         if tmp_file is not None:
-            tmp_file.close()
-            os.remove(tmp_file.name)
+            tmp_file.unlink(missing_ok=True)
 
         # Reset resource status to None
         await Resource.update(resource_id, {"status": None})

@@ -1,8 +1,8 @@
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 
 import magic
 from asyncpg import Record
@@ -109,7 +109,7 @@ async def analyse_resource(
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
-    tmp_file = None
+    tmp_file: Path | None = None
     if change_status != Change.HAS_NOT_CHANGED or force_analysis:
         try:
             await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
@@ -120,9 +120,9 @@ async def analyse_resource(
         else:
             await Resource.update(resource_id, data={"status": "ANALYSING_DOWNLOADED_RESOURCE"})
             # Get file size
-            dl_analysis["analysis:content-length"] = os.path.getsize(tmp_file.name)
+            dl_analysis["analysis:content-length"] = tmp_file.stat().st_size
             # Get checksum
-            dl_analysis["analysis:checksum"] = compute_checksum_from_file(tmp_file.name)
+            dl_analysis["analysis:checksum"] = compute_checksum_from_file(str(tmp_file))
             # Check if checksum has been modified if we don't have other hints
             if change_status == Change.NO_GUESS:
                 (
@@ -131,10 +131,10 @@ async def analyse_resource(
                 ) = await detect_resource_change_from_checksum(
                     new_checksum=dl_analysis["analysis:checksum"], last_check=last_check
                 )
-            dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
+            dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file, mime=True)
         finally:
             if tmp_file and not (is_tabular or is_geojson or is_parquet):
-                os.remove(tmp_file.name)
+                tmp_file.unlink(missing_ok=True)
             await Check.update(
                 check["id"],
                 {
@@ -172,7 +172,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_csv,
                 check=check,
-                filename=os.path.basename(tmp_file.name),
+                filename=tmp_file.name,
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
@@ -181,7 +181,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_geojson,
                 check=check,
-                filename=os.path.basename(tmp_file.name),
+                filename=tmp_file.name,
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )
@@ -190,7 +190,7 @@ async def analyse_resource(
             queue.enqueue(
                 analyse_parquet,
                 check=check,
-                filename=os.path.basename(tmp_file.name),
+                filename=tmp_file.name,
                 _priority="high" if worker_priority == "high" else "default",
                 _exception=bool(exception),
             )

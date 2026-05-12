@@ -1,7 +1,6 @@
 import hashlib
 import json
 import logging
-import os
 import re
 from datetime import datetime, timezone
 from typing import Iterator
@@ -88,7 +87,7 @@ async def analyse_parquet(
 
         # open the file and read the metadata
         try:
-            parquet_file = pq.ParquetFile(tmp_file.name)
+            parquet_file = pq.ParquetFile(tmp_file)
             columns = {}
             for col in parquet_file.schema_arrow:
                 col_type = str(col.type)
@@ -149,8 +148,7 @@ async def analyse_parquet(
         await helpers.notify_udata(resource, check)
         timer.stop()
         if tmp_file is not None:
-            tmp_file.close()
-            os.remove(tmp_file.name)
+            tmp_file.unlink(missing_ok=True)
 
         # Reset resource status to None
         await Resource.update(resource_id, {"status": None})

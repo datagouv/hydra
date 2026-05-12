@@ -127,7 +127,7 @@ async def analyse_csv(
             if previous_analysis:
                 await Resource.update(resource_id, {"status": "VALIDATING_CSV"})
                 csv_inspection = validate_then_detect(
-                    file_path=tmp_file.name,
+                    file_path=str(tmp_file),
                     previous_analysis=previous_analysis,
                     output_profile=True,
                     num_rows=-1,
@@ -135,7 +135,7 @@ async def analyse_csv(
                 )
             else:
                 csv_inspection = csv_detective_routine(
-                    file_path=tmp_file.name,
+                    file_path=str(tmp_file),
                     output_profile=True,
                     num_rows=-1,
                     save_results=False,
@@ -151,7 +151,7 @@ async def analyse_csv(
         timer.mark("csv-inspection")
 
         await csv_to_db(
-            file_path=tmp_file.name,
+            file_path=str(tmp_file),
             inspection=csv_inspection,
             table_name=table_name,
             table_indexes=table_indexes,
@@ -164,7 +164,7 @@ async def analyse_csv(
 
         try:
             await csv_to_parquet(
-                file_path=tmp_file.name,
+                file_path=str(tmp_file),
                 inspection=csv_inspection,
                 resource_id=resource_id,
                 check_id=check["id"],
@@ -183,7 +183,7 @@ async def analyse_csv(
 
         try:
             await csv_to_geojson_and_pmtiles(
-                file_path=tmp_file.name,
+                file_path=str(tmp_file),
                 inspection=csv_inspection,
                 resource_id=resource_id,
                 check_id=check["id"],
@@ -213,8 +213,7 @@ async def analyse_csv(
         await helpers.notify_udata(resource, check)
         timer.stop()
         if tmp_file is not None:
-            tmp_file.close()
-            os.remove(tmp_file.name)
+            tmp_file.unlink(missing_ok=True)
 
         # Reset resource status to None
         await Resource.update(resource_id, {"status": None})

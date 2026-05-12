@@ -1,6 +1,6 @@
 import json
 import os
-from typing import IO
+from pathlib import Path
 
 from asyncpg import Record
 
@@ -22,29 +22,26 @@ async def read_or_download_file(
     filename: str | None,
     file_format: str,
     exception: Record | None,
-) -> IO[bytes]:
+) -> Path:
     if filename:
         temp_dir = config.TEMPORARY_DOWNLOAD_FOLDER or "/tmp"
         full_path = os.path.join(temp_dir, filename)
-        try:
-            return open(full_path, "rb")
-        except FileNotFoundError:
+        if not Path(full_path).is_file():
             raise IOException(
                 f"Temporary file not found: {full_path}",
                 resource_id=check["resource_id"],
                 url=check["url"],
             )
-    else:
-        tmp_file, _ = await download_resource(
-            url=check["url"],
-            headers=json.loads(check.get("headers") or "{}"),
-            max_size_allowed=None
-            if exception
-            else int(
-                config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED)
-            ),
-        )
-        return tmp_file
+        return Path(full_path)
+
+    dl_path, _ = await download_resource(
+        url=check["url"],
+        headers=json.loads(check.get("headers") or "{}"),
+        max_size_allowed=None
+        if exception
+        else int(config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED)),
+    )
+    return dl_path
 
 
 async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:

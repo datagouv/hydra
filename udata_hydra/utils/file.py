@@ -29,13 +29,17 @@ def compute_checksum_from_file(filename: str) -> str:
     return sha1sum.hexdigest()
 
 
-def extract_gzip(file_path: str | Path) -> IO[bytes]:
-    with gzip.open(file_path, "rb") as gz_file:
-        with tempfile.NamedTemporaryFile(
-            dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, mode="wb", delete=False
-        ) as temp_file:
-            temp_file.write(gz_file.read())
-    return temp_file
+def extract_gzip(file_path: str | Path) -> Path:
+    tmp = tempfile.NamedTemporaryFile(
+        dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, mode="wb", delete=False
+    )
+    out = Path(tmp.name)
+    try:
+        with gzip.open(file_path, "rb") as gz_file:
+            tmp.write(gz_file.read())
+    finally:
+        tmp.close()
+    return out
 
 
 async def _http_get_to_temp_path(
@@ -93,10 +97,10 @@ async def download_resource(
     url: str,
     headers: dict | None = None,
     max_size_allowed: int | None = None,
-) -> tuple[IO[bytes], str]:
+) -> tuple[Path, str]:
     """
     Attempts downloading a resource from a given url.
-    Returns a tuple of (downloaded_file_object, detected_extension).
+    Returns a tuple of (local path on disk after optional gunzip, detected_extension).
     Raises custom IOException if the resource is too large or if the URL is unreachable.
     """
     path, _ = await _http_get_to_temp_path(
@@ -114,8 +118,7 @@ async def download_resource(
         "application/gzip",
     ]:
         # It's compressed - extract and determine extension from URL
-        tmp_file: IO[bytes] = extract_gzip(path)
-        # Remove the gzip original temporary file
+        out_path = extract_gzip(path)
         path.unlink()
 
         # Extract any extension before .gz using regex
@@ -124,14 +127,13 @@ async def download_resource(
             detected_extension = f".{match.group(1)}"
         else:
             detected_extension = ""
+        path = out_path
     else:
         # Not compressed - use magic to detect type
         mime_type: str = magic.from_file(path, mime=True)
         detected_extension = mimetypes.guess_extension(mime_type) or ""
-        tmp_file = open(path, "rb")
-        tmp_file.close()
 
-    return tmp_file, detected_extension
+    return path, detected_extension
 
 
 async def download_url_to_tempfile(

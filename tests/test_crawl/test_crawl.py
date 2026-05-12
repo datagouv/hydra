@@ -1,9 +1,11 @@
 import hashlib
 import json
+import os
 import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import ANY, patch
 
 import nest_asyncio2 as nest_asyncio
@@ -34,10 +36,10 @@ nest_asyncio.apply()
 
 
 async def mock_download_resource(url, headers, max_size_allowed):
-    tmp_file = tempfile.NamedTemporaryFile(delete=False)
-    tmp_file.write(SIMPLE_CSV_CONTENT.encode("utf-8"))
-    tmp_file.close()
-    return tmp_file, ""
+    fd, pathname = tempfile.mkstemp(suffix=".csv")
+    os.write(fd, SIMPLE_CSV_CONTENT.encode("utf-8"))
+    os.close(fd)
+    return Path(pathname), ""
 
 
 @pytest.mark.parametrize(
