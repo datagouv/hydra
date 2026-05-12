@@ -46,7 +46,7 @@ async def parquet_to_db(
 ) -> None:
     """
     Convert a parquet file to database table using inspection data. It should (re)create one table:
-    - `table_name` with data from `file_path`
+    - `table_name` with data from `parquet_file`
 
     :parquet_file: parquet file to convert
     :inspection: CSV detective-like report
