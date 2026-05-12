@@ -19,14 +19,14 @@ log = logging.getLogger("udata-hydra")
 minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MINIO_PARQUET_FOLDER)
 
 
-def records_to_parquet(
-    records: Iterator[list],
+def tabular_rows_to_parquet(
+    rows: Iterator[list],
     columns: dict[str, dict],
     output_filename: str | None = None,
 ) -> tuple[str, pa.Table]:
     # the "output_filename = None" case is only used in tests
     table = pa.Table.from_pylist(
-        [{c: v for c, v in zip(columns, values)} for values in records],
+        [{c: v for c, v in zip(columns, values)} for values in rows],
         schema=pa.schema(
             [pa.field(c, PYTHON_TYPE_TO_PA[columns[c]["python_type"]]) for c in columns]
         ),
@@ -86,8 +86,8 @@ async def csv_to_parquet(
             output_filename=resource_id,
         )
     else:
-        parquet_file, _ = records_to_parquet(
-            records=iter_tabular_rows(file_path, inspection, cast_json=False),
+        parquet_file, _ = tabular_rows_to_parquet(
+            rows=iter_tabular_rows(file_path, inspection, cast_json=False),
             columns=inspection["columns"],
             output_filename=resource_id,
         )
