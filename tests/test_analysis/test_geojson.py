@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 from pathlib import Path
@@ -7,9 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tests.conftest import RESOURCE_ID
-from udata_hydra.analysis.csv import csv_detective_routine
 from udata_hydra.analysis.geojson import analyse_geojson
-from udata_hydra.conversion.csv_to_geojson import csv_to_geojson
 from udata_hydra.conversion.geojson_to_pmtiles import geojson_to_pmtiles
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.timer import Timer
@@ -95,94 +92,6 @@ async def test_geojson_analysis(setup_catalog, db, fake_check, rmock, produce_mo
     assert res["parsing_finished_at"] is not None
     assert res["pmtiles_size"] == pmtiles_size
     assert res["pmtiles_url"] == pmtiles_url
-
-
-@pytest.mark.asyncio
-@pytest.mark.slow
-async def test_csv_to_geojson_big_file(
-    mocker, input_file: str | None, output_cleanup: bool = False
-):
-    """Test performance with a CSV file containing geographical data"""
-
-    if not input_file:
-        pytest.skip(reason="No input_file provided, skipping performance test")
-
-    csv_path = "tests/data" / Path(input_file)
-    test_geojson_path = csv_path.parent / f"{csv_path.stem}.geojson"
-
-    # Create timer for performance measurement
-    timer = Timer("csv-to-geojson-performance-test")
-
-    # Mock MinIO for the test
-    minio_url = "my.minio.fr"
-    bucket = "bucket"
-    folder = "folder"
-    mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-    mocked_minio = MagicMock()
-    mocked_minio.fput_object.return_value = None
-    mocked_minio.bucket_exists.return_value = True
-
-    with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-        mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
-
-    with patch(
-        "udata_hydra.conversion.csv_to_geojson.minio_client_geojson", new=mocked_minio_client
-    ):
-        mock_os = mocker.patch("udata_hydra.utils.minio.os")
-        mock_os.path = os.path
-        mock_os.remove.return_value = None
-
-        # Analyze the CSV with csv_detective first
-        inspection, df = csv_detective_routine(
-            file_path=str(csv_path),
-            output_profile=True,
-            output_df=True,
-            cast_json=False,
-            num_rows=-1,
-            save_results=False,
-        )
-        timer.mark("csv-analysis")
-
-        # Test the performance of csv_to_geojson with the real file
-        result = await csv_to_geojson(
-            file_path=str(csv_path),
-            inspection=inspection,
-            output_file_path=test_geojson_path,
-            upload_to_minio=False,
-        )
-        timer.mark("geojson-conversion")
-
-        if result:
-            geojson_size, geojson_url = result
-
-            # Verify the GeoJSON file was created correctly
-            with test_geojson_path.open("r") as f:
-                geojson_data = json.load(f)
-                assert geojson_data["type"] == "FeatureCollection"
-                assert "features" in geojson_data
-                assert len(geojson_data["features"]) > 0
-
-            # The size should be significant
-            assert geojson_size > 1e6  # Should be much larger than small files
-
-            # Get output file size before cleanup
-            csv_size = csv_path.stat().st_size
-
-            # Clean up
-            if output_cleanup:
-                test_geojson_path.unlink(missing_ok=True)
-                log.info(f"Output GeoJSON file removed: {test_geojson_path}")
-            else:
-                log.info(f"Output GeoJSON file kept: {test_geojson_path}")
-
-            # Stop timer and log performance results
-            timer.stop()
-
-            log.info(f"Real CSV to GeoJSON test completed. Input CSV size: {csv_size} bytes")
-            log.info(f"Output GeoJSON size: {geojson_size} bytes")
-            log.info(f"Features converted: {len(geojson_data['features'])}")
-        else:
-            pytest.skip(reason="CSV file does not contain geographical data, skipping test")
 
 
 @pytest.mark.asyncio

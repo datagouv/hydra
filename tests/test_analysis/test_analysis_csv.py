@@ -3,7 +3,7 @@ import json
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from aiohttp import ClientSession
@@ -15,12 +15,10 @@ from yarl import URL
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.conversion.csv_to_db import csv_to_db
-from udata_hydra.conversion.csv_to_geojson_and_pmtiles import csv_to_geojson_and_pmtiles
 from udata_hydra.conversion.db_to_geojson import db_to_geojson
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils.minio import MinIOClient
 
 pytestmark = pytest.mark.asyncio
 
@@ -550,196 +548,6 @@ async def test_validation(
 
 
 @pytest.mark.parametrize(
-    "params",
-    (
-        # csv to geojson is disabled
-        ({}, None, False),
-        # no geographical data in the file
-        ({"data": ["rouge", "vert", "bleu", "jaune", "blanc"]}, None, True),
-        # a column contains geometry
-        (
-            {
-                "polyg": [
-                    json.dumps(
-                        {"type": "Point", "coordinates": [10 * k * (-1) ** k, 20 * k * (-1) ** k]}
-                    )
-                    for k in range(1, 5)
-                ]
-                + [""]
-            },
-            {"polyg": "geojson"},
-            True,
-        ),
-        # a column contains coordinates (format: lat,lon)
-        (
-            {"coords": [f"{10.0 * k * (-1) ** k},{20.0 * k * (-1) ** k}" for k in range(1, 6)]},
-            {"coords": "latlon_wgs"},
-            True,
-        ),
-        # a column contains coordinates (format: [lon, lat])
-        (
-            {
-                "geopoint": [
-                    f"[{20.0 * k * (-1) ** k}, {10.0 * k * (-1) ** k}]" for k in range(1, 6)
-                ]
-            },
-            {"geopoint": "lonlat_wgs"},
-            True,
-        ),
-        # the table has latitude and longitude in separate columns
-        (
-            {
-                "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
-                "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
-            },
-            {"lat": "latitude_wgs", "long": "longitude_wgs"},
-            True,
-        ),
-        # the table has latitude and longitude in separate columns
-        # and columns that look like they could be lat/lon too
-        (
-            {
-                "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
-                "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
-                "latin": [10.0 * k * (-1) ** k for k in range(1, 6)],
-                "longueur": [20.0 * k * (-1) ** k for k in range(1, 6)],
-            },
-            {"lat": "latitude_wgs", "long": "longitude_wgs"},
-            True,
-        ),
-    ),
-)
-async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
-    # removing remainders if one of the previous parametered tests failed
-    for ext in ["geojson", "pmtiles", "pmtiles.journal"]:
-        try:
-            Path(f"{RESOURCE_ID}.{ext}").unlink()
-        except FileNotFoundError:
-            pass
-    other_columns = {
-        "nombre": range(1, 6),
-        "score": [0.01, 1.2, 34.5, 678.9, 10],
-        "est_colonne": ["oui", "non", "non", "oui", "non"],
-        "naissance": ["1996-02-13", "1995-02-06", "2000-01-28", "1998-02-20", "2015-04-23"],
-    }
-    geo_columns, expected_formats, patched_config = params
-    sep = ";"
-    columns = other_columns | geo_columns
-    file = sep.join(columns) + "\n"
-    for _ in range(len(other_columns["nombre"])):
-        file += sep.join(str(val) for val in [data[_] for data in columns.values()]) + "\n"
-
-    with NamedTemporaryFile(delete=False) as fp:
-        fp.write(file.encode("utf-8"))
-        fp.seek(0)
-        inspection = csv_detective_routine(
-            file_path=fp.name,
-            output_profile=True,
-            num_rows=-1,
-            save_results=False,
-        )
-
-    if expected_formats:
-        for col in expected_formats:
-            assert expected_formats[col] in inspection["columns"][col]["format"]
-
-    with (
-        patch("udata_hydra.config.CSV_TO_GEOJSON", patched_config),
-        patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
-    ):
-        if not patched_config or expected_formats is None:
-            # process is disabled or early exit because no geo data
-            with patch(
-                "udata_hydra.conversion.csv_to_geojson_and_pmtiles.geojson_to_pmtiles"
-            ) as mock_func:
-                res = await csv_to_geojson_and_pmtiles(fp.name, inspection, RESOURCE_ID)
-                assert res is None
-                mock_func.assert_not_called()
-        else:
-            minio_url = "my.minio.fr"
-            geojson_bucket = "geojson_bucket"
-            geojson_folder = "geojson_folder"
-            pmtiles_bucket = "pmtiles_bucket"
-            pmtiles_folder = "pmtiles_folder"
-            mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-            mocked_minio = MagicMock()
-            mocked_minio.fput_object.return_value = None
-            mocked_minio.bucket_exists.return_value = True
-            with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-                mocked_minio_client_geojson = MinIOClient(
-                    bucket=geojson_bucket, folder=geojson_folder
-                )
-                mocked_minio_client_pmtiles = MinIOClient(
-                    bucket=pmtiles_bucket, folder=pmtiles_folder
-                )
-            with (
-                patch(
-                    "udata_hydra.conversion.csv_to_geojson.minio_client_geojson",
-                    new=mocked_minio_client_geojson,
-                ),
-                patch(
-                    "udata_hydra.conversion.geojson_to_pmtiles.minio_client_pmtiles",
-                    new=mocked_minio_client_pmtiles,
-                ),
-            ):
-                result = await csv_to_geojson_and_pmtiles(fp.name, inspection, RESOURCE_ID)
-                assert result is not None, (
-                    "Expected geographical data to be processed, but function returned None"
-                )
-                (
-                    geojson_filepath,
-                    geojson_size,
-                    geojson_url,
-                    pmtiles_filepath,
-                    pmtiles_size,
-                    pmtiles_url,
-                ) = result
-            # checking geojson
-            with open(f"{RESOURCE_ID}.geojson", "r") as f:
-                geojson = json.load(f)
-            assert all(key in geojson for key in ("type", "features"))
-            assert len(geojson["features"]) == 5
-            for idx, feat in enumerate(geojson["features"]):
-                assert feat["type"] == "Feature"
-                if "polyg" in columns and idx == len(geojson["features"]) - 1:
-                    # the last feature of the polyg data is missing, we should have None here
-                    assert feat["geometry"] is None
-                else:
-                    assert isinstance(feat["geometry"], dict)
-                assert all(
-                    col in feat["properties"]
-                    for col in list(other_columns.keys())
-                    + [
-                        # this is only for the test with misleading geo columns
-                        # checking that the two ambiguous columns are in the properties
-                        col
-                        for col in geo_columns
-                        if col not in expected_formats
-                    ]
-                )
-                assert not any(col in feat["properties"] for col in expected_formats)
-            assert (
-                geojson_url
-                == f"https://{minio_url}/{geojson_bucket}/{geojson_folder}/{RESOURCE_ID}.geojson"
-            )
-            assert isinstance(geojson_size, int)
-
-            # checking PMTiles
-            with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
-                header = f.read(7)
-            assert header == b"PMTiles"
-            assert (
-                pmtiles_url
-                == f"https://{minio_url}/{pmtiles_bucket}/{pmtiles_folder}/{RESOURCE_ID}.pmtiles"
-            )
-            assert isinstance(pmtiles_size, int)
-
-            # Clean up files after tests
-            geojson_filepath.unlink()
-            pmtiles_filepath.unlink()
-
-
-@pytest.mark.parametrize(
     "geo_columns",
     (
         # latlon format: "lat,lon" → GeoJSON coordinates should be [lon, lat]
@@ -782,8 +590,7 @@ async def test_db_to_geojson(db, geo_columns, clean_db):
         )
 
     table_name = "test_geojson_from_db"
-    with patch("udata_hydra.config.CSV_TO_DB", True):
-        await csv_to_db(fp.name, inspection, table_name)
+    await csv_to_db(fp.name, inspection, table_name)
 
     result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
     assert result is not None
@@ -840,8 +647,7 @@ async def test_db_to_geojson_with_reserved_column(db, clean_db):
         )
 
     table_name = "test_geojson_reserved_col"
-    with patch("udata_hydra.config.CSV_TO_DB", True):
-        await csv_to_db(fp.name, inspection, table_name)
+    await csv_to_db(fp.name, inspection, table_name)
 
     result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
     assert result is not None
@@ -894,8 +700,7 @@ async def test_db_to_geojson_with_quote_in_column_name(db, clean_db):
         )
 
     table_name = "test_geojson_quote_col"
-    with patch("udata_hydra.config.CSV_TO_DB", True):
-        await csv_to_db(fp.name, inspection, table_name)
+    await csv_to_db(fp.name, inspection, table_name)
 
     result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
     assert result is not None
@@ -943,8 +748,7 @@ async def test_db_to_geojson_lonlat(db, clean_db):
     assert "lonlat" in inspection["columns"]["geopoint"]["format"]
 
     table_name = "test_geojson_lonlat"
-    with patch("udata_hydra.config.CSV_TO_DB", True):
-        await csv_to_db(fp.name, inspection, table_name)
+    await csv_to_db(fp.name, inspection, table_name)
 
     result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
     assert result is not None
@@ -998,8 +802,7 @@ async def test_db_to_geojson_geojson_column(db, clean_db):
     assert "geojson" in inspection["columns"]["polyg"]["format"]
 
     table_name = "test_geojson_geojson_col"
-    with patch("udata_hydra.config.CSV_TO_DB", True):
-        await csv_to_db(fp.name, inspection, table_name)
+    await csv_to_db(fp.name, inspection, table_name)
 
     result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
     assert result is not None
@@ -1044,8 +847,7 @@ async def test_db_to_geojson_many_columns(db, clean_db):
         )
 
     table_name = "test_geojson_many_cols"
-    with patch("udata_hydra.config.CSV_TO_DB", True):
-        await csv_to_db(fp.name, inspection, table_name)
+    await csv_to_db(fp.name, inspection, table_name)
 
     result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
     assert result is not None

@@ -72,7 +72,6 @@ DEFAULT_MAX_FILESIZE_ALLOWED = 52428800
 SQL_INDEXES_TYPES_SUPPORTED = ["index"]
 
 CSV_ANALYSIS = true
-CSV_TO_DB = true
 TEMPORARY_DOWNLOAD_FOLDER = ""
 
 # -- Worker settings -- #
@@ -93,22 +92,21 @@ MINIO_USER = ""
 MINIO_PWD = ""
 
 # -- Parquet conversion settings -- #
-CSV_TO_PARQUET = false
+CSV_TO_PARQUET = false # to deprecated
 DB_TO_PARQUET = false
 MIN_LINES_FOR_PARQUET = 200
 MINIO_PARQUET_BUCKET = ""
 MINIO_PARQUET_FOLDER = "" # no trailing slash
 
+# -- Geojson conversion settings -- #
+DB_TO_GEOJSON = false
+MINIO_GEOJSON_BUCKET = ""
+MINIO_GEOJSON_FOLDER = "" # no trailing slash
+
 # -- PMTiles conversion settings -- #
 GEOJSON_TO_PMTILES = false
 MINIO_PMTILES_BUCKET = ""
 MINIO_PMTILES_FOLDER = "" # no trailing slash
-
-# -- Geojson conversion settings -- #
-CSV_TO_GEOJSON = false
-DB_TO_GEOJSON = false
-MINIO_GEOJSON_BUCKET = ""
-MINIO_GEOJSON_FOLDER = "" # no trailing slash
 
 # -- Parquet analysis settings -- #
 PARQUET_TO_DB = false
