@@ -6,14 +6,12 @@ import pytest
 from csv_detective import routine as csv_detective_routine
 
 from tests.conftest import RESOURCE_ID
-from udata_hydra.analysis.csv import (
-    csv_to_db,
-    csv_to_parquet,
-    generate_records,
-)
+from udata_hydra.conversion.csv_to_db import csv_to_db
+from udata_hydra.conversion.csv_to_parquet import csv_to_parquet, save_as_parquet
+from udata_hydra.conversion.db_to_parquet import db_to_parquet
 from udata_hydra.db import db_col_name
+from udata_hydra.utils.casting import generate_records
 from udata_hydra.utils.minio import MinIOClient
-from udata_hydra.utils.parquet import db_to_parquet, save_as_parquet
 
 pytestmark = pytest.mark.asyncio
 
@@ -115,7 +113,7 @@ async def test_csv_to_parquet(mocker, parquet_config):
         mocked_minio.bucket_exists.return_value = True
         with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
             mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
-        with patch("udata_hydra.analysis.csv.minio_client", new=mocked_minio_client):
+        with patch("udata_hydra.conversion.csv_to_parquet.minio_client", new=mocked_minio_client):
             result = await execute_csv_to_parquet()
             assert result is not None
             parquet_url, parquet_size = result

@@ -13,8 +13,10 @@ from csv_detective import validate_then_detect
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
-from udata_hydra.analysis.csv import analyse_csv, csv_to_db
-from udata_hydra.analysis.geojson import csv_to_geojson_and_pmtiles, db_to_geojson
+from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.conversion.csv_to_db import csv_to_db
+from udata_hydra.conversion.csv_to_geojson_and_pmtiles import csv_to_geojson_and_pmtiles
+from udata_hydra.conversion.db_to_geojson import db_to_geojson
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -647,7 +649,9 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
     ):
         if not patched_config or expected_formats is None:
             # process is disabled or early exit because no geo data
-            with patch("udata_hydra.analysis.geojson.geojson_to_pmtiles") as mock_func:
+            with patch(
+                "udata_hydra.conversion.csv_to_geojson_and_pmtiles.geojson_to_pmtiles"
+            ) as mock_func:
                 res = await csv_to_geojson_and_pmtiles(fp.name, inspection, RESOURCE_ID)
                 assert res is None
                 mock_func.assert_not_called()
@@ -670,11 +674,11 @@ async def test_csv_to_geojson_pmtiles(db, params, clean_db, mocker):
                 )
             with (
                 patch(
-                    "udata_hydra.analysis.geojson.minio_client_geojson",
+                    "udata_hydra.conversion.csv_to_geojson.minio_client_geojson",
                     new=mocked_minio_client_geojson,
                 ),
                 patch(
-                    "udata_hydra.analysis.geojson.minio_client_pmtiles",
+                    "udata_hydra.conversion.geojson_to_pmtiles.minio_client_pmtiles",
                     new=mocked_minio_client_pmtiles,
                 ),
             ):
