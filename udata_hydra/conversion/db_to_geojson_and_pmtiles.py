@@ -14,6 +14,10 @@ DEFAULT_PMTILES_FILEPATH = Path("converted_from_geojson.pmtiles")
 log = logging.getLogger("udata-hydra")
 
 
+def _artifact_dir() -> Path:
+    return Path(config.TEMPORARY_DOWNLOAD_FOLDER or "/tmp")
+
+
 async def db_to_geojson_and_pmtiles(
     table_name: str,
     inspection: dict,
@@ -30,8 +34,9 @@ async def db_to_geojson_and_pmtiles(
     )
 
     if resource_id:
-        geojson_filepath = Path(f"{resource_id}.geojson")
-        pmtiles_filepath = Path(f"{resource_id}.pmtiles")
+        base = _artifact_dir()
+        geojson_filepath = base / f"{resource_id}.geojson"
+        pmtiles_filepath = base / f"{resource_id}.pmtiles"
         # Update resource status for GeoJSON conversion
         await Resource.update(resource_id, {"status": "CONVERTING_TO_GEOJSON"})
     else:

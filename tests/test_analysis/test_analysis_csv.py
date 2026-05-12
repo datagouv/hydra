@@ -296,6 +296,49 @@ async def test_analyse_csv_send_udata_webhook(
         assert webhook.get(f"analysis:parsing:{k}", False) is None
 
 
+async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
+    mocker, setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
+):
+    """Parquet export is scheduled on the low RQ queue (CSV geo export disabled)."""
+    import asyncio
+
+    recorded: list[tuple[object, str | None]] = []
+
+    async def tracking_parquet_export(*args, **kwargs):
+        pass
+
+    mocker.patch("udata_hydra.analysis.csv.export_csv_parquet", tracking_parquet_export)
+
+    def capture_enqueue(fn, *args, **kwargs):
+        recorded.append((fn, kwargs.get("_priority")))
+        kwargs = dict(kwargs)
+        kwargs.pop("_priority", None)
+        kwargs.pop("_exception", None)
+        result = fn(*args, **kwargs)
+        if asyncio.iscoroutine(result):
+            loop = asyncio.get_running_loop()
+            return loop.run_until_complete(result)
+        return result
+
+    mocker.patch("udata_hydra.utils.queue.enqueue", capture_enqueue)
+
+    check = await fake_check()
+    url = check["url"]
+    rmock.get(url, status=200, body=catalog_content)
+    with (
+        patch("udata_hydra.config.DB_TO_PARQUET", True),
+        patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
+        patch("udata_hydra.config.DB_TO_GEOJSON", False),
+    ):
+        await analyse_csv(check=check)
+
+    assert any(f is tracking_parquet_export and p == "low" for f, p in recorded)
+
+    from udata_hydra.analysis.csv_exports import export_csv_geojson_pmtiles as exp_geo
+
+    assert not any(f is exp_geo for f, _ in recorded)
+
+
 @pytest.mark.parametrize(
     "forced_analysis",
     (

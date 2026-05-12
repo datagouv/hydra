@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 from asyncpg import Record
 from csv_detective import routine as csv_detective_routine
@@ -11,9 +12,10 @@ from csv_detective.detection.engine import engine_to_file
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
+from udata_hydra.analysis.csv_exports import export_csv_geojson_pmtiles, export_csv_parquet
 from udata_hydra.analysis.tables_index import get_previous_analysis, insert_tables_index_entry
 from udata_hydra.conversion.csv_to_db import csv_to_db
-from udata_hydra.conversion.db_to_geojson_and_pmtiles import db_to_geojson_and_pmtiles
+from udata_hydra.conversion.csv_to_geojson import _detect_geo_columns
 from udata_hydra.conversion.db_to_parquet import db_to_parquet
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -24,7 +26,7 @@ from udata_hydra.utils import (
     Timer,
     detect_tabular_from_headers,
     handle_parse_exception,
-    remove_remainders,
+    queue,
 )
 from udata_hydra.utils.minio import MinIOClient
 
@@ -123,50 +125,39 @@ async def analyse_csv(
         timer.mark("csv-to-db")
         await insert_tables_index_entry(table_name, csv_inspection, check, dataset_id)
 
-        if config.DB_TO_PARQUET:
-            try:
-                await export_parquet_for_csv_resource(
-                    table_name=table_name,
-                    inspection=csv_inspection,
-                    resource_id=resource_id,
-                    check_id=check["id"],
-                )
-                timer.mark("csv-to-parquet")
-            except Exception as e:
-                remove_remainders(resource_id, ["parquet"])
-                raise ParseException(
-                    message=str(e),
-                    step="parquet_export",
-                    resource_id=resource_id,
-                    url=url,
-                    check_id=check["id"],
-                ) from e
-
-        try:
-            if config.DB_TO_GEOJSON:
-                await db_to_geojson_and_pmtiles(
-                    table_name=table_name,
-                    inspection=csv_inspection,
-                    resource_id=resource_id,
-                    check_id=check["id"],
-                    timer=timer,
-                )
-        except Exception as e:
-            remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
-            raise ParseException(
-                message=str(e),
-                step="geojson_export",
-                resource_id=resource_id,
-                url=url,
-                check_id=check["id"],
-            ) from e
-
         check = await Check.update(  # type: ignore[assignment]
             check["id"],
             {
                 "parsing_finished_at": datetime.now(timezone.utc),
             },
         )
+
+        if (
+            config.DB_TO_PARQUET
+            and int(csv_inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET
+        ):
+            queue.enqueue(
+                export_csv_parquet,
+                table_name=table_name,
+                inspection=csv_inspection,
+                resource_id=resource_id,
+                check_id=check["id"],
+                url=url,
+                _priority="low",
+                _exception=bool(exception),
+            )
+
+        if config.DB_TO_GEOJSON and _detect_geo_columns(csv_inspection) is not None:
+            queue.enqueue(
+                export_csv_geojson_pmtiles,
+                table_name=table_name,
+                inspection=csv_inspection,
+                resource_id=resource_id,
+                check_id=check["id"],
+                url=url,
+                _priority="low",
+                _exception=bool(exception),
+            )
 
     except (ParseException, IOException) as e:
         check = await handle_parse_exception(e, table_name, check)  # type: ignore[assignment]
@@ -211,10 +202,15 @@ async def export_parquet_for_csv_resource(
     if resource_id:
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
 
+    out_base = (
+        str(Path(config.TEMPORARY_DOWNLOAD_FOLDER or "/tmp") / resource_id)
+        if resource_id
+        else resource_id
+    )
     parquet_file, _ = await db_to_parquet(
         table_name=table_name,
         inspection=inspection,
-        output_filename=resource_id,
+        output_filename=out_base,
     )
     parquet_size: int = os.path.getsize(parquet_file)
     parquet_url: str = _parquet_minio_client.send_file(parquet_file)
