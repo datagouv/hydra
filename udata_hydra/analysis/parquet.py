@@ -10,7 +10,7 @@ from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
-from udata_hydra.analysis.tables_index import parquet_to_db_index
+from udata_hydra.analysis.tables_index import insert_tables_index_entry
 from udata_hydra.conversion.parquet_to_db import parquet_to_db
 from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
 from udata_hydra.db.check import Check
@@ -121,7 +121,7 @@ async def analyse_parquet(
                 "parsing_finished_at": datetime.now(timezone.utc),
             },
         )
-        await parquet_to_db_index(table_name, inspection, check, dataset_id or "")
+        await insert_tables_index_entry(table_name, inspection, check, dataset_id or "")
 
     except (ParseException, IOException) as e:
         check = await handle_parse_exception(e, table_name, check)  # type: ignore[assignment]

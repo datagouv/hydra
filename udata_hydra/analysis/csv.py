@@ -10,7 +10,7 @@ from csv_detective import validate_then_detect
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
-from udata_hydra.analysis.tables_index import csv_to_db_index, get_previous_analysis
+from udata_hydra.analysis.tables_index import get_previous_analysis, insert_tables_index_entry
 from udata_hydra.conversion.csv_to_db import csv_to_db
 from udata_hydra.conversion.csv_to_geojson_and_pmtiles import csv_to_geojson_and_pmtiles
 from udata_hydra.conversion.csv_to_parquet import csv_to_parquet
@@ -115,7 +115,7 @@ async def analyse_csv(
         )
         check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
         timer.mark("csv-to-db")
-        await csv_to_db_index(table_name, csv_inspection, check, dataset_id)
+        await insert_tables_index_entry(table_name, csv_inspection, check, dataset_id)
 
         try:
             await csv_to_parquet(

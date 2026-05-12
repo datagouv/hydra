@@ -36,10 +36,10 @@ async def get_previous_analysis(resource_id: str) -> dict | None:
     return analysis
 
 
-async def csv_to_db_index(
+async def insert_tables_index_entry(
     table_name: str, inspection: dict, check: Record | dict, dataset_id: str
 ) -> None:
-    """Store meta info about a converted CSV table in `DATABASE_URL_CSV.tables_index`"""
+    """Insert metadata for a parsed table into `DATABASE_URL_CSV.tables_index`."""
     db = await context.pool("csv")
     q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)"
     try:
@@ -59,13 +59,3 @@ async def csv_to_db_index(
             url=check.get("url"),
             check_id=check["id"],
         ) from e
-
-
-async def parquet_to_db_index(
-    table_name: str,
-    inspection: dict,
-    check: Record,
-    dataset_id: str,
-) -> None:
-    # convenience method just to make it clearer
-    await csv_to_db_index(table_name, inspection, check, dataset_id)
