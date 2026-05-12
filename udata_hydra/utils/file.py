@@ -108,7 +108,7 @@ async def download_resource(
         headers,
         max_size_allowed,
         "",
-        "Error downloading CSV",
+        "Error downloading file",
     )
 
     detected_extension: str = ""
