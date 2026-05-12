@@ -10,7 +10,7 @@ from udata_hydra.conversion.csv_to_db import csv_to_db
 from udata_hydra.conversion.csv_to_parquet import csv_to_parquet, records_to_parquet
 from udata_hydra.conversion.db_to_parquet import db_to_parquet
 from udata_hydra.db import db_col_name
-from udata_hydra.utils.casting import generate_records
+from udata_hydra.utils.casting import iter_tabular_rows
 from udata_hydra.utils.minio import MinIOClient
 
 pytestmark = pytest.mark.asyncio
@@ -37,7 +37,7 @@ async def test_records_to_parquet(file_and_count):
     columns = inspection["columns"]
     columns = {db_col_name(c): v["python_type"] for c, v in columns.items()}
     _, table = records_to_parquet(
-        records=generate_records(file_path, inspection),
+        records=iter_tabular_rows(file_path, inspection),
         columns=inspection["columns"],
         output_filename=None,
     )
@@ -66,7 +66,7 @@ async def test_db_to_parquet(clean_db):
     )
 
     _, table_from_csv = records_to_parquet(
-        records=generate_records(file_path, inspection),
+        records=iter_tabular_rows(file_path, inspection),
         columns=inspection["columns"],
         output_filename=None,
     )

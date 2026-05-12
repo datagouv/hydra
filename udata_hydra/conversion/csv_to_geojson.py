@@ -7,7 +7,7 @@ from typing import Any, Iterator
 from json_stream import streamable_list
 
 from udata_hydra import config
-from udata_hydra.utils.casting import generate_records
+from udata_hydra.utils.casting import iter_tabular_rows
 from udata_hydra.utils.minio import MinIOClient
 
 log = logging.getLogger("udata-hydra")
@@ -80,7 +80,7 @@ async def csv_to_geojson(
     def get_features(
         file_path: str, inspection: dict, geo: dict[str, Any]
     ) -> Iterator[dict[str, Any]]:
-        for row in generate_records(file_path, inspection, cast_json=False, as_dict=True):
+        for row in iter_tabular_rows(file_path, inspection, cast_json=False, as_dict=True):
             if "geojson" in geo:
                 yield {
                     "type": "Feature",

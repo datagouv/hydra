@@ -11,7 +11,7 @@ from udata_hydra.conversion.db_to_parquet import db_to_parquet
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils.casting import generate_records
+from udata_hydra.utils.casting import iter_tabular_rows
 from udata_hydra.utils.minio import MinIOClient
 
 log = logging.getLogger("udata-hydra")
@@ -87,7 +87,7 @@ async def csv_to_parquet(
         )
     else:
         parquet_file, _ = records_to_parquet(
-            records=generate_records(file_path, inspection, cast_json=False),
+            records=iter_tabular_rows(file_path, inspection, cast_json=False),
             columns=inspection["columns"],
             output_filename=resource_id,
         )
