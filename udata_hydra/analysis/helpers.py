@@ -1,6 +1,5 @@
 import json
 import os
-import tempfile
 from typing import IO
 
 from asyncpg import Record
@@ -25,8 +24,7 @@ async def read_or_download_file(
     exception: Record | None,
 ) -> IO[bytes]:
     if filename:
-        # Match download_resource / NamedTemporaryFile when TEMPORARY_DOWNLOAD_FOLDER is unset.
-        temp_dir = config.TEMPORARY_DOWNLOAD_FOLDER or tempfile.gettempdir()
+        temp_dir = config.TEMPORARY_DOWNLOAD_FOLDER or "/tmp"
         full_path = os.path.join(temp_dir, filename)
         try:
             return open(full_path, "rb")
