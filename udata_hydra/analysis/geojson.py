@@ -192,9 +192,7 @@ async def export_pmtiles_from_local_geojson(
             check_id,
             {"pmtiles_url": pmtiles_url, "pmtiles_size": pmtiles_size},
         )
-    do_unlink = (
-        unlink_geojson_after or config.REMOVE_GENERATED_FILES
-    )
+    do_unlink = unlink_geojson_after or config.REMOVE_GENERATED_FILES
     if do_unlink and geojson_filepath.is_file():
         geojson_filepath.unlink()
     return pmtiles_size, pmtiles_url
