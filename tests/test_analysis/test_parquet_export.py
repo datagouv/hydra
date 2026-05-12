@@ -7,7 +7,7 @@ from csv_detective import routine as csv_detective_routine
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.conversion.csv_to_db import csv_to_db
-from udata_hydra.conversion.csv_to_parquet import csv_to_parquet, save_as_parquet
+from udata_hydra.conversion.csv_to_parquet import csv_to_parquet, records_to_parquet
 from udata_hydra.conversion.db_to_parquet import db_to_parquet
 from udata_hydra.db import db_col_name
 from udata_hydra.utils.casting import generate_records
@@ -24,7 +24,7 @@ pytestmark = pytest.mark.asyncio
         ("catalog.xlsx", 2),
     ),
 )
-async def test_save_as_parquet(file_and_count):
+async def test_records_to_parquet(file_and_count):
     filename, expected_count = file_and_count
     file_path = f"tests/data/{filename}"
     inspection = csv_detective_routine(
@@ -36,7 +36,7 @@ async def test_save_as_parquet(file_and_count):
     assert inspection
     columns = inspection["columns"]
     columns = {db_col_name(c): v["python_type"] for c, v in columns.items()}
-    _, table = save_as_parquet(
+    _, table = records_to_parquet(
         records=generate_records(file_path, inspection),
         columns=inspection["columns"],
         output_filename=None,
@@ -65,7 +65,7 @@ async def test_db_to_parquet(clean_db):
         output_filename=None,
     )
 
-    _, table_from_csv = save_as_parquet(
+    _, table_from_csv = records_to_parquet(
         records=generate_records(file_path, inspection),
         columns=inspection["columns"],
         output_filename=None,

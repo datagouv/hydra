@@ -19,7 +19,7 @@ log = logging.getLogger("udata-hydra")
 minio_client = MinIOClient(bucket=config.MINIO_PARQUET_BUCKET, folder=config.MINIO_PARQUET_FOLDER)
 
 
-def save_as_parquet(
+def records_to_parquet(
     records: Iterator[list],
     columns: dict[str, dict],
     output_filename: str | None = None,
@@ -86,7 +86,7 @@ async def csv_to_parquet(
             output_filename=resource_id,
         )
     else:
-        parquet_file, _ = save_as_parquet(
+        parquet_file, _ = records_to_parquet(
             records=generate_records(file_path, inspection, cast_json=False),
             columns=inspection["columns"],
             output_filename=resource_id,
