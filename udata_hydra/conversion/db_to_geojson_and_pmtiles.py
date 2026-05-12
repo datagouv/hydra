@@ -32,11 +32,13 @@ async def db_to_geojson_and_pmtiles(
     if resource_id:
         geojson_filepath = Path(f"{resource_id}.geojson")
         pmtiles_filepath = Path(f"{resource_id}.pmtiles")
+        # Update resource status for GeoJSON conversion
         await Resource.update(resource_id, {"status": "CONVERTING_TO_GEOJSON"})
     else:
         geojson_filepath = DEFAULT_GEOJSON_FILEPATH
         pmtiles_filepath = DEFAULT_PMTILES_FILEPATH
 
+    # Generate GeoJSON by streaming features from the parsing table (see db_to_geojson).
     result = await db_to_geojson(
         table_name,
         inspection,
@@ -58,8 +60,10 @@ async def db_to_geojson_and_pmtiles(
     )
 
     if resource_id:
+        # Update resource status for PMTiles conversion
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
 
+    # Convert GeoJSON to PMTiles
     pmtiles_size, pmtiles_url = await geojson_to_pmtiles(geojson_filepath, pmtiles_filepath)
     if timer:
         timer.mark("geojson-to-pmtiles")
@@ -75,4 +79,5 @@ async def db_to_geojson_and_pmtiles(
     if config.REMOVE_GENERATED_FILES:
         geojson_filepath.unlink()
 
+    # returning only for tests purposes
     return geojson_filepath, geojson_size, geojson_url, pmtiles_filepath, pmtiles_size, pmtiles_url
