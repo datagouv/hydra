@@ -17,7 +17,7 @@ from udata_hydra.utils import ParseException
 log = logging.getLogger("udata-hydra")
 
 
-def generate_records_from_parquet(parquet_file: pq.ParquetFile) -> Iterator[list]:
+def iter_parquet_rows(parquet_file: pq.ParquetFile) -> Iterator[tuple]:
     # pandas cannot have None in columns typed as int so we have to cast
     # NaN-int values to None for db insertion, and we also change NaN to None
     for batch in parquet_file.iter_batches():
@@ -97,7 +97,7 @@ async def parquet_to_db(
         try:
             await db.copy_records_to_table(
                 table_name,
-                records=generate_records_from_parquet(parquet_file),
+                records=iter_parquet_rows(parquet_file),
                 columns=list(columns.keys()),
             )
         except Exception as e:  # I know what I'm doing, pinky swear
@@ -110,7 +110,7 @@ async def parquet_to_db(
     # this inserts rows from iterator one by one, slow but useful for debugging
     else:
         bar = ProgressBar(total=inspection["total_lines"])
-        for r in bar.iter(generate_records_from_parquet(parquet_file)):
+        for r in bar.iter(iter_parquet_rows(parquet_file)):
             data = {k: v for k, v in zip(parquet_file.schema.names, r)}
             print(data)
             # NB: possible sql injection here, but should not be used in prod
