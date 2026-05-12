@@ -136,15 +136,15 @@ async def download_resource(
     return path, detected_extension
 
 
-async def download_url_to_tempfile(
+async def download_url_to_path(
     url: str,
     suffix: str = "",
     headers: dict | None = None,
     max_size_allowed: int | None = None,
 ) -> Path:
-    """Download a URL to a named temporary file and return its path.
+    """Stream a URL response body to a new file on disk and return its path.
 
-    Streams the response body to disk to avoid loading large files into memory.
+    Uses a named temporary file under the configured download folder.
     """
     path, total_bytes = await _http_get_to_temp_path(
         url,
@@ -157,8 +157,8 @@ async def download_url_to_tempfile(
     return path
 
 
-async def download_file(url: str, fd: BinaryIO) -> None:
-    """Download a file from URL to a file descriptor"""
+async def download_url_to_fileobj(url: str, fd: BinaryIO) -> None:
+    """Stream a URL response body into a writable binary file object."""
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             while True:

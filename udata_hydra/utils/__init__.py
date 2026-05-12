@@ -3,9 +3,9 @@ from .csv import detect_tabular_from_headers
 from .errors import IOException, ParseException, handle_parse_exception
 from .file import (
     compute_checksum_from_file,
-    download_file,
     download_resource,
-    download_url_to_tempfile,
+    download_url_to_fileobj,
+    download_url_to_path,
     extract_gzip,
     remove_remainders,
 )
@@ -23,9 +23,9 @@ __all__ = [
     "ParseException",
     "handle_parse_exception",
     "compute_checksum_from_file",
-    "download_file",
     "download_resource",
-    "download_url_to_tempfile",
+    "download_url_to_fileobj",
+    "download_url_to_path",
     "extract_gzip",
     "remove_remainders",
     "detect_geojson_from_headers",

@@ -34,7 +34,7 @@ from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import setup_logging
 from udata_hydra.migrations import Migrator
-from udata_hydra.utils import download_file, download_resource
+from udata_hydra.utils import download_resource, download_url_to_fileobj
 
 cli = typer.Typer()
 context = {"conn": {}}
@@ -138,7 +138,7 @@ async def _load_catalog(
     try:
         log.info(f"Downloading resources catalog from {url}...")
         with NamedTemporaryFile(dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False) as fd:
-            await download_file(url, fd)
+            await download_url_to_fileobj(url, fd)
         log.info("Upserting resources catalog in database...")
         # consider everything deleted, deleted will be updated when loading new catalog
         conn = await connection()
@@ -723,7 +723,7 @@ async def _csv_sample(
         lines.append(line)
         if not download:
             continue
-        await download_file(r["url"], filename.open("wb"))
+        await download_url_to_fileobj(r["url"], filename.open("wb"))
         with os.popen(f"file {filename} -b --mime-type") as proc:
             line["magic_mime"] = proc.read().lower().strip()
         line["real_size"] = filename.stat().st_size
