@@ -935,9 +935,12 @@ async def test_crash_after_db_insertion(
         body=("a,b,c\n" + "1,2,3\n" * 200).encode("utf-8"),
         repeat=True,
     )
-    with patch(
-        "udata_hydra.analysis.csv.csv_to_parquet",
-        new=_crash,
+    with (
+        patch("udata_hydra.config.DB_TO_PARQUET", True),
+        patch(
+            "udata_hydra.analysis.csv.export_parquet_for_csv_resource",
+            new=_crash,
+        ),
     ):
         # pretend the analysis crashes during parquet conversion
         await analyse_csv(check=check)
