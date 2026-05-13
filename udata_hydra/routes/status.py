@@ -188,8 +188,8 @@ async def get_health(request: web.Request) -> web.Response:
             "csv_to_db": config.CSV_TO_DB,
             "csv_to_parquet": config.CSV_TO_PARQUET,
             "db_to_parquet": config.DB_TO_PARQUET,
-            "geojson_to_pmtiles": config.GEOJSON_TO_PMTILES,
             "db_to_geojson": config.DB_TO_GEOJSON,
+            "geojson_to_pmtiles": config.GEOJSON_TO_PMTILES,
             "parquet_to_db": config.PARQUET_TO_DB,
         }
     )
