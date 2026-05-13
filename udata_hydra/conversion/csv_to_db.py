@@ -31,10 +31,6 @@ async def csv_to_db(
     :table_name: used to create tables
     :debug_insert: insert record one by one instead of using postgresql COPY
     """
-    if not config.CSV_TO_DB:
-        log.debug("CSV_TO_DB turned off, skipping.")
-        return
-
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
         f"to db for {table_name}"
