@@ -105,17 +105,18 @@ async def analyse_csv(
             ) from e
         timer.mark("csv-inspection")
 
-        await csv_to_db(
-            file_path=tmp_file.name,
-            inspection=csv_inspection,
-            table_name=table_name,
-            table_indexes=table_indexes,
-            resource_id=resource_id,
-            debug_insert=debug_insert,
-        )
-        check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
-        timer.mark("csv-to-db")
-        await insert_tables_index_entry(table_name, csv_inspection, check, dataset_id)
+        if config.CSV_TO_DB:
+            await csv_to_db(
+                file_path=tmp_file.name,
+                inspection=csv_inspection,
+                table_name=table_name,
+                table_indexes=table_indexes,
+                resource_id=resource_id,
+                debug_insert=debug_insert,
+            )
+            check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
+            timer.mark("csv-to-db")
+            await insert_tables_index_entry(table_name, csv_inspection, check, dataset_id)
 
         try:
             await csv_to_parquet(
