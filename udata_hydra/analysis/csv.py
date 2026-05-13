@@ -26,9 +26,6 @@ from udata_hydra.utils import (
     remove_remainders,
 )
 
-# Re-exported for backwards-compatible imports (e.g. udata_hydra/cli.py).
-__all__ = ["analyse_csv", "csv_detective_routine"]
-
 log = logging.getLogger("udata-hydra")
 
 
