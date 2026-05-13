@@ -148,6 +148,8 @@ async def analyse_csv(
                     check_id=check["id"],
                     timer=timer,
                 )
+            else:
+                log.debug("DB_TO_GEOJSON is off, skipping GeoJSON/PMTiles export.")
         except Exception as e:
             remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
             raise ParseException(
