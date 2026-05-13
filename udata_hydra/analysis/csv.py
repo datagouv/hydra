@@ -117,6 +117,8 @@ async def analyse_csv(
             check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
             timer.mark("csv-to-db")
             await insert_tables_index_entry(table_name, csv_inspection, check, dataset_id)
+        else:
+            log.debug("CSV_TO_DB is off, skipping Postgres parsing table ingest")
 
         try:
             await csv_to_parquet(
