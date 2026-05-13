@@ -105,7 +105,11 @@ async def analyse_csv(
             ) from e
         timer.mark("csv-inspection")
 
-        if config.CSV_TO_DB:
+        if not config.CSV_TO_DB:
+            log.debug(
+                "CSV_TO_DB is off, skipping Postgres parsing table ingest and DB-backed GeoJSON/PMTiles export."
+            )
+        else:
             await csv_to_db(
                 file_path=tmp_file.name,
                 inspection=csv_inspection,
@@ -117,8 +121,27 @@ async def analyse_csv(
             check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
             timer.mark("csv-to-db")
             await insert_tables_index_entry(table_name, csv_inspection, check, dataset_id)
-        else:
-            log.debug("CSV_TO_DB is off, skipping Postgres parsing table ingest")
+
+            try:
+                if config.DB_TO_GEOJSON:
+                    await db_to_geojson_and_pmtiles(
+                        table_name=table_name,
+                        inspection=csv_inspection,
+                        resource_id=resource_id,
+                        check_id=check["id"],
+                        timer=timer,
+                    )
+                else:
+                    log.debug("DB_TO_GEOJSON is off, skipping GeoJSON/PMTiles export.")
+            except Exception as e:
+                remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
+                raise ParseException(
+                    message=str(e),
+                    step="geojson_export",
+                    resource_id=resource_id,
+                    url=url,
+                    check_id=check["id"],
+                ) from e
 
         try:
             await csv_to_parquet(
@@ -126,7 +149,7 @@ async def analyse_csv(
                 inspection=csv_inspection,
                 resource_id=resource_id,
                 check_id=check["id"],
-                table_name=table_name if config.DB_TO_PARQUET else None,
+                table_name=table_name if config.CSV_TO_DB and config.DB_TO_PARQUET else None,
             )
             timer.mark("csv-to-parquet")
         except Exception as e:
@@ -134,27 +157,6 @@ async def analyse_csv(
             raise ParseException(
                 message=str(e),
                 step="parquet_export",
-                resource_id=resource_id,
-                url=url,
-                check_id=check["id"],
-            ) from e
-
-        try:
-            if config.DB_TO_GEOJSON:
-                await db_to_geojson_and_pmtiles(
-                    table_name=table_name,
-                    inspection=csv_inspection,
-                    resource_id=resource_id,
-                    check_id=check["id"],
-                    timer=timer,
-                )
-            else:
-                log.debug("DB_TO_GEOJSON is off, skipping GeoJSON/PMTiles export.")
-        except Exception as e:
-            remove_remainders(resource_id, ["geojson", "pmtiles", "pmtiles-journal"])
-            raise ParseException(
-                message=str(e),
-                step="geojson_export",
                 resource_id=resource_id,
                 url=url,
                 check_id=check["id"],
