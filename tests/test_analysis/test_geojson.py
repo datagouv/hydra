@@ -8,11 +8,9 @@ import pytest
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.csv import csv_detective_routine
-from udata_hydra.analysis.geojson import (
-    analyse_geojson,
-    csv_to_geojson,
-    geojson_to_pmtiles,
-)
+from udata_hydra.analysis.geojson import analyse_geojson
+from udata_hydra.conversion.csv_to_geojson import csv_to_geojson
+from udata_hydra.conversion.geojson_to_pmtiles import geojson_to_pmtiles
 from udata_hydra.utils.minio import MinIOClient
 from udata_hydra.utils.timer import Timer
 
@@ -56,7 +54,10 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
     with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
         mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
     with (
-        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client),
+        patch(
+            "udata_hydra.conversion.geojson_to_pmtiles.minio_client_pmtiles",
+            new=mocked_minio_client,
+        ),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):
         mock_os = mocker.patch("udata_hydra.utils.minio.os")
@@ -124,7 +125,9 @@ async def test_csv_to_geojson_big_file(
     with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
         mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
 
-    with patch("udata_hydra.analysis.geojson.minio_client_geojson", new=mocked_minio_client):
+    with patch(
+        "udata_hydra.conversion.csv_to_geojson.minio_client_geojson", new=mocked_minio_client
+    ):
         mock_os = mocker.patch("udata_hydra.utils.minio.os")
         mock_os.path = os.path
         mock_os.remove.return_value = None
@@ -211,7 +214,10 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
         mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
 
     with (
-        patch("udata_hydra.analysis.geojson.minio_client_pmtiles", new=mocked_minio_client),
+        patch(
+            "udata_hydra.conversion.geojson_to_pmtiles.minio_client_pmtiles",
+            new=mocked_minio_client,
+        ),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):
         mock_os = mocker.patch("udata_hydra.utils.minio.os")

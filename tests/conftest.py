@@ -99,6 +99,8 @@ def setup():
         SLEEP_BETWEEN_BATCHES=0,
         WEBHOOK_ENABLED=True,
         SENTRY_DSN=None,
+        # Align download_resource with read_or_download_file basename lookup (or "" uses OS temp vs /tmp).
+        TEMPORARY_DOWNLOAD_FOLDER="/tmp",
     )
     # prevent sentry from sending events in tests (config override is not enough)
     stop_sentry()

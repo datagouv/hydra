@@ -6,14 +6,12 @@ import pytest
 from csv_detective import routine as csv_detective_routine
 
 from tests.conftest import RESOURCE_ID
-from udata_hydra.analysis.csv import (
-    csv_to_db,
-    csv_to_parquet,
-    generate_records,
-)
+from udata_hydra.conversion.csv_to_db import csv_to_db
+from udata_hydra.conversion.csv_to_parquet import csv_to_parquet, tabular_rows_to_parquet
+from udata_hydra.conversion.db_to_parquet import db_to_parquet
 from udata_hydra.db import db_col_name
+from udata_hydra.utils.casting import iter_tabular_rows
 from udata_hydra.utils.minio import MinIOClient
-from udata_hydra.utils.parquet import db_to_parquet, save_as_parquet
 
 pytestmark = pytest.mark.asyncio
 
@@ -26,7 +24,7 @@ pytestmark = pytest.mark.asyncio
         ("catalog.xlsx", 2),
     ),
 )
-async def test_save_as_parquet(file_and_count):
+async def test_tabular_rows_to_parquet(file_and_count):
     filename, expected_count = file_and_count
     file_path = f"tests/data/{filename}"
     inspection = csv_detective_routine(
@@ -38,8 +36,8 @@ async def test_save_as_parquet(file_and_count):
     assert inspection
     columns = inspection["columns"]
     columns = {db_col_name(c): v["python_type"] for c, v in columns.items()}
-    _, table = save_as_parquet(
-        records=generate_records(file_path, inspection),
+    _, table = tabular_rows_to_parquet(
+        rows=iter_tabular_rows(file_path, inspection),
         columns=inspection["columns"],
         output_filename=None,
     )
@@ -67,8 +65,8 @@ async def test_db_to_parquet(clean_db):
         output_filename=None,
     )
 
-    _, table_from_csv = save_as_parquet(
-        records=generate_records(file_path, inspection),
+    _, table_from_csv = tabular_rows_to_parquet(
+        rows=iter_tabular_rows(file_path, inspection),
         columns=inspection["columns"],
         output_filename=None,
     )
@@ -115,7 +113,7 @@ async def test_csv_to_parquet(mocker, parquet_config):
         mocked_minio.bucket_exists.return_value = True
         with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
             mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
-        with patch("udata_hydra.analysis.csv.minio_client", new=mocked_minio_client):
+        with patch("udata_hydra.conversion.csv_to_parquet.minio_client", new=mocked_minio_client):
             result = await execute_csv_to_parquet()
             assert result is not None
             parquet_url, parquet_size = result

@@ -23,7 +23,7 @@ class Resource:
         "CONVERTING_TO_PARQUET": "currently being converted to Parquet",
         "TO_ANALYSE_GEOJSON": "geojson resource content to be analysed",
         "ANALYSING_GEOJSON": "geojson resource content currently being analysed",
-        "CONVERTING_TO_PMTILES": "currently being converted to pmtiles",
+        "CONVERTING_TO_PMTILES": "currently being converted to PMTiles",
         "CONVERTING_TO_GEOJSON": "csv is currently being converted to geojson",
         "TO_ANALYSE_PARQUET": "parquet resource content to be analysed",
         "ANALYSING_PARQUET": "retrieving parquet column metadata",

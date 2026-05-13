@@ -8,7 +8,7 @@ from udata_hydra.utils.reader import Reader
 log = logging.getLogger("udata-hydra")
 
 
-def smart_cast(_type: str, value, cast_json: bool = True, failsafe: bool = False) -> Any:
+def _smart_cast(_type: str, value, cast_json: bool = True, failsafe: bool = False) -> Any:
     try:
         if value is None or value == "":
             return None
@@ -23,7 +23,7 @@ def smart_cast(_type: str, value, cast_json: bool = True, failsafe: bool = False
         return None
 
 
-def generate_records(
+def iter_tabular_rows(
     file_path: str, inspection: dict, cast_json: bool = True, as_dict: bool = False
 ) -> Iterator[list | dict]:
     # because we need the iterator multiple times, not possible to
@@ -34,7 +34,7 @@ def generate_records(
             if line:
                 if not as_dict:
                     yield [
-                        smart_cast(
+                        _smart_cast(
                             _type,
                             value if isinstance(value, str) or value is None else str(value),
                             cast_json=cast_json,
@@ -44,7 +44,7 @@ def generate_records(
                     ]
                 else:
                     yield {
-                        col: smart_cast(
+                        col: _smart_cast(
                             _type,
                             value if isinstance(value, str) or value is None else str(value),
                             cast_json=cast_json,
