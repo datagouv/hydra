@@ -1,8 +1,11 @@
 import importlib.metadata
+import logging
 import os
 import re
 import tomllib
 from pathlib import Path
+
+log = logging.getLogger("udata-hydra")
 
 
 class Configurator:
