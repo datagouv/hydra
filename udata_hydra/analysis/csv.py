@@ -113,17 +113,22 @@ async def analyse_csv(
             ) from e
         timer.mark("csv-inspection")
 
-        await csv_to_db(
-            file_path=tmp_file.name,
-            inspection=csv_inspection,
-            table_name=table_name,
-            table_indexes=table_indexes,
-            resource_id=resource_id,
-            debug_insert=debug_insert,
-        )
-        check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
-        timer.mark("csv-to-db")
-        await insert_tables_index_entry(table_name, csv_inspection, check, dataset_id)
+        if not config.CSV_TO_DB:
+            log.debug(
+                "CSV_TO_DB is off, skipping Postgres parsing table ingest and deferred export jobs."
+            )
+        else:
+            await csv_to_db(
+                file_path=tmp_file.name,
+                inspection=csv_inspection,
+                table_name=table_name,
+                table_indexes=table_indexes,
+                resource_id=resource_id,
+                debug_insert=debug_insert,
+            )
+            check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
+            timer.mark("csv-to-db")
+            await insert_tables_index_entry(table_name, csv_inspection, check, dataset_id)
 
         check = await Check.update(  # type: ignore[assignment]
             check["id"],
@@ -132,32 +137,33 @@ async def analyse_csv(
             },
         )
 
-        if (
-            config.DB_TO_PARQUET
-            and int(csv_inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET
-        ):
-            queue.enqueue(
-                export_csv_parquet,
-                table_name=table_name,
-                inspection=csv_inspection,
-                resource_id=resource_id,
-                check_id=check["id"],
-                url=url,
-                _priority="low",
-                _exception=bool(exception),
-            )
+        if config.CSV_TO_DB:
+            if (
+                config.DB_TO_PARQUET
+                and int(csv_inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET
+            ):
+                queue.enqueue(
+                    export_csv_parquet,
+                    table_name=table_name,
+                    inspection=csv_inspection,
+                    resource_id=resource_id,
+                    check_id=check["id"],
+                    url=url,
+                    _priority="low",
+                    _exception=bool(exception),
+                )
 
-        if config.DB_TO_GEOJSON and _detect_geo_columns(csv_inspection) is not None:
-            queue.enqueue(
-                export_csv_geojson_pmtiles,
-                table_name=table_name,
-                inspection=csv_inspection,
-                resource_id=resource_id,
-                check_id=check["id"],
-                url=url,
-                _priority="low",
-                _exception=bool(exception),
-            )
+            if config.DB_TO_GEOJSON and _detect_geo_columns(csv_inspection) is not None:
+                queue.enqueue(
+                    export_csv_geojson_pmtiles,
+                    table_name=table_name,
+                    inspection=csv_inspection,
+                    resource_id=resource_id,
+                    check_id=check["id"],
+                    url=url,
+                    _priority="low",
+                    _exception=bool(exception),
+                )
 
     except (ParseException, IOException) as e:
         check = await handle_parse_exception(e, table_name, check)  # type: ignore[assignment]
@@ -181,7 +187,11 @@ async def export_parquet_for_csv_resource(
     """
     Export parsed CSV table to Parquet in MinIO and persist URLs on the check.
 
-    Requires config.DB_TO_PARQUET and a populated table from csv_to_db.
+    Orchestrates object storage uploads and check updates. Writing the Parquet
+    file from the database table uses db_to_parquet.
+
+    Requires config.DB_TO_PARQUET and a populated table from csv_to_db when
+    this path is exercised (e.g. from the CSV export RQ worker).
     """
     if not config.DB_TO_PARQUET:
         log.debug("DB_TO_PARQUET turned off, skipping parquet export.")

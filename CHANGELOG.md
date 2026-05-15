@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.10.0 (2026-05-15)
+
+- chore(csv): remove redundant __all__ from csv analysis ([#426](https://github.com/datagouv/hydra/pull/426))
+- feat(analysis): GeoJSON export from DB only in CSV pipeline ([#423](https://github.com/datagouv/hydra/pull/423))
+- refactor(conversion): separate conversion methods into dedicated files in `/conversion` ([#422](https://github.com/datagouv/hydra/pull/422))
+
+
 ## 2.9.0 (2026-05-06)
 
 - feat: generate GeoJSON from PostgreSQL instead of re-reading CSV ([#404](https://github.com/datagouv/hydra/pull/404))

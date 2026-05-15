@@ -1,6 +1,8 @@
+from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 from csv_detective import routine as csv_detective_routine
 
@@ -16,6 +18,10 @@ pytestmark = pytest.mark.asyncio
 
 
 def _reference_table_from_csv(file_path: str, inspection: dict) -> pa.Table:
+    """Build an Arrow table from a tabular file for assertions against ``db_to_parquet`` output.
+
+    Uses ``iter_tabular_rows`` (``cast_json=False``) and ``PYTHON_TYPE_TO_PA`` for schema alignment.
+    """
     rows = list(iter_tabular_rows(file_path, inspection, cast_json=False))
     columns = inspection["columns"]
     return pa.Table.from_pylist(
@@ -24,6 +30,33 @@ def _reference_table_from_csv(file_path: str, inspection: dict) -> pa.Table:
             [pa.field(c, PYTHON_TYPE_TO_PA[columns[c]["python_type"]]) for c in columns]
         ),
     )
+
+
+@pytest.mark.parametrize(
+    "file_and_count",
+    (
+        ("catalog.csv", 2),
+        ("catalog.xls", 2),
+        ("catalog.xlsx", 2),
+    ),
+)
+async def test_reference_table_from_csv(file_and_count):
+    """Catalog fixtures: typed Arrow table row count and Parquet serialization for CSV / XLS / XLSX."""
+    filename, expected_count = file_and_count
+    file_path = f"tests/data/{filename}"
+    inspection = csv_detective_routine(
+        file_path=file_path,
+        output_profile=True,
+        num_rows=-1,
+        save_results=False,
+    )
+    assert inspection
+
+    table = _reference_table_from_csv(file_path, inspection)
+    assert table.num_rows == expected_count
+
+    fake_file = BytesIO()
+    pq.write_table(table, fake_file)
 
 
 async def test_db_to_parquet(clean_db):
@@ -57,7 +90,8 @@ async def test_db_to_parquet(clean_db):
     (
         (False, 1, False),  # DB_TO_PARQUET = False
         (True, 1, True),  # DB_TO_PARQUET = True, MIN_LINES = 1, export runs
-        (True, 3, False),  # DB_TO_PARQUET = True, MIN_LINES = 3, below threshold
+        (True, 10, False),  # MIN_LINES above csv_detective total_lines → skip
+        (True, 3, False),  # MIN_LINES above fixture row count → skip
     ),
 )
 async def test_export_parquet_for_csv_resource(mocker, parquet_config, clean_db):
@@ -101,7 +135,10 @@ async def test_export_parquet_for_csv_resource(mocker, parquet_config, clean_db)
         mocked_minio.bucket_exists.return_value = True
         with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
             mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
-        with patch("udata_hydra.analysis.csv._parquet_minio_client", new=mocked_minio_client):
+        with patch(
+            "udata_hydra.analysis.csv._parquet_minio_client",
+            new=mocked_minio_client,
+        ):
             result = await run_export()
             assert result is not None
             parquet_url, parquet_size = result
