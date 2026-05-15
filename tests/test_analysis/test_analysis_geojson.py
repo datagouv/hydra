@@ -20,7 +20,7 @@ async def test_analyse_geojson_disabled(fake_check):
         mock_func.assert_not_called()
 
 
-async def test_geojson_analysis(setup_catalog, db, fake_check, rmock, produce_mock):
+async def test_analyse_geojson(setup_catalog, db, fake_check, rmock, produce_mock):
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=b"{pretend this is a geojson}")
