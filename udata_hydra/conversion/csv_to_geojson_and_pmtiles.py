@@ -23,10 +23,6 @@ async def csv_to_geojson_and_pmtiles(
     timer: Timer | None = None,
     table_name: str | None = None,
 ) -> tuple[Path, int, str | None, Path, int, str | None] | None:
-    if not config.CSV_TO_GEOJSON and not config.DB_TO_GEOJSON:
-        log.debug("CSV_TO_GEOJSON and DB_TO_GEOJSON turned off, skipping GeoJSON/PMTiles export.")
-        return None
-
     log.debug(
         f"Converting to GeoJSON and PMTiles if relevant for {resource_id} and sending to MinIO."
     )
