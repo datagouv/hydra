@@ -24,10 +24,9 @@ class S3Client:
         self.password = config.S3_SECRET_ACCESS_KEY
         self.bucket = bucket
         self.prefix = _normalize_prefix(prefix)
-        host = config.S3_ENDPOINT or "test"
         self._resource = boto3.resource(
             "s3",
-            endpoint_url=f"https://{host}",
+            endpoint_url=f"https://{config.S3_ENDPOINT or 'test'}",
             aws_access_key_id=self.user or "test",
             aws_secret_access_key=self.password or "test",
             config=Config(**_DEFAULT_BOTO_CONFIG),
