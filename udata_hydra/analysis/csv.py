@@ -137,7 +137,7 @@ async def analyse_csv(
         if config.CSV_TO_DB:
             if (
                 config.DB_TO_PARQUET
-                and int(csv_inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET
+                and int(csv_inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET  # type: ignore[arg-type]
             ):
                 queue.enqueue(
                     export_csv_parquet,
