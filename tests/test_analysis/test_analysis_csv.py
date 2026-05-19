@@ -2,7 +2,7 @@ import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from aiohttp import ClientSession
@@ -468,6 +468,49 @@ async def test_too_long_column_name(
     assert table_name not in [r["table_name"] for r in tables]
 
 
+@pytest.mark.parametrize(
+    "db_to_parquet_enabled, expected_await_count",
+    (
+        (True, 1),
+        (False, 0),
+    ),
+)
+async def test_analyse_csv_db_to_parquet_switch(
+    setup_catalog,
+    rmock,
+    catalog_content,
+    fake_check,
+    produce_mock,
+    db_to_parquet_enabled,
+    expected_await_count,
+):
+    """export_db_to_parquet runs only when DB_TO_PARQUET is enabled (analyse_csv path)."""
+    check = await fake_check()
+    url = check["url"]
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    rmock.get(url, status=200, body=catalog_content)
+
+    with (
+        patch("udata_hydra.config.DB_TO_PARQUET", db_to_parquet_enabled),
+        patch(
+            "udata_hydra.analysis.csv.export_db_to_parquet",
+            new_callable=AsyncMock,
+        ) as mock_export,
+    ):
+        mock_export.return_value = ("https://example.test/fake.parquet", 42)
+        await analyse_csv(check=check)
+
+    assert mock_export.await_count == expected_await_count
+    if db_to_parquet_enabled:
+        mock_export.assert_awaited_once()
+        assert mock_export.await_args is not None
+        kwargs = mock_export.await_args.kwargs
+        assert kwargs["table_name"] == table_name
+        assert kwargs["resource_id"] == RESOURCE_ID
+        assert kwargs["check_id"] == check["id"]
+        assert "inspection" in kwargs
+
+
 async def test_crash_after_db_insertion(
     setup_catalog,
     rmock,
@@ -491,9 +534,12 @@ async def test_crash_after_db_insertion(
         body=("a,b,c\n" + "1,2,3\n" * 200).encode("utf-8"),
         repeat=True,
     )
-    with patch(
-        "udata_hydra.analysis.csv.csv_to_parquet",
-        new=_crash,
+    with (
+        patch("udata_hydra.config.DB_TO_PARQUET", True),
+        patch(
+            "udata_hydra.analysis.csv.export_db_to_parquet",
+            new=_crash,
+        ),
     ):
         # pretend the analysis crashes during parquet conversion
         await analyse_csv(check=check)

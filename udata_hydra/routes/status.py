@@ -186,7 +186,6 @@ async def get_health(request: web.Request) -> web.Response:
             "uptime_since": request.app["started_at"].isoformat(),
             "csv_analysis": config.CSV_ANALYSIS,
             "csv_to_db": config.CSV_TO_DB,
-            "csv_to_parquet": config.CSV_TO_PARQUET,
             "db_to_parquet": config.DB_TO_PARQUET,
             "db_to_geojson": config.DB_TO_GEOJSON,
             "geojson_to_pmtiles": config.GEOJSON_TO_PMTILES,

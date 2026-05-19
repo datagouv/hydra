@@ -7,13 +7,14 @@ from datetime import datetime, timezone
 from asyncpg import Record
 from csv_detective import routine as csv_detective_routine
 from csv_detective import validate_then_detect
+from csv_detective.detection.engine import engine_to_file
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.tables_index import get_previous_analysis, insert_tables_index_entry
 from udata_hydra.conversion.csv_to_db import csv_to_db
-from udata_hydra.conversion.csv_to_parquet import csv_to_parquet
 from udata_hydra.conversion.db_to_geojson_and_pmtiles import db_to_geojson_and_pmtiles
+from udata_hydra.conversion.db_to_parquet import db_to_parquet
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -25,8 +26,13 @@ from udata_hydra.utils import (
     handle_parse_exception,
     remove_remainders,
 )
+from udata_hydra.utils.minio import MinIOClient
 
 log = logging.getLogger("udata-hydra")
+
+_parquet_minio_client = MinIOClient(
+    bucket=config.MINIO_PARQUET_BUCKET, folder=config.MINIO_PARQUET_FOLDER
+)
 
 
 async def analyse_csv(
@@ -104,7 +110,7 @@ async def analyse_csv(
 
         if not config.CSV_TO_DB:
             log.debug(
-                "CSV_TO_DB is off, skipping Postgres parsing table ingest and DB-backed GeoJSON/PMTiles export."
+                "CSV_TO_DB is off, skipping Postgres parsing table ingest, GeoJSON/PMTiles export and Parquet export."
             )
         else:
             await csv_to_db(
@@ -140,24 +146,26 @@ async def analyse_csv(
                     check_id=check["id"],
                 ) from e
 
-        try:
-            await csv_to_parquet(
-                file_path=tmp_file.name,
-                inspection=csv_inspection,
-                resource_id=resource_id,
-                check_id=check["id"],
-                table_name=table_name if config.CSV_TO_DB and config.DB_TO_PARQUET else None,
-            )
-            timer.mark("csv-to-parquet")
-        except Exception as e:
-            remove_remainders(resource_id, ["parquet"])
-            raise ParseException(
-                message=str(e),
-                step="parquet_export",
-                resource_id=resource_id,
-                url=url,
-                check_id=check["id"],
-            ) from e
+            if config.DB_TO_PARQUET:
+                try:
+                    await export_db_to_parquet(
+                        table_name=table_name,
+                        inspection=csv_inspection,
+                        resource_id=resource_id,
+                        check_id=check["id"],
+                    )
+                    timer.mark("csv-to-parquet")
+                except Exception as e:
+                    remove_remainders(resource_id, ["parquet"])
+                    raise ParseException(
+                        message=str(e),
+                        step="parquet_export",
+                        resource_id=resource_id,
+                        url=url,
+                        check_id=check["id"],
+                    ) from e
+            else:
+                log.debug("DB_TO_PARQUET is off, skipping Parquet export.")
 
         check = await Check.update(  # type: ignore[assignment]
             check["id"],
@@ -177,3 +185,51 @@ async def analyse_csv(
 
         # Reset resource status to None
         await Resource.update(resource_id, {"status": None})
+
+
+async def export_db_to_parquet(
+    table_name: str,
+    inspection: dict,
+    resource_id: str | None = None,
+    check_id: int | None = None,
+) -> tuple[str, int] | None:
+    """
+    Build a Parquet file from the parsing table, upload it to object storage,
+    and store parquet_url / parquet_size on the check.
+
+    This orchestrates storage and persistence. For writing only the Parquet
+    file from the database table, see db_to_parquet.
+
+    Requires a populated table from csv_to_db.
+    """
+    if int(inspection.get("total_lines", 0)) < config.MIN_LINES_FOR_PARQUET:
+        log.debug(
+            f"Skipping parquet export for {resource_id} because it has less than "
+            f"{config.MIN_LINES_FOR_PARQUET} lines."
+        )
+        return None
+
+    log.debug(
+        f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
+        f"to parquet for {resource_id} and sending to Minio."
+    )
+
+    if resource_id:
+        await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
+
+    parquet_file, _ = await db_to_parquet(
+        table_name=table_name,
+        inspection=inspection,
+        output_filename=resource_id,
+    )
+    parquet_size: int = os.path.getsize(parquet_file)
+    parquet_url: str = _parquet_minio_client.send_file(parquet_file)
+
+    await Check.update(
+        check_id,
+        {
+            "parquet_url": parquet_url,
+            "parquet_size": parquet_size,
+        },
+    )
+    return parquet_url, parquet_size
