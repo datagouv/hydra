@@ -20,11 +20,11 @@ async def export_csv_parquet(
     url: str,
 ) -> None:
     """RQ target: parquet export for a parsed CSV resource."""
-    from udata_hydra.analysis.csv import export_parquet_for_csv_resource
+    from udata_hydra.analysis.csv import export_db_to_parquet
 
     check_out = None
     try:
-        await export_parquet_for_csv_resource(
+        await export_db_to_parquet(
             table_name=table_name,
             inspection=inspection,
             resource_id=resource_id,

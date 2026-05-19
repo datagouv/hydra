@@ -30,9 +30,6 @@ from udata_hydra.utils import (
 )
 from udata_hydra.utils.minio import MinIOClient
 
-# Re-exported for backwards-compatible imports (e.g. udata_hydra/cli.py).
-__all__ = ["analyse_csv", "csv_detective_routine"]
-
 log = logging.getLogger("udata-hydra")
 
 _parquet_minio_client = MinIOClient(
@@ -178,20 +175,20 @@ async def analyse_csv(
         await Resource.update(resource_id, {"status": None})
 
 
-async def export_parquet_for_csv_resource(
+async def export_db_to_parquet(
     table_name: str,
     inspection: dict,
     resource_id: str | None = None,
     check_id: int | None = None,
 ) -> tuple[str, int] | None:
     """
-    Export parsed CSV table to Parquet in MinIO and persist URLs on the check.
+    Build a Parquet file from the parsing table, upload it to object storage,
+    and store parquet_url / parquet_size on the check.
 
-    Orchestrates object storage uploads and check updates. Writing the Parquet
-    file from the database table uses db_to_parquet.
+    This orchestrates storage and persistence. For writing only the Parquet
+    file from the database table, see db_to_parquet.
 
-    Requires config.DB_TO_PARQUET and a populated table from csv_to_db when
-    this path is exercised (e.g. from the CSV export RQ worker).
+    Requires a populated table from csv_to_db.
     """
     if not config.DB_TO_PARQUET:
         log.debug("DB_TO_PARQUET turned off, skipping parquet export.")
