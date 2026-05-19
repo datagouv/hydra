@@ -30,9 +30,7 @@ from udata_hydra.utils.s3 import S3Client
 
 log = logging.getLogger("udata-hydra")
 
-_parquet_s3_client = S3Client(
-    bucket=config.S3_PARQUET_BUCKET, prefix=config.S3_PARQUET_PREFIX
-)
+_parquet_s3_client = S3Client(bucket=config.S3_PARQUET_BUCKET, prefix=config.S3_PARQUET_PREFIX)
 
 
 async def analyse_csv(

@@ -54,12 +54,10 @@ class S3Client:
         path = Path(file_path)
         if path.is_file():
             file_name = path.name
-            key = f"{self.prefix}/{file_name}" if self.prefix else file_name
-            self._resource.Bucket(self.bucket).upload_file(str(path), key)
+            object_key = f"{self.prefix}/{file_name}" if self.prefix else file_name
+            self._resource.Bucket(self.bucket).upload_file(str(path), object_key)
             if delete_source:
                 path.unlink()
-            if self.prefix:
-                return f"https://{config.S3_ENDPOINT}/{self.bucket}/{self.prefix}/{file_name}"
-            return f"https://{config.S3_ENDPOINT}/{self.bucket}/{file_name}"
+            return f"https://{self.bucket}.{config.S3_ENDPOINT}/{object_key}"
         else:
             raise Exception(f"file '{path}' does not exists")

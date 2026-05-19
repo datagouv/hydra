@@ -125,7 +125,7 @@ async def test_export_db_to_parquet(mocker, parquet_config, clean_db):
         assert await run_export() is None
         check_update.assert_not_called()
     else:
-        s3_endpoint = "s3.example.com"
+        s3_endpoint = "s3-example.com"
         bucket = "bucket"
         mocker.patch("udata_hydra.config.S3_ENDPOINT", s3_endpoint)
         mocked_resource = MagicMock()

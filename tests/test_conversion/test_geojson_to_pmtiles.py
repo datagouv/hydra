@@ -24,7 +24,7 @@ async def test_geojson_to_pmtiles_invalid_geometry():
 
 async def test_geojson_to_pmtiles_valid_geometry(mocker):
     """Test handling of valid geometry"""
-    s3_endpoint = "s3.example.com"
+    s3_endpoint = "s3-example.com"
     bucket = "bucket"
     mocker.patch("udata_hydra.config.S3_ENDPOINT", s3_endpoint)
     mocked_resource = MagicMock()
@@ -71,7 +71,7 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     timer = Timer("geojson-to-pmtiles-performance-test")
 
     # Mock S3 for the test
-    s3_endpoint = "s3.example.com"
+    s3_endpoint = "s3-example.com"
     bucket = "bucket"
     mocker.patch("udata_hydra.config.S3_ENDPOINT", s3_endpoint)
     mocked_resource = MagicMock()

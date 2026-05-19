@@ -12,7 +12,7 @@ from udata_hydra.utils.s3 import S3Client
 
 @pytest.fixture
 def mock_s3(mocker: MockerFixture) -> Iterator[MagicMock]:
-    mocker.patch("udata_hydra.config.S3_ENDPOINT", "s3.example.com")
+    mocker.patch("udata_hydra.config.S3_ENDPOINT", "s3-example.com")
     resource = MagicMock()
     resource.meta.client.head_bucket.return_value = {}
     bucket = MagicMock()
@@ -28,7 +28,7 @@ def test_s3_client_upload_at_bucket_root(mock_s3: MagicMock, tmp_path: Path) -> 
     url = client.send_file(f, delete_source=False)
 
     mock_s3.upload_file.assert_called_once_with(str(f), "file.parquet")
-    assert url == "https://s3.example.com/my-bucket/file.parquet"
+    assert url == "https://s3-example.com/my-bucket/file.parquet"
 
 
 def test_s3_client_upload_with_prefix(mock_s3: MagicMock, tmp_path: Path) -> None:
@@ -38,4 +38,4 @@ def test_s3_client_upload_with_prefix(mock_s3: MagicMock, tmp_path: Path) -> Non
     url = client.send_file(f, delete_source=False)
 
     mock_s3.upload_file.assert_called_once_with(str(f), "exports/file.parquet")
-    assert url == "https://s3.example.com/my-bucket/exports/file.parquet"
+    assert url == "https://s3-example.com/my-bucket/exports/file.parquet"
