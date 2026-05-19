@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.10.1 (2026-05-19)
+
+- feat: db only parquet export ([#424](https://github.com/datagouv/hydra/pull/424))
+- fix(conversion): drop stale CSV_TO_GEOJSON guard in standalone helper
+- test: align test layout with conversion package ([#427](https://github.com/datagouv/hydra/pull/427))
+
+
 ## 2.10.0 (2026-05-15)
 
 - chore(csv): remove redundant __all__ from csv analysis ([#426](https://github.com/datagouv/hydra/pull/426))
