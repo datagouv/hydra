@@ -936,7 +936,6 @@ async def test_analyse_csv_db_to_parquet_switch(
 
     with (
         patch("udata_hydra.config.DB_TO_PARQUET", db_to_parquet_enabled),
-        patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
         patch(
             "udata_hydra.analysis.csv.export_db_to_parquet",
             new_callable=AsyncMock,
