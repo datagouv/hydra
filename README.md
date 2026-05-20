@@ -86,7 +86,7 @@ To empty all the queues:
 
 `uv run rq empty -c udata_hydra.worker low default high`
 
-CSV Parquet and GeoJSON/PMTiles exports from parsed tables are queued as separate jobs on the **`low`** queue (`export_csv_parquet`, `export_csv_geojson_pmtiles`), so you can run dedicated workers or tune capacity for heavy MinIO and tippecanoe work without blocking CSV ingest on **`default`** / **`high`**.
+CSV Parquet and GeoJSON/PMTiles exports from parsed tables are queued as separate jobs on the **`low`** queue (`export_parquet`, `export_geojson_pmtiles`), so you can run dedicated workers or tune capacity for heavy MinIO and tippecanoe work without blocking CSV ingest on **`default`** / **`high`**.
 
 ## 📊 CSV conversion to database
 

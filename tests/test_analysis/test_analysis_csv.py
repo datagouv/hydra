@@ -12,7 +12,7 @@ from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.analysis.csv_exports import export_csv_parquet
+from udata_hydra.analysis.exports import export_parquet
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -183,7 +183,7 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
     async def tracking_parquet_export(*args, **kwargs):
         pass
 
-    mocker.patch("udata_hydra.analysis.csv.export_csv_parquet", tracking_parquet_export)
+    mocker.patch("udata_hydra.analysis.csv.export_parquet", tracking_parquet_export)
 
     def capture_enqueue(fn, *args, **kwargs):
         recorded.append((fn, kwargs.get("_priority")))
@@ -210,7 +210,7 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
 
     assert any(f is tracking_parquet_export and p == "low" for f, p in recorded)
 
-    from udata_hydra.analysis.csv_exports import export_csv_geojson_pmtiles as exp_geo
+    from udata_hydra.analysis.exports import export_geojson_pmtiles as exp_geo
 
     assert not any(f is exp_geo for f, _ in recorded)
 
@@ -542,7 +542,7 @@ async def test_analyse_csv_db_to_parquet_switch(
         await analyse_csv(check=check)
 
     parquet_jobs = [
-        c for c in mock_enqueue.call_args_list if c.args and c.args[0] is export_csv_parquet
+        c for c in mock_enqueue.call_args_list if c.args and c.args[0] is export_parquet
     ]
     assert len(parquet_jobs) == expected_await_count
     if db_to_parquet_enabled:
@@ -566,7 +566,7 @@ async def test_crash_after_db_insertion(
     queued_parquet_kwargs: list[dict] = []
 
     def capture_enqueue(fn, *args, **kwargs):
-        if fn is export_csv_parquet:
+        if fn is export_parquet:
             queued_parquet_kwargs.append(dict(kwargs))
         return MagicMock()
 
@@ -596,7 +596,7 @@ async def test_crash_after_db_insertion(
         "udata_hydra.analysis.csv.export_db_to_parquet",
         new=_crash,
     ):
-        await export_csv_parquet(
+        await export_parquet(
             table_name=job_kw["table_name"],
             inspection=job_kw["inspection"],
             resource_id=job_kw["resource_id"],

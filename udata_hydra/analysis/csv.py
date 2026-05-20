@@ -12,7 +12,7 @@ from csv_detective.detection.engine import engine_to_file
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
-from udata_hydra.analysis.csv_exports import export_csv_geojson_pmtiles, export_csv_parquet
+from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.analysis.tables_index import get_previous_analysis, insert_tables_index_entry
 from udata_hydra.conversion.csv_to_db import csv_to_db
 from udata_hydra.conversion.csv_to_geojson import _detect_geo_columns
@@ -140,7 +140,7 @@ async def analyse_csv(
                 and int(csv_inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET  # type: ignore[arg-type]
             ):
                 queue.enqueue(
-                    export_csv_parquet,
+                    export_parquet,
                     table_name=table_name,
                     inspection=csv_inspection,
                     resource_id=resource_id,
@@ -152,7 +152,7 @@ async def analyse_csv(
 
             if config.DB_TO_GEOJSON and _detect_geo_columns(csv_inspection) is not None:
                 queue.enqueue(
-                    export_csv_geojson_pmtiles,
+                    export_geojson_pmtiles,
                     table_name=table_name,
                     inspection=csv_inspection,
                     resource_id=resource_id,

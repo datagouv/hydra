@@ -1,5 +1,5 @@
 """
-Low-priority RQ jobs: CSV table exports (Parquet, GeoJSON + PMTiles).
+Low-priority RQ jobs: exports from parsed DB tables (Parquet, GeoJSON + PMTiles).
 
 Wrappers delegate to existing conversion helpers and own notify_udata,
 ParseException handling, and resource status cleanup.
@@ -12,7 +12,7 @@ from udata_hydra.db.resource import Resource
 from udata_hydra.utils import ParseException, handle_parse_exception, remove_remainders
 
 
-async def export_csv_parquet(
+async def export_parquet(
     table_name: str,
     inspection: dict,
     resource_id: str,
@@ -52,14 +52,14 @@ async def export_csv_parquet(
         await Resource.update(resource_id, {"status": None})
 
 
-async def export_csv_geojson_pmtiles(
+async def export_geojson_pmtiles(
     table_name: str,
     inspection: dict,
     resource_id: str,
     check_id: int,
     url: str,
 ) -> None:
-    """RQ target: GeoJSON + PMTiles export from a parsed CSV table (single process)."""
+    """RQ target: GeoJSON + PMTiles export for a parsed CSV resource."""
     check_out = None
     try:
         await db_to_geojson_and_pmtiles(
