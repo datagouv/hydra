@@ -3,7 +3,6 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 
 from asyncpg import Record
 from csv_detective import routine as csv_detective_routine
@@ -209,15 +208,10 @@ async def export_db_to_parquet(
     if resource_id:
         await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
 
-    out_base = (
-        str(Path(config.TEMPORARY_DOWNLOAD_FOLDER or "/tmp") / resource_id)
-        if resource_id
-        else resource_id
-    )
     parquet_file, _ = await db_to_parquet(
         table_name=table_name,
         inspection=inspection,
-        output_filename=out_base,
+        output_filename=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
     parquet_url: str = _parquet_minio_client.send_file(parquet_file)
