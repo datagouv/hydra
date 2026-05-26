@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.10.3 (2026-05-26)
+
+- Fix S3 uploads ([#428](https://github.com/datagouv/hydra/pull/428))
+- One bucket per env, prefixes made from file extentions ([#429](https://github.com/datagouv/hydra/pull/429))
+
+
 ## 2.10.2 (2026-05-26)
 
 - docs: fix minor enqueue docstring error
