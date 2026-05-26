@@ -92,6 +92,7 @@ REMOVE_GENERATED_FILES = true
 S3_ENDPOINT = ""
 S3_ACCESS_KEY_ID = ""
 S3_SECRET_ACCESS_KEY = ""
+S3_URL_PATTERN = "https://{endpoint}/{bucket}/{key}"
 
 # -- Parquet conversion settings -- #
 DB_TO_PARQUET = false

@@ -58,6 +58,10 @@ class S3Client:
             self._resource.Bucket(self.bucket).upload_file(str(path), object_key)
             if delete_source:
                 path.unlink()
-            return f"https://{self.bucket}.{config.S3_ENDPOINT}/{object_key}"
+            return config.S3_URL_PATTERN.format(
+                endpoint=config.S3_ENDPOINT,
+                bucket=self.bucket,
+                key=object_key,
+            )
         else:
             raise Exception(f"file '{path}' does not exists")
