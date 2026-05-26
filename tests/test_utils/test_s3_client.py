@@ -39,3 +39,14 @@ def test_s3_client_upload_with_prefix(mock_s3: MagicMock, tmp_path: Path) -> Non
 
     mock_s3.upload_file.assert_called_once_with(str(f), "exports/file.parquet")
     assert url == "https://s3-example.com/my-bucket/exports/file.parquet"
+
+
+def test_s3_client_upload_changed_pattern(mock_s3: MagicMock, tmp_path: Path, mocker) -> None:
+    f = tmp_path / "file.parquet"
+    f.write_bytes(b"x")
+    mocker.patch("udata_hydra.config.S3_URL_PATTERN", "s3://{bucket}:{endpoint}:{key}")
+    client = S3Client(bucket="my-bucket", prefix="exports")
+    url = client.send_file(f, delete_source=False)
+
+    mock_s3.upload_file.assert_called_once_with(str(f), "exports/file.parquet")
+    assert url == "s3://my-bucket:s3-example.com:exports/file.parquet"
