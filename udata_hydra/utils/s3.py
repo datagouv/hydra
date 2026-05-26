@@ -49,14 +49,12 @@ class S3Client:
             raise AttributeError("A bucket has to be specified.")
         path = Path(file_path)
         if path.is_file():
-            file_name = path.name
-            file_ext = file_name.split(".")[-1]
-            object_key = f"{file_ext}/{file_name}"
+            object_key = f"{path.suffix}/{path.name}"
             self._resource.Bucket(self.bucket).upload_file(
                 str(path),
                 object_key,
                 ExtraArgs={
-                    "ContentType": CONTENT_TYPES[file_ext],
+                    "ContentType": CONTENT_TYPES[path.suffix],
                     "ACL": "public-read",
                 },
             )
