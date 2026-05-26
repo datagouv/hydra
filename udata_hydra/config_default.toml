@@ -92,23 +92,18 @@ REMOVE_GENERATED_FILES = true
 S3_ENDPOINT = ""
 S3_ACCESS_KEY_ID = ""
 S3_SECRET_ACCESS_KEY = ""
+S3_BUCKET = ""
 S3_URL_PATTERN = "https://{endpoint}/{bucket}/{key}"
 
 # -- Parquet conversion settings -- #
 DB_TO_PARQUET = false
 MIN_LINES_FOR_PARQUET = 200
-S3_PARQUET_BUCKET = ""
-S3_PARQUET_PREFIX = "" # optional object key prefix, no leading/trailing slash; empty = bucket root
 
 # -- Geojson conversion settings -- #
 DB_TO_GEOJSON = false
-S3_GEOJSON_BUCKET = ""
-S3_GEOJSON_PREFIX = "" # optional object key prefix, no leading/trailing slash; empty = bucket root
 
 # -- PMTiles conversion settings -- #
 GEOJSON_TO_PMTILES = false
-S3_PMTILES_BUCKET = ""
-S3_PMTILES_PREFIX = "" # optional object key prefix, no leading/trailing slash; empty = bucket root
 
 # -- Parquet analysis settings -- #
 PARQUET_TO_DB = false

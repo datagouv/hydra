@@ -49,7 +49,7 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
     with open(f"{RESOURCE_ID}.pmtiles", "rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
-    assert url == f"https://{s3_endpoint}/{bucket}/{RESOURCE_ID}.pmtiles"
+    assert url == f"https://{s3_endpoint}/{bucket}/pmtiles/{RESOURCE_ID}.pmtiles"
     # size slightly differs depending on the env
     assert 850 <= size <= 900
     os.remove(f"{RESOURCE_ID}.pmtiles")
@@ -99,7 +99,7 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     with test_pmtiles_path.open("rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
-    assert pmtiles_url == f"https://{s3_endpoint}/{bucket}/{geojson_path.stem}.pmtiles"
+    assert pmtiles_url == f"https://{s3_endpoint}/{bucket}/pmtiles/{geojson_path.stem}.pmtiles"
 
     # The size should be significantly larger than the small test file
     assert pmtiles_size > 5000  # Should be much larger than the 850-900 range of small file

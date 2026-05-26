@@ -9,7 +9,7 @@ from udata_hydra.utils.s3 import S3Client
 
 log = logging.getLogger("udata-hydra")
 
-s3_client_pmtiles = S3Client(bucket=config.S3_PMTILES_BUCKET, prefix=config.S3_PMTILES_PREFIX)
+s3_client_pmtiles = S3Client(bucket=config.S3_BUCKET)
 
 
 async def geojson_to_pmtiles(

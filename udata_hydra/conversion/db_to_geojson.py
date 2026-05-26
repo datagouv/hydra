@@ -9,7 +9,7 @@ from udata_hydra.utils.s3 import S3Client
 
 log = logging.getLogger("udata-hydra")
 
-s3_client_geojson = S3Client(bucket=config.S3_GEOJSON_BUCKET, prefix=config.S3_GEOJSON_PREFIX)
+s3_client_geojson = S3Client(bucket=config.S3_BUCKET)
 
 
 def _quote_ident(name: str) -> str:
