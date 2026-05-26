@@ -15,20 +15,11 @@ CONTENT_TYPES = {
 }
 
 
-def _normalize_prefix(prefix: str | None) -> str | None:
-    """Return an object key prefix without leading/trailing slashes, or None when unset."""
-    if prefix is None:
-        return None
-    p = prefix.strip().strip("/")
-    return p if p else None
-
-
 class S3Client:
-    def __init__(self, bucket: str, prefix: str | None = None):
+    def __init__(self, bucket: str):
         self.user = config.S3_ACCESS_KEY_ID
         self.password = config.S3_SECRET_ACCESS_KEY
         self.bucket = bucket
-        self.prefix = _normalize_prefix(prefix)
         self._resource = boto3.resource(
             "s3",
             endpoint_url=f"https://{config.S3_ENDPOINT or 'test'}",
@@ -59,12 +50,13 @@ class S3Client:
         path = Path(file_path)
         if path.is_file():
             file_name = path.name
-            object_key = f"{self.prefix}/{file_name}" if self.prefix else file_name
+            file_ext = file_name.split(".")[-1]
+            object_key = f"{file_ext}/{file_name}"
             self._resource.Bucket(self.bucket).upload_file(
                 str(path),
                 object_key,
                 ExtraArgs={
-                    "ContentType": CONTENT_TYPES[file_name.split(".")[-1]],
+                    "ContentType": CONTENT_TYPES[file_ext],
                     "ACL": "public-read",
                 },
             )
