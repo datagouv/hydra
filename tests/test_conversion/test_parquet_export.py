@@ -140,6 +140,6 @@ async def test_export_db_to_parquet(mocker, parquet_config, clean_db):
             result = await run_export()
             assert result is not None
             parquet_url, parquet_size = result
-        assert parquet_url == f"https://{s3_endpoint}/{bucket}/{RESOURCE_ID}.parquet"
+        assert parquet_url == f"https://{s3_endpoint}/{bucket}/parquet/{RESOURCE_ID}.parquet"
         assert isinstance(parquet_size, int)
         check_update.assert_called()
