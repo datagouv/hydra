@@ -22,7 +22,7 @@ async def db_to_geojson_and_pmtiles(
     timer: Timer | None = None,
 ) -> tuple[Path, int, str | None, Path, int, str | None] | None:
     log.debug(
-        f"Converting to GeoJSON and PMTiles if relevant for {resource_id} and sending to MinIO."
+        f"Converting to GeoJSON and PMTiles if relevant for {resource_id} and uploading to S3."
     )
 
     if resource_id:
@@ -39,7 +39,7 @@ async def db_to_geojson_and_pmtiles(
         table_name,
         inspection,
         geojson_filepath,
-        upload_to_minio=True,
+        upload_to_s3=True,
     )
     if result is None:
         return None

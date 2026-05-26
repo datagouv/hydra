@@ -25,7 +25,7 @@ async def test_analyse_geojson(setup_catalog, db, fake_check, rmock, produce_moc
     url = check["url"]
     rmock.get(url, status=200, body=b"{pretend this is a geojson}")
     pmtiles_size = 100
-    pmtiles_url = "http://minio/test.pmtiles"
+    pmtiles_url = "https://bucket.s3-example.com/test.pmtiles"
     with (
         patch("udata_hydra.config.GEOJSON_TO_PMTILES", True),
         patch(

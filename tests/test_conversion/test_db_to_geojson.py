@@ -57,7 +57,7 @@ async def test_db_to_geojson(db, geo_columns, clean_db):
     table_name = "test_geojson_from_db"
     await csv_to_db(fp.name, inspection, table_name)
 
-    result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
+    result = await db_to_geojson(table_name, inspection, output_path, upload_to_s3=False)
     assert result is not None
     geojson_size, geojson_url = result
     assert geojson_url is None
@@ -114,7 +114,7 @@ async def test_db_to_geojson_with_reserved_column(db, clean_db):
     table_name = "test_geojson_reserved_col"
     await csv_to_db(fp.name, inspection, table_name)
 
-    result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
+    result = await db_to_geojson(table_name, inspection, output_path, upload_to_s3=False)
     assert result is not None
     geojson_size, _ = result
 
@@ -167,7 +167,7 @@ async def test_db_to_geojson_with_quote_in_column_name(db, clean_db):
     table_name = "test_geojson_quote_col"
     await csv_to_db(fp.name, inspection, table_name)
 
-    result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
+    result = await db_to_geojson(table_name, inspection, output_path, upload_to_s3=False)
     assert result is not None
 
     with open(output_path) as f:
@@ -215,7 +215,7 @@ async def test_db_to_geojson_lonlat(db, clean_db):
     table_name = "test_geojson_lonlat"
     await csv_to_db(fp.name, inspection, table_name)
 
-    result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
+    result = await db_to_geojson(table_name, inspection, output_path, upload_to_s3=False)
     assert result is not None
 
     with open(output_path) as f:
@@ -269,7 +269,7 @@ async def test_db_to_geojson_geojson_column(db, clean_db):
     table_name = "test_geojson_geojson_col"
     await csv_to_db(fp.name, inspection, table_name)
 
-    result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
+    result = await db_to_geojson(table_name, inspection, output_path, upload_to_s3=False)
     assert result is not None
 
     with open(output_path) as f:
@@ -314,7 +314,7 @@ async def test_db_to_geojson_many_columns(db, clean_db):
     table_name = "test_geojson_many_cols"
     await csv_to_db(fp.name, inspection, table_name)
 
-    result = await db_to_geojson(table_name, inspection, output_path, upload_to_minio=False)
+    result = await db_to_geojson(table_name, inspection, output_path, upload_to_s3=False)
     assert result is not None
 
     with open(output_path) as f:
