@@ -8,13 +8,11 @@ from json_stream import streamable_list
 
 from udata_hydra import config
 from udata_hydra.utils.casting import iter_tabular_rows
-from udata_hydra.utils.minio import MinIOClient
+from udata_hydra.utils.s3 import S3Client
 
 log = logging.getLogger("udata-hydra")
 
-minio_client_geojson = MinIOClient(
-    bucket=config.MINIO_GEOJSON_BUCKET, folder=config.MINIO_GEOJSON_FOLDER
-)
+s3_client_geojson = S3Client(bucket=config.S3_GEOJSON_BUCKET, prefix=config.S3_GEOJSON_PREFIX)
 
 
 def _cast_latlon(latlon: str) -> list[float]:
@@ -58,10 +56,10 @@ async def csv_to_geojson(
     file_path: str,
     inspection: dict,
     output_file_path: Path,
-    upload_to_minio: bool = True,
+    upload_to_s3: bool = True,
 ) -> tuple[int, str | None] | None:
     """
-    Convert a CSV file to GeoJSON format and optionally upload to MinIO.
+    Convert a CSV file to GeoJSON format and optionally upload to S3-compatible storage.
 
     Detects geographical columns (geometry, latlon, lonlat, or lat/lon) and converts
     CSV data to GeoJSON features. Rows with NaN values in geographical columns are skipped.
@@ -70,11 +68,11 @@ async def csv_to_geojson(
         file_path: Target CSV file to convert.
         inspection: CSV detective analysis results with column format detection.
         output_file_path: Path where the GeoJSON file should be saved.
-        upload_to_minio: Whether to upload to MinIO (default: True).
+        upload_to_s3: Whether to upload to S3 (default: True).
 
     Returns:
         geojson_size: Size of the GeoJSON file in bytes.
-        geojson_url: URL of the GeoJSON file on MinIO. None if it was not uploaded to MinIO.
+        geojson_url: Public URL of the GeoJSON object. None if it was not uploaded.
     """
 
     def get_features(
@@ -142,9 +140,9 @@ async def csv_to_geojson(
 
     geojson_size: int = os.path.getsize(output_file_path)
 
-    if upload_to_minio:
-        log.debug(f"Sending GeoJSON file {output_file_path} to MinIO")
-        geojson_url = minio_client_geojson.send_file(str(output_file_path), delete_source=False)
+    if upload_to_s3:
+        log.debug(f"Uploading GeoJSON file {output_file_path} to S3")
+        geojson_url = s3_client_geojson.send_file(str(output_file_path), delete_source=False)
     else:
         geojson_url = None
 

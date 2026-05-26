@@ -5,13 +5,11 @@ from pathlib import Path
 from udata_hydra import config, context
 from udata_hydra.conversion.csv_to_geojson import _detect_geo_columns
 from udata_hydra.db import db_col_name
-from udata_hydra.utils.minio import MinIOClient
+from udata_hydra.utils.s3 import S3Client
 
 log = logging.getLogger("udata-hydra")
 
-minio_client_geojson = MinIOClient(
-    bucket=config.MINIO_GEOJSON_BUCKET, folder=config.MINIO_GEOJSON_FOLDER
-)
+s3_client_geojson = S3Client(bucket=config.S3_GEOJSON_BUCKET, prefix=config.S3_GEOJSON_PREFIX)
 
 
 def _quote_ident(name: str) -> str:
@@ -102,7 +100,7 @@ async def db_to_geojson(
     table_name: str,
     inspection: dict,
     output_file_path: Path,
-    upload_to_minio: bool = True,
+    upload_to_s3: bool = True,
 ) -> tuple[int, str | None] | None:
     """Generate a GeoJSON file by streaming features directly from PostgreSQL.
 
@@ -113,11 +111,11 @@ async def db_to_geojson(
         table_name: Name of the PostgreSQL table containing the CSV data.
         inspection: CSV detective analysis results with column format detection.
         output_file_path: Path where the GeoJSON file should be saved.
-        upload_to_minio: Whether to upload to MinIO (default: True).
+        upload_to_s3: Whether to upload to S3-compatible storage (default: True).
 
     Returns:
         geojson_size: Size of the GeoJSON file in bytes.
-        geojson_url: URL of the GeoJSON file on MinIO. None if not uploaded.
+        geojson_url: Public URL of the GeoJSON object. None if not uploaded.
     """
     geo = _detect_geo_columns(inspection)
     if geo is None:
@@ -144,9 +142,9 @@ async def db_to_geojson(
 
     geojson_size: int = os.path.getsize(output_file_path)
 
-    if upload_to_minio:
-        log.debug(f"Sending GeoJSON file {output_file_path} to MinIO")
-        geojson_url = minio_client_geojson.send_file(str(output_file_path), delete_source=False)
+    if upload_to_s3:
+        log.debug(f"Uploading GeoJSON file {output_file_path} to S3")
+        geojson_url = s3_client_geojson.send_file(str(output_file_path), delete_source=False)
     else:
         geojson_url = None
 

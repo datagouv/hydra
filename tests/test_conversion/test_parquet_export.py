@@ -12,7 +12,7 @@ from udata_hydra.conversion.csv_to_db import csv_to_db
 from udata_hydra.conversion.db_to_parquet import db_to_parquet
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.utils.casting import iter_tabular_rows
-from udata_hydra.utils.minio import MinIOClient
+from udata_hydra.utils.s3 import S3Client
 
 pytestmark = pytest.mark.asyncio
 
@@ -125,22 +125,21 @@ async def test_export_db_to_parquet(mocker, parquet_config, clean_db):
         assert await run_export() is None
         check_update.assert_not_called()
     else:
-        minio_url = "my.minio.fr"
+        s3_endpoint = "s3-example.com"
         bucket = "bucket"
-        folder = "folder"
-        mocker.patch("udata_hydra.config.MINIO_URL", minio_url)
-        mocked_minio = MagicMock()
-        mocked_minio.fput_object.return_value = None
-        mocked_minio.bucket_exists.return_value = True
-        with patch("udata_hydra.utils.minio.Minio", return_value=mocked_minio):
-            mocked_minio_client = MinIOClient(bucket=bucket, folder=folder)
+        mocker.patch("udata_hydra.config.S3_ENDPOINT", s3_endpoint)
+        mocked_resource = MagicMock()
+        mocked_resource.meta.client.head_bucket.return_value = {}
+        mocked_resource.Bucket.return_value = MagicMock()
+        with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
+            mocked_s3_client = S3Client(bucket=bucket)
         with patch(
-            "udata_hydra.analysis.csv._parquet_minio_client",
-            new=mocked_minio_client,
+            "udata_hydra.analysis.csv._parquet_s3_client",
+            new=mocked_s3_client,
         ):
             result = await run_export()
             assert result is not None
             parquet_url, parquet_size = result
-        assert parquet_url == f"https://{minio_url}/{bucket}/{folder}/{RESOURCE_ID}.parquet"
+        assert parquet_url == f"https://{s3_endpoint}/{bucket}/{RESOURCE_ID}.parquet"
         assert isinstance(parquet_size, int)
         check_update.assert_called()

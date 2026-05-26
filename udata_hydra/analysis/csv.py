@@ -26,13 +26,11 @@ from udata_hydra.utils import (
     handle_parse_exception,
     remove_remainders,
 )
-from udata_hydra.utils.minio import MinIOClient
+from udata_hydra.utils.s3 import S3Client
 
 log = logging.getLogger("udata-hydra")
 
-_parquet_minio_client = MinIOClient(
-    bucket=config.MINIO_PARQUET_BUCKET, folder=config.MINIO_PARQUET_FOLDER
-)
+_parquet_s3_client = S3Client(bucket=config.S3_PARQUET_BUCKET, prefix=config.S3_PARQUET_PREFIX)
 
 
 async def analyse_csv(
@@ -211,7 +209,7 @@ async def export_db_to_parquet(
 
     log.debug(
         f"Converting from {engine_to_file.get(inspection.get('engine', ''), 'CSV')} "
-        f"to parquet for {resource_id} and sending to Minio."
+        f"to parquet for {resource_id} and uploading to S3."
     )
 
     if resource_id:
@@ -223,7 +221,7 @@ async def export_db_to_parquet(
         output_filename=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
-    parquet_url: str = _parquet_minio_client.send_file(parquet_file)
+    parquet_url: str = _parquet_s3_client.send_file(parquet_file)
 
     await Check.update(
         check_id,
