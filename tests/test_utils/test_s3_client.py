@@ -33,7 +33,7 @@ def test_s3_client_upload_at_bucket_root(mock_s3: MagicMock, tmp_path: Path) -> 
         ExtraArgs={
             "ContentType": CONTENT_TYPES[f.name.split(".")[-1]],
             "ACL": "public-read",
-        }
+        },
     )
     assert url == "https://s3-example.com/my-bucket/file.parquet"
 
@@ -50,7 +50,7 @@ def test_s3_client_upload_with_prefix(mock_s3: MagicMock, tmp_path: Path) -> Non
         ExtraArgs={
             "ContentType": CONTENT_TYPES[f.name.split(".")[-1]],
             "ACL": "public-read",
-        }
+        },
     )
     assert url == "https://s3-example.com/my-bucket/exports/file.geojson"
 
@@ -68,6 +68,6 @@ def test_s3_client_upload_changed_pattern(mock_s3: MagicMock, tmp_path: Path, mo
         ExtraArgs={
             "ContentType": CONTENT_TYPES[f.name.split(".")[-1]],
             "ACL": "public-read",
-        }
+        },
     )
     assert url == "s3://my-bucket:s3-example.com:exports/file.pmtiles"
