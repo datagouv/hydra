@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.10.2 (2026-05-26)
+
+- docs: fix minor enqueue docstring error
+- feat(s3): S3 Object Storage via boto3 ([#415](https://github.com/datagouv/hydra/pull/415))
+
+
 ## 2.10.1 (2026-05-19)
 
 - feat: db only parquet export ([#424](https://github.com/datagouv/hydra/pull/424))
