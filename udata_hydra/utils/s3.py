@@ -8,6 +8,11 @@ from udata_hydra import config
 
 # Match datagouvfr_data_pipelines S3 defaults for slow networks / large uploads.
 _DEFAULT_BOTO_CONFIG = {"connect_timeout": 3600, "read_timeout": 3600}
+CONTENT_TYPES = {
+    "parquet": "application/vnd.apache.parquet",
+    "geojson": "application/geo+json",
+    "pmtiles": "application/vnd.pmtiles",
+}
 
 
 def _normalize_prefix(prefix: str | None) -> str | None:
@@ -55,7 +60,14 @@ class S3Client:
         if path.is_file():
             file_name = path.name
             object_key = f"{self.prefix}/{file_name}" if self.prefix else file_name
-            self._resource.Bucket(self.bucket).upload_file(str(path), object_key)
+            self._resource.Bucket(self.bucket).upload_file(
+                str(path),
+                object_key,
+                ExtraArgs={
+                    "ContentType": CONTENT_TYPES[file_name.split(".")[-1]],
+                    "ACL": "public-read",
+                },
+            )
             if delete_source:
                 path.unlink()
             return config.S3_URL_PATTERN.format(
