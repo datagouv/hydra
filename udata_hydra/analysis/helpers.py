@@ -64,7 +64,7 @@ async def notify_udata(resource: Record | None, check: Record | dict | None) -> 
             else None,
         },
     }
-    if check.get("parsing_table"):
+    if config.CSV_TO_DB and check.get("parsing_table"):
         payload["document"]["analysis:parsing:parsing_table"] = check.get("parsing_table")
     if config.DB_TO_PARQUET and check.get("parquet_url"):
         payload["document"]["analysis:parsing:parquet_url"] = check.get("parquet_url")
