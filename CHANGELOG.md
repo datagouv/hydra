@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.11.0 (2026-05-27)
+
+- feat(csv): parquet and GeoJSON exports on dedicated RQ queues ([#425](https://github.com/datagouv/hydra/pull/425))
+
+
 ## 2.10.3 (2026-05-26)
 
 - Fix S3 uploads ([#428](https://github.com/datagouv/hydra/pull/428))
