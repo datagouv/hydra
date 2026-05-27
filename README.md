@@ -86,6 +86,8 @@ To empty all the queues:
 
 `uv run rq empty -c udata_hydra.worker low default high`
 
+CSV Parquet and GeoJSON/PMTiles exports from parsed tables are queued as separate jobs on the **`low`** queue (`export_parquet`, `export_geojson_pmtiles`), so you can run dedicated workers or tune capacity for heavy S3 and tippecanoe work without blocking CSV ingest on **`default`** / **`high`**.
+
 ## 📊 CSV conversion to database
 
 Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's the same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.

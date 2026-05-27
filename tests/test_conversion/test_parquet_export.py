@@ -88,10 +88,10 @@ async def test_db_to_parquet(clean_db):
 @pytest.mark.parametrize(
     "parquet_config",
     (
-        # MIN_LINES above csv_detective total_lines → skip before touching Postgres
-        (10, False),  # MIN_LINES_FOR_PARQUET = 10 (> total_lines) → skip
-        (1, True),  # MIN_LINES_FOR_PARQUET = 1 → convert
-        (3, False),  # MIN_LINES_FOR_PARQUET = 3 (> fixture row count) → skip
+        (False, 1, False),  # DB_TO_PARQUET off → no export
+        (True, 10, False),  # MIN_LINES_FOR_PARQUET = 10 (> total_lines) → skip
+        (True, 1, True),  # DB_TO_PARQUET on, MIN_LINES = 1 → convert
+        (True, 3, False),  # MIN_LINES_FOR_PARQUET = 3 (> fixture row count) → skip
     ),
 )
 async def test_export_db_to_parquet(mocker, parquet_config, clean_db):
@@ -104,7 +104,8 @@ async def test_export_db_to_parquet(mocker, parquet_config, clean_db):
     )
     assert inspection
 
-    min_lines_for_parquet_config, expected_conversion = parquet_config
+    db_to_parquet_flag, min_lines_for_parquet_config, expected_conversion = parquet_config
+    mocker.patch("udata_hydra.config.DB_TO_PARQUET", db_to_parquet_flag)
     mocker.patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", min_lines_for_parquet_config)
 
     async def run_export() -> tuple[str, int] | None:
