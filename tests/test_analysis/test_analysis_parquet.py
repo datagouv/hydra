@@ -89,7 +89,7 @@ async def test_analyse_parquet(
 
     # checking table content
     rows = list(await db.fetch(f'SELECT * FROM "{table_name}"'))
-    assert len(rows) == 4
+    assert len(rows) == len(df)
     pgtypes = await db.fetchrow(
         "SELECT "
         + ", ".join([f"pg_typeof({col}) as {col}" for col in expected_types.keys()])
@@ -101,7 +101,7 @@ async def test_analyse_parquet(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
     inspection = json.loads(res["csv_detective"])
-    assert inspection["total_lines"] == 4
+    assert inspection["total_lines"] == len(df)
     assert inspection["header"] == list(df.columns)
 
     for col, types in expected_types.items():
