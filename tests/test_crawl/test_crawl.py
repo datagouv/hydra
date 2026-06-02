@@ -264,7 +264,7 @@ async def test_no_switch_head_to_get(setup_catalog, rmock, produce_mock, analysi
 
 async def test_analyse_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
-    # disable webhook, tested in following test
+    # webhook covered by test_analyse_resource_udata_webhook
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
     check = await fake_check()
@@ -277,35 +277,27 @@ async def test_analyse_resource(setup_catalog, mocker, fake_check):
     assert result["mime_type"] == "text/plain"
 
 
-async def test_analyse_resource_send_udata(setup_catalog, mocker, rmock, fake_check, udata_url):
-    mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
-    rmock.put(udata_url, status=200, repeat=True)
-
-    check = await fake_check()
-    await analyse_resource(check=check, last_check=None)
-
-    req = rmock.requests[("PUT", URL(udata_url))]
-    assert len(req) == 1
-    document = req[0].kwargs["json"]
-    assert document["analysis:content-length"] == len(SIMPLE_CSV_CONTENT)
-    assert document["analysis:mime-type"] == "text/plain"
-
-
-async def test_analyse_resource_send_udata_no_change(
-    setup_catalog, mocker, rmock, fake_check, udata_url
+@pytest.mark.parametrize(
+    "same_checksum,expect_put",
+    [(False, True), (True, False)],
+    ids=["checksum_changed", "checksum_unchanged"],
+)
+async def test_analyse_resource_udata_webhook(
+    setup_catalog, mocker, rmock, fake_check, udata_url, same_checksum, expect_put
 ):
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
-
-    # previous check with same checksum
-    last_check = await fake_check(
-        checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
-    )
+    checksum = hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
+    last_check = await fake_check(checksum=checksum) if same_checksum else None
     check = await fake_check()
     await analyse_resource(check=check, last_check=last_check)
-
-    # udata has not been called
-    assert ("PUT", URL(udata_url)) not in rmock.requests
+    put_key = ("PUT", URL(udata_url))
+    if expect_put:
+        doc = rmock.requests[put_key][0].kwargs["json"]
+        assert doc["analysis:content-length"] == len(SIMPLE_CSV_CONTENT)
+        assert doc["analysis:mime-type"] == "text/plain"
+    else:
+        assert put_key not in rmock.requests
 
 
 async def test_analyse_resource_from_crawl(setup_catalog, rmock, db, udata_url):
