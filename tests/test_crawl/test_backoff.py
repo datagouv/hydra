@@ -12,11 +12,6 @@ from udata_hydra.crawl.check_resources import (
     check_resource,
 )
 
-# TODO: make file content configurable
-SIMPLE_CSV_CONTENT = """code_insee,number
-95211,102
-36522,48"""
-
 pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
 nest_asyncio.apply()
