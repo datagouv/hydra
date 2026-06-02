@@ -1,4 +1,6 @@
 import logging
+from contextlib import contextmanager
+from typing import Iterator
 
 import coloredlogs
 import sentry_sdk
@@ -37,6 +39,20 @@ def setup_logging() -> logging.Logger:
     logging.getLogger("owslib").setLevel("INFO")
     context["inited"] = True
     return log
+
+
+@contextmanager
+def quiet_logs(enabled: bool = True) -> Iterator[None]:
+    """Suppress all log output below ERROR for every logger when enabled."""
+    if not enabled:
+        yield
+        return
+    # disable() takes the cutoff: levels at or below it are suppressed (ERROR+ still pass).
+    logging.disable(logging.WARNING)
+    try:
+        yield
+    finally:
+        logging.disable(logging.NOTSET)
 
 
 class OwsLibPyprojFilter(logging.Filter):

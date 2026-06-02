@@ -34,7 +34,7 @@ from udata_hydra.crawl.check_resources import (
 )
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.logger import setup_logging
+from udata_hydra.logger import quiet_logs, setup_logging
 from udata_hydra.migrations import Migrator
 from udata_hydra.utils import download_file, download_resource
 
@@ -117,76 +117,78 @@ async def _load_catalog(
     quiet: bool = False,
 ):
     """Load the catalog into DB from CSV file"""
-    if quiet:
-        log.setLevel(logging.ERROR)
+    with quiet_logs(enabled=quiet):
+        if not url:
+            url = config.CATALOG_URL
 
-    if not url:
-        url = config.CATALOG_URL
+        if drop_meta or drop_all:
+            dbs = ["main"] if drop_meta else ["main", "csv"]
+            await _drop_dbs(dbs=dbs)
+            await _migrate()
 
-    if drop_meta or drop_all:
-        dbs = ["main"] if drop_meta else ["main", "csv"]
-        await _drop_dbs(dbs=dbs)
-        await _migrate()
+        def iter_with_progressbar_or_quiet(rows, quiet):
+            if quiet:
+                for row in rows:
+                    yield row
+            else:
+                bar = ProgressBar(total=len(rows))
+                for row in bar.iter(rows):
+                    yield row
 
-    def iter_with_progressbar_or_quiet(rows, quiet):
-        if quiet:
-            for row in rows:
-                yield row
-        else:
-            bar = ProgressBar(total=len(rows))
-            for row in bar.iter(rows):
-                yield row
+        try:
+            log.info(f"Downloading resources catalog from {url}...")
+            with NamedTemporaryFile(
+                dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False
+            ) as fd:
+                await download_file(url, fd)
+            log.info("Upserting resources catalog in database...")
+            # consider everything deleted, deleted will be updated when loading new catalog
+            conn = await connection()
+            await conn.execute("UPDATE catalog SET deleted = TRUE")
+            with open(fd.name) as fd:
+                reader = csv.DictReader(fd, delimiter=";")
+                rows = list(reader)
+                for row in iter_with_progressbar_or_quiet(rows, quiet):
+                    if row.get("dataset.archived") != "False":
+                        continue
 
-    try:
-        log.info(f"Downloading resources catalog from {url}...")
-        with NamedTemporaryFile(dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False) as fd:
-            await download_file(url, fd)
-        log.info("Upserting resources catalog in database...")
-        # consider everything deleted, deleted will be updated when loading new catalog
-        conn = await connection()
-        await conn.execute("UPDATE catalog SET deleted = TRUE")
-        with open(fd.name) as fd:
-            reader = csv.DictReader(fd, delimiter=";")
-            rows = list(reader)
-            for row in iter_with_progressbar_or_quiet(rows, quiet):
-                if row.get("dataset.archived") != "False":
-                    continue
-
-                await conn.execute(
-                    """
-                    INSERT INTO catalog (
-                        dataset_id, resource_id, url, type, format,
-                        harvest_modified_at, title, deleted, priority, status
+                    await conn.execute(
+                        """
+                        INSERT INTO catalog (
+                            dataset_id, resource_id, url, type, format,
+                            harvest_modified_at, title, deleted, priority, status
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, FALSE, NULL)
+                        ON CONFLICT (resource_id) DO UPDATE SET
+                            dataset_id = $1,
+                            url = $3,
+                            deleted = FALSE,
+                            type = $4,
+                            format = $5,
+                            harvest_modified_at = $6,
+                            title = $7;
+                    """,
+                        row["dataset.id"],
+                        row["id"],
+                        row["url"],
+                        row["type"],
+                        row["format"],
+                        # force timezone info to UTC (catalog data should be in UTC)
+                        datetime.fromisoformat(row["harvest.modified_at"]).replace(
+                            tzinfo=timezone.utc
+                        )
+                        if row["harvest.modified_at"]
+                        else None,
+                        row["title"],
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, FALSE, NULL)
-                    ON CONFLICT (resource_id) DO UPDATE SET
-                        dataset_id = $1,
-                        url = $3,
-                        deleted = FALSE,
-                        type = $4,
-                        format = $5,
-                        harvest_modified_at = $6,
-                        title = $7;
-                """,
-                    row["dataset.id"],
-                    row["id"],
-                    row["url"],
-                    row["type"],
-                    row["format"],
-                    # force timezone info to UTC (catalog data should be in UTC)
-                    datetime.fromisoformat(row["harvest.modified_at"]).replace(tzinfo=timezone.utc)
-                    if row["harvest.modified_at"]
-                    else None,
-                    row["title"],
-                )
-        log.info("Resources catalog successfully upserted into DB.")
-        cleaned_count: int = await Resource.clean_up_statuses()
-        log.info(f" {cleaned_count} stuck statuses successfully reset to null.")
-    except Exception as e:
-        raise e
-    finally:
-        fd.close()
-        os.unlink(fd.name)
+            log.info("Resources catalog successfully upserted into DB.")
+            cleaned_count: int = await Resource.clean_up_statuses()
+            log.info(f" {cleaned_count} stuck statuses successfully reset to null.")
+        except Exception as e:
+            raise e
+        finally:
+            fd.close()
+            os.unlink(fd.name)
 
 
 @cli.command()
@@ -802,16 +804,14 @@ async def _purge_checks(
     quiet: bool = False,
 ) -> None:
     """Delete outdated checks that are more than `retention_days` days old"""
-    if quiet:
-        log.setLevel(logging.ERROR)
-
-    conn = await connection()
-    log.debug(f"Deleting checks that are more than {retention_days} days old...")
-    res: Record = await conn.fetchrow(
-        f"""WITH deleted AS (DELETE FROM checks WHERE created_at < now() - interval '{retention_days} days' RETURNING *) SELECT count(*) FROM deleted"""
-    )
-    deleted: int = res["count"]
-    log.info(f"Deleted {deleted} checks.")
+    with quiet_logs(enabled=quiet):
+        conn = await connection()
+        log.debug(f"Deleting checks that are more than {retention_days} days old...")
+        res: Record = await conn.fetchrow(
+            f"""WITH deleted AS (DELETE FROM checks WHERE created_at < now() - interval '{retention_days} days' RETURNING *) SELECT count(*) FROM deleted"""
+        )
+        deleted: int = res["count"]
+        log.info(f"Deleted {deleted} checks.")
 
 
 @cli.command()
@@ -832,58 +832,56 @@ async def _purge_csv_tables(
     # And are they necessarily in sync?
 
     # We want to delete all tables which names (from md5(url)) don't match any URL in catalog
-    if quiet:
-        log.setLevel(logging.ERROR)
+    with quiet_logs(enabled=quiet):
+        q_catalog = "SELECT DISTINCT md5(url) AS parsing_table FROM catalog WHERE deleted IS false;"
+        conn_main = await connection()
+        res_catalog: list[Record] = await conn_main.fetch(q_catalog)
+        catalog_tables: set[str] = set([r["parsing_table"] for r in res_catalog])
 
-    q_catalog = "SELECT DISTINCT md5(url) AS parsing_table FROM catalog WHERE deleted IS false;"
-    conn_main = await connection()
-    res_catalog: list[Record] = await conn_main.fetch(q_catalog)
-    catalog_tables: set[str] = set([r["parsing_table"] for r in res_catalog])
+        # only including the parsing tables (hopefully the conditions are restrictive enough)
+        q_tables = f"""SELECT tablename FROM pg_catalog.pg_tables
+        WHERE schemaname = '{config.DATABASE_SCHEMA}'
+        AND LENGTH(tablename) = 32
+        AND tablename ~ '[0-9]';"""
+        conn_csv = await connection(db_name="csv")
+        res_tables: list[Record] = await conn_csv.fetch(q_tables)
+        parsing_tables: set[str] = set([r["tablename"] for r in res_tables])
 
-    # only including the parsing tables (hopefully the conditions are restrictive enough)
-    q_tables = f"""SELECT tablename FROM pg_catalog.pg_tables
-    WHERE schemaname = '{config.DATABASE_SCHEMA}'
-    AND LENGTH(tablename) = 32
-    AND tablename ~ '[0-9]';"""
-    conn_csv = await connection(db_name="csv")
-    res_tables: list[Record] = await conn_csv.fetch(q_tables)
-    parsing_tables: set[str] = set([r["tablename"] for r in res_tables])
+        tables_to_delete: set[str] = parsing_tables - catalog_tables
 
-    tables_to_delete: set[str] = parsing_tables - catalog_tables
-
-    success_count = 0
-    error_count = 0
-    log.debug(f"{len(tables_to_delete)} tables to delete")
-    for table in tables_to_delete:
-        try:
-            async with conn_main.transaction():
-                async with conn_csv.transaction():
-                    log.debug(f'Deleting table "{table}"')
-                    await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
-                    if hard_delete:
-                        await conn_csv.execute(
-                            "DELETE FROM tables_index WHERE parsing_table = $1", table
+        success_count = 0
+        error_count = 0
+        log.debug(f"{len(tables_to_delete)} tables to delete")
+        for table in tables_to_delete:
+            try:
+                async with conn_main.transaction():
+                    async with conn_csv.transaction():
+                        log.debug(f'Deleting table "{table}"')
+                        await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
+                        if hard_delete:
+                            await conn_csv.execute(
+                                "DELETE FROM tables_index WHERE parsing_table = $1", table
+                            )
+                        else:
+                            await conn_csv.execute(
+                                "UPDATE tables_index SET deleted_at = NOW() WHERE parsing_table = $1",
+                                table,
+                            )
+                        await conn_main.execute(
+                            "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
                         )
-                    else:
-                        await conn_csv.execute(
-                            "UPDATE tables_index SET deleted_at = NOW() WHERE parsing_table = $1",
-                            table,
-                        )
-                    await conn_main.execute(
-                        "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-                    )
-                    success_count += 1
-        except Exception as e:
-            error_count += 1
-            log.error(f'Failed to delete table "{table}": {str(e)}')
-            continue
+                        success_count += 1
+            except Exception as e:
+                error_count += 1
+                log.error(f'Failed to delete table "{table}": {str(e)}')
+                continue
 
-    if success_count:
-        log.info(f"Successfully deleted {success_count} table(s).")
-    if error_count:
-        log.warning(f"Failed to delete {error_count} table(s). Check logs for details.")
-    if not (success_count or error_count):
-        log.info("Nothing to delete.")
+        if success_count:
+            log.info(f"Successfully deleted {success_count} table(s).")
+        if error_count:
+            log.warning(f"Failed to delete {error_count} table(s). Check logs for details.")
+        if not (success_count or error_count):
+            log.info("Nothing to delete.")
 
 
 @cli.command()
@@ -1017,55 +1015,53 @@ async def _purge_selected_csv_tables(
     - if they're more than retention_days days old
     - if they're not in the top retention_tables most recent
     """
-    if quiet:
-        log.setLevel(logging.ERROR)
+    with quiet_logs(enabled=quiet):
+        assert retention_days is not None or retention_tables is not None
+        conn_csv = await connection(db_name="csv")
+        if retention_days is not None:
+            threshold = datetime.now(timezone.utc) - timedelta(days=int(retention_days))
+            q = """SELECT DISTINCT parsing_table FROM tables_index WHERE created_at <= $1"""
+            res: list[Record] = await conn_csv.fetch(q, threshold)
+        elif retention_tables is not None:
+            q = """SELECT DISTINCT ON (created_at) parsing_table FROM tables_index ORDER BY created_at DESC OFFSET $1"""
+            res: list[Record] = await conn_csv.fetch(q, int(retention_tables))
 
-    assert retention_days is not None or retention_tables is not None
-    conn_csv = await connection(db_name="csv")
-    if retention_days is not None:
-        threshold = datetime.now(timezone.utc) - timedelta(days=int(retention_days))
-        q = """SELECT DISTINCT parsing_table FROM tables_index WHERE created_at <= $1"""
-        res: list[Record] = await conn_csv.fetch(q, threshold)
-    elif retention_tables is not None:
-        q = """SELECT DISTINCT ON (created_at) parsing_table FROM tables_index ORDER BY created_at DESC OFFSET $1"""
-        res: list[Record] = await conn_csv.fetch(q, int(retention_tables))
+        tables_to_delete: list[str] = [r["parsing_table"] for r in res]
 
-    tables_to_delete: list[str] = [r["parsing_table"] for r in res]
+        success_count = 0
+        error_count = 0
+        conn_main = await connection()
+        for table in tables_to_delete:
+            try:
+                async with conn_main.transaction():
+                    async with conn_csv.transaction():
+                        log.debug(f'Deleting table "{table}"')
+                        await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
+                        await conn_csv.execute(
+                            "DELETE FROM tables_index WHERE parsing_table = $1", table
+                        )
+                        await conn_main.execute(
+                            "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
+                        )
+                        success_count += 1
+            except Exception as e:
+                error_count += 1
+                log.error(f'Failed to delete table "{table}": {str(e)}')
+                continue
 
-    success_count = 0
-    error_count = 0
-    conn_main = await connection()
-    for table in tables_to_delete:
-        try:
-            async with conn_main.transaction():
-                async with conn_csv.transaction():
-                    log.debug(f'Deleting table "{table}"')
-                    await conn_csv.execute(f'DROP TABLE IF EXISTS "{table}"')
-                    await conn_csv.execute(
-                        "DELETE FROM tables_index WHERE parsing_table = $1", table
-                    )
-                    await conn_main.execute(
-                        "UPDATE checks SET parsing_table = NULL WHERE parsing_table = $1", table
-                    )
-                    success_count += 1
-        except Exception as e:
-            error_count += 1
-            log.error(f'Failed to delete table "{table}": {str(e)}')
-            continue
-
-    if success_count:
-        log.info(f"Successfully deleted {success_count} table(s).")
-    if error_count:
-        log.warning(f"Failed to delete {error_count} table(s). Check logs for details.")
-    if not (success_count or error_count):
-        log.info("Nothing to delete.")
+        if success_count:
+            log.info(f"Successfully deleted {success_count} table(s).")
+        if error_count:
+            log.warning(f"Failed to delete {error_count} table(s). Check logs for details.")
+        if not (success_count or error_count):
+            log.info("Nothing to delete.")
 
 
 @cli.command()
 def purge_selected_csv_tables(
     retention_days: int | None = None,
     retention_tables: int | None = None,
-    quiet: bool = False,
+    quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
 ) -> Coroutine[Any, Any, None]:
     """Delete converted CSV tables either:
     - if they're more than retention_days days old
