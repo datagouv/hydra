@@ -446,46 +446,53 @@ async def test_no_change_analysis_harvested(
     assert res[0]["detected_last_modified_at"] == last_modfied_at
 
 
-async def test_change_analysis_last_modified_header_twice(
-    setup_catalog, rmock, fake_check, udata_url
+@pytest.mark.parametrize(
+    "head_last_modified,expect_put,expected_modified_at,use_detected_at",
+    [
+        ("Thu, 09 Jan 2020 09:33:37 GMT", False, None, False),
+        ("2020-01-09T09:33:37+04:00", True, "2020-01-09T09:33:37+04:00", True),
+    ],
+    ids=["same_instant_rfc822", "same_instant_different_offset"],
+)
+async def test_change_analysis_last_modified_no_reanalysis(
+    setup_catalog,
+    rmock,
+    fake_check,
+    udata_url,
+    head_last_modified,
+    expect_put,
+    expected_modified_at,
+    use_detected_at,
 ):
-    _date = "Thu, 09 Jan 2020 09:33:37 GMT"
-    await fake_check(
-        headers={"last-modified": _date, "content-type": "application/json"},
-        created_at=datetime.now() - timedelta(days=10),
-    )
+    created_at = datetime.now() - timedelta(days=10)
+    json_headers = {"content-type": "application/json"}
+    if use_detected_at:
+        await fake_check(
+            detected_last_modified_at=datetime.fromisoformat("2020-01-09T09:33:37+01:00"),
+            created_at=created_at,
+            headers=json_headers,
+        )
+    else:
+        await fake_check(
+            headers=json_headers | {"last-modified": head_last_modified},
+            created_at=created_at,
+        )
     rmock.head(
         RESOURCE_URL,
-        headers={"last-modified": _date, "content-type": "application/json"},
+        headers=json_headers | {"last-modified": head_last_modified},
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     await start_checks(iterations=1)
-    # udata has not been called: not first check, outdated check, and last-modified stayed the same
-    assert ("PUT", URL(udata_url)) not in rmock.requests
-
-
-async def test_change_analysis_last_modified_header_twice_tz(
-    setup_catalog, rmock, fake_check, udata_url
-):
-    _date_1 = "2020-01-09T09:33:37+01:00"
-    _date_2 = "2020-01-09T09:33:37+04:00"
-    await fake_check(
-        detected_last_modified_at=datetime.fromisoformat(_date_1),
-        created_at=datetime.now() - timedelta(days=10),
-        headers={"content-type": "application/json"},
-    )
-    rmock.head(
-        RESOURCE_URL,
-        headers={"last-modified": _date_2, "content-type": "application/json"},
-    )
-    rmock.get(RESOURCE_URL)
-    rmock.put(udata_url, repeat=True)
-    await start_checks(iterations=1)
-    # udata has been called: last-modified has changed (different timezones)
-    assert ("PUT", URL(udata_url)) in rmock.requests
-    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
-    assert webhook.get("analysis:last-modified-at") == _date_2
+    put_key = ("PUT", URL(udata_url))
+    if expect_put:
+        assert put_key in rmock.requests
+        assert (
+            rmock.requests[put_key][0].kwargs["json"].get("analysis:last-modified-at")
+            == expected_modified_at
+        )
+    else:
+        assert put_key not in rmock.requests
 
 
 @pytest.mark.parametrize(
