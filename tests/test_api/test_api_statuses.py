@@ -3,6 +3,7 @@ NB: we can't use pytest-aiohttp helpers because
 it will interfere with the rest of our async code
 """
 
+import platform
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -92,3 +93,5 @@ async def test_get_stats(setup_catalog, client, fake_check):
 async def test_get_health(client) -> None:
     resp = await client.get("/api/health")
     assert resp.status == 200
+    data = await resp.json()
+    assert data["python_version"] == platform.python_version()

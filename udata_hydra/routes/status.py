@@ -1,3 +1,4 @@
+import platform
 from datetime import datetime, timezone
 
 from aiohttp import web
@@ -182,6 +183,7 @@ async def get_health(request: web.Request) -> web.Response:
     return web.json_response(
         {
             "version": config.APP_VERSION,
+            "python_version": platform.python_version(),
             "environment": config.ENVIRONMENT or "unknown",
             "uptime_since": request.app["started_at"].isoformat(),
             "csv_analysis": config.CSV_ANALYSIS,
