@@ -70,7 +70,9 @@ async def analyse_parquet(
         try:
             parquet_file = pq.ParquetFile(tmp_file.name)
             columns = {}
+            inspection = {"header": []}
             for col in parquet_file.schema_arrow:
+                inspection["header"].append(col.name)
                 col_type = str(col.type)
                 if col_type.startswith("dictionary"):
                     # dictionaries are for columns with repeated values
@@ -84,14 +86,12 @@ async def analyse_parquet(
                     )
                 except StopIteration:
                     raise ValueError(f"Unknown pyarrow type: {col.type}")
-            inspection = {
-                "columns": {
-                    col_name: {
-                        "format": pytype,
-                        "python_type": pytype,
-                    }
-                    for col_name, pytype in columns.items()
+            inspection["columns"] = {
+                col_name: {
+                    "format": pytype,
+                    "python_type": pytype,
                 }
+                for col_name, pytype in columns.items()
             }
             inspection["total_lines"] = parquet_file.metadata.num_rows
         except Exception as e:
