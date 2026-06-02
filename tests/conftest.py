@@ -361,3 +361,26 @@ def udata_resource_payload():
             "last_modified": datetime.now().isoformat(),
         },
     }
+
+
+@pytest.fixture
+def udata_update_resource_payload():
+    return {
+        "resource_id": RESOURCE_ID,
+        "dataset_id": DATASET_ID,
+        "document": {
+            "id": RESOURCE_ID,
+            "url": RESOURCE_URL,
+            "title": "random title",
+            "description": "random description",
+            "filetype": "file",
+            "type": "documentation",
+            "format": "pdf",
+            "mime": "text/plain",
+            "filesize": 1024,
+            "checksum_type": "sha1",
+            "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
+            "created_at": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat(),
+        },
+    }
