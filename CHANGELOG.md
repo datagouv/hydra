@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.12 (2026-06-02)
+
+- feat(status): include python version in health endpoint ([#433](https://github.com/datagouv/hydra/pull/433))
+- perf: use Python 3.14 ([#378](https://github.com/datagouv/hydra/pull/378))
+
+
 ## 2.11.1 (2026-06-02)
 
 - Add `header` field to parquet analysis ([#431](https://github.com/datagouv/hydra/pull/431))
