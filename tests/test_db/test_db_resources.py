@@ -11,20 +11,17 @@ pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
 
-async def test_catalog(setup_catalog, db):
+async def test_catalog_deleted(setup_catalog, db, rmock):
     res = await db.fetch(
         "SELECT * FROM catalog WHERE resource_id = $1",
         RESOURCE_ID,
     )
     # Only one resource because the other belonged to an archived dataset
     assert len(res) == 1
-    resource = res[0]
-    assert resource["url"] == RESOURCE_URL
-    assert resource["dataset_id"] == DATASET_ID
-    assert resource["status"] is None
+    assert res[0]["url"] == RESOURCE_URL
+    assert res[0]["dataset_id"] == DATASET_ID
+    assert res[0]["status"] is None
 
-
-async def test_catalog_deleted(setup_catalog, db, rmock):
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE")
     assert len(res) == 1
     with open("tests/data/catalog.csv", "rb") as cfile:

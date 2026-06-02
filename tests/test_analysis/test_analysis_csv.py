@@ -171,49 +171,6 @@ async def test_analyse_csv_send_udata_webhook(
         assert webhook.get(f"analysis:parsing:{k}", False) is None
 
 
-async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
-    mocker, setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
-):
-    """Parquet export is scheduled on the low RQ queue (CSV geo export disabled)."""
-    import asyncio
-
-    recorded: list[tuple[object, str | None]] = []
-
-    async def tracking_parquet_export(*args, **kwargs):
-        pass
-
-    mocker.patch("udata_hydra.analysis.csv.export_parquet", tracking_parquet_export)
-
-    def capture_enqueue(fn, *args, **kwargs):
-        recorded.append((fn, kwargs.get("_priority")))
-        kwargs = dict(kwargs)
-        kwargs.pop("_priority", None)
-        kwargs.pop("_exception", None)
-        result = fn(*args, **kwargs)
-        if asyncio.iscoroutine(result):
-            loop = asyncio.get_running_loop()
-            return loop.run_until_complete(result)
-        return result
-
-    mocker.patch("udata_hydra.utils.queue.enqueue", capture_enqueue)
-
-    check = await fake_check()
-    url = check["url"]
-    rmock.get(url, status=200, body=catalog_content)
-    with (
-        patch("udata_hydra.config.DB_TO_PARQUET", True),
-        patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
-        patch("udata_hydra.config.DB_TO_GEOJSON", False),
-    ):
-        await analyse_csv(check=check)
-
-    assert any(f is tracking_parquet_export and p == "low" for f, p in recorded)
-
-    from udata_hydra.analysis.exports import export_geojson_pmtiles as exp_geo
-
-    assert not any(f is exp_geo for f, _ in recorded)
-
-
 @pytest.mark.parametrize(
     "forced_analysis",
     (
@@ -512,22 +469,27 @@ async def test_too_long_column_name(
 
 
 @pytest.mark.parametrize(
-    "db_to_parquet_enabled, expected_await_count",
+    "db_to_parquet_enabled, expected_parquet_jobs",
     (
-        (True, 1),
-        (False, 0),
+        pytest.param(True, 1, id="enabled"),
+        pytest.param(False, 0, id="disabled"),
     ),
 )
-async def test_analyse_csv_db_to_parquet_switch(
+async def test_analyse_csv_parquet_export_enqueue(
+    mocker,
     setup_catalog,
     rmock,
     catalog_content,
     fake_check,
     produce_mock,
     db_to_parquet_enabled,
-    expected_await_count,
+    expected_parquet_jobs,
 ):
-    """Parquet export is scheduled when DB_TO_PARQUET is enabled (low-priority enqueue path)."""
+    """Parquet export enqueue respects DB_TO_PARQUET, uses low priority, skips geo export."""
+    from udata_hydra.analysis.exports import export_geojson_pmtiles as exp_geo
+
+    mock_enqueue = mocker.patch("udata_hydra.analysis.csv.queue.enqueue")
+
     check = await fake_check()
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
@@ -536,16 +498,19 @@ async def test_analyse_csv_db_to_parquet_switch(
     with (
         patch("udata_hydra.config.DB_TO_PARQUET", db_to_parquet_enabled),
         patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
-        patch("udata_hydra.analysis.csv.queue.enqueue") as mock_enqueue,
+        patch("udata_hydra.config.DB_TO_GEOJSON", False),
     ):
         await analyse_csv(check=check)
 
     parquet_jobs = [
         c for c in mock_enqueue.call_args_list if c.args and c.args[0] is export_parquet
     ]
-    assert len(parquet_jobs) == expected_await_count
+    assert len(parquet_jobs) == expected_parquet_jobs
+    assert not any(c.args and c.args[0] is exp_geo for c in mock_enqueue.call_args_list)
+
     if db_to_parquet_enabled:
         kw = parquet_jobs[0].kwargs
+        assert kw["_priority"] == "low"
         assert kw["table_name"] == table_name
         assert kw["resource_id"] == RESOURCE_ID
         assert kw["check_id"] == check["id"]

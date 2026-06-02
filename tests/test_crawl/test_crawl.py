@@ -496,25 +496,59 @@ async def test_change_analysis_last_modified_header_twice_tz(
     assert webhook.get("analysis:last-modified-at") == _date_2
 
 
-async def test_check_changed_content_length_header(setup_catalog, rmock, fake_check, udata_url):
+@pytest.mark.parametrize(
+    "header_name, head_header_value, expected_webhook_value",
+    [
+        pytest.param("content-length", "15", 15, id="content_length_changed"),
+        pytest.param("content-type", "text/csv", "text/csv", id="content_type_changed"),
+    ],
+)
+async def test_check_changed_header(
+    setup_catalog,
+    rmock,
+    fake_check,
+    udata_url,
+    header_name,
+    head_header_value,
+    expected_webhook_value,
+):
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
     )
     rmock.head(
         RESOURCE_URL,
-        headers={"content-length": "15", "content-type": "application/json"},
+        headers={
+            header_name: head_header_value,
+            "content-length": "10" if header_name != "content-length" else head_header_value,
+            "content-type": "application/json"
+            if header_name != "content-type"
+            else head_header_value,
+        },
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     await start_checks(iterations=1)
-    # udata has been called in compute_check_has_changed: content-length has changed
     assert ("PUT", URL(udata_url)) in rmock.requests
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
-    assert webhook.get("check:headers:content-length") == 15
+    assert webhook.get(f"check:headers:{header_name}") == expected_webhook_value
 
 
-async def test_no_check_changed_content_length_header(setup_catalog, rmock, fake_check, udata_url):
+@pytest.mark.parametrize(
+    "header_name, head_header_value",
+    [
+        pytest.param("content-length", "10", id="content_length_unchanged"),
+        pytest.param("content-type", "application/json", id="content_type_unchanged"),
+    ],
+)
+async def test_no_check_changed_header(
+    setup_catalog,
+    rmock,
+    fake_check,
+    udata_url,
+    header_name,
+    head_header_value,
+):
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
@@ -522,47 +556,17 @@ async def test_no_check_changed_content_length_header(setup_catalog, rmock, fake
     )
     rmock.head(
         RESOURCE_URL,
-        headers={"content-length": "10", "content-type": "application/json"},
+        headers={
+            header_name: head_header_value,
+            "content-length": "10" if header_name != "content-length" else head_header_value,
+            "content-type": "application/json"
+            if header_name != "content-type"
+            else head_header_value,
+        },
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     await start_checks(iterations=1)
-    # udata has not been called: not first check, outdated check, and content-length stayed the same
-    assert ("PUT", URL(udata_url)) not in rmock.requests
-
-
-async def test_check_changed_content_type_header(setup_catalog, rmock, fake_check, udata_url):
-    await fake_check(
-        created_at=datetime.now() - timedelta(days=10),
-        headers={"content-type": "application/json", "content-length": "10"},
-    )
-    rmock.head(
-        RESOURCE_URL,
-        headers={"content-length": "10", "content-type": "text/csv"},
-    )
-    rmock.get(RESOURCE_URL)
-    rmock.put(udata_url, repeat=True)
-    await start_checks(iterations=1)
-    # udata has been called in compute_check_has_changed: content-type has changed
-    assert ("PUT", URL(udata_url)) in rmock.requests
-    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
-    assert webhook.get("check:headers:content-type") == "text/csv"
-
-
-async def test_no_check_changed_content_type_header(setup_catalog, rmock, fake_check, udata_url):
-    await fake_check(
-        created_at=datetime.now() - timedelta(days=10),
-        headers={"content-type": "application/json", "content-length": "10"},
-        detected_last_modified_at=datetime.now() - timedelta(days=20),
-    )
-    rmock.head(
-        RESOURCE_URL,
-        headers={"content-length": "10", "content-type": "application/json"},
-    )
-    rmock.get(RESOURCE_URL)
-    rmock.put(udata_url, repeat=True)
-    await start_checks(iterations=1)
-    # udata has not been called: not first check, outdated check, and content-type remained the same
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
