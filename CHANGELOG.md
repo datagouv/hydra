@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.11.1 (2026-06-02)
+
+- Add `header` field to parquet analysis ([#431](https://github.com/datagouv/hydra/pull/431))
+- fix(cli): apply --quiet to all loggers globally ([#432](https://github.com/datagouv/hydra/pull/432))
+
+
 ## 2.11.0 (2026-05-27)
 
 - feat(csv): parquet and GeoJSON exports on dedicated RQ queues ([#425](https://github.com/datagouv/hydra/pull/425))
