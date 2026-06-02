@@ -162,3 +162,31 @@ async def test_parquet_to_db_copy_failure_raises_parse_exception(mocker):
             resource_id=RESOURCE_ID,
         )
     assert exc.value.step == "copy_records_to_table"
+
+
+async def test_parquet_to_db_create_table_failure_raises_parse_exception(mocker):
+    """Wrap CREATE TABLE failures in a ParseException for consistent error handling."""
+    mock_pool = mocker.MagicMock()
+
+    async def execute(q: str, *args: object) -> None:
+        if "CREATE TABLE" in q.upper():
+            raise RuntimeError("ddl failed")
+
+    mock_pool.execute = mocker.AsyncMock(side_effect=execute)
+    mocker.patch(
+        "udata_hydra.conversion.parquet_to_db.context.pool",
+        new=mocker.AsyncMock(return_value=mock_pool),
+    )
+    mocker.patch("udata_hydra.conversion.parquet_to_db.Resource.update", new=mocker.AsyncMock())
+    inspection = {
+        "columns": {"name": {"python_type": "string", "format": set()}},
+        "total_lines": 1,
+    }
+    with pytest.raises(ParseException) as exc:
+        await parquet_to_db(
+            _parquet_file(pd.DataFrame({"name": ["Marie"]})),
+            inspection,
+            "create_fail_tbl",
+            resource_id=RESOURCE_ID,
+        )
+    assert exc.value.step == "create_table_query"
