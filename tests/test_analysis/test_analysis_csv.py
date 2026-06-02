@@ -20,9 +20,8 @@ from udata_hydra.db.resource import Resource
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.parametrize("debug_insert", [True, False])
 async def test_analyse_csv_on_catalog(
-    setup_catalog, rmock, catalog_content, db, debug_insert, fake_check, produce_mock
+    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
 ):
     check = await fake_check()
     url = check["url"]

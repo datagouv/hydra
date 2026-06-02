@@ -11,14 +11,24 @@ pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
 
-async def test_csv_analysis_from_check_id(
-    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
+@pytest.mark.parametrize(
+    "entry_mode",
+    [
+        pytest.param("check_id", id="check_id"),
+        pytest.param("url", id="url"),
+    ],
+)
+async def test_csv_analysis_from_catalog(
+    setup_catalog, rmock, catalog_content, fake_check, produce_mock, entry_mode
 ):
-    """Test the analyse-csv CLI command using check_id"""
+    """Test the analyse-csv CLI command using check_id or URL for a catalog resource."""
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
-    await analyse_csv_cli(check_id=str(check["id"]))
+    if entry_mode == "check_id":
+        await analyse_csv_cli(check_id=str(check["id"]))
+    else:
+        await analyse_csv_cli(check_id=None, url=url, debug_insert=False)
 
 
 async def test_csv_analysis_with_debug_insert(setup_catalog, rmock, db, fake_check, produce_mock):
@@ -51,16 +61,6 @@ async def test_csv_analysis_with_debug_insert(setup_catalog, rmock, db, fake_che
     assert len(table_data) == 3  # Should have 3 rows
     assert table_data[0]["name"] == "Alice"
     assert table_data[0]["value"] == 42
-
-
-async def test_csv_analysis_from_url(
-    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
-):
-    """Test the analyse-csv CLI command using URL, with an existing check"""
-    check = await fake_check()
-    url = check["url"]
-    rmock.get(url, status=200, body=catalog_content)
-    await analyse_csv_cli(check_id=None, url=url, debug_insert=False)
 
 
 async def test_csv_analysis_from_external_url(setup_catalog, rmock, db, produce_mock):

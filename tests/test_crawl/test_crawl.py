@@ -235,18 +235,19 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
-async def test_switch_head_to_get(setup_catalog, rmock, produce_mock):
+@pytest.mark.parametrize(
+    "head_status,head_headers",
+    [
+        pytest.param(501, None, id="invalid_status"),
+        pytest.param(200, {}, id="missing_size_headers"),
+    ],
+)
+async def test_switch_head_to_get(setup_catalog, rmock, produce_mock, head_status, head_headers):
     rurl = RESOURCE_URL
-    rmock.head(rurl, status=501)
-    rmock.get(rurl, status=200)
-    await start_checks(iterations=1)
-    assert ("HEAD", URL(rurl)) in rmock.requests
-    assert ("GET", URL(rurl)) in rmock.requests
-
-
-async def test_switch_head_to_get_headers(setup_catalog, rmock, produce_mock):
-    rurl = RESOURCE_URL
-    rmock.head(rurl, status=200, headers={})
+    head_kwargs = {"status": head_status}
+    if head_headers is not None:
+        head_kwargs["headers"] = head_headers
+    rmock.head(rurl, **head_kwargs)
     rmock.get(rurl, status=200)
     await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
