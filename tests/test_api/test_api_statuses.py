@@ -3,9 +3,12 @@ NB: we can't use pytest-aiohttp helpers because
 it will interfere with the rest of our async code
 """
 
+import platform
 from datetime import datetime, timedelta, timezone
 
 import pytest
+
+from udata_hydra import config
 
 pytestmark = pytest.mark.asyncio
 
@@ -92,3 +95,17 @@ async def test_get_stats(setup_catalog, client, fake_check):
 async def test_get_health(client) -> None:
     resp = await client.get("/api/health")
     assert resp.status == 200
+    data = await resp.json()
+
+    datetime.fromisoformat(data.pop("uptime_since"))
+    assert data == {
+        "version": config.APP_VERSION,
+        "python_version": platform.python_version(),
+        "environment": config.ENVIRONMENT or "unknown",
+        "csv_analysis": config.CSV_ANALYSIS,
+        "csv_to_db": config.CSV_TO_DB,
+        "db_to_parquet": config.DB_TO_PARQUET,
+        "db_to_geojson": config.DB_TO_GEOJSON,
+        "geojson_to_pmtiles": config.GEOJSON_TO_PMTILES,
+        "parquet_to_db": config.PARQUET_TO_DB,
+    }
