@@ -649,6 +649,27 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     assert updated_check["parsing_error"] is not None
 
 
+async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, fake_check, mocker):
+    """When GeoJSON/PMTiles export succeeds, notify udata and clear the resource status."""
+    check = await fake_check()
+    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PMTILES"})
+    notify_udata = mocker.patch(
+        "udata_hydra.analysis.exports.helpers.notify_udata",
+        new=mocker.AsyncMock(),
+    )
+    mocker.patch(
+        "udata_hydra.analysis.exports.db_to_geojson_and_pmtiles",
+        new=mocker.AsyncMock(),
+    )
+
+    await export_geojson_pmtiles("tbl", {}, RESOURCE_ID, check["id"], check["url"])
+
+    notify_udata.assert_awaited_once()
+    resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
+    assert resource["status"] is None
+
+
 async def test_file_with_nan(
     setup_catalog,
     rmock,
