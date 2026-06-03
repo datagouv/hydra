@@ -29,6 +29,9 @@ RESOURCE_EXCEPTION_TABLE_INDEXES = {"Nom": "index", "N° de certificat": "index"
 RESOURCE_URL = "https://example.com/resource-1"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 NOT_EXISTING_RESOURCE_ID = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
+SIMPLE_CSV_CONTENT = """code_insee,number
+95211,102
+36522,48"""
 pytestmark = pytest.mark.asyncio
 
 # nest_asyncio2 skips _patch_loop() in Python 3.14 when no event loop is running
@@ -351,6 +354,29 @@ def udata_resource_payload():
             "format": "pdf",
             "mime": "text/plain",
             "schema": None,
+            "filesize": 1024,
+            "checksum_type": "sha1",
+            "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
+            "created_at": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat(),
+        },
+    }
+
+
+@pytest.fixture
+def udata_update_resource_payload():
+    return {
+        "resource_id": RESOURCE_ID,
+        "dataset_id": DATASET_ID,
+        "document": {
+            "id": RESOURCE_ID,
+            "url": RESOURCE_URL,
+            "title": "random title",
+            "description": "random description",
+            "filetype": "file",
+            "type": "documentation",
+            "format": "pdf",
+            "mime": "text/plain",
             "filesize": 1024,
             "checksum_type": "sha1",
             "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",

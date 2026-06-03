@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import nest_asyncio2 as nest_asyncio
 import pytest
+import pytest_asyncio
 from asyncpg.exceptions import UndefinedTableError
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
@@ -13,6 +14,40 @@ from udata_hydra.cli import (
 
 pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
+
+
+async def _create_parsed_csv_table(db, fake_check, *, with_tables_index: bool = False) -> dict:
+    """Fake CSV analysis table (+ optional tables_index row) for purge CLI tests."""
+    check = await fake_check(parsing_table=True)
+    md5 = check["parsing_table"]
+    await db.execute(f'CREATE TABLE "{md5}"(id serial)')
+    if with_tables_index:
+        await db.execute(
+            "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)",
+            md5,
+            "{}",
+            check.get("resource_id"),
+            check.get("url"),
+        )
+    return {"check": check, "md5": md5, "url": check["url"]}
+
+
+async def _assert_pg_table_exists(db, md5: str) -> None:
+    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
+    assert res is not None
+
+
+async def _assert_pg_table_missing(db, md5: str) -> None:
+    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
+    assert res is None
+
+
+@pytest_asyncio.fixture
+async def csv_table_for_purge(db, fake_check):
+    async def setup(*, with_tables_index: bool = False) -> dict:
+        return await _create_parsed_csv_table(db, fake_check, with_tables_index=with_tables_index)
+
+    return setup
 
 
 async def test_purge_checks(setup_catalog, db, fake_check):
@@ -40,136 +75,90 @@ async def test_purge_checks(setup_catalog, db, fake_check):
         (True, None),  # hard_delete=True: table_index entry should be completely deleted
     ],
 )
-async def test_purge_csv_tables(setup_catalog, db, fake_check, hard_delete, expected_deleted_at):
+async def test_purge_csv_tables(
+    setup_catalog, db, csv_table_for_purge, hard_delete, expected_deleted_at
+):
     """Test the purge_csv_tables CLI command with different hard_delete values"""
-    # pretend we have a csv_analysis with a converted table for this url
-    check = await fake_check(parsing_table=True)
-    md5 = check["parsing_table"]
-    await db.execute(f'CREATE TABLE "{md5}"(id serial)')
+    table = await csv_table_for_purge(with_tables_index=True)
+    md5 = table["md5"]
+    await _assert_pg_table_exists(db, md5)
 
-    # Create the tables_index entry
-    await db.execute(
-        "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)",
-        md5,
-        "{}",
-        check.get("resource_id"),
-        check.get("url"),
-    )
-
-    # check table is there before purge
-    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
-    assert res is not None
-
-    # pretend the resource's url has changed
     await db.execute(
         f"UPDATE catalog SET url = '{RESOURCE_URL + '-new'}' WHERE resource_id = '{RESOURCE_ID}'"
     )
 
-    # purge with the specified hard_delete parameter
     await purge_csv_tables(quiet=False, hard_delete=hard_delete)
 
-    # check table is gone
-    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
-    assert res is None
+    await _assert_pg_table_missing(db, md5)
 
-    # Check tables_index entry based on hard_delete parameter
     res = await db.fetchrow("SELECT * FROM tables_index WHERE parsing_table = $1", md5)
     if expected_deleted_at is None:
-        # Entry should be completely deleted
         assert res is None
     else:
-        # Entry should exist and be marked as deleted with a timestamp
         assert res is not None
-        assert res["deleted_at"] is not None  # Should have a timestamp
-        assert isinstance(res["deleted_at"], datetime)  # Should be a datetime object
+        assert res["deleted_at"] is not None
+        assert isinstance(res["deleted_at"], datetime)
 
 
-async def test_purge_csv_tables_url_used_by_other_resource(setup_catalog, db, fake_check):
+async def test_purge_csv_tables_url_used_by_other_resource(setup_catalog, db, csv_table_for_purge):
     """We should not delete csv table if the url is used by a resource still active"""
-    # pretend we have a csv_analysis with a converted table for this url
-    check = await fake_check(parsing_table=True)
-    md5 = check["parsing_table"]
-    await db.execute(f'CREATE TABLE "{md5}"(id serial)')
+    table = await csv_table_for_purge()
+    md5 = table["md5"]
+    await _assert_pg_table_exists(db, md5)
 
-    # check table is there before purge
-    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
-    assert res is not None
-
-    # pretend the resource is deleted
     await db.execute("UPDATE catalog SET deleted = TRUE")
 
-    # insert another resource with same url
     await db.execute(
         "INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority) VALUES($1, $2, $3, $4, $5)",
         "6115eed4acb337ce13b83db3",
         "7a0c10a0-8e6f-403f-a987-2e223b22ee33",
-        check["url"],
+        table["url"],
         False,
         False,
     )
 
-    # purge
     await purge_csv_tables(quiet=False, hard_delete=False)
 
-    # check table is _not_ gone
-    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
-    assert res is not None
+    await _assert_pg_table_exists(db, md5)
 
 
-async def test_purge_csv_tables_url_used_by_deleted_resource_only(setup_catalog, db, fake_check):
+async def test_purge_csv_tables_url_used_by_deleted_resource_only(
+    setup_catalog, db, csv_table_for_purge
+):
     """We should delete csv table if all resource with this url are marked as deleted"""
-    # pretend we have a csv_analysis with a converted table for this url
-    check = await fake_check(parsing_table=True)
-    md5 = check["parsing_table"]
-    await db.execute(f'CREATE TABLE "{md5}"(id serial)')
+    table = await csv_table_for_purge()
+    md5 = table["md5"]
+    await _assert_pg_table_exists(db, md5)
 
-    # check table is there before purge
-    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
-    assert res is not None
-
-    # pretend the resource is deleted
     await db.execute("UPDATE catalog SET deleted = TRUE")
 
-    # insert another deleted resource with same url
     await db.execute(
         "INSERT INTO catalog (dataset_id, resource_id, url, deleted, priority) VALUES($1, $2, $3, $4, $5)",
         "6115eed4acb337ce13b83db3",
         "7a0c10a0-8e6f-403f-a987-2e223b22ee33",
-        check["url"],
+        table["url"],
         True,
         False,
     )
 
-    # purge
     await purge_csv_tables(quiet=False, hard_delete=False)
 
-    # check table is gone
-    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
-    assert res is None
+    await _assert_pg_table_missing(db, md5)
     res = await db.fetchrow("SELECT * FROM tables_index WHERE parsing_table = $1", md5)
     assert res is None
 
 
-async def test_purge_csv_tables_url_not_in_catalog(setup_catalog, db, fake_check):
+async def test_purge_csv_tables_url_not_in_catalog(setup_catalog, db, csv_table_for_purge):
     """We should delete csv table if the url is not the catalog anymore"""
-    # pretend we have a csv_analysis with a converted table for this url
-    check = await fake_check(parsing_table=True)
-    md5 = check["parsing_table"]
-    await db.execute(f'CREATE TABLE "{md5}"(id serial)')
+    table = await csv_table_for_purge()
+    md5 = table["md5"]
+    await _assert_pg_table_exists(db, md5)
 
-    # check table is there before purge
-    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
-    assert res is not None
-
-    # pretend the resource URL have been updated
     await db.execute("UPDATE catalog SET url = 'https://example.com/resource-0'")
 
-    # purge
     await purge_csv_tables(quiet=False, hard_delete=False)
 
-    # check table is gone
-    res = await db.fetchrow("SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1", md5)
-    assert res is None
+    await _assert_pg_table_missing(db, md5)
     res = await db.fetchrow("SELECT * FROM tables_index WHERE parsing_table = $1", md5)
     assert res is None
 
