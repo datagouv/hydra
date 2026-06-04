@@ -4,6 +4,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
+import udata_hydra.utils.s3 as s3_module
 from udata_hydra import config
 
 # Match datagouvfr_data_pipelines S3 defaults for slow networks / large uploads.
@@ -14,7 +15,6 @@ CONTENT_TYPES = {
     "pmtiles": "application/vnd.pmtiles",
 }
 
-
 _client: "S3Client | None" = None
 
 
@@ -24,10 +24,9 @@ def get_s3_client() -> "S3Client":
     Avoids initializing boto3 at import time (e.g. when loading the CLI for
     commands that never upload to S3).
     """
-    global _client
-    if _client is None:
-        _client = S3Client(bucket=config.S3_BUCKET)
-    return _client
+    if s3_module._client is None:
+        s3_module._client = S3Client(bucket=config.S3_BUCKET)
+    return s3_module._client
 
 
 def reset_s3_client() -> None:
@@ -35,8 +34,7 @@ def reset_s3_client() -> None:
 
     Intended for tests only (isolated mocks between test cases).
     """
-    global _client
-    _client = None
+    s3_module._client = None
 
 
 class S3Client:
