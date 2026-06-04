@@ -2,14 +2,12 @@ import logging
 import os
 from pathlib import Path
 
-from udata_hydra import config, context
+from udata_hydra import context
 from udata_hydra.conversion.csv_to_geojson import _detect_geo_columns
 from udata_hydra.db import db_col_name
-from udata_hydra.utils.s3 import S3Client
+from udata_hydra.utils.s3 import get_s3_client
 
 log = logging.getLogger("udata-hydra")
-
-s3_client_geojson = S3Client(bucket=config.S3_BUCKET)
 
 
 def _quote_ident(name: str) -> str:
@@ -144,7 +142,7 @@ async def db_to_geojson(
 
     if upload_to_s3:
         log.debug(f"Uploading GeoJSON file {output_file_path} to S3")
-        geojson_url = s3_client_geojson.send_file(str(output_file_path), delete_source=False)
+        geojson_url = get_s3_client().send_file(str(output_file_path), delete_source=False)
     else:
         geojson_url = None
 

@@ -1074,7 +1074,9 @@ def purge_selected_csv_tables(
 
 def run():
     """Main entry point for the CLI"""
-    cli()
+    from udata_hydra.cli_entry import run as _run
+
+    _run()
 
 
 if __name__ == "__main__":

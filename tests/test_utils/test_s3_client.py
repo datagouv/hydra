@@ -8,7 +8,13 @@ import pytest
 from pytest_mock import MockerFixture
 
 from udata_hydra import config
-from udata_hydra.utils.s3 import CONTENT_TYPES, S3Client
+from udata_hydra.utils.s3 import CONTENT_TYPES, S3Client, reset_s3_client
+
+
+@pytest.fixture(autouse=True)
+def _reset_s3_client_cache() -> Iterator[None]:
+    yield
+    reset_s3_client()
 
 
 @pytest.fixture

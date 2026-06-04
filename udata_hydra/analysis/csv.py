@@ -27,11 +27,9 @@ from udata_hydra.utils import (
     handle_parse_exception,
     queue,
 )
-from udata_hydra.utils.s3 import S3Client
+from udata_hydra.utils.s3 import get_s3_client
 
 log = logging.getLogger("udata-hydra")
-
-_parquet_s3_client = S3Client(bucket=config.S3_BUCKET)
 
 
 async def analyse_csv(
@@ -212,7 +210,7 @@ async def export_db_to_parquet(
         output_filename=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
-    parquet_url: str = _parquet_s3_client.send_file(parquet_file)
+    parquet_url: str = get_s3_client().send_file(parquet_file)
 
     await Check.update(
         check_id,
