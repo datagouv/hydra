@@ -6,7 +6,6 @@ class PMTiles(DataFormat):
 
     standard_mime_type = "application/vnd.pmtiles"
     valid_mime_types = {standard_mime_type}
-    max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["pmtiles"])
 
     def analyse(self, **kwargs):
         raise NotImplementedError
