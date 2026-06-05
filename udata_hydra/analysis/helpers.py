@@ -5,6 +5,7 @@ from typing import IO
 from asyncpg import Record
 
 from udata_hydra import config
+from udata_hydra.data_formats import DataFormat
 from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send
 
 
@@ -20,7 +21,7 @@ def get_python_type(column: dict) -> str:
 async def read_or_download_file(
     check: Record | dict,
     filename: str | None,
-    file_format: str,
+    data_format: DataFormat | None,
     exception: Record | None,
 ) -> IO[bytes]:
     if filename:
@@ -40,8 +41,10 @@ async def read_or_download_file(
             headers=json.loads(check.get("headers") or "{}"),
             max_size_allowed=None
             if exception
-            else int(
-                config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED)
+            else (
+                data_format.max_filesize_allowed
+                if data_format is not None
+                else config.DEFAULT_MAX_FILESIZE_ALLOWED
             ),
         )
         return tmp_file

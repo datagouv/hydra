@@ -13,6 +13,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.analysis.tables_index import insert_tables_index_entry
 from udata_hydra.conversion.parquet_to_db import parquet_to_db
 from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
+from udata_hydra.data_formats.parquet import Parquet
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -58,7 +59,7 @@ async def analyse_parquet(
         tmp_file = await helpers.read_or_download_file(
             check=check,
             filename=filename,
-            file_format="parquet",
+            data_format=Parquet,
             exception=exception,
         )
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()

@@ -1,28 +1,19 @@
 import re
+
 import pyarrow.parquet as pq
 
-from udata_hydra import config, context
+from udata_hydra import config
 from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
 from udata_hydra.data_formats.data_format import DataFormat
-# from udata_hydra.data_formats.parquet.to_db import parquet_to_db
 
 
 class Parquet(DataFormat):
-
     standard_mime_type = "application/vnd.apache.parquet"
     valid_mime_types = {standard_mime_type}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["parquet"])
     file: pq.ParquetFile
     check_url = "parquet"
-
-    @classmethod
-    async def detect_from_catalog(cls, check: dict) -> bool:
-        pool = await context.pool()
-        async with pool.acquire() as connection:
-            row = await connection.fetchrow(
-                "SELECT format FROM catalog WHERE resource_id = $1", f"{check['resource_id']}"
-            )
-        return row["format"] == "parquet"
+    further_analysis = True
 
     def analyse(self) -> None:
         self.file = pq.ParquetFile(self.path.as_posix())
@@ -51,15 +42,3 @@ class Parquet(DataFormat):
             }
         }
         self.inspection["total_lines"] = self.file.metadata.num_rows
-
-    async def to(self, target_format: str, **kwargs) -> DataFormat | None:
-        match target_format:
-            case "db":
-                # return await parquet_to_db(
-                #     parquet_file=self.file,
-                #     inspection=self.inspection,
-                #     **kwargs,
-                # )
-                return
-            case _:
-                raise NotImplementedError

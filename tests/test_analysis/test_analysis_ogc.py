@@ -9,7 +9,15 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.ogc import analyse_ogc
-from udata_hydra.utils.ogc import detect_layer_name, detect_ogc, is_valid_layer_name
+from udata_hydra.data_formats import (
+    OGC,
+    WFS,
+    WMS,
+    Csv,
+    detect_data_format_from_check_or_catalog,
+)
+
+pytestmark = pytest.mark.asyncio
 
 log = logging.getLogger("udata-hydra")
 
@@ -20,49 +28,55 @@ class TestOgcDetection:
     @pytest.mark.parametrize(
         "url,expected",
         [
-            ("https://example.com/geoserver?SERVICE=WFS&REQUEST=GetCapabilities", (True, "wfs")),
-            ("https://example.com/geoserver?service=wfs&request=GetCapabilities", (True, "wfs")),
-            ("https://example.com/geoserver?Service=Wfs&Request=GetCapabilities", (True, "wfs")),
-            ("https://example.com/geoserver/wfs", (True, "wfs")),
-            ("https://example.com/geoserver/WFS", (True, "wfs")),
-            ("https://example.com/geoserver/wfs?request=GetCapabilities", (True, "wfs")),
-            ("https://example.com/geoserver?SERVICE=WMS&REQUEST=GetCapabilities", (True, "wms")),
-            ("https://example.com/geoserver?service=wms&request=GetCapabilities", (True, "wms")),
-            ("https://example.com/geoserver?Service=Wms&Request=GetCapabilities", (True, "wms")),
-            ("https://example.com/geoserver/wms", (True, "wms")),
-            ("https://example.com/geoserver/WMS", (True, "wms")),
-            ("https://example.com/geoserver/wms?request=GetCapabilities", (True, "wms")),
-            ("https://example.com/data/wfsx", (False, "unknown")),
-            ("https://example.com/data/file.csv", (False, "unknown")),
-            ("", (False, "unknown")),
+            ("https://example.com/geoserver?SERVICE=WFS&REQUEST=GetCapabilities", WFS),
+            ("https://example.com/geoserver?service=wfs&request=GetCapabilities", WFS),
+            ("https://example.com/geoserver?Service=Wfs&Request=GetCapabilities", WFS),
+            ("https://example.com/geoserver/wfs", WFS),
+            ("https://example.com/geoserver/WFS", WFS),
+            ("https://example.com/geoserver/wfs?request=GetCapabilities", WFS),
+            ("https://example.com/geoserver?SERVICE=WMS&REQUEST=GetCapabilities", WMS),
+            ("https://example.com/geoserver?service=wms&request=GetCapabilities", WMS),
+            ("https://example.com/geoserver?Service=Wms&Request=GetCapabilities", WMS),
+            ("https://example.com/geoserver/wms", WMS),
+            ("https://example.com/geoserver/WMS", WMS),
+            ("https://example.com/geoserver/wms?request=GetCapabilities", WMS),
+            ("https://example.com/data/wfsx", None),
+            ("https://example.com/data/file.csv", None),
+            ("", None),
         ],
     )
-    def test_detect_wfs_from_url(self, url, expected):
-        check = {"url": url}
-        assert detect_ogc(check) == expected
+    async def test_detect_wfs_from_url(self, db, clean_db, mocker, url, expected):
+        mocker.patch("udata_hydra.config.OGC_ANALYSIS_ENABLED", True)
+        check = {"url": url, "resource_id": RESOURCE_ID}
+        assert await detect_data_format_from_check_or_catalog(check) == expected
 
-    def test_detect_missing_url(self):
-        check = {}
-        assert detect_ogc(check) == (False, "unknown")
+    async def test_detect_missing_url(self, mocker, db, clean_db):
+        mocker.patch("udata_hydra.config.OGC_ANALYSIS_ENABLED", True)
+        check = {"resource_id": RESOURCE_ID}
+        assert await detect_data_format_from_check_or_catalog(check) == None
 
     @pytest.mark.parametrize(
         "resource_format,expected",
         [
-            ("wfs", (True, "wfs")),
-            ("WFS", (True, "wfs")),
-            ("ogc:wfs", (True, "wfs")),
-            ("OGC:WFS", (True, "wfs")),
-            ("wms", (True, "wms")),
-            ("WMS", (True, "wms")),
-            ("ogc:wms", (True, "wms")),
-            ("OGC:WMS", (True, "wms")),
-            ("csv", (False, "unknown")),
-            (None, (False, "unknown")),
+            ("wfs", WFS),
+            ("WFS", WFS),
+            ("ogc:wfs", WFS),
+            ("OGC:WFS", WFS),
+            ("wms", WMS),
+            ("WMS", WMS),
+            ("ogc:wms", WMS),
+            ("OGC:WMS", WMS),
+            ("csv", Csv),
+            (None, None),
         ],
     )
-    def test_detect_wfs_from_format(self, resource_format, expected):
-        check = {"url": "https://example.com/data"}
-        assert detect_ogc(check, resource_format) == expected
+    async def test_detect_wfs_from_format(
+        self, mocker, clean_db, insert_fake_resource, resource_format, expected
+    ):
+        mocker.patch("udata_hydra.config.OGC_ANALYSIS_ENABLED", True)
+        check = {"url": "https://example.com/data", "resource_id": RESOURCE_ID}
+        await insert_fake_resource(format=resource_format)
+        assert await detect_data_format_from_check_or_catalog(check) == expected
 
 
 @pytest.mark.asyncio
@@ -450,7 +464,7 @@ class TestLayerNameDetection:
         ],
     )
     def test_is_valid_layer_name(self, name, expected):
-        assert is_valid_layer_name(name) is expected
+        assert OGC.is_valid_layer_name(name) is expected
 
     @pytest.mark.parametrize(
         "url,title,expected",
@@ -475,4 +489,4 @@ class TestLayerNameDetection:
         ],
     )
     def test_detect_layer_name(self, url, title, expected):
-        assert detect_layer_name(url, title) == expected
+        assert OGC.detect_layer_name(url, title) == expected

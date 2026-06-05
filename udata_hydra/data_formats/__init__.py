@@ -1,12 +1,22 @@
-from udata_hydra.data_formats.csv_like import Csv, Csvgz, Xls, Xlsx
+from asyncpg import Record
+
+from udata_hydra import context
+from udata_hydra.data_formats.csv_like import Csv, Csvgz, CsvLike, Xls, Xlsx  # noqa
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.geojson import Geojson
+from udata_hydra.data_formats.ogc import OGC, WFS, WMS  # noqa
 from udata_hydra.data_formats.parquet import Parquet
 from udata_hydra.data_formats.pmtiles import PMTiles  # noqa
-from udata_hydra.data_formats.table import Table
+from udata_hydra.data_formats.table import Table  # noqa
 
 
-async def detect_data_format_from_check(check: dict) -> DataFormat | None:
+async def detect_data_format_from_check_or_catalog(check: dict) -> DataFormat | None:
+    pool = await context.pool()
+    async with pool.acquire() as connection:
+        row: Record = await connection.fetchrow(
+            "SELECT format FROM catalog WHERE resource_id = $1", f"{check['resource_id']}"
+        )
+    resource_format = row["format"] if row is not None else None
     for fmt in [
         Csv,
         Csvgz,
@@ -14,8 +24,11 @@ async def detect_data_format_from_check(check: dict) -> DataFormat | None:
         Xlsx,
         Geojson,
         Parquet,
-        Table,
+        WFS,
+        WMS,
     ]:
-        if fmt.detect_from_check(check) or await fmt.detect_from_catalog(check):
+        if fmt.detect_from_check(
+            check, resource_format=resource_format
+        ) or fmt.detect_from_catalog_format(resource_format):
             return fmt
     return None

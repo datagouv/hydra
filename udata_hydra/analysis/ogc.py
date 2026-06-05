@@ -9,11 +9,11 @@ from owslib.wms import WebMapService
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
+from udata_hydra.data_formats.ogc import OGC
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.types import OgcFormatLiteral
 from udata_hydra.utils import ParseException, handle_parse_exception
-from udata_hydra.utils.ogc import detect_layer_name
 
 log = logging.getLogger("udata-hydra")
 
@@ -150,7 +150,7 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
                 resource_record = await Resource.get(str(resource_id), "title")
                 if resource_record:
                     resource_title = resource_record["title"]
-            candidate = detect_layer_name(url, resource_title)
+            candidate = OGC.detect_layer_name(url, resource_title)
             # Only keep the candidate if it matches one of the layer names
             if candidate and layers:
                 # Exact match (including namespace)

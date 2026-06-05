@@ -8,6 +8,7 @@ from asyncpg import Record
 from udata_hydra import config
 from udata_hydra.analysis import helpers
 from udata_hydra.conversion.geojson_to_pmtiles import geojson_to_pmtiles
+from udata_hydra.data_formats.geojson import Geojson
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -53,7 +54,7 @@ async def analyse_geojson(
         tmp_file = await helpers.read_or_download_file(
             check=check,
             filename=filename,
-            file_format="geojson",
+            data_format=Geojson,
             exception=exception,
         )
         timer.mark("download-file")

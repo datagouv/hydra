@@ -4,12 +4,11 @@ from csv_detective import validate_then_detect
 from udata_hydra import config
 from udata_hydra.analysis.tables_index import get_previous_analysis
 from udata_hydra.data_formats.data_format import DataFormat
-# from udata_hydra.data_formats.csv_like.to_db import csv_to_db
-# from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
 from udata_hydra.db.resource import Resource
 
 
 class CsvLike(DataFormat):
+    further_analysis = True
 
     async def analyse(self) -> None:
         if not self.resource_id:
@@ -32,29 +31,8 @@ class CsvLike(DataFormat):
                 save_results=False,
             )
 
-    async def to(self, target_format: str, **kwargs) -> DataFormat | None:
-        match target_format:
-            case "db":
-                # return await csv_to_db(
-                #     file_path=self.path.as_posix(),
-                #     inspection=self.inspection,
-                #     resource_id=self.resource_id,
-                #     **kwargs,
-                # )
-                return
-            case "geojson":
-                # return await csv_to_geojson(
-                #     file_path=self.path.as_posix(),
-                #     inspection=self.inspection,
-                #     **kwargs,
-                # )
-                return
-            case _:
-                raise NotImplementedError
-
 
 class Csv(CsvLike):
-
     standard_mime_type = "text/csv"
     valid_mime_types = {
         standard_mime_type,
@@ -66,19 +44,21 @@ class Csv(CsvLike):
 
 
 class Csvgz(CsvLike):
-
     standard_mime_type = "application/gzip"
     valid_mime_types = {
         standard_mime_type,
         "application/octet-stream",
-        "application/x-gzip", 
+        "application/x-gzip",
     }
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["csvgz"])
     check_url = "csv.gz"
 
+    @classmethod
+    def detect_from_catalog_format(cls, format: str) -> bool:
+        return format == "csv.gz"
+
 
 class Xls(CsvLike):
-
     standard_mime_type = "application/vnd.ms-excel"
     valid_mime_types = {standard_mime_type}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["xls"])
@@ -86,7 +66,6 @@ class Xls(CsvLike):
 
 
 class Xlsx(CsvLike):
-
     standard_mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     valid_mime_types = {standard_mime_type}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["xlsx"])

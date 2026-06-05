@@ -16,6 +16,7 @@ from udata_hydra.analysis.tables_index import get_previous_analysis, insert_tabl
 from udata_hydra.conversion.csv_to_db import csv_to_db
 from udata_hydra.conversion.csv_to_geojson import _detect_geo_columns
 from udata_hydra.conversion.db_to_parquet import db_to_parquet
+from udata_hydra.data_formats import detect_data_format_from_check_or_catalog
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -23,7 +24,6 @@ from udata_hydra.utils import (
     IOException,
     ParseException,
     Timer,
-    detect_tabular_from_headers,
     handle_parse_exception,
     queue,
 )
@@ -66,11 +66,11 @@ async def analyse_csv(
 
     table_name, tmp_file = None, None
     try:
-        _, file_format = detect_tabular_from_headers(check)
+        data_format = await detect_data_format_from_check_or_catalog(check)
         tmp_file = await helpers.read_or_download_file(
             check=check,
             filename=filename,
-            file_format=file_format,
+            data_format=data_format,
             exception=exception,
         )
         table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
