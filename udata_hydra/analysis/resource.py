@@ -15,10 +15,10 @@ from udata_hydra.analysis.ogc import analyse_ogc
 from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.data_formats import (
-    OGC,
     CsvLike,
     DataFormat,
     Geojson,
+    Ogc,
     Parquet,
     detect_data_format_from_check_or_catalog,
 )
@@ -182,7 +182,7 @@ async def analyse_resource(
                     _priority="high" if worker_priority == "high" else "default",
                     _exception=bool(exception),
                 )
-            elif issubclass(data_format, OGC):
+            elif issubclass(data_format, Ogc):
                 await Resource.update(resource_id, data={"status": "TO_ANALYSE_OGC"})
                 queue.enqueue(
                     analyse_ogc,

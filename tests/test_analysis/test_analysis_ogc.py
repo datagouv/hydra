@@ -10,10 +10,10 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.ogc import analyse_ogc
 from udata_hydra.data_formats import (
-    OGC,
-    WFS,
-    WMS,
     Csv,
+    Ogc,
+    Wfs,
+    Wms,
     detect_data_format_from_check_or_catalog,
 )
 
@@ -28,18 +28,18 @@ class TestOgcDetection:
     @pytest.mark.parametrize(
         "url,expected",
         [
-            ("https://example.com/geoserver?SERVICE=WFS&REQUEST=GetCapabilities", WFS),
-            ("https://example.com/geoserver?service=wfs&request=GetCapabilities", WFS),
-            ("https://example.com/geoserver?Service=Wfs&Request=GetCapabilities", WFS),
-            ("https://example.com/geoserver/wfs", WFS),
-            ("https://example.com/geoserver/WFS", WFS),
-            ("https://example.com/geoserver/wfs?request=GetCapabilities", WFS),
-            ("https://example.com/geoserver?SERVICE=WMS&REQUEST=GetCapabilities", WMS),
-            ("https://example.com/geoserver?service=wms&request=GetCapabilities", WMS),
-            ("https://example.com/geoserver?Service=Wms&Request=GetCapabilities", WMS),
-            ("https://example.com/geoserver/wms", WMS),
-            ("https://example.com/geoserver/WMS", WMS),
-            ("https://example.com/geoserver/wms?request=GetCapabilities", WMS),
+            ("https://example.com/geoserver?SERVICE=WFS&REQUEST=GetCapabilities", Wfs),
+            ("https://example.com/geoserver?service=wfs&request=GetCapabilities", Wfs),
+            ("https://example.com/geoserver?Service=Wfs&Request=GetCapabilities", Wfs),
+            ("https://example.com/geoserver/wfs", Wfs),
+            ("https://example.com/geoserver/WFS", Wfs),
+            ("https://example.com/geoserver/wfs?request=GetCapabilities", Wfs),
+            ("https://example.com/geoserver?SERVICE=WMS&REQUEST=GetCapabilities", Wms),
+            ("https://example.com/geoserver?service=wms&request=GetCapabilities", Wms),
+            ("https://example.com/geoserver?Service=Wms&Request=GetCapabilities", Wms),
+            ("https://example.com/geoserver/wms", Wms),
+            ("https://example.com/geoserver/WMS", Wms),
+            ("https://example.com/geoserver/wms?request=GetCapabilities", Wms),
             ("https://example.com/data/wfsx", None),
             ("https://example.com/data/file.csv", None),
             ("", None),
@@ -58,14 +58,14 @@ class TestOgcDetection:
     @pytest.mark.parametrize(
         "resource_format,expected",
         [
-            ("wfs", WFS),
-            ("WFS", WFS),
-            ("ogc:wfs", WFS),
-            ("OGC:WFS", WFS),
-            ("wms", WMS),
-            ("WMS", WMS),
-            ("ogc:wms", WMS),
-            ("OGC:WMS", WMS),
+            ("wfs", Wfs),
+            ("WFS", Wfs),
+            ("ogc:wfs", Wfs),
+            ("OGC:WFS", Wfs),
+            ("wms", Wms),
+            ("WMS", Wms),
+            ("ogc:wms", Wms),
+            ("OGC:WMS", Wms),
             ("csv", Csv),
             (None, None),
         ],
@@ -464,7 +464,7 @@ class TestLayerNameDetection:
         ],
     )
     def test_is_valid_layer_name(self, name, expected):
-        assert OGC.is_valid_layer_name(name) is expected
+        assert Ogc.is_valid_layer_name(name) is expected
 
     @pytest.mark.parametrize(
         "url,title,expected",
@@ -489,4 +489,4 @@ class TestLayerNameDetection:
         ],
     )
     def test_detect_layer_name(self, url, title, expected):
-        assert OGC.detect_layer_name(url, title) == expected
+        assert Ogc.detect_layer_name(url, title) == expected

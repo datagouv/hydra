@@ -4,7 +4,7 @@ from udata_hydra import context
 from udata_hydra.data_formats.csv_like import Csv, Csvgz, CsvLike, Xls, Xlsx  # noqa
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.geojson import Geojson
-from udata_hydra.data_formats.ogc import OGC, WFS, WMS  # noqa
+from udata_hydra.data_formats.ogc import Ogc, Wfs, Wms  # noqa
 from udata_hydra.data_formats.parquet import Parquet
 from udata_hydra.data_formats.pmtiles import PMTiles  # noqa
 from udata_hydra.data_formats.table import Table  # noqa
@@ -24,8 +24,8 @@ async def detect_data_format_from_check_or_catalog(check: dict) -> DataFormat | 
         Xlsx,
         Geojson,
         Parquet,
-        WFS,
-        WMS,
+        Wfs,
+        Wms,
     ]:
         if fmt.detect_from_check(
             check, resource_format=resource_format

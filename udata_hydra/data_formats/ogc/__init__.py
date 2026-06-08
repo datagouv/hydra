@@ -9,7 +9,7 @@ VALID_LAYER_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-.:]{1,100}$")
 OgcFormatLiteral = Literal["wfs", "wms"]
 
 
-class OGC(DataFormat):
+class Ogc(DataFormat):
     @classmethod
     def detect_from_check(cls, check: dict, resource_format: str | None) -> bool:
         ogc_format = cls.__name__.lower()
@@ -65,9 +65,9 @@ class OGC(DataFormat):
         return None
 
 
-class WFS(OGC):
+class Wfs(Ogc):
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["wfs"])
 
 
-class WMS(OGC):
+class Wms(Ogc):
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["wms"])
