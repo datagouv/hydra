@@ -40,7 +40,6 @@ class Csv(CsvLike):
         "text/plain",
     }
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["csv"])
-    check_url = None
 
 
 class Csvgz(CsvLike):
@@ -62,11 +61,9 @@ class Xls(CsvLike):
     standard_mime_type = "application/vnd.ms-excel"
     valid_mime_types = {standard_mime_type}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["xls"])
-    check_url = None
 
 
 class Xlsx(CsvLike):
     standard_mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     valid_mime_types = {standard_mime_type}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["xlsx"])
-    check_url = None

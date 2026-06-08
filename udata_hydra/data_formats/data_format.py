@@ -10,7 +10,7 @@ class DataFormat(ABC):
     filesize: int
     max_filesize_allowed: int
     further_analysis: bool = False
-    check_url: str | None
+    check_url: str | None = None
     inspection: dict
 
     def __init__(
