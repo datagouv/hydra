@@ -1,8 +1,7 @@
-import json
-
-
 async def detect_geojson_from_headers(check: dict) -> bool:
-    headers: dict = json.loads(check["headers"] or "{}")
+    from udata_hydra.db.codec import parse_json_value
+
+    headers: dict = parse_json_value(check.get("headers"), {})
     # in some cases geojson files have the content-type `application/json`
     # but adding this in the list would not have been a restrictive enough condition
     # so we check the URL

@@ -6,6 +6,7 @@ from asyncpg.exceptions import UndefinedTableError
 from csv_detective.utils import sanitize_for_json
 
 from udata_hydra import context
+from udata_hydra.db.codec import parse_json_value
 from udata_hydra.utils import ParseException
 
 log = logging.getLogger("udata-hydra")
@@ -20,7 +21,7 @@ async def get_previous_analysis(resource_id: str) -> dict | None:
     res = await db.fetch(q)
     if not res:
         return None
-    analysis = json.loads(res[0]["csv_detective"])
+    analysis = parse_json_value(res[0]["csv_detective"])
     # the csv_detective column is JSONB, so keys are reordered compared to the actual table
     # so we get the right order from the table
     try:
@@ -46,7 +47,8 @@ async def insert_tables_index_entry(
         await db.execute(
             q,
             table_name,
-            json.dumps(sanitize_for_json(inspection), default=str),
+            # Round-trip via json.dumps(default=str) so numpy types become native JSON types for the codec.
+            json.loads(json.dumps(sanitize_for_json(inspection), default=str)),
             check.get("resource_id"),
             dataset_id,
             check.get("url"),

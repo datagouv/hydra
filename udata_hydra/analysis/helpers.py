@@ -5,6 +5,7 @@ from typing import IO
 from asyncpg import Record
 
 from udata_hydra import config
+from udata_hydra.db.codec import parse_json_value
 from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send
 
 
@@ -37,7 +38,7 @@ async def read_or_download_file(
     else:
         tmp_file, _ = await download_resource(
             url=check["url"],
-            headers=json.loads(check.get("headers") or "{}"),
+            headers=parse_json_value(check.get("headers"), {}),
             max_size_allowed=None
             if exception
             else int(

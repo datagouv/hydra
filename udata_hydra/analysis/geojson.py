@@ -40,7 +40,9 @@ async def analyse_geojson(
     url = check["url"]
 
     # Update resource status to ANALYSING_GEOJSON
-    resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_GEOJSON"})
+    resource: Record | None = await Resource.set_job_status(
+        resource_id, "geojson", "ANALYSING_GEOJSON"
+    )
 
     # Check if the resource is in the exceptions table
     exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
@@ -97,4 +99,4 @@ async def analyse_geojson(
             os.remove(tmp_file.name)
 
         # Reset resource status to None
-        await Resource.update(resource_id, {"status": None})
+        await Resource.clear_job_status(resource_id, "geojson")

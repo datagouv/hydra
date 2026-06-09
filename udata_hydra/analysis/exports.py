@@ -21,6 +21,7 @@ async def _run_export_job(
     step: str,
     remainder_types: list[str],
     export_fn,
+    job_keys: tuple[str, ...],
 ) -> None:
     check_out = None
     try:
@@ -44,7 +45,8 @@ async def _run_export_job(
         resource = await Resource.get(resource_id)
         if resource is not None and check_out is not None:
             await helpers.notify_udata(resource, check_out)
-        await Resource.update(resource_id, {"status": None})
+        for job in job_keys:
+            await Resource.clear_job_status(resource_id, job)
 
 
 async def export_parquet(
@@ -66,6 +68,7 @@ async def export_parquet(
         step="parquet_export",
         remainder_types=["parquet"],
         export_fn=export_db_to_parquet,
+        job_keys=("parquet",),
     )
 
 
@@ -86,4 +89,5 @@ async def export_geojson_pmtiles(
         step="geojson_export",
         remainder_types=["geojson", "pmtiles", "pmtiles-journal"],
         export_fn=db_to_geojson_and_pmtiles,
+        job_keys=("geojson", "pmtiles"),
     )

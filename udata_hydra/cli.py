@@ -50,9 +50,12 @@ async def connection(db_name: str = "main"):
             if db_name == "main"
             else getattr(config, f"DATABASE_URL_{db_name.upper()}")
         )
+        from udata_hydra.db.codec import init_connection
+
         context["conn"][db_name] = await asyncpg.connect(
             dsn=dsn, server_settings={"search_path": config.DATABASE_SCHEMA}
         )
+        await init_connection(context["conn"][db_name])
     return context["conn"][db_name]
 
 
@@ -158,7 +161,7 @@ async def _load_catalog(
                             dataset_id, resource_id, url, type, format,
                             harvest_modified_at, title, deleted, priority, status
                         )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, FALSE, NULL)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, FALSE, '{}'::jsonb)
                         ON CONFLICT (resource_id) DO UPDATE SET
                             dataset_id = $1,
                             url = $3,
@@ -183,7 +186,7 @@ async def _load_catalog(
                     )
             log.info("Resources catalog successfully upserted into DB.")
             cleaned_count: int = await Resource.clean_up_statuses()
-            log.info(f" {cleaned_count} stuck statuses successfully reset to null.")
+            log.info(f" {cleaned_count} stuck job statuses successfully cleared.")
         except Exception as e:
             raise e
         finally:
@@ -917,7 +920,7 @@ async def _insert_resource_into_catalog(resource_id: str):
                 dataset_id, resource_id, url, title, harvest_modified_at,
                 deleted, priority, status
             )
-            VALUES ($1, $2, $3, $4, $5, FALSE, FALSE, NULL)
+            VALUES ($1, $2, $3, $4, $5, FALSE, FALSE, '{}'::jsonb)
             ON CONFLICT (resource_id) DO UPDATE SET
                 dataset_id = $1,
                 url = $3,
@@ -974,7 +977,7 @@ async def _insert_url_into_catalog(url: str, resource_id: str):
                 dataset_id, resource_id, url, type, format,
                 harvest_modified_at, deleted, priority, status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NULL)
+            VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, '{}'::jsonb)
             ON CONFLICT (resource_id) DO UPDATE SET
                 dataset_id = $1,
                 url = $3,

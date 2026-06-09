@@ -1,5 +1,4 @@
 import hashlib
-import json
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -15,6 +14,7 @@ from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.analysis.exports import export_parquet
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
+from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -31,8 +31,7 @@ async def test_analyse_csv_on_catalog(
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
-    assert resource["status_since"] is None
+    assert resource["status"] == {}
 
     # Analyse the CSV
     await analyse_csv(check=check)
@@ -40,8 +39,7 @@ async def test_analyse_csv_on_catalog(
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
-    assert isinstance(resource["status_since"], datetime)
+    assert resource["status"] == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table_name
@@ -52,7 +50,7 @@ async def test_analyse_csv_on_catalog(
     assert row["id"] == RESOURCE_ID
     assert row["url"] == RESOURCE_URL
     res = await db.fetchrow("SELECT * from tables_index")
-    inspection = json.loads(res["csv_detective"])
+    inspection = parse_json_value(res["csv_detective"])
     assert all(k in inspection["columns"] for k in ["id", "url"])
 
 
@@ -77,7 +75,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     # Analyse the CSV
     await analyse_csv(check=check)
@@ -85,14 +83,14 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == EXPECTED_COUNT
     profile = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    profile = json.loads(profile["csv_detective"])
+    profile = parse_json_value(profile["csv_detective"])
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == EXPECTED_COUNT
@@ -111,7 +109,7 @@ async def test_error_reporting_csv_detective(
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -133,7 +131,7 @@ async def test_error_reporting_parsing(
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -160,7 +158,7 @@ async def test_analyse_csv_send_udata_webhook(
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("analysis:parsing:started_at")
@@ -372,7 +370,7 @@ async def test_validation(
     await db.execute(
         "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)",
         table_name,
-        json.dumps(previous_analysis),
+        previous_analysis,
         check.get("resource_id"),
         check.get("dataset_id"),
         check.get("url"),
@@ -410,7 +408,7 @@ async def test_validation(
     assert all(row["url"] == check["url"] for row in res)
     assert all(row["dataset_id"] == check["dataset_id"] for row in res)
     assert all(row["deleted_at"] is None for row in res)  # Should be NULL for new records
-    latest_analysis = json.loads(res[0]["csv_detective"])
+    latest_analysis = parse_json_value(res[0]["csv_detective"])
     # check that latest analysis is in line with expectation
     for key in current_analysis.keys():
         if current_analysis[key] is not None:
@@ -606,7 +604,7 @@ async def test_file_with_nan(
     rows = await db.fetch(f'SELECT * FROM "{table_name}"')
     assert dict(rows[0])["c"] == float("inf")
     assert dict(rows[1])["b"] is None
-    profile = json.loads(
+    profile = parse_json_value(
         list(
             await db.fetch(
                 "SELECT * FROM tables_index WHERE resource_id = $1", check["resource_id"]

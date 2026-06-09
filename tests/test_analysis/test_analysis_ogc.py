@@ -1,4 +1,3 @@
-import json
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -9,6 +8,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.ogc import analyse_ogc
+from udata_hydra.db.codec import parse_json_value
 from udata_hydra.utils.ogc import detect_layer_name, detect_ogc, is_valid_layer_name
 
 log = logging.getLogger("udata-hydra")
@@ -122,7 +122,7 @@ class TestOgcAnalysis:
 
         # Verify metadata was stored in the database
         res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
-        assert json.loads(res["ogc_metadata"]) == expected_metadata
+        assert parse_json_value(res["ogc_metadata"]) == expected_metadata
         assert res["parsing_started_at"] is not None
         assert res["parsing_finished_at"] is not None
 
@@ -411,7 +411,7 @@ class TestOgcAnalysis:
 
         # Verify metadata was stored in the database
         res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
-        assert json.loads(res["ogc_metadata"]) == expected_metadata
+        assert parse_json_value(res["ogc_metadata"]) == expected_metadata
         assert res["parsing_started_at"] is not None
         assert res["parsing_finished_at"] is not None
 

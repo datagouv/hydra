@@ -1,5 +1,4 @@
 import hashlib
-import json
 import logging
 import os
 from datetime import datetime, timezone
@@ -17,6 +16,7 @@ from udata_hydra.conversion.csv_to_db import csv_to_db
 from udata_hydra.conversion.csv_to_geojson import _detect_geo_columns
 from udata_hydra.conversion.db_to_parquet import db_to_parquet
 from udata_hydra.db.check import Check
+from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
@@ -51,7 +51,7 @@ async def analyse_csv(
     url = check["url"]
 
     # Update resource status to ANALYSING_CSV
-    resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
+    resource: Record | None = await Resource.set_job_status(resource_id, "csv", "ANALYSING_CSV")
 
     # Check if the resource is in the exceptions table
     # If it is, get the table_indexes to use them later
@@ -59,7 +59,7 @@ async def analyse_csv(
 
     table_indexes: dict | None = None
     if exception and exception.get("table_indexes"):
-        table_indexes = json.loads(exception["table_indexes"])
+        table_indexes = parse_json_value(exception["table_indexes"])
 
     timer = Timer("analyse-csv", resource_id)
     assert any(_ is not None for _ in (check["id"], url))
@@ -82,7 +82,7 @@ async def analyse_csv(
         try:
             previous_analysis: dict | None = await get_previous_analysis(resource_id=resource_id)
             if previous_analysis:
-                await Resource.update(resource_id, {"status": "VALIDATING_CSV"})
+                await Resource.set_job_status(resource_id, "csv", "VALIDATING_CSV")
                 csv_inspection = validate_then_detect(
                     file_path=tmp_file.name,
                     previous_analysis=previous_analysis,
@@ -169,7 +169,7 @@ async def analyse_csv(
             os.remove(tmp_file.name)
 
         # Reset resource status to None
-        await Resource.update(resource_id, {"status": None})
+        await Resource.clear_job_status(resource_id, "csv")
 
 
 async def export_db_to_parquet(
@@ -204,7 +204,7 @@ async def export_db_to_parquet(
     )
 
     if resource_id:
-        await Resource.update(resource_id, {"status": "CONVERTING_TO_PARQUET"})
+        await Resource.set_job_status(resource_id, "parquet", "CONVERTING_TO_PARQUET")
 
     parquet_file, _ = await db_to_parquet(
         table_name=table_name,

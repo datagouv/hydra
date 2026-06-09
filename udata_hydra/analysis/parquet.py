@@ -1,5 +1,4 @@
 import hashlib
-import json
 import logging
 import os
 import re
@@ -14,6 +13,7 @@ from udata_hydra.analysis.tables_index import insert_tables_index_entry
 from udata_hydra.conversion.parquet_to_db import parquet_to_db
 from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
 from udata_hydra.db.check import Check
+from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
@@ -41,14 +41,16 @@ async def analyse_parquet(
     # Preserve dataset_id from original check record
     dataset_id = check.get("dataset_id")
 
-    resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_PARQUET"})
+    resource: Record | None = await Resource.set_job_status(
+        resource_id, "parquet", "ANALYSING_PARQUET"
+    )
 
     # Check if the resource is in the exceptions table
     # If it is, get the table_indexes to use them later
     exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
     table_indexes: dict | None = None
     if exception and exception.get("table_indexes"):
-        table_indexes = json.loads(exception["table_indexes"])
+        table_indexes = parse_json_value(exception["table_indexes"])
 
     timer = Timer("analyse-parquet", resource_id)
     assert any(_ is not None for _ in (check["id"], url))
@@ -133,4 +135,4 @@ async def analyse_parquet(
             os.remove(tmp_file.name)
 
         # Reset resource status to None
-        await Resource.update(resource_id, {"status": None})
+        await Resource.clear_job_status(resource_id, "parquet")

@@ -1,5 +1,4 @@
 import hashlib
-import json
 from datetime import datetime
 from unittest.mock import patch
 
@@ -7,6 +6,7 @@ import pandas as pd
 import pytest
 
 from udata_hydra.analysis.parquet import analyse_parquet
+from udata_hydra.db.codec import parse_json_value
 
 pytestmark = pytest.mark.asyncio
 
@@ -100,7 +100,7 @@ async def test_analyse_parquet(
     res = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    inspection = json.loads(res["csv_detective"])
+    inspection = parse_json_value(res["csv_detective"])
     assert inspection["total_lines"] == len(df)
     assert inspection["header"] == list(df.columns)
 

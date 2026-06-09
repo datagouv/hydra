@@ -77,7 +77,7 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
 
     resource: Record | None = None
     if resource_id:
-        resource = await Resource.update(str(resource_id), {"status": "ANALYSING_OGC"})
+        resource = await Resource.set_job_status(str(resource_id), "ogc", "ANALYSING_OGC")
 
     metadata: OgcMetadata | None = None
     try:
@@ -203,4 +203,4 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
         if resource and check_id:
             await helpers.notify_udata(resource, check)
         if resource_id:
-            await Resource.update(str(resource_id), {"status": None})
+            await Resource.clear_job_status(str(resource_id), "ogc")

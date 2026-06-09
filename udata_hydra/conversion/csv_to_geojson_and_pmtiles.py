@@ -31,7 +31,7 @@ async def csv_to_geojson_and_pmtiles(
         geojson_filepath = Path(f"{resource_id}.geojson")
         pmtiles_filepath = Path(f"{resource_id}.pmtiles")
         # Update resource status for GeoJSON conversion
-        await Resource.update(resource_id, {"status": "CONVERTING_TO_GEOJSON"})
+        await Resource.set_job_status(resource_id, "geojson", "CONVERTING_TO_GEOJSON")
     else:
         geojson_filepath = DEFAULT_GEOJSON_FILEPATH
         pmtiles_filepath = DEFAULT_PMTILES_FILEPATH
@@ -62,7 +62,7 @@ async def csv_to_geojson_and_pmtiles(
 
     # Update resource status for PMTiles conversion
     if resource_id:
-        await Resource.update(resource_id, {"status": "CONVERTING_TO_PMTILES"})
+        await Resource.update_job_status(resource_id, "geojson", "pmtiles", "CONVERTING_TO_PMTILES")
 
     # Convert GeoJSON to PMTiles
     pmtiles_size, pmtiles_url = await geojson_to_pmtiles(geojson_filepath, pmtiles_filepath)

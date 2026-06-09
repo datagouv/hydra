@@ -93,9 +93,8 @@ async def check_resource(
     if should_backoff:
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
-        await Resource.update(
-            str(resource["resource_id"]), data={"status": "BACKOFF", "priority": False}
-        )
+        await Resource.set_job_status(str(resource["resource_id"]), "crawler", "BACKOFF")
+        await Resource.update(str(resource["resource_id"]), data={"priority": False})
         return RESOURCE_RESPONSE_STATUSES["BACKOFF"]
 
     try:
@@ -154,8 +153,8 @@ async def check_resource(
             )
 
             # Update resource status to TO_ANALYSE_RESOURCE
-            await Resource.update(
-                str(resource["resource_id"]), data={"status": "TO_ANALYSE_RESOURCE"}
+            await Resource.set_job_status(
+                str(resource["resource_id"]), "crawler", "TO_ANALYSE_RESOURCE"
             )
 
             # Enqueue the resource for analysis
@@ -183,7 +182,7 @@ async def check_resource(
         )
 
         # Reset resource status so that it's not forbidden to be checked again
-        await Resource.update(str(resource["resource_id"]), data={"status": None})
+        await Resource.clear_job_status(str(resource["resource_id"]), "crawler")
 
         return RESOURCE_RESPONSE_STATUSES["TIMEOUT"]
 
@@ -229,7 +228,7 @@ async def check_resource(
         log.warning(f"Crawling error for url {url}", exc_info=e)
 
         # Reset resource status so that it's not forbidden to be checked again
-        await Resource.update(str(resource["resource_id"]), data={"status": None})
+        await Resource.clear_job_status(str(resource["resource_id"]), "crawler")
 
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
 

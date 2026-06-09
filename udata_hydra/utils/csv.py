@@ -1,5 +1,3 @@
-import json
-
 from asyncpg import Record
 
 from udata_hydra.types import FileFormatLiteral
@@ -12,7 +10,9 @@ def detect_tabular_from_headers(check: Record | dict) -> tuple[bool, FileFormatL
         - a csv.gz (1. is the file's content binary?, 2. does the URL contain "csv.gz"?)
         - a xls(x)
     """
-    headers: dict = json.loads(check["headers"] or "{}")
+    from udata_hydra.db.codec import parse_json_value
+
+    headers: dict = parse_json_value(check.get("headers"), {})
 
     if any(
         headers.get("content-type", "").lower().startswith(ct)
