@@ -98,7 +98,7 @@ Workers process three RQ queues in order: **`high`**, **`default`**, **`low`**.
 | `analyse_geojson` | `default`, or `high` via API/CLI | When a GeoJSON file needs parsing |
 | `analyse_parquet` | `default`, or `high` via API/CLI | When a Parquet file needs metadata extraction |
 | `analyse_ogc` | `default`, or `high` via API/CLI | When an OGC service needs analysis |
-| `send` | `high` | When check data or analysis/parsing results change |
+| `send` | `high` | When hydra informs udata of a resource's changes |
 | `export_parquet` | `low` | After CSV ingest, if `DB_TO_PARQUET` is enabled |
 | `export_geojson_pmtiles` | `low` | After CSV ingest, if geo columns are detected |
 
