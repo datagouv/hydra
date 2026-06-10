@@ -13,7 +13,7 @@ Since it's called _hydra_, it also has mythical powers embedded:
 - analyse remote resource metadata over time to detect changes in the smartest way possible
 - if the remote resource is tabular (csv or excel-like), convert it to a PostgreSQL table, ready for APIfication, and to parquet to offer another distribution of the data
 - if the remote resource is a geojson, convert it to PMTiles to offer another distribution of the data
-- if the remote resource is parquet, ingest it into a PostgreSQL table for analysis
+- if the remote resource is parquet, ingest it into a PostgreSQL table for API exposition (similarly to csv/excel resources)
 - if the remote resource is an OGC service (WFS or WMS), fetch capabilities and extract layer metadata
 - probe CORS headers on external resources during crawling
 - send crawl and analysis info to a udata instance
