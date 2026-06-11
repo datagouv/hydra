@@ -42,12 +42,6 @@ async def test_create_resource(
     )
     assert resp.status == 403
 
-    for bad_headers in ({"Authorization": "Bearer"}, {"Authorization": "Basic wrong-token"}):
-        resp = await client.post(
-            path="/api/resources/", headers=bad_headers, json=udata_resource_payload
-        )
-        assert resp.status == 403
-
     # Test API call with invalid POST data
     stupid_post_data: dict = {"stupid": "stupid"}
     resp = await client.post(path="/api/resources/", headers=api_headers, json=stupid_post_data)
@@ -69,6 +63,19 @@ async def test_create_resource(
     assert resp.status == 400
     text = await resp.text()
     assert text == "Missing document body"
+
+
+async def test_create_resource_rejects_malformed_auth_headers(client, udata_resource_payload):
+    """Reject POST /api/resources when the Authorization header is malformed or uses the wrong scheme.
+    Complements the existing missing-token and wrong-token checks in test_create_resource."""
+    for headers in (
+        {"Authorization": "Bearer"},
+        {"Authorization": "Basic wrong-token"},
+    ):
+        resp = await client.post(
+            path="/api/resources/", headers=headers, json=udata_resource_payload
+        )
+        assert resp.status == 403
 
 
 async def test_update_resource(

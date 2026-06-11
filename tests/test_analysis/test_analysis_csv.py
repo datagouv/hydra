@@ -11,7 +11,7 @@ from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.analysis.exports import export_parquet
+from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.codec import parse_json_value
@@ -167,6 +167,49 @@ async def test_analyse_csv_send_udata_webhook(
     assert webhook.get("analysis:parsing:error") is None
     for k in ["parquet_size", "parquet_url"]:
         assert webhook.get(f"analysis:parsing:{k}", False) is None
+
+
+async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
+    mocker, setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
+):
+    """Parquet export is scheduled on the low RQ queue (CSV geo export disabled)."""
+    import asyncio
+
+    recorded: list[tuple[object, str | None]] = []
+
+    async def tracking_parquet_export(*args, **kwargs):
+        pass
+
+    mocker.patch("udata_hydra.analysis.csv.export_parquet", tracking_parquet_export)
+
+    def capture_enqueue(fn, *args, **kwargs):
+        recorded.append((fn, kwargs.get("_priority")))
+        kwargs = dict(kwargs)
+        kwargs.pop("_priority", None)
+        kwargs.pop("_exception", None)
+        result = fn(*args, **kwargs)
+        if asyncio.iscoroutine(result):
+            loop = asyncio.get_running_loop()
+            return loop.run_until_complete(result)
+        return result
+
+    mocker.patch("udata_hydra.utils.queue.enqueue", capture_enqueue)
+
+    check = await fake_check()
+    url = check["url"]
+    rmock.get(url, status=200, body=catalog_content)
+    with (
+        patch("udata_hydra.config.DB_TO_PARQUET", True),
+        patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
+        patch("udata_hydra.config.DB_TO_GEOJSON", False),
+    ):
+        await analyse_csv(check=check)
+
+    assert any(f is tracking_parquet_export and p == "low" for f, p in recorded)
+
+    from udata_hydra.analysis.exports import export_geojson_pmtiles as exp_geo
+
+    assert not any(f is exp_geo for f, _ in recorded)
 
 
 @pytest.mark.parametrize(
@@ -577,6 +620,70 @@ async def test_crash_after_db_insertion(
     assert updated_check is not None
     assert updated_check["parsing_error"] is not None
     assert updated_check["parquet_url"] is None
+
+
+async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fake_check, mocker):
+    """When GeoJSON/PMTiles export fails, record the error and reset the resource status.
+    Also removes leftover geojson/pmtiles files so a retry does not leave stale artifacts."""
+    check = await fake_check()
+    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_GEOJSON"})
+    remove_remainders = mocker.patch("udata_hydra.analysis.exports.remove_remainders")
+    mocker.patch("udata_hydra.analysis.exports.helpers.notify_udata")
+    mocker.patch(
+        "udata_hydra.analysis.exports.db_to_geojson_and_pmtiles",
+        side_effect=RuntimeError("export failed"),
+    )
+
+    await export_geojson_pmtiles("tbl", {}, RESOURCE_ID, check["id"], check["url"])
+
+    remove_remainders.assert_called_once_with(
+        RESOURCE_ID, ["geojson", "pmtiles", "pmtiles-journal"]
+    )
+    resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
+    assert resource["status"] is None
+    updated_check = await Check.get_by_id(check["id"])
+    assert updated_check is not None
+    assert updated_check["parsing_error"] is not None
+
+
+async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, fake_check, mocker):
+    """When GeoJSON/PMTiles export succeeds, notify udata and clear the resource status."""
+    check = await fake_check()
+    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PMTILES"})
+    notify_udata = mocker.patch(
+        "udata_hydra.analysis.exports.helpers.notify_udata",
+        new=mocker.AsyncMock(),
+    )
+    mocker.patch(
+        "udata_hydra.analysis.exports.db_to_geojson_and_pmtiles",
+        new=mocker.AsyncMock(),
+    )
+
+    await export_geojson_pmtiles("tbl", {}, RESOURCE_ID, check["id"], check["url"])
+
+    notify_udata.assert_awaited_once()
+    resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
+    assert resource["status"] is None
+
+
+async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_check, mocker):
+    """When parquet export succeeds, notify udata and clear the resource status."""
+    check = await fake_check()
+    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PARQUET"})
+    notify_udata = mocker.patch(
+        "udata_hydra.analysis.exports.helpers.notify_udata",
+        new=mocker.AsyncMock(),
+    )
+    mocker.patch("udata_hydra.analysis.csv.export_db_to_parquet", new=mocker.AsyncMock())
+
+    await export_parquet("tbl", {}, RESOURCE_ID, check["id"], check["url"])
+
+    notify_udata.assert_awaited_once()
+    resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
+    assert resource["status"] is None
 
 
 async def test_file_with_nan(
