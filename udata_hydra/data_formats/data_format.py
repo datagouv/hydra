@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 class DataFormat(ABC):
+    path: Path
     standard_mime_type: str
     valid_mime_types: set[str]
     filesize: int
@@ -12,6 +13,8 @@ class DataFormat(ABC):
     further_analysis: bool = False
     check_url: str | None = None
     inspection: dict
+    resource_id: str | None = None
+    dataset_id: str | None = None
 
     def __init__(
         self,
@@ -20,6 +23,7 @@ class DataFormat(ABC):
         table_name: str | None = None,
         inspection: dict | None = None,
         resource_id: str | None = None,
+        dataset_id: str | None = None,
     ) -> None:
         if path:
             self.path = Path(path) if isinstance(path, str) else path
@@ -31,6 +35,13 @@ class DataFormat(ABC):
         if inspection:
             # passing it on
             self.inspection = inspection
+        if resource_id:
+            self.resource_id = resource_id
+        if dataset_id:
+            self.dataset_id = dataset_id
+
+    def __call__(self, *args, **kwargs):
+        return self.__class__(*args, **kwargs)
 
     @classmethod
     def detect_from_check(cls, check: dict, **kwargs) -> bool:
@@ -46,4 +57,4 @@ class DataFormat(ABC):
         return cls.__name__.lower() == format
 
     @abstractmethod
-    def analyse(self, **kwargs): ...
+    def analyse(self, check: dict): ...

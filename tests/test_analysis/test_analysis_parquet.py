@@ -33,7 +33,6 @@ async def test_analyse_parquet(
 ):
     check = await fake_check(**check_kwargs)
     url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     df = pd.DataFrame(
         {
             "name": ["Marie", "Paul", "Léa", "Pierre"],
@@ -85,20 +84,20 @@ async def test_analyse_parquet(
     }
     rmock.get(url, status=200, body=df.to_parquet())
     with patch("udata_hydra.config.PARQUET_TO_DB", True):
-        await analyse_parquet(check=check)
-
+        table = await analyse_parquet(check=check)
+    assert table is not None
     # checking check result
     res = await db.fetchrow("SELECT * FROM checks")
-    assert res["parsing_table"] == table_name
+    assert res["parsing_table"] == table.table_name
     assert res["parsing_error"] is None
 
     # checking table content
-    rows = list(await db.fetch(f'SELECT * FROM "{table_name}"'))
+    rows = list(await db.fetch(f'SELECT * FROM "{table.table_name}"'))
     assert len(rows) == len(df)
     pgtypes = await db.fetchrow(
         "SELECT "
         + ", ".join([f"pg_typeof({col}) as {col}" for col in expected_types.keys()])
-        + f' FROM "{table_name}"'
+        + f' FROM "{table.table_name}"'
     )
 
     # checking analysis

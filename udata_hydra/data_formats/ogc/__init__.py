@@ -41,8 +41,9 @@ class Ogc(DataFormat):
     def detect_from_catalog_format(cls, format: str) -> bool:
         return False
 
-    def analyse(self, **kwargs):
-        raise NotImplementedError
+    async def analyse(self, check: dict):
+        from udata_hydra.data_formats.ogc.analyse import analyse_ogc
+        await analyse_ogc(check=check)
 
     @classmethod
     def is_valid_layer_name(cls, name: str) -> bool:

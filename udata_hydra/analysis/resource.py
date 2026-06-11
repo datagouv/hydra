@@ -9,17 +9,10 @@ from asyncpg import Record
 from dateparser import parse as date_parser
 
 from udata_hydra import config, context
-from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.analysis.geojson import analyse_geojson
-from udata_hydra.analysis.ogc import analyse_ogc
-from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.data_formats import (
-    CsvLike,
     DataFormat,
-    Geojson,
     Ogc,
-    Parquet,
     detect_data_format_from_check_or_catalog,
 )
 from udata_hydra.db.check import Check
@@ -84,7 +77,7 @@ async def analyse_resource(
 
     # could it be a CSV, parquet, GeoJSON or OGC service (WFS)?
     # If we get hints, we will analyse the file further depending on change status
-    data_format: DataFormat | None = await detect_data_format_from_check_or_catalog(check)
+    data_format: type[DataFormat] | None = await detect_data_format_from_check_or_catalog(check)
 
     max_size_allowed = (
         None
@@ -153,41 +146,23 @@ async def analyse_resource(
 
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
         if data_format is not None:
-            if issubclass(data_format, CsvLike) and tmp_file:
-                # Change status to TO_ANALYSE_CSV
-                await Resource.update(resource_id, data={"status": "TO_ANALYSE_CSV"})
-                # Analyse CSV and create a table in the CSV database
+            if issubclass(data_format, Ogc):
                 queue.enqueue(
-                    analyse_csv,
+                    data_format,
                     check=check,
-                    filename=os.path.basename(tmp_file.name),
                     _priority="high" if worker_priority == "high" else "default",
                     _exception=bool(exception),
                 )
-            elif data_format == Geojson and tmp_file:
-                await Resource.update(resource_id, data={"status": "TO_ANALYSE_GEOJSON"})
-                queue.enqueue(
-                    analyse_geojson,
-                    check=check,
-                    filename=os.path.basename(tmp_file.name),
-                    _priority="high" if worker_priority == "high" else "default",
-                    _exception=bool(exception),
+            elif tmp_file:
+                await Resource.update(resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"})
+                file = data_format(
+                    path=tmp_file.name,
+                    resource_id=resource_id,
+                    dataset_id=dataset_id,
                 )
-            elif data_format == Parquet and tmp_file:
-                await Resource.update(resource_id, data={"status": "TO_ANALYSE_PARQUET"})
                 queue.enqueue(
-                    analyse_parquet,
+                    file.analyse,
                     check=check,
-                    filename=os.path.basename(tmp_file.name),
-                    _priority="high" if worker_priority == "high" else "default",
-                    _exception=bool(exception),
-                )
-            elif issubclass(data_format, Ogc):
-                await Resource.update(resource_id, data={"status": "TO_ANALYSE_OGC"})
-                queue.enqueue(
-                    analyse_ogc,
-                    check=check,
-                    format=data_format.__name__.lower(),
                     _priority="high" if worker_priority == "high" else "default",
                     _exception=bool(exception),
                 )

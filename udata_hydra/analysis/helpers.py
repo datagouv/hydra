@@ -5,7 +5,7 @@ from typing import IO
 from asyncpg import Record
 
 from udata_hydra import config
-from udata_hydra.data_formats import DataFormat
+from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send
 
 
@@ -21,7 +21,7 @@ def get_python_type(column: dict) -> str:
 async def read_or_download_file(
     check: Record | dict,
     filename: str | None,
-    data_format: DataFormat | None,
+    data_format: type[DataFormat] | None,
     exception: Record | None,
 ) -> IO[bytes]:
     if filename:

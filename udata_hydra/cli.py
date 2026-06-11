@@ -19,19 +19,23 @@ from humanfriendly import parse_size
 from progressist import ProgressBar
 
 from udata_hydra import config
-from udata_hydra.analysis.csv import analyse_csv, csv_detective_routine
-from udata_hydra.analysis.geojson import analyse_geojson
-from udata_hydra.analysis.ogc import analyse_ogc
-from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.analysis.resource import analyse_resource
-from udata_hydra.conversion.csv_to_geojson import csv_to_geojson
-from udata_hydra.conversion.geojson_to_pmtiles import geojson_to_pmtiles
+from udata_hydra.data_formats import detect_data_format_from_check_or_catalog
+from udata_hydra.data_formats.csv_like import CsvLike
+from udata_hydra.data_formats.csv_like.analyse import analyse_csv
+from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
+from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
+from udata_hydra.data_formats.ogc import Ogc
+from udata_hydra.data_formats.parquet.analyse import analyse_parquet
+from udata_hydra.data_formats.ogc.analyse import analyse_ogc
 from udata_hydra.crawl.check_resources import (
     check_resource as crawl_check_resource,
 )
 from udata_hydra.crawl.check_resources import (
     probe_cors,
 )
+from udata_hydra.data_formats.geojson import Geojson
+from udata_hydra.data_formats.geojson.analyse import analyse_geojson
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import quiet_logs, setup_logging
@@ -468,30 +472,15 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
 
     :csv_filepath: Path to the CSV file to convert
     """
-
-    csv_path = Path(csv_filepath)
-    geojson_filepath = Path(f"{csv_path.stem}.geojson")
-
-    if not csv_path.exists():
-        log.error(f"CSV file not found: {csv_path}")
-        return
-
-    file_size = csv_path.stat().st_size
-    log.info(f"Processing CSV file: {csv_path}")
-    log.info(f"File size: {file_size} bytes")
+    csv_file = CsvLike(path=csv_filepath)
+    log.info(f"Processing CSV-like file: {csv_file.path}")
+    log.info(f"File size: {csv_file.filesize} bytes")
 
     # Analyze the CSV with csv_detective
     log.info("Analyzing CSV structure...")
     try:
         # csv_detective handles encoding detection automatically
-        inspection, df = csv_detective_routine(
-            file_path=str(csv_path),
-            output_profile=True,
-            cast_json=False,
-            num_rows=-1,
-            save_results=False,
-            verbose=True,
-        )
+        inspection = await csv_file.inspect()
 
         log.info(
             f"CSV analysis complete. Found {inspection['total_lines']} rows and {len(inspection['headers'])} columns"
@@ -508,19 +497,12 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
 
         try:
             # Convert to GeoJSON (no S3 upload, no database updates)
-            result = await csv_to_geojson(
-                file_path=str(csv_path),
-                inspection=inspection,
-                output_file_path=geojson_filepath,
-                upload_to_s3=False,
-            )
+            geojson_file = await csv_to_geojson(csv_file)
 
-            if result:
-                geojson_size, geojson_url = result
+            if geojson_file:
                 log.info("Conversion successful!")
-                log.info(f"GeoJSON file: {geojson_filepath}")
-                log.info(f"GeoJSON file size: {geojson_size} bytes")
-                log.info(f"GeoJSON file URL: {geojson_url}")
+                log.info(f"GeoJSON file: {geojson_file.path}")
+                log.info(f"GeoJSON file size: {geojson_file.filesize} bytes")
             else:
                 log.warning("No geographical data found in CSV, skipping conversion")
 
@@ -551,31 +533,22 @@ async def _convert_geojson_to_pmtiles_cli(geojson_filepath: str):
 
     :geojson_filepath: Path to the GeoJSON file to convert
     """
-    geojson_path = Path(geojson_filepath)
-
-    if not geojson_path.exists():
-        log.error(f"GeoJSON file not found: {geojson_path}")
-        return
-
-    file_size = geojson_path.stat().st_size
-    log.info(f"Processing GeoJSON file: {geojson_path}")
-    log.info(f"File size: {file_size} bytes")
+    geojson_file = Geojson(path=geojson_filepath)
+    log.info(f"Processing GeoJSON file: {geojson_file.path}")
+    log.info(f"File size: {geojson_file.filesize} bytes")
 
     # Convert to PMTiles
     log.info("Converting to PMTiles...")
 
-    pmtiles_filepath = Path(f"{geojson_path.stem}.pmtiles")
+    pmtiles_filepath = Path(f"{geojson_file.path.stem}.pmtiles")
 
     try:
         # Convert to PMTiles (no S3 upload, no database updates)
-        pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
-            input_file_path=geojson_path, output_file_path=pmtiles_filepath, upload_to_s3=False
-        )
+        pmtiles_file = geojson_to_pmtiles(file=geojson_file)
 
         log.info("Conversion successful!")
         log.info(f"PMTiles file: {pmtiles_filepath}")
-        log.info(f"PMTiles file size: {pmtiles_size} bytes")
-        log.info(f"PMTiles file URL: {pmtiles_url}")
+        log.info(f"PMTiles file size: {pmtiles_file.filesize} bytes")
 
     except Exception as e:
         log.error(f"Error during PMTiles conversion: {e}")
@@ -622,7 +595,6 @@ def analyse_parquet_cli(
 
 
 async def _analyse_ogc_cli(
-    format: str,
     check_id: str | None = None,
     url: str | None = None,
     resource_id: str | None = None,
@@ -636,13 +608,19 @@ async def _analyse_ogc_cli(
         check = {"id": None, "url": url, "resource_id": None}
 
     if not check:
+        log.warning("Could not find a check relatedto this resource, aborting")
         return
 
     if not config.OGC_ANALYSIS_ENABLED:
         log.warning("Temporarily enabling OGC analysis for CLI")
         config.override(OGC_ANALYSIS_ENABLED=True)
 
-    result = await analyse_ogc(check=check, format=format)
+    data_format = await detect_data_format_from_check_or_catalog(check)
+    if data_format is None or not issubclass(data_format, Ogc):
+        log.warning("Could not infer an OGC format for the check, aborting")
+        return
+
+    result = await analyse_ogc(data_format, check)
     if result:
         log.info("OGC analysis completed successfully.")
         log.debug(json.dumps(result, indent=2, default=str, ensure_ascii=False))

@@ -6,5 +6,5 @@ class PMTiles(DataFormat):
     standard_mime_type = "application/vnd.pmtiles"
     valid_mime_types = {standard_mime_type}
 
-    def analyse(self, **kwargs):
+    async def analyse(self, **kwargs):
         raise NotImplementedError

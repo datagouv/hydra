@@ -1,5 +1,10 @@
+from typing import TYPE_CHECKING
+
 from udata_hydra import config
 from udata_hydra.data_formats.data_format import DataFormat
+
+if TYPE_CHECKING:
+    from udata_hydra.data_formats.pmtiles import PMTiles
 
 
 class Geojson(DataFormat):
@@ -9,5 +14,10 @@ class Geojson(DataFormat):
     check_url = "geojson"
     further_analysis = True
 
-    def analyse(self, **kwargs):
-        raise NotImplementedError
+    async def analyse(self, check: dict):
+        from udata_hydra.data_formats.geojson.analyse import analyse_geojson
+        await analyse_geojson(file=self, check=check)
+
+    async def to_pmtiles(self) -> "PMTiles":
+        from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
+        return geojson_to_pmtiles(self)

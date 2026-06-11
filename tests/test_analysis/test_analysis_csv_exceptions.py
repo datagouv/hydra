@@ -6,7 +6,7 @@ import pytest
 from asyncpg import Record
 
 from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_EXCEPTION_TABLE_INDEXES
-from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.data_formats.csv_like.analyse import analyse_csv
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils.db import get_columns_with_indexes
 

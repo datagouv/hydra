@@ -3,7 +3,8 @@ import json
 
 import pytest
 
-from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.data_formats import Csvgz, Xls, Xlsx
+from udata_hydra.data_formats.csv_like.analyse import analyse_csv
 
 pytestmark = pytest.mark.asyncio
 
@@ -11,14 +12,14 @@ pytestmark = pytest.mark.asyncio
 @pytest.mark.parametrize(
     "file_and_count",
     (
-        ("20190618-annuaire-diagnostiqueurs_compressed.csv.gz", 29),
-        ("catalog.xls", 2),
-        ("catalog.xlsx", 2),
+        (Csvgz, "20190618-annuaire-diagnostiqueurs_compressed.csv.gz", 29),
+        (Xls, "catalog.xls", 2),
+        (Xlsx, "catalog.xlsx", 2),
     ),
 )
 async def test_formats_analysis(setup_catalog, rmock, db, fake_check, produce_mock, file_and_count):
-    check: dict = await fake_check()
-    filename, expected_count = file_and_count
+    data_format, filename, expected_count = file_and_count
+    check: dict = await fake_check(headers={"content-type": data_format.standard_mime_type})
     url: str = check["url"]
     table_name: str = hashlib.md5(url.encode("utf-8")).hexdigest()
     with open(f"tests/data/{filename}", "rb") as f:

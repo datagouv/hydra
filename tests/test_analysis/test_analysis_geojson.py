@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from tests.conftest import RESOURCE_ID
-from udata_hydra.analysis.geojson import analyse_geojson
+from udata_hydra.data_formats.geojson.analyse import analyse_geojson
 
 pytestmark = pytest.mark.asyncio
 
@@ -24,17 +24,13 @@ async def test_analyse_geojson(setup_catalog, db, fake_check, rmock, produce_moc
     check = await fake_check()
     url = check["url"]
     rmock.get(url, status=200, body=b"{pretend this is a geojson}")
-    pmtiles_size = 100
-    pmtiles_url = "https://bucket.s3-example.com/test.pmtiles"
     with (
         patch("udata_hydra.config.GEOJSON_TO_PMTILES", True),
         patch(
-            "udata_hydra.analysis.geojson.geojson_to_pmtiles",
-            return_value=(pmtiles_size, pmtiles_url),
+            "udata_hydra.data_formats.geojson.analyse.export_pmtiles",
+            return_value=None,
         ),
     ):
         await analyse_geojson(check=check)
     res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
     assert res["parsing_finished_at"] is not None
-    assert res["pmtiles_size"] == pmtiles_size
-    assert res["pmtiles_url"] == pmtiles_url

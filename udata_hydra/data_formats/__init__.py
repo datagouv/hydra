@@ -10,7 +10,7 @@ from udata_hydra.data_formats.pmtiles import PMTiles  # noqa
 from udata_hydra.data_formats.table import Table  # noqa
 
 
-async def detect_data_format_from_check_or_catalog(check: dict) -> DataFormat | None:
+async def detect_data_format_from_check_or_catalog(check: dict) -> type[DataFormat] | None:
     pool = await context.pool()
     async with pool.acquire() as connection:
         row: Record = await connection.fetchrow(

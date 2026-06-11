@@ -3,9 +3,8 @@ from datetime import date, datetime, timedelta, timezone
 from tempfile import NamedTemporaryFile
 
 import pytest
-from csv_detective import routine as csv_detective_routine
 
-from udata_hydra.conversion.csv_to_db import csv_to_db
+from udata_hydra.data_formats import Csv
 
 pytestmark = pytest.mark.asyncio
 
@@ -28,14 +27,11 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"{header}\n{line}".encode("utf-8"))
         fp.seek(0)
-        inspection = csv_detective_routine(
-            file_path=fp.name,
-            num_rows=-1,
-            save_results=False,
-        )
+        file = Csv(path=fp.name)
+        inspection = await file.inspect()
         assert inspection["separator"] == separator
-        await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
-    res = list(await db.fetch("SELECT * FROM test_table"))
+        table = await file.to_db(check={"url": "http://example.com/csv", "id": 1})
+    res = list(await db.fetch(f"SELECT * FROM {table.table_name}"))
     assert len(res) == 1
     cols = ["__id", "int", "float", "string", "bool"]
     assert dict(res[0]) == {k: v for k, v in zip(cols, expected)}
@@ -72,14 +68,10 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"json;date;datetime;aware_datetime\n{line}".encode("utf-8"))
         fp.seek(0)
-        inspection = csv_detective_routine(
-            file_path=fp.name,
-            encoding="utf-8",
-            num_rows=-1,
-            save_results=False,
-        )
-        await csv_to_db(fp.name, inspection=inspection, table_name="test_table", debug_insert=True)
-    res = list(await db.fetch("SELECT * FROM test_table"))
+        file = Csv(path=fp.name)
+        await file.inspect()
+        table = await file.to_db(check={"url": "http://example.com/csv", "id": 1})
+    res = list(await db.fetch(f"SELECT * FROM {table.table_name}"))
     assert len(res) == 1
     cols = ["__id", "json", "date", "datetime", "aware_datetime"]
     assert dict(res[0]) == {k: v for k, v in zip(cols, expected)}
@@ -92,14 +84,10 @@ async def test_basic_sql_injection(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write(f"int,{injection}\n1,test".encode("utf-8"))
         fp.seek(0)
-        inspection = csv_detective_routine(
-            file_path=fp.name,
-            sep=",",
-            num_rows=-1,
-            save_results=False,
-        )
-        await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
-    res = await db.fetchrow("SELECT * FROM test_table")
+        file = Csv(path=fp.name)
+        await file.inspect()
+        table = await file.to_db(check={"url": "http://example.com/csv", "id": 1})
+    res = await db.fetchrow(f"SELECT * FROM {table.table_name}")
     assert res[injection] == "test"
 
 
@@ -107,13 +95,10 @@ async def test_percentage_column(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write("int,% mon pourcent\n1,test".encode("utf-8"))
         fp.seek(0)
-        inspection = csv_detective_routine(
-            file_path=fp.name,
-            num_rows=-1,
-            save_results=False,
-        )
-        await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
-    res = await db.fetchrow("SELECT * FROM test_table")
+        file = Csv(path=fp.name)
+        await file.inspect()
+        table = await file.to_db(check={"url": "http://example.com/csv", "id": 1})
+    res = await db.fetchrow(f"SELECT * FROM {table.table_name}")
     assert res["% mon pourcent"] == "test"
 
 
@@ -121,11 +106,8 @@ async def test_reserved_column_name(db, clean_db):
     with NamedTemporaryFile() as fp:
         fp.write("int,xmin\n1,test".encode("utf-8"))
         fp.seek(0)
-        inspection = csv_detective_routine(
-            file_path=fp.name,
-            num_rows=-1,
-            save_results=False,
-        )
-        await csv_to_db(fp.name, inspection=inspection, table_name="test_table")
-    res = await db.fetchrow("SELECT * FROM test_table")
+        file = Csv(path=fp.name)
+        await file.inspect()
+        table = await file.to_db(check={"url": "http://example.com/csv", "id": 1})
+    res = await db.fetchrow(f"SELECT * FROM {table.table_name}")
     assert res["xmin__hydra_renamed"] == "test"

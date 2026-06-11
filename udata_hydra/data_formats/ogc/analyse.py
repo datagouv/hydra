@@ -9,7 +9,7 @@ from owslib.wms import WebMapService
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
-from udata_hydra.data_formats.ogc import Ogc
+from udata_hydra.data_formats.ogc import Ogc, Wfs, Wms
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.types import OgcFormatLiteral
@@ -41,7 +41,7 @@ class OgcMetadata(TypedDict):
     detected_layer: OgcLayer | None
 
 
-async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMetadata | None:
+async def analyse_ogc(data_format: type[Wfs | Wms], check: dict | Record) -> OgcMetadata | None:
     """
     Analyse an OGC endpoint and extract metadata.
 
@@ -52,6 +52,7 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
     - Supported output formats for WFS
 
     Args:
+        data_format: the correct DataFormat subclass for anlysis
         check: Dictionary containing at least "url" key. "id" and "resource_id" are optional
                (for CLI usage without database).
 
@@ -62,6 +63,7 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
         log.debug("OGC_ANALYSIS_ENABLED turned off, skipping.")
         return None
 
+    format = data_format.__name__.lower()
     if format not in config.OGC_FORMATS:
         log.debug(
             f"Only OGC service formats activated in config are : OGC_FORMATS={config.OGC_FORMATS}"
@@ -76,7 +78,7 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
 
     resource: Record | None = None
     if resource_id:
-        resource = await Resource.update(str(resource_id), {"status": "ANALYSING_OGC"})
+        resource = await Resource.update(str(resource_id), {"status": f"ANALYSING_{format.upper()}"})
 
     metadata: OgcMetadata | None = None
     try:
