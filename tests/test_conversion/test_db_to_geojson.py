@@ -9,9 +9,8 @@ from csv_detective import routine as csv_detective_routine
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.conversion.csv_to_db import csv_to_db
+from udata_hydra.conversion.csv_to_geojson import _cast_latlon, _detect_geo_columns
 from udata_hydra.conversion.db_to_geojson import db_to_geojson
-
-pytestmark = pytest.mark.asyncio
 
 
 def _build_csv_content(columns: dict, sep: str = ";") -> str:
@@ -84,6 +83,7 @@ def _assert_geojson_column_format(inspection: dict) -> None:
         },
     ),
 )
+@pytest.mark.asyncio
 async def test_db_to_geojson(db, geo_columns, clean_db):
     expected_lats = [10.0 * k * (-1) ** k for k in range(1, 6)]
     expected_lons = [20.0 * k * (-1) ** k for k in range(1, 6)]
@@ -114,6 +114,7 @@ async def test_db_to_geojson(db, geo_columns, clean_db):
             assert geo_col not in feat["properties"]
 
 
+@pytest.mark.asyncio
 async def test_db_to_geojson_with_reserved_column(db, clean_db):
     """A CSV with a reserved PG column name (xmin) should still produce valid GeoJSON from DB."""
     geojson, _ = await _geojson_from_columns(
@@ -132,6 +133,7 @@ async def test_db_to_geojson_with_reserved_column(db, clean_db):
     assert actual_xmin_values == expected_xmin_values
 
 
+@pytest.mark.asyncio
 async def test_db_to_geojson_with_quote_in_column_name(db, clean_db):
     """A CSV with a single quote in a column name should not break the SQL query."""
     geojson, _ = await _geojson_from_columns(
@@ -155,6 +157,7 @@ async def test_db_to_geojson_with_quote_in_column_name(db, clean_db):
         assert "l'adresse" in feat["properties"]
 
 
+@pytest.mark.asyncio
 async def test_db_to_geojson_lonlat(db, clean_db):
     """lonlat format ("[lon, lat]") should produce correct GeoJSON coordinates [lon, lat]."""
     lons = [20.0 * k * (-1) ** k for k in range(1, 6)]
@@ -178,6 +181,7 @@ async def test_db_to_geojson_lonlat(db, clean_db):
         assert "nombre" in feat["properties"]
 
 
+@pytest.mark.asyncio
 async def test_db_to_geojson_geojson_column(db, clean_db):
     """A column containing GeoJSON strings should produce valid geometry from DB."""
     geometries = [
@@ -201,6 +205,7 @@ async def test_db_to_geojson_geojson_column(db, clean_db):
         assert "nombre" in feat["properties"]
 
 
+@pytest.mark.asyncio
 async def test_db_to_geojson_many_columns(db, clean_db):
     """More than 50 property columns should trigger json_build_object chunking."""
     columns = {f"col_{i:03d}": range(1, 6) for i in range(55)}
@@ -218,3 +223,67 @@ async def test_db_to_geojson_many_columns(db, clean_db):
         assert f"col_{i:03d}" in feat["properties"]
     assert "lat" not in feat["properties"]
     assert "long" not in feat["properties"]
+
+
+def _geo_col(formats: dict[str, float], score: float = 1.0) -> dict:
+    return {"format": formats, "score": score}
+
+
+@pytest.mark.parametrize(
+    "inspection,expected",
+    (
+        (
+            {"columns": {"geom": _geo_col({"geojson": 1.0}), "coords": _geo_col({"latlon": 1.0})}},
+            {"geojson": "geom"},
+        ),
+        (
+            {"columns": {"coords": _geo_col({"latlon": 1.0})}},
+            {"latlon": "coords"},
+        ),
+        (
+            {"columns": {"geopoint": _geo_col({"lonlat": 1.0})}},
+            {"lonlat": "geopoint"},
+        ),
+        (
+            {
+                "columns": {
+                    "lat": _geo_col({"latitude": 1.0}),
+                    "long": _geo_col({"longitude": 1.0}),
+                }
+            },
+            {"latitude": "lat", "longitude": "long"},
+        ),
+        (
+            {"columns": {"lat": _geo_col({"latitude": 1.0})}},
+            None,
+        ),
+        (
+            {"columns": {"nombre": _geo_col({}), "score": _geo_col({})}},
+            None,
+        ),
+        (
+            {
+                "columns": {
+                    "low": _geo_col({"latlon": 1.0}, score=0.3),
+                    "high": _geo_col({"latlon": 1.0}, score=0.9),
+                }
+            },
+            {"latlon": "high"},
+        ),
+    ),
+)
+def test_detect_geo_columns(inspection: dict, expected: dict[str, str] | None) -> None:
+    """Pick geo columns from csv-detective inspection with correct format priority."""
+    assert _detect_geo_columns(inspection) == expected
+
+
+@pytest.mark.parametrize(
+    "latlon,expected",
+    (
+        ("1.5,2.5", [2.5, 1.5]),
+        ("[1.5, 2.5]", [2.5, 1.5]),
+    ),
+)
+def test_cast_latlon(latlon: str, expected: list[float]) -> None:
+    """Convert lat,lon strings to GeoJSON [lon, lat] coordinate order."""
+    assert _cast_latlon(latlon) == expected
