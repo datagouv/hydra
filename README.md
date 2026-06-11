@@ -13,6 +13,9 @@ Since it's called _hydra_, it also has mythical powers embedded:
 - analyse remote resource metadata over time to detect changes in the smartest way possible
 - if the remote resource is tabular (csv or excel-like), convert it to a PostgreSQL table, ready for APIfication, and to parquet to offer another distribution of the data
 - if the remote resource is a geojson, convert it to PMTiles to offer another distribution of the data
+- if the remote resource is parquet, ingest it into a PostgreSQL table for API exposition (similarly to csv/excel resources)
+- if the remote resource is an OGC service (WFS or WMS), fetch capabilities and extract layer metadata
+- probe CORS headers on external resources during crawling
 - send crawl and analysis info to a udata instance
 
 ## 🏗️ Architecture schema
@@ -32,7 +35,7 @@ This project uses `libmagic`, which needs to be installed on your system, e.g.:
 
 `brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on Linux.
 
-This project uses Python >=3.11 and [uv](https://docs.astral.sh/uv/) to manage dependencies.
+This project uses Python >=3.11,<3.15 (3.14 recommended) and [uv](https://docs.astral.sh/uv/) to manage dependencies.
 
 ## 🚀 Installation
 
@@ -86,7 +89,20 @@ To empty all the queues:
 
 `uv run rq empty -c udata_hydra.worker low default high`
 
-CSV Parquet and GeoJSON/PMTiles exports from parsed tables are queued as separate jobs on the **`low`** queue (`export_parquet`, `export_geojson_pmtiles`), so you can run dedicated workers or tune capacity for heavy S3 and tippecanoe work without blocking CSV ingest on **`default`** / **`high`**.
+Workers process three RQ queues in order: **`high`**, **`default`**, **`low`**.
+
+| Function | Queue | When it runs |
+|----------|-------|--------------|
+| `analyse_resource` | `default` (priority crawl) or `low` (regular crawl) | After a successful crawl/check |
+| `analyse_csv` | `default`, or `high` via API/CLI | When a tabular file needs parsing |
+| `analyse_geojson` | `default`, or `high` via API/CLI | When a GeoJSON file needs parsing |
+| `analyse_parquet` | `default`, or `high` via API/CLI | When a Parquet file needs metadata extraction |
+| `analyse_ogc` | `default`, or `high` via API/CLI | When an OGC service needs analysis |
+| `send` | `high` | When hydra informs udata of a resource's changes |
+| `export_parquet` | `low` | After CSV ingest, if `DB_TO_PARQUET` is enabled |
+| `export_geojson_pmtiles` | `low` | After CSV ingest, if geo columns are detected |
+
+Manual checks (`POST /api/checks`, CLI `check-resource`) use **`high`** for the full pipeline. Regular crawls enqueue `analyse_resource` on **`low`**, but follow-up parsing jobs still run on **`default`**.
 
 ## 📊 CSV conversion to database
 
@@ -205,6 +221,7 @@ The API serves the following endpoints:
 - `GET` on `/api/checks/all?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
 - `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurrences grouped by a `column` for a specific `date`
 - `GET` on `/api/checks/stats` to get aggregates for the latest HTTP check per eligible resource (ok / error / timeout counts and HTTP status code distribution)
+- `POST` on `/api/checks` to trigger an on-demand crawl and analysis for a given `resource_id` (returns the created check)
 
 *Related to resources:*
 - `GET` on `/api/resources/{resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
@@ -213,11 +230,6 @@ The API serves the following endpoints:
 - `POST` on `/api/resources` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
 - `PUT` on `/api/resources/{resource_id}` to update a resource in the DB "catalog" table
 - `DELETE` on `/api/resources/{resource_id}` to delete a resource in the DB "catalog" table
-
-> :warning: **Warning: the following routes are deprecated and will be removed in the future:**
-> - `POST` on `/api/resource/created` -> use `POST` on `/api/resources/` instead
-> - `POST` on `/api/resource/updated` -> use `PUT` on `/api/resources/` instead
-> - `POST` on `/api/resource/deleted` -> use `DELETE` on `/api/resources/` instead
 
 *Related to resources exceptions:*
 - `GET` on `/api/resources-exceptions` to get the list of all resources exceptions
@@ -228,10 +240,21 @@ The API serves the following endpoints:
 *Related to some status and health check:*
 - `GET` on `/api/status/crawler` to get the crawling status
 - `GET` on `/api/status/worker` to get the worker status
-- `GET` on `/api/health` to get the API version number and environment
+- `GET` on `/api/health` to get version, Python version, environment, uptime, and enabled feature flags
 
 You may want to use a helper such as [Bruno](https://www.usebruno.com/) to handle API calls, in which case all the endpoints are ready to use [here](https://github.com/datagouv/api-calls).
 More details about some endpoints are provided below with examples, but not for all of them:
+
+#### Create a check (on-demand crawl)
+
+Requires a Bearer token. Accepts a JSON body with `resource_id` and optional `force_analysis` (defaults to `true`).
+
+```bash
+$ curl -X POST http://localhost:8000/api/checks \
+       -H 'Authorization: Bearer <myAPIkey>' \
+       -H 'Content-Type: application/json' \
+       -d '{"resource_id": "b3678c59-5b35-43ad-9379-fce29e5b56fe"}' | json_pp
+```
 
 #### Get latest check
 
@@ -511,6 +534,24 @@ $ curl -s "http://localhost:8000/api/checks/stats" | json_pp
 }
 ```
 
+#### Get health status
+
+```bash
+$ curl -s "http://localhost:8000/api/health" | json_pp
+{
+   "version" : "2.12.0",
+   "python_version" : "3.14.0",
+   "environment" : "local",
+   "uptime_since" : "2026-06-09T10:00:00.123456+00:00",
+   "csv_analysis" : true,
+   "csv_to_db" : true,
+   "db_to_parquet" : false,
+   "db_to_geojson" : false,
+   "geojson_to_pmtiles" : false,
+   "parquet_to_db" : false
+}
+```
+
 ## 🔗 Using Webhook integration
 
 **Set the config values**
@@ -559,12 +600,19 @@ Usage:
 ### 📝 Logging & Debugging
 
 The log level can be adjusted using the environment variable LOG_LEVEL.
-For example, to set the log level to `DEBUG` when initializing the database, use `LOG_LEVEL="DEBUG" udata-hydra init_db `.
+For example, to set the log level to `DEBUG` when migrating the database, use `LOG_LEVEL="DEBUG" uv run udata-hydra migrate`.
 
 ### 📋 Writing a migration
 
-1. Add a file named `migrations/{YYYYMMDD}_{description}.sql` and write the SQL you need to perform migration.
-2. `udata-hydra migrate` will migrate the database as needed.
+Hydra maintains two migration directories, one per database:
+
+- `udata_hydra/migrations/main/` — catalog, checks, and metadata
+- `udata_hydra/migrations/csv/` — CSV conversion tables
+
+To add a migration:
+
+1. Add a file named `{YYYYMMDD}_{description}.sql` in the appropriate directory above.
+2. Run `uv run udata-hydra migrate` to apply pending migrations (both databases by default; pass `--dbs main` or `--dbs csv` to target one).
 
 ## 🚀 Deployment
 

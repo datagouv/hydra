@@ -75,7 +75,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "catalog_harvested: use catalog_harvested.csv as source",
 ]
-addopts = "--cov=udata_hydra --cov-report term-missing --cov-branch --cov-fail-under=79"
+addopts = "--cov=udata_hydra --cov-report term-missing --cov-branch --cov-fail-under=83"
 
 [tool.ty]
 [tool.ty.rules]
@@ -89,6 +89,10 @@ line-length = 100
 [tool.setuptools_scm]
 version_scheme = "guess-next-dev"
 local_scheme = "no-local-version"
+
+# Provisional: drop when sentry-sdk requires a patched urllib3 lower bound (GHSA-mf9v-mfxr-j63j).
+[tool.uv]
+constraint-dependencies = ["urllib3>=2.7.0"]
 
 [tool.uv.build-backend]
 module-name = "udata_hydra"

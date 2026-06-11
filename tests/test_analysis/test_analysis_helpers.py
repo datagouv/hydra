@@ -1,5 +1,7 @@
+import json
 import os
 import tempfile
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -55,3 +57,94 @@ async def test_read_or_download_file_missing_file():
         )
 
     assert "Temporary file not found" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "missing",
+    ("check", "resource"),
+)
+async def test_notify_udata_raises_without_check_or_resource(missing):
+    resource = {"dataset_id": "dataset-id"}
+    check = {
+        "resource_id": "resource-id",
+        "parsing_started_at": datetime.now(timezone.utc),
+        "parsing_finished_at": datetime.now(timezone.utc),
+    }
+    if missing == "check":
+        check = None
+    else:
+        resource = None
+
+    with pytest.raises(ValueError, match="Tried to notify udata"):
+        await helpers.notify_udata(resource, check)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "config_flag,check_fields,expected_document_keys",
+    (
+        (
+            "CSV_TO_DB",
+            {"parsing_table": "tbl_abc"},
+            ["analysis:parsing:parsing_table"],
+        ),
+        (
+            "DB_TO_PARQUET",
+            {"parquet_url": "https://example.com/file.parquet", "parquet_size": 42},
+            ["analysis:parsing:parquet_url", "analysis:parsing:parquet_size"],
+        ),
+        (
+            "GEOJSON_TO_PMTILES",
+            {"pmtiles_url": "https://example.com/file.pmtiles", "pmtiles_size": 99},
+            ["analysis:parsing:pmtiles_url", "analysis:parsing:pmtiles_size"],
+        ),
+        (
+            "DB_TO_GEOJSON",
+            {"geojson_url": "https://example.com/file.geojson", "geojson_size": 77},
+            ["analysis:parsing:geojson_url", "analysis:parsing:geojson_size"],
+        ),
+    ),
+)
+async def test_notify_udata_includes_optional_payload_fields(
+    mocker, config_flag, check_fields, expected_document_keys
+):
+    enqueue = mocker.patch("udata_hydra.analysis.helpers.queue.enqueue")
+    mocker.patch(f"udata_hydra.config.{config_flag}", True)
+
+    started_at = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    finished_at = datetime(2024, 1, 2, tzinfo=timezone.utc)
+    check = {
+        "resource_id": "resource-id",
+        "parsing_started_at": started_at,
+        "parsing_finished_at": finished_at,
+        **check_fields,
+    }
+    resource = {"dataset_id": "dataset-id"}
+
+    await helpers.notify_udata(resource, check)
+
+    enqueue.assert_called_once()
+    document = enqueue.call_args.kwargs["document"].payload
+    for key in expected_document_keys:
+        assert key in document
+
+
+@pytest.mark.asyncio
+async def test_notify_udata_parses_string_ogc_metadata(mocker):
+    enqueue = mocker.patch("udata_hydra.analysis.helpers.queue.enqueue")
+    mocker.patch("udata_hydra.config.OGC_ANALYSIS_ENABLED", True)
+
+    ogc_metadata = {"service": "WMS", "version": "1.3.0"}
+    check = {
+        "resource_id": "resource-id",
+        "parsing_started_at": datetime(2024, 1, 1, tzinfo=timezone.utc),
+        "parsing_finished_at": datetime(2024, 1, 2, tzinfo=timezone.utc),
+        "ogc_metadata": json.dumps(ogc_metadata),
+    }
+    resource = {"dataset_id": "dataset-id"}
+
+    await helpers.notify_udata(resource, check)
+
+    document = enqueue.call_args.kwargs["document"].payload
+    assert document["analysis:parsing:ogc_metadata"] == ogc_metadata
