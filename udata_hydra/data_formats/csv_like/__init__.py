@@ -45,12 +45,14 @@ class CsvLike(DataFormat):
 
     async def analyse(self, check: dict, debug_insert: bool = False):
         from udata_hydra.data_formats.csv_like.analyse import analyse_csv
+
         return await analyse_csv(check=check, file=self, debug_insert=debug_insert)
 
     async def to_db(
         self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False
     ) -> "Table":
         from udata_hydra.data_formats.csv_like.to_db import csv_to_db
+
         if not config.CSV_TO_DB:
             log.debug(
                 "CSV_TO_DB is off, skipping Postgres parsing table ingest and deferred export jobs."
@@ -64,6 +66,7 @@ class CsvLike(DataFormat):
 
     async def to_geojson(self) -> "Geojson|None ":
         from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
+
         return await csv_to_geojson(file=self)
 
 

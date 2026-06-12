@@ -59,6 +59,7 @@ async def parquet_to_db(
     :debug_insert: insert record one by one instead of using postgresql COPY
     """
     from udata_hydra.data_formats import Table
+
     table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
 
     log.debug(f"Converting from parquet to db for {table_name}")
@@ -80,7 +81,9 @@ async def parquet_to_db(
         await Resource.update(file.resource_id, {"status": "INSERTING_IN_DB"})
 
     # build a `column_name: type` mapping and explicitely rename reserved column names
-    columns = {db_col_name(c): helpers.get_python_type(v) for c, v in file.inspection["columns"].items()}
+    columns = {
+        db_col_name(c): helpers.get_python_type(v) for c, v in file.inspection["columns"].items()
+    }
 
     q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
@@ -128,5 +131,8 @@ async def parquet_to_db(
     check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
     await insert_tables_index_entry(table_name, file.inspection, check, file.dataset_id)
     return Table(
-        table_name=table_name, inspection=file.inspection, resource_id=file.resource_id, dataset_id=file.dataset_id
+        table_name=table_name,
+        inspection=file.inspection,
+        resource_id=file.resource_id,
+        dataset_id=file.dataset_id,
     )

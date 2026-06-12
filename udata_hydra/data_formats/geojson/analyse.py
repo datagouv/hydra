@@ -48,7 +48,9 @@ async def analyse_geojson(
             data_format=Geojson,
             exception=exception,
         )
-        file = Geojson(path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id"))
+        file = Geojson(
+            path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id")
+        )
     timer.mark("download-file")
 
     # Convert to PMTiles

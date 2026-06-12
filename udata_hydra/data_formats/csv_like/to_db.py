@@ -37,6 +37,7 @@ async def csv_to_db(
     :debug_insert: insert record one by one instead of using postgresql COPY
     """
     from udata_hydra.data_formats import Table
+
     table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
     inspection: dict | None = file.inspection
     log.debug(

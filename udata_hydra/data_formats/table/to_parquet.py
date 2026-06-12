@@ -65,5 +65,8 @@ async def db_to_parquet(table: Table) -> "Parquet":
             writer.close()
 
     return Parquet(
-        path=parquet_path, inspection=table.inspection, resource_id=table.resource_id, dataset_id=table.dataset_id
+        path=parquet_path,
+        inspection=table.inspection,
+        resource_id=table.resource_id,
+        dataset_id=table.dataset_id,
     )

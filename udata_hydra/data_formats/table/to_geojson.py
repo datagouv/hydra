@@ -3,8 +3,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from udata_hydra import context
-from udata_hydra.data_formats.csv_like.to_geojson import DEFAULT_GEOJSON_FILENAME, _detect_geo_columns
 from udata_hydra.data_formats import Table
+from udata_hydra.data_formats.csv_like.to_geojson import (
+    DEFAULT_GEOJSON_FILENAME,
+    _detect_geo_columns,
+)
 from udata_hydra.db import db_col_name
 
 if TYPE_CHECKING:
@@ -110,6 +113,7 @@ async def db_to_geojson(table: Table) -> "Geojson|None":
         geojson_file: a Geojson instance.
     """
     from udata_hydra.data_formats import Geojson
+
     geo = _detect_geo_columns(table.inspection)
     if geo is None:
         log.debug("No geographical columns found, skipping")
@@ -141,5 +145,8 @@ async def db_to_geojson(table: Table) -> "Geojson|None":
                 f.write("]}")
 
     return Geojson(
-        path=geojson_path, inspection=table.inspection, resource_id=table.resource_id, dataset_id=table.dataset_id,
+        path=geojson_path,
+        inspection=table.inspection,
+        resource_id=table.resource_id,
+        dataset_id=table.dataset_id,
     )

@@ -2,16 +2,15 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from udata_hydra.data_formats.table import Table
-from udata_hydra.data_formats.table import Table
 
 from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
-from udata_hydra.data_formats.csv_like.to_geojson import _detect_geo_columns
 from udata_hydra.data_formats import CsvLike, Table, detect_data_format_from_check_or_catalog
+from udata_hydra.data_formats.csv_like.to_geojson import _detect_geo_columns
+from udata_hydra.data_formats.table import Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -65,7 +64,9 @@ async def analyse_csv(
                 data_format=data_format,
                 exception=exception,
             )
-            file = data_format(path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id"))
+            file = data_format(
+                path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id")
+            )
         timer.mark("download-file")
 
         check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore[assignment]

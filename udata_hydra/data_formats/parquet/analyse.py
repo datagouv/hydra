@@ -53,7 +53,9 @@ async def analyse_parquet(
             data_format=Parquet,
             exception=exception,
         )
-        file = Parquet(path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id"))
+        file = Parquet(
+            path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id")
+        )
     timer.mark("download-file")
 
     check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore[assignment]

@@ -95,7 +95,7 @@ class TestOgcAnalysis:
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
             data_format = await detect_data_format_from_check_or_catalog(check)
-            assert data_format is not None and issubclass(data_format, (Wfs, Wms)) and issubclass(data_format, (Wfs, Wms))
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms))
 
         mock_crs_4326 = MagicMock(spec=Crs)
         mock_crs_4326.getcode.return_value = "EPSG:4326"
@@ -222,7 +222,9 @@ class TestOgcAnalysis:
                 },
                 clear=False,
             ),
-            patch("udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock),
+            patch(
+                "udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock
+            ),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
@@ -251,7 +253,9 @@ class TestOgcAnalysis:
                 {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
                 clear=False,
             ),
-            patch("udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock),
+            patch(
+                "udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock
+            ),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
@@ -289,7 +293,9 @@ class TestOgcAnalysis:
                 {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
                 clear=False,
             ),
-            patch("udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock),
+            patch(
+                "udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock
+            ),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
@@ -325,7 +331,9 @@ class TestOgcAnalysis:
                 {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
                 clear=False,
             ),
-            patch("udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock),
+            patch(
+                "udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock
+            ),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
@@ -361,7 +369,9 @@ class TestOgcAnalysis:
                 {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
                 clear=False,
             ),
-            patch("udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock),
+            patch(
+                "udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock
+            ),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
@@ -397,7 +407,9 @@ class TestOgcAnalysis:
                 {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
                 clear=False,
             ),
-            patch("udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock),
+            patch(
+                "udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock
+            ),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
@@ -480,7 +492,9 @@ class TestOgcAnalysis:
                 {"wms": {"service": lambda *a, **kw: mock_wms, "versions": ["1.3.0"]}},
                 clear=False,
             ),
-            patch("udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock),
+            patch(
+                "udata_hydra.data_formats.ogc.analyse.helpers.notify_udata", new_callable=AsyncMock
+            ),
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]

@@ -6,9 +6,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.data_formats import CsvLike, Parquet
 from udata_hydra.data_formats.table.to_parquet import DEFAULT_PARQUET_FILENAME
-from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.utils.casting import iter_tabular_rows
 
 pytestmark = pytest.mark.asyncio
@@ -99,9 +99,7 @@ async def test_export_db_to_parquet(fake_check, mocker, parquet_config, clean_db
         return await table.to_parquet()
 
     if not expected_conversion:
-        with patch(
-            "udata_hydra.data_formats.table.to_parquet.db_to_parquet"
-        ) as conversion:
+        with patch("udata_hydra.data_formats.table.to_parquet.db_to_parquet") as conversion:
             assert await run_export() is None
             conversion.assert_not_called()
             assert not Path(DEFAULT_PARQUET_FILENAME).exists()

@@ -2,14 +2,13 @@ import json
 
 import pytest
 
+from tests.conftest import RESOURCE_ID
 from udata_hydra.data_formats import (
     Csvgz,
     Xls,
     Xlsx,
     detect_data_format_from_check_or_catalog,
 )
-
-from tests.conftest import RESOURCE_ID
 
 
 @pytest.mark.parametrize(

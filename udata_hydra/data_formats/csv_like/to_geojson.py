@@ -129,14 +129,15 @@ async def csv_to_geojson(file: CsvLike) -> "Geojson|None":
     template["features"] = streamable_list(get_features(file.path, file.inspection, geo))
 
     geojson_path = Path(
-        f"{file.resource_id}.geojson"
-        if file.resource_id is not None
-        else DEFAULT_GEOJSON_FILENAME
+        f"{file.resource_id}.geojson" if file.resource_id is not None else DEFAULT_GEOJSON_FILENAME
     )
 
     with geojson_path.open("w") as f:
         json.dump(template, f, indent=4, ensure_ascii=False, default=str)
 
     return Geojson(
-        path=geojson_path, inspection=file.inspection, resource_id=file.resource_id, dataset_id=file.dataset_id,
+        path=geojson_path,
+        inspection=file.inspection,
+        resource_id=file.resource_id,
+        dataset_id=file.dataset_id,
     )

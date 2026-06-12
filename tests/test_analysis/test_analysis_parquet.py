@@ -9,8 +9,8 @@ import pyarrow.parquet as pq
 import pytest
 
 from tests.conftest import RESOURCE_ID
-from udata_hydra.data_formats.parquet.analyse import analyse_parquet
 from udata_hydra.data_formats import Parquet
+from udata_hydra.data_formats.parquet.analyse import analyse_parquet
 from udata_hydra.utils import ParseException
 
 pytestmark = pytest.mark.asyncio
@@ -129,7 +129,7 @@ async def test_parquet_to_db_rejects_too_long_column_name(fake_check):
     check = await fake_check()
     with (
         patch("udata_hydra.config.NAMEDATALEN", 10),
-        patch("udata_hydra.data_formats.data_format.os.path.getsize", return_value=10)
+        patch("udata_hydra.data_formats.data_format.os.path.getsize", return_value=10),
     ):
         file = Parquet(path="file.parquet", inspection=inspection)
         with pytest.raises(ParseException) as exc:

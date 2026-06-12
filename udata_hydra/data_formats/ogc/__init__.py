@@ -44,6 +44,7 @@ class Ogc(DataFormat):
     @classmethod
     async def analyse(cls, check: dict):
         from udata_hydra.data_formats.ogc.analyse import analyse_ogc
+
         return await analyse_ogc(data_format=cls, check=check)
 
     @classmethod

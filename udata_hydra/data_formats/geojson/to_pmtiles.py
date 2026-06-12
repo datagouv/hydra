@@ -24,10 +24,9 @@ def geojson_to_pmtiles(file: Geojson) -> "PMTiles":
         pmtiles_file: a PMTiles instance.
     """
     from udata_hydra.data_formats import PMTiles
+
     pmtiles_path = Path(
-        f"{file.resource_id}.pmtiles"
-        if file.resource_id is not None
-        else DEFAULT_PMTILES_FILENAME
+        f"{file.resource_id}.pmtiles" if file.resource_id is not None else DEFAULT_PMTILES_FILENAME
     )
     log.debug(f"Converting GeoJSON file '{file.path}' to PMTiles file '{pmtiles_path}'")
 

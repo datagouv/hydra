@@ -7,8 +7,8 @@ from unittest.mock import patch
 import pytest
 
 from tests.conftest import RESOURCE_ID
-from udata_hydra.data_formats.csv_like.to_geojson import _cast_latlon, _detect_geo_columns
 from udata_hydra.data_formats import Csv
+from udata_hydra.data_formats.csv_like.to_geojson import _cast_latlon, _detect_geo_columns
 
 
 def _build_csv_content(columns: dict, sep: str = ";") -> str:
@@ -40,12 +40,12 @@ async def _geojson_from_columns(
         fp.write(_build_csv_content(columns, sep).encode("utf-8"))
         fp.seek(0)
         file = Csv(path=fp.name, resource_id=RESOURCE_ID)
-        inspection= await file.inspect()
+        inspection = await file.inspect()
         if inspection_check is not None:
             inspection_check(inspection)
 
         table = await file.to_db(check=check)
-        geojson_file  = await table.to_geojson()
+        geojson_file = await table.to_geojson()
         assert geojson_file is not None
     with open(output_path) as f:
         geojson: dict = json.load(f)

@@ -23,7 +23,7 @@ pytestmark = pytest.mark.asyncio
     ),
 )
 async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db, fake_check):
-    check= await fake_check()
+    check = await fake_check()
     line, expected, separator = line_expected
     header = separator.join(["int", "float", "string", "bool"])
     with NamedTemporaryFile() as fp:
@@ -66,7 +66,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db, fake_c
     ),
 )
 async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db, fake_check):
-    check= await fake_check()
+    check = await fake_check()
     line, expected = line_expected
     with NamedTemporaryFile() as fp:
         fp.write(f"json;date;datetime;aware_datetime\n{line}".encode("utf-8"))
@@ -81,7 +81,7 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db, fake_
 
 
 async def test_basic_sql_injection(db, clean_db, fake_check):
-    check= await fake_check()
+    check = await fake_check()
     # tries to execute
     # CREATE TABLE table_name("int" integer, "col_name" text);DROP TABLE toto;--)
     injection = 'col_name" text);DROP TABLE toto;--'
@@ -97,7 +97,7 @@ async def test_basic_sql_injection(db, clean_db, fake_check):
 
 
 async def test_percentage_column(db, clean_db, fake_check):
-    check= await fake_check()
+    check = await fake_check()
     with NamedTemporaryFile() as fp:
         fp.write("int,% mon pourcent\n1,test".encode("utf-8"))
         fp.seek(0)
@@ -109,7 +109,7 @@ async def test_percentage_column(db, clean_db, fake_check):
 
 
 async def test_reserved_column_name(db, clean_db, fake_check):
-    check= await fake_check()
+    check = await fake_check()
     with NamedTemporaryFile() as fp:
         fp.write("int,xmin\n1,test".encode("utf-8"))
         fp.seek(0)

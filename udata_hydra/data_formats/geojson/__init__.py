@@ -16,8 +16,10 @@ class Geojson(DataFormat):
 
     async def analyse(self, check: dict):
         from udata_hydra.data_formats.geojson.analyse import analyse_geojson
+
         await analyse_geojson(file=self, check=check)
 
     async def to_pmtiles(self) -> "PMTiles":
         from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
+
         return geojson_to_pmtiles(self)

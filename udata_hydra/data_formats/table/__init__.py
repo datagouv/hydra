@@ -27,6 +27,7 @@ class Table(DataFormat):
 
     async def to_parquet(self) -> "Parquet|None":
         from udata_hydra.data_formats.table.to_parquet import db_to_parquet
+
         if (
             config.DB_TO_PARQUET
             and int(self.inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET  # type: ignore[arg-type]
@@ -35,5 +36,6 @@ class Table(DataFormat):
 
     async def to_geojson(self) -> "Geojson|None":
         from udata_hydra.data_formats.table.to_geojson import db_to_geojson
+
         if config.DB_TO_GEOJSON:
             return await db_to_geojson(table=self)

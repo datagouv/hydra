@@ -52,7 +52,6 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     timer = Timer("geojson-to-pmtiles-performance-test")
 
     with patch("udata_hydra.config.REMOVE_GENERATED_FILES", False):
-
         # Test the performance of geojson_to_pmtiles with the real file
         pmtiles_file = await geojson_file.to_pmtiles()
         timer.mark("pmtiles-conversion")
@@ -63,7 +62,9 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
     assert header == b"PMTiles"
 
     # The size should be significantly larger than the small test file
-    assert pmtiles_file.filesize > 5000  # Should be much larger than the 850-900 range of small file
+    assert (
+        pmtiles_file.filesize > 5000
+    )  # Should be much larger than the 850-900 range of small file
 
     # Stop timer and log performance results
     timer.stop()

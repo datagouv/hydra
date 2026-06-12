@@ -49,12 +49,14 @@ class Parquet(DataFormat):
 
     async def analyse(self, check: dict, debug_insert: bool = False):
         from udata_hydra.data_formats.parquet.analyse import analyse_parquet
+
         return await analyse_parquet(check=check, file=self, debug_insert=debug_insert)
 
     async def to_db(
         self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False
     ) -> "Table":
         from udata_hydra.data_formats.parquet.to_db import parquet_to_db
+
         return await parquet_to_db(
             file=self,
             check=check,

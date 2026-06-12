@@ -154,7 +154,9 @@ async def analyse_resource(
                     _exception=bool(exception),
                 )
             elif tmp_file:
-                await Resource.update(resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"})
+                await Resource.update(
+                    resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
+                )
                 file = data_format(
                     path=tmp_file.name,
                     resource_id=resource_id,

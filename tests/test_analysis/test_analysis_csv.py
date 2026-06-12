@@ -13,7 +13,7 @@ from yarl import URL
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.crawl.check_resources import check_resource
-from udata_hydra.data_formats import Geojson, PMTiles, Parquet, Table
+from udata_hydra.data_formats import Geojson, Parquet, PMTiles, Table
 from udata_hydra.data_formats.csv_like.analyse import analyse_csv
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -183,7 +183,9 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
     async def tracking_parquet_export(*args, **kwargs):
         pass
 
-    mocker.patch("udata_hydra.data_formats.csv_like.analyse.export_parquet", tracking_parquet_export)
+    mocker.patch(
+        "udata_hydra.data_formats.csv_like.analyse.export_parquet", tracking_parquet_export
+    )
 
     def capture_enqueue(fn, *args, **kwargs):
         recorded.append((fn, kwargs.get("_priority")))
@@ -592,7 +594,9 @@ async def test_crash_after_db_insertion(
     with (
         patch("udata_hydra.config.DB_TO_PARQUET", True),
         patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
-        patch("udata_hydra.data_formats.csv_like.analyse.queue.enqueue", side_effect=capture_enqueue),
+        patch(
+            "udata_hydra.data_formats.csv_like.analyse.queue.enqueue", side_effect=capture_enqueue
+        ),
     ):
         await analyse_csv(check=check)
 
@@ -602,10 +606,7 @@ async def test_crash_after_db_insertion(
         "udata_hydra.data_formats.table.to_parquet.db_to_parquet",
         new=_crash,
     ):
-        await export_parquet(
-            table=job_kw["table"],
-            check=job_kw["check"]
-        )
+        await export_parquet(table=job_kw["table"], check=job_kw["check"])
     # we should still have the table and its reference in tables_index
     await db.execute(f'SELECT * FROM "{table_name}"')
     rows = list(
@@ -637,9 +638,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
         check=check,
     )
 
-    remove_remainders.assert_called_once_with(
-        RESOURCE_ID, ["geojson"]
-    )
+    remove_remainders.assert_called_once_with(RESOURCE_ID, ["geojson"])
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
     assert resource["status"] is None
@@ -658,7 +657,9 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
     )
     mocker.patch(
         "udata_hydra.analysis.exports.Table.to_geojson",
-        new=mocker.AsyncMock(return_value=Geojson(path="tests/data/valid.geojson", resource_id=RESOURCE_ID)),
+        new=mocker.AsyncMock(
+            return_value=Geojson(path="tests/data/valid.geojson", resource_id=RESOURCE_ID)
+        ),
     )
     mocker.patch(
         "udata_hydra.analysis.exports.Geojson.to_pmtiles",
