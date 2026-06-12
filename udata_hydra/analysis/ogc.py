@@ -37,7 +37,6 @@ class OgcLayer(TypedDict):
 class OgcMetadata(TypedDict):
     format: str
     version: str
-    layers: list[OgcLayer]
     output_formats: list[str]
     detected_layer: OgcLayer | None
 
@@ -49,7 +48,7 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
     Currently supports WFS and WMS. Connects to the service, retrieves GetCapabilities,
     and extracts:
     - Service format and version
-    - Available layers with their CRS options
+    - Detected layer with its CRS options if any
     - Supported output formats for WFS
 
     Args:
@@ -111,10 +110,10 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
 
         # Extract service metadata
         try:
+            layers = []
             metadata = {
                 "format": format,
                 "version": version,
-                "layers": [],
                 "output_formats": [],
                 "detected_layer": None,
             }
@@ -143,7 +142,7 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
                         else crs_options[0]  # crs_options[0] is already a str in the case of WMS
                     )
 
-                metadata["layers"].append(ogc_layer)
+                layers.append(ogc_layer)
 
             # Detect layer name from URL params or resource title
             resource_title = None
@@ -153,20 +152,16 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
                     resource_title = resource_record["title"]
             candidate = detect_layer_name(url, resource_title)
             # Only keep the candidate if it matches one of the layer names
-            if candidate and metadata["layers"]:
+            if candidate and layers:
                 # Exact match (including namespace)
-                exact = next(
-                    (layer for layer in metadata["layers"] if layer["name"] == candidate), None
-                )
+                exact = next((layer for layer in layers if layer["name"] == candidate), None)
                 if exact:
                     metadata["detected_layer"] = exact
                 else:
                     # Try matching against local name (without namespace prefix),
                     # but only if there's exactly one match to avoid ambiguity
                     matches = [
-                        layer
-                        for layer in metadata["layers"]
-                        if layer["name"].split(":")[-1] == candidate
+                        layer for layer in layers if layer["name"].split(":")[-1] == candidate
                     ]
                     if len(matches) == 1:
                         metadata["detected_layer"] = matches[0]
@@ -188,7 +183,12 @@ async def analyse_ogc(check: dict | Record, format: OgcFormatLiteral) -> OgcMeta
                 },
             )  # type: ignore
 
-        log.debug(f"OGC analysis complete for {url}: {len(metadata['layers'])} layers found")
+        log.debug(
+            f"OGC analysis complete for {url}: {len(layers)} layers found"
+            + f"; detected layer: {metadata['detected_layer']['name']}"
+            if metadata["detected_layer"]
+            else ""
+        )
 
         return metadata
 
