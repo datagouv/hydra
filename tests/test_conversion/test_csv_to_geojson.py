@@ -6,7 +6,6 @@ from tempfile import NamedTemporaryFile
 
 import pytest
 
-from tests.conftest import RESOURCE_ID
 from udata_hydra.data_formats import Csv
 from udata_hydra.data_formats.csv_like.to_geojson import DEFAULT_GEOJSON_FILENAME
 

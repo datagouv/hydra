@@ -2,7 +2,6 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from unittest.mock import patch
 
 import pytest
 

@@ -1,4 +1,3 @@
-import hashlib
 import io
 import json
 from datetime import datetime
@@ -8,7 +7,6 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
-from tests.conftest import RESOURCE_ID
 from udata_hydra.data_formats import Parquet
 from udata_hydra.data_formats.parquet.analyse import analyse_parquet
 from udata_hydra.utils import ParseException

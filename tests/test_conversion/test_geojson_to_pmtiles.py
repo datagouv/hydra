@@ -1,11 +1,9 @@
 import logging
-import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from tests.conftest import RESOURCE_ID
 from udata_hydra.data_formats import Geojson
 from udata_hydra.data_formats.geojson.to_pmtiles import DEFAULT_PMTILES_FILENAME
 from udata_hydra.utils.timer import Timer
@@ -21,7 +19,7 @@ async def test_geojson_to_pmtiles_invalid_geometry():
         await Geojson(path="tests/data/invalid.geojson").to_pmtiles()
 
 
-async def test_geojson_to_pmtiles_valid_geometry(mocker):
+async def test_geojson_to_pmtiles_valid_geometry():
     """Test handling of valid geometry"""
     # Make sure that we don't crash even if output pmtiles already exists
     Path(DEFAULT_PMTILES_FILENAME).touch()
@@ -37,7 +35,7 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
 
 
 @pytest.mark.slow
-async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
+async def test_geojson_to_pmtiles_big_file(input_file: str | None):
     """Test performance with a GeoJSON file
 
     :input_file: Path to the GeoJSON file to test (mandatory)
