@@ -19,6 +19,7 @@ from humanfriendly import parse_size
 from progressist import ProgressBar
 
 from udata_hydra import config
+from udata_hydra.analysis import helpers
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import (
     check_resource as crawl_check_resource,
@@ -30,13 +31,13 @@ from udata_hydra.data_formats import (
     CsvLike,
     Geojson,
     Ogc,
+    Parquet,
     detect_data_format_from_check_or_catalog,
 )
 from udata_hydra.data_formats.csv_like.analyse import analyse_csv
 from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
 from udata_hydra.data_formats.geojson.analyse import analyse_geojson
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
-from udata_hydra.data_formats.parquet.analyse import analyse_parquet
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import quiet_logs, setup_logging
@@ -578,7 +579,15 @@ async def _analyse_parquet_cli(
     check = await _find_check(check_id=check_id, url=url, resource_id=resource_id)
     if not check:
         return
-    await analyse_parquet(check=check)
+    tmp_file = await helpers.read_or_download_file(
+        check=check,
+        filename=None,
+        data_format=Parquet,
+    )
+    file = Parquet(
+        path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id")
+    )
+    await file.analyse(check=check)
 
 
 @cli.command(name="analyse-parquet")

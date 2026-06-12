@@ -22,7 +22,7 @@ async def read_or_download_file(
     check: Record | dict,
     filename: str | None,
     data_format: type[DataFormat] | None,
-    exception: Record | None,
+    exception: Record | None = None,
 ) -> IO[bytes]:
     if filename:
         temp_dir = config.TEMPORARY_DOWNLOAD_FOLDER or "/tmp"

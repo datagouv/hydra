@@ -7,8 +7,9 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
+from tests.conftest import RESOURCE_ID
+from udata_hydra.analysis import helpers
 from udata_hydra.data_formats import Parquet
-from udata_hydra.data_formats.parquet.analyse import analyse_parquet
 from udata_hydra.utils import ParseException
 
 pytestmark = pytest.mark.asyncio
@@ -81,8 +82,16 @@ async def test_analyse_parquet(
         "bina": {"python": "binary", "pg": "bytea"},
     }
     rmock.get(url, status=200, body=df.to_parquet())
+    tmp_file = await helpers.read_or_download_file(
+        check=check,
+        filename=None,
+        data_format=Parquet,
+    )
+    file = Parquet(
+        path=tmp_file.name, resource_id=RESOURCE_ID
+    )
     with patch("udata_hydra.config.PARQUET_TO_DB", True):
-        table = await analyse_parquet(check=check)
+        table = await file.analyse(check=check)
     assert table is not None
     # checking check result
     res = await db.fetchrow("SELECT * FROM checks")
