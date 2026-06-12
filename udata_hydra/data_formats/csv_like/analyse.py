@@ -8,7 +8,13 @@ from asyncpg import Record
 from udata_hydra import config
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
-from udata_hydra.data_formats import CsvLike, Table, detect_data_format_from_check_or_catalog
+from udata_hydra.data_formats import (
+    Csv,
+    Csvgz,
+    CsvLike,
+    Table,
+    detect_data_format_from_check_or_catalog,
+)
 from udata_hydra.data_formats.csv_like.to_geojson import _detect_geo_columns
 from udata_hydra.data_formats.table import Table
 from udata_hydra.db.check import Check
@@ -38,7 +44,7 @@ async def analyse_csv(
     resource_id: str = str(check["resource_id"])
 
     # Update resource status to ANALYSING_CSVLIKE
-    resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSVLIKE"})
+    resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
 
     # Check if the resource is in the exceptions table
     # If it is, get the table_indexes to use them later
@@ -64,6 +70,9 @@ async def analyse_csv(
                 data_format=data_format,
                 exception=exception,
             )
+            if data_format == Csvgz:
+                # extraction has been done in read_or_download_file, now the file is a csv
+                data_format = Csv
             file = data_format(
                 path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id")
             )

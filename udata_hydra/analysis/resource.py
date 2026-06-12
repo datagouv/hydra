@@ -146,6 +146,9 @@ async def analyse_resource(
 
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
         if data_format is not None:
+            await Resource.update(
+                resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
+            )
             if issubclass(data_format, Ogc):
                 queue.enqueue(
                     data_format,
@@ -154,9 +157,6 @@ async def analyse_resource(
                     _exception=bool(exception),
                 )
             elif tmp_file:
-                await Resource.update(
-                    resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
-                )
                 file = data_format(
                     path=tmp_file.name,
                     resource_id=resource_id,

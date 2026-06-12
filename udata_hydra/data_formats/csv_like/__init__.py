@@ -26,7 +26,7 @@ class CsvLike(DataFormat):
         )
         if previous_inspection:
             if self.resource_id:
-                await Resource.update(self.resource_id, {"status": "VALIDATING_CSVLIKE"})
+                await Resource.update(self.resource_id, {"status": "VALIDATING_CSV"})
             self.inspection = validate_then_detect(  # ty: ignore[invalid-assignment]
                 file_path=self.path.as_posix(),
                 previous_analysis=previous_inspection,
