@@ -634,7 +634,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     )
 
     await export_geojson_pmtiles(
-        table=Table(table_name="test", resource_id=RESOURCE_ID),
+        source=Table(table_name="test", resource_id=RESOURCE_ID),
         check=check,
     )
 
@@ -676,7 +676,7 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
     )
 
     await export_geojson_pmtiles(
-        table=Table(table_name="test", resource_id=RESOURCE_ID),
+        source=Table(table_name="test", resource_id=RESOURCE_ID),
         check=check,
     )
 

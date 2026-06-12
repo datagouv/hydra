@@ -9,8 +9,7 @@ import logging
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
-from udata_hydra.data_formats import DataFormat, Geojson, Table
-from udata_hydra.data_formats.geojson import Geojson
+from udata_hydra.data_formats import CsvLike, DataFormat, Geojson, Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import ParseException, handle_parse_exception, remove_remainders
@@ -105,12 +104,12 @@ async def export_pmtiles(
 
 
 async def export_geojson_pmtiles(
-    table: Table,
+    source: Table | CsvLike,
     check: dict,
 ) -> None:
     """RQ target: GeoJSON + PMTiles export for a db table."""
     geojson_file = await _run_export_job(
-        data_object=table,
+        data_object=source,
         check=check,
         delete_output=False,
         step="geojson_export",
