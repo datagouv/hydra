@@ -26,15 +26,16 @@ from udata_hydra.crawl.check_resources import (
 from udata_hydra.crawl.check_resources import (
     probe_cors,
 )
-from udata_hydra.data_formats import detect_data_format_from_check_or_catalog
-from udata_hydra.data_formats.csv_like import CsvLike
+from udata_hydra.data_formats import (
+    CsvLike,
+    Geojson,
+    Ogc,
+    detect_data_format_from_check_or_catalog,
+)
 from udata_hydra.data_formats.csv_like.analyse import analyse_csv
 from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
-from udata_hydra.data_formats.geojson import Geojson
 from udata_hydra.data_formats.geojson.analyse import analyse_geojson
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
-from udata_hydra.data_formats.ogc import Ogc
-from udata_hydra.data_formats.ogc.analyse import analyse_ogc
 from udata_hydra.data_formats.parquet.analyse import analyse_parquet
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -620,7 +621,7 @@ async def _analyse_ogc_cli(
         log.warning("Could not infer an OGC format for the check, aborting")
         return
 
-    result = await analyse_ogc(data_format, check)
+    result = await data_format.analyse(check)
     if result:
         log.info("OGC analysis completed successfully.")
         log.debug(json.dumps(result, indent=2, default=str, ensure_ascii=False))
