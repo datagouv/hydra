@@ -15,14 +15,14 @@ _parquet_s3_client = S3Client(bucket=config.S3_BUCKET)
 
 class Table(DataFormat):
     @classmethod
-    def detect_from_check(cls, **kwargs):
+    def detect_from_check(cls, check: dict, **kwargs):
         raise NotImplementedError
 
     @classmethod
-    def detect_from_catalog_format(cls, **kwargs):
+    def detect_from_catalog_format(cls, format: str | None):
         raise NotImplementedError
 
-    def analyse(self, **kwargs):
+    def analyse(self, check: dict):
         raise NotImplementedError
 
     async def to_parquet(self) -> "Parquet|None":
@@ -30,7 +30,7 @@ class Table(DataFormat):
 
         if (
             config.DB_TO_PARQUET
-            and int(self.inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET  # type: ignore[arg-type]
+            and int(self.inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET
         ):
             return await db_to_parquet(table=self)
 

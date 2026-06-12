@@ -52,7 +52,7 @@ async def _run_export_job(
     except Exception as e:
         if data_object.resource_id:
             remove_remainders(data_object.resource_id, remainder_types)
-        check = await Check.get_by_id(check["id"])
+        check = await Check.get_by_id(check["id"])  # ty: ignore[invalid-assignment]
         try:
             raise ParseException(
                 message=str(e),

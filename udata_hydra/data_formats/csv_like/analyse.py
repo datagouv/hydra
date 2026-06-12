@@ -116,7 +116,11 @@ async def analyse_csv(
                     _exception=bool(exception),
                 )
 
-            if config.DB_TO_GEOJSON and _detect_geo_columns(table.inspection) is not None:
+            if (
+                config.DB_TO_GEOJSON
+                and table is not None
+                and _detect_geo_columns(table.inspection) is not None
+            ):
                 queue.enqueue(
                     export_geojson_pmtiles,
                     table=table,

@@ -27,7 +27,7 @@ class CsvLike(DataFormat):
         if previous_inspection:
             if self.resource_id:
                 await Resource.update(self.resource_id, {"status": "VALIDATING_CSVLIKE"})
-            self.inspection = validate_then_detect(
+            self.inspection = validate_then_detect(  # ty: ignore[invalid-assignment]
                 file_path=self.path.as_posix(),
                 previous_analysis=previous_inspection,
                 output_profile=True,
@@ -35,7 +35,7 @@ class CsvLike(DataFormat):
                 save_results=False,
             )
         else:
-            self.inspection = csv_detective_routine(
+            self.inspection = csv_detective_routine(  # ty: ignore[invalid-assignment]
                 file_path=self.path.as_posix(),
                 output_profile=True,
                 num_rows=-1,
@@ -91,7 +91,7 @@ class Csvgz(CsvLike):
     check_url = "csv.gz"
 
     @classmethod
-    def detect_from_catalog_format(cls, format: str) -> bool:
+    def detect_from_catalog_format(cls, format: str | None) -> bool:
         return format == "csv.gz"
 
 

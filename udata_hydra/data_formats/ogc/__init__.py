@@ -11,7 +11,7 @@ OgcFormatLiteral = Literal["wfs", "wms"]
 
 class Ogc(DataFormat):
     @classmethod
-    def detect_from_check(cls, check: dict, resource_format: str | None) -> bool:
+    def detect_from_check(cls, check: dict, resource_format: str | None) -> bool:  # ty: ignore[invalid-method-override]
         ogc_format = cls.__name__.lower()
         if not config.OGC_ANALYSIS_ENABLED or ogc_format not in config.OGC_FORMATS:
             return False
@@ -38,7 +38,7 @@ class Ogc(DataFormat):
         )
 
     @classmethod
-    def detect_from_catalog_format(cls, format: str) -> bool:
+    def detect_from_catalog_format(cls, format: str | None) -> bool:
         return False
 
     @classmethod
