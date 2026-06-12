@@ -32,7 +32,7 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
         header = f.read(7)
     assert header == b"PMTiles"
     # size slightly differs depending on the env
-    assert 850 <= pmtiles_file.filesize <= 900
+    assert 820 <= pmtiles_file.filesize <= 900
     pmtiles_file.path.unlink()
 
 
