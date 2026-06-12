@@ -28,6 +28,7 @@ class Geojson(DataFormat):
             return
 
         from udata_hydra.analysis.exports import export_pmtiles
+
         resource_id: str = str(check["resource_id"])
         url = check["url"]
 

@@ -11,8 +11,8 @@ from csv_detective import validate_then_detect
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
-from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
+from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
 from udata_hydra.db.check import Check
@@ -188,9 +188,7 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
     async def tracking_parquet_export(*args, **kwargs):
         pass
 
-    mocker.patch(
-        "udata_hydra.analysis.exports.export_parquet", tracking_parquet_export
-    )
+    mocker.patch("udata_hydra.analysis.exports.export_parquet", tracking_parquet_export)
 
     def capture_enqueue(fn, *args, **kwargs):
         recorded.append((fn, kwargs.get("_priority")))
@@ -603,9 +601,7 @@ async def test_crash_after_db_insertion(
     with (
         patch("udata_hydra.config.DB_TO_PARQUET", True),
         patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
-        patch(
-            "udata_hydra.data_formats.csv_like.queue.enqueue", side_effect=capture_enqueue
-        ),
+        patch("udata_hydra.data_formats.csv_like.queue.enqueue", side_effect=capture_enqueue),
     ):
         file = await download_from_check(check, Csv)
         await file.analyse(check=check)

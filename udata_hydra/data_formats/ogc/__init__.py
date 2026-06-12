@@ -1,6 +1,6 @@
 import logging
-from datetime import datetime, timezone
 import re
+from datetime import datetime, timezone
 from typing import Literal, TypedDict
 from urllib.parse import parse_qs, urlparse
 
@@ -8,7 +8,6 @@ from asyncpg import Record
 from owslib.crs import Crs
 from owslib.wfs import WebFeatureService
 from owslib.wms import WebMapService
-
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
@@ -120,7 +119,9 @@ class Ogc(DataFormat):
         metadata: OgcMetadata | None = None
         try:
             if check_id:
-                check = await Check.update(check_id, {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore
+                check = await Check.update(
+                    check_id, {"parsing_started_at": datetime.now(timezone.utc)}
+                )  # type: ignore
 
             # Try connecting with version fallback
             web_service = None
@@ -178,7 +179,9 @@ class Ogc(DataFormat):
                         ogc_layer["default_crs"] = (
                             crs_options[0].getcode()
                             if isinstance(crs_options[0], Crs)
-                            else crs_options[0]  # crs_options[0] is already a str in the case of WMS
+                            else crs_options[
+                                0
+                            ]  # crs_options[0] is already a str in the case of WMS
                         )
 
                     layers.append(ogc_layer)

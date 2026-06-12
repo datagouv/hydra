@@ -87,9 +87,7 @@ async def test_analyse_parquet(
         filename=None,
         data_format=Parquet,
     )
-    file = Parquet(
-        path=tmp_file.name, resource_id=RESOURCE_ID
-    )
+    file = Parquet(path=tmp_file.name, resource_id=RESOURCE_ID)
     with patch("udata_hydra.config.PARQUET_TO_DB", True):
         table = await file.analyse(check=check)
     assert table is not None

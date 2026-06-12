@@ -217,9 +217,7 @@ class TestOgcAnalysis:
                     },
                     clear=False,
                 ),
-                patch(
-                    "udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock
-                ),
+                patch("udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock),
             ):
                 result = await data_format.analyse(check=check)
 
@@ -246,9 +244,7 @@ class TestOgcAnalysis:
                     {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
                     clear=False,
                 ),
-                patch(
-                    "udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock
-                ),
+                patch("udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock),
             ):
                 result = await data_format.analyse(check=check)
 
@@ -284,9 +280,7 @@ class TestOgcAnalysis:
                     {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
                     clear=False,
                 ),
-                patch(
-                    "udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock
-                ),
+                patch("udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock),
             ):
                 result = await data_format.analyse(check=check)
 
@@ -320,9 +314,7 @@ class TestOgcAnalysis:
                     {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
                     clear=False,
                 ),
-                patch(
-                    "udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock
-                ),
+                patch("udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock),
             ):
                 result = await data_format.analyse(check=check)
 
@@ -343,7 +335,7 @@ class TestOgcAnalysis:
         mock_wfs = MagicMock()
         mock_wfs.contents = {"ns:my_layer": mock_layer}
         mock_wfs.getOperationByName.return_value = None
-    
+
         with patch("udata_hydra.data_formats.ogc.config") as mock_config:
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
@@ -356,9 +348,7 @@ class TestOgcAnalysis:
                     {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
                     clear=False,
                 ),
-                patch(
-                    "udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock
-                ),
+                patch("udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock),
             ):
                 result = await data_format.analyse(check=check)
 
@@ -392,9 +382,7 @@ class TestOgcAnalysis:
                     {"wfs": {"service": lambda *a, **kw: mock_wfs, "versions": ["2.0.0"]}},
                     clear=False,
                 ),
-                patch(
-                    "udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock
-                ),
+                patch("udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock),
             ):
                 result = await data_format.analyse(check=check)
 
@@ -473,9 +461,7 @@ class TestOgcAnalysis:
                     {"wms": {"service": lambda *a, **kw: mock_wms, "versions": ["1.3.0"]}},
                     clear=False,
                 ),
-                patch(
-                    "udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock
-                ),
+                patch("udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock),
             ):
                 result = await data_format.analyse(check=check)
 

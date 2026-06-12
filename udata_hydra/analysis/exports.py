@@ -15,7 +15,6 @@ from udata_hydra.db.resource import Resource
 from udata_hydra.utils import ParseException, handle_parse_exception, remove_remainders
 from udata_hydra.utils.s3 import S3Client
 
-
 log = logging.getLogger("udata-hydra")
 
 s3_client = S3Client(bucket=config.S3_BUCKET)

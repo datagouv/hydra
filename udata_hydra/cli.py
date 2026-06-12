@@ -419,7 +419,9 @@ async def _analyse_csv_cli(
                 table_hash = hashlib.md5(url.encode()).hexdigest()
 
                 await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_hash}"')
-                await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_hash}'")
+                await csv_pool.execute(
+                    f"DELETE FROM tables_index WHERE parsing_table='{table_hash}'"
+                )
 
                 # Clean up the temporary resource and temporary check from catalog
                 check = await Check.get_by_resource_id(tmp_resource_id)
@@ -598,9 +600,7 @@ async def _analyse_parquet_cli(
         filename=None,
         data_format=Parquet,
     )
-    file = Parquet(
-        path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id")
-    )
+    file = Parquet(path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id"))
     await file.analyse(check=check)
 
 

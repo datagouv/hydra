@@ -36,9 +36,7 @@ async def test_analyse_geojson(setup_catalog, db, fake_check, rmock, produce_moc
             filename=None,
             data_format=Geojson,
         )
-        file = Geojson(
-            path=tmp_file.name, resource_id=RESOURCE_ID
-        )
+        file = Geojson(path=tmp_file.name, resource_id=RESOURCE_ID)
         await file.analyse(check=check)
     res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
     assert res["parsing_finished_at"] is not None

@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
-import logging
 import json
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from asyncpg import Record
@@ -11,10 +10,10 @@ from csv_detective import validate_then_detect
 from udata_hydra import config
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.tables_index import get_previous_inspection
-from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.csv_like.to_geojson import _detect_geo_columns
-from udata_hydra.db.resource import Resource
+from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
     IOException,
@@ -82,7 +81,9 @@ class CsvLike(DataFormat):
 
         table = None
         try:
-            check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore[assignment]
+            check = await Check.update(
+                check["id"], {"parsing_started_at": datetime.now(timezone.utc)}
+            )  # type: ignore[assignment]
             # Launch csv-detective against given file
             try:
                 await self.inspect()
@@ -121,6 +122,7 @@ class CsvLike(DataFormat):
                     and int(table.inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET  # type: ignore[arg-type]
                 ):
                     from udata_hydra.analysis.exports import export_parquet
+
                     queue.enqueue(
                         export_parquet,
                         table=table,
@@ -135,6 +137,7 @@ class CsvLike(DataFormat):
                     and _detect_geo_columns(table.inspection) is not None
                 ):
                     from udata_hydra.analysis.exports import export_geojson_pmtiles
+
                     queue.enqueue(
                         export_geojson_pmtiles,
                         table=table,

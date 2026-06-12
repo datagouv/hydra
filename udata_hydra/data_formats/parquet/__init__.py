@@ -1,18 +1,17 @@
-from udata_hydra.data_formats.table import Table
-
-
 import json
 import logging
-from datetime import datetime, timezone
 import re
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from asyncpg import Record
 import pyarrow.parquet as pq
+from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
+from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
 from udata_hydra.data_formats.data_format import DataFormat
+from udata_hydra.data_formats.table import Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -20,7 +19,6 @@ from udata_hydra.utils import (
     ParseException,
     Timer,
 )
-from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats.table import Table
@@ -100,7 +98,9 @@ class Parquet(DataFormat):
         timer.mark("parquet-analysis")
 
         # Convert to PMTiles
-        table = await self.to_db(check=check, table_indexes=table_indexes, debug_insert=debug_insert)
+        table = await self.to_db(
+            check=check, table_indexes=table_indexes, debug_insert=debug_insert
+        )
         timer.mark("parquet-to-db")
         check = await Check.update(  # type: ignore[assignment]
             check_id=check["id"],
