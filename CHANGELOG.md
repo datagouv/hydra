@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.12.1 (2026-06-12)
+
+- chore: remove ogc layers in payload ([#440](https://github.com/datagouv/hydra/pull/440))
+- docs: refresh README for current API, CLI, and worker behavior ([#439](https://github.com/datagouv/hydra/pull/439))
+- fix(cli): silence botocore logs when using --quiet ([#436](https://github.com/datagouv/hydra/pull/436))
+- fix(deps): constrain urllib3 for GHSA-mf9v-mfxr-j63j ([#420](https://github.com/datagouv/hydra/pull/420))
+- refactor: refactor cli ([#437](https://github.com/datagouv/hydra/pull/437))
+- test: add tests to improve test coverage ([#434](https://github.com/datagouv/hydra/pull/434))
+- test: refactor tests ([#435](https://github.com/datagouv/hydra/pull/435))
+
+
 ## 2.12 (2026-06-02)
 
 - feat(status): include python version in health endpoint ([#433](https://github.com/datagouv/hydra/pull/433))
