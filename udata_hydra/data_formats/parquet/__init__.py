@@ -8,7 +8,6 @@ import pyarrow.parquet as pq
 from asyncpg import Record
 
 from udata_hydra import config
-from udata_hydra.analysis import helpers
 from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.table import Table

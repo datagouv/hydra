@@ -544,7 +544,6 @@ async def test_analyse_csv_parquet_export_enqueue(
 
     check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(url, status=200, body=catalog_content)
 
     with (
@@ -676,10 +675,8 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
             )
         ),
     )
-    mocker.patch(
-        "udata_hydra.analysis.exports.s3_client.send_file",
-        new=MagicMock(),
-    )
+    mock_s3 = MagicMock()
+    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=mock_s3)
 
     await export_geojson_pmtiles(
         source=Table(table_name="test", resource_id=RESOURCE_ID),
@@ -709,10 +706,8 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
             )
         ),
     )
-    mocker.patch(
-        "udata_hydra.analysis.exports.s3_client.send_file",
-        new=MagicMock(),
-    )
+    mock_s3 = MagicMock()
+    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=mock_s3)
 
     await export_parquet(
         table=Table(table_name="test", resource_id=RESOURCE_ID),

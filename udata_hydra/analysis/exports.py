@@ -7,17 +7,14 @@ ParseException handling, and resource status cleanup.
 
 import logging
 
-from udata_hydra import config
+from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.data_formats import CsvLike, DataFormat, Geojson, Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import ParseException, handle_parse_exception, remove_remainders
-from udata_hydra.utils.s3 import S3Client
 
 log = logging.getLogger("udata-hydra")
-
-s3_client = S3Client(bucket=config.S3_BUCKET)
 
 
 async def _run_export_job(
@@ -36,7 +33,7 @@ async def _run_export_job(
         if upload_to_s3:
             df_name = output.__class__.__name__
             log.debug(f"Uploading {df_name} file {output.path} to S3")
-            upload_url = s3_client.send_file(
+            upload_url = context.s3_client().send_file(
                 output, delete_source=delete_output and config.REMOVE_GENERATED_FILES
             )
             await Check.update(

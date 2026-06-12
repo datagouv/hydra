@@ -52,7 +52,7 @@ class TestOgcDetection:
     async def test_detect_missing_url(self, mocker, db, clean_db):
         mocker.patch("udata_hydra.config.OGC_ANALYSIS_ENABLED", True)
         check = {"resource_id": RESOURCE_ID}
-        assert await detect_data_format_from_check_or_catalog(check) == None
+        assert await detect_data_format_from_check_or_catalog(check) is None
 
     @pytest.mark.parametrize(
         "resource_format,expected",

@@ -3,14 +3,11 @@ from typing import TYPE_CHECKING
 
 from udata_hydra import config
 from udata_hydra.data_formats.data_format import DataFormat
-from udata_hydra.utils.s3 import S3Client
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats import Geojson, Parquet
 
 log = logging.getLogger("udata-hydra")
-
-_parquet_s3_client = S3Client(bucket=config.S3_BUCKET)
 
 
 class Table(DataFormat):

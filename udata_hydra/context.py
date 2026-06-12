@@ -8,7 +8,13 @@ from rq import Queue
 from udata_hydra import config
 
 log = logging.getLogger("udata-hydra")
-context = {
+
+# Shared lazy state for reusable infrastructure components.
+# - "databases": asyncpg pools, keyed by db name (e.g. "main") — see pool()
+# - "queues": RQ queues, keyed by queue name (e.g. "default") — see queue()
+# - "monitor": healthcheck mock singleton — see monitor(), added on first use
+# - "s3": S3 upload client singleton — see s3_client(), added on first use
+context: dict = {
     "databases": {},
     "queues": {},
 }
@@ -16,7 +22,7 @@ context = {
 
 def monitor() -> MagicMock:
     if "monitor" in context:
-        return context["monitor"]  # type: ignore[return-value]
+        return context["monitor"]
     monitor = MagicMock()
     monitor.set_status = lambda x: log.debug(x)
     monitor.init = lambda **kwargs: log.debug(f"Starting udata-hydra... {kwargs}")
@@ -49,3 +55,14 @@ def queue(name: str = "default", exception: bool = False) -> Queue | None:
             ),
         )
     return context["queues"][name]
+
+
+def s3_client():
+    if "s3" in context:
+        return context["s3"]
+    # Import here, not at module level: utils.s3 pulls in boto3/botocore on load.
+    # Defer until first upload so CLI commands that never touch S3 stay quiet/fast.
+    from udata_hydra.utils.s3 import S3Client
+
+    context["s3"] = S3Client(bucket=config.S3_BUCKET)
+    return context["s3"]

@@ -1,6 +1,6 @@
 import json
 import os
-from typing import IO, TYPE_CHECKING
+from typing import IO
 
 from asyncpg import Record
 
