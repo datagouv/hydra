@@ -16,7 +16,6 @@ from udata_hydra.data_formats import (
     detect_data_format_from_check_or_catalog,
 )
 from udata_hydra.data_formats.csv_like.to_geojson import _detect_geo_columns
-from udata_hydra.data_formats.table import Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
