@@ -77,7 +77,9 @@ async def analyse_ogc(data_format: type[Wfs | Wms], check: dict | Record) -> Ogc
 
     resource: Record | None = None
     if resource_id:
-        resource = await Resource.update(str(resource_id), {"status": f"ANALYSING_{format.upper()}"})
+        resource = await Resource.update(
+            str(resource_id), {"status": f"ANALYSING_{format.upper()}"}
+        )
 
     metadata: OgcMetadata | None = None
     try:
