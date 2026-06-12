@@ -1,11 +1,13 @@
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from udata_hydra import config
-from udata_hydra.data_formats import DataFormat
+
+if TYPE_CHECKING:
+    from udata_hydra.data_formats import DataFormat
 
 # Match datagouvfr_data_pipelines S3 defaults for slow networks / large uploads.
 _DEFAULT_BOTO_CONFIG = {"connect_timeout": 3600, "read_timeout": 3600}
@@ -38,7 +40,7 @@ class S3Client:
 
     def send_file(
         self,
-        file: DataFormat,
+        file: "DataFormat",
         delete_source: bool = True,
     ) -> str:
         if self.bucket is None:

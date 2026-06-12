@@ -3,8 +3,8 @@ import json
 
 import pytest
 
+from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csvgz, Xls, Xlsx
-from udata_hydra.data_formats.csv_like.analyse import analyse_csv
 
 pytestmark = pytest.mark.asyncio
 
@@ -25,7 +25,8 @@ async def test_formats_analysis(setup_catalog, rmock, db, fake_check, produce_mo
     with open(f"tests/data/{filename}", "rb") as f:
         data = f.read()
     rmock.get(url, status=200, body=data)
-    await analyse_csv(check=check)
+    file = await download_from_check(check, data_format)
+    await file.analyse(check=check)
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
     profile = await db.fetchrow(

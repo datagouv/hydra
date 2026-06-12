@@ -7,8 +7,8 @@ from udata_hydra.data_formats import (
     Csvgz,
     Xls,
     Xlsx,
-    detect_data_format_from_check_or_catalog,
 )
+from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 
 
 @pytest.mark.parametrize(

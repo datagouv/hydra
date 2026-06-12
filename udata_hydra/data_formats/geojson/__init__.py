@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from udata_hydra import config
-from udata_hydra.analysis.exports import export_pmtiles
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -22,12 +21,13 @@ class Geojson(DataFormat):
     check_url = "geojson"
     further_analysis = True
 
-    async def analyse(self, check: dict):
+    async def analyse(self, check: dict) -> None:
         """Launch GeoJSON analysis from a check or an URL (debug), using previously downloaded file if any"""
         if not config.GEOJSON_TO_PMTILES:
             log.debug("GEOJSON_TO_PMTILES turned off, skipping.")
             return
 
+        from udata_hydra.analysis.exports import export_pmtiles
         resource_id: str = str(check["resource_id"])
         url = check["url"]
 

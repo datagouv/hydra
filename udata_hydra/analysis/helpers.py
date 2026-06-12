@@ -5,10 +5,8 @@ from typing import IO, TYPE_CHECKING
 from asyncpg import Record
 
 from udata_hydra import config
+from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send
-
-if TYPE_CHECKING:
-    from udata_hydra.data_formats.data_format import DataFormat
 
 
 def get_python_type(column: dict) -> str:
@@ -50,6 +48,17 @@ async def read_or_download_file(
             ),
         )
         return tmp_file
+
+
+async def download_from_check(check: dict, data_format: type[DataFormat]) -> DataFormat:
+    tmp_file = await read_or_download_file(
+        check=check,
+        filename=None,
+        data_format=data_format,
+    )
+    return data_format(
+        path=tmp_file.name, resource_id=check.get("resource_id"), dataset_id=check.get("dataset_id")
+    )
 
 
 async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:

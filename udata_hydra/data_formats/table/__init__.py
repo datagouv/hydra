@@ -22,7 +22,7 @@ class Table(DataFormat):
     def detect_from_catalog_format(cls, format: str | None):
         raise NotImplementedError
 
-    def analyse(self, check: dict):
+    async def analyse(self, check: dict):
         raise NotImplementedError
 
     async def to_parquet(self) -> "Parquet|None":

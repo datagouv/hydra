@@ -32,10 +32,9 @@ from udata_hydra.data_formats import (
     Geojson,
     Ogc,
     Parquet,
-    detect_data_format_from_check_or_catalog,
 )
-from udata_hydra.data_formats.csv_like.analyse import analyse_csv
 from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
+from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -398,31 +397,42 @@ async def _analyse_csv_cli(
     if not check:
         return
 
-    await analyse_csv(check=check, debug_insert=debug_insert)
-    log.info("CSV analysis completed")
-
-    if url and tmp_resource_id:
-        # Clean up temporary data created for analysis with external URL
+    try:
+        data_format = await detect_data_format_from_check_or_catalog(check)
+        if data_format is None or not issubclass(data_format, CsvLike):
+            log.error("File does not look like csv-like, aborting")
+            return
         try:
-            # Clean up CSV database tables
-            csv_pool = await connection(db_name="csv")
-            table_hash = hashlib.md5(url.encode()).hexdigest()
-
-            await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_hash}"')
-            await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_hash}'")
-
-            # Clean up the temporary resource and temporary check from catalog
-            check = await Check.get_by_resource_id(tmp_resource_id)
-            if check:
-                await Check.delete(check["id"])
-            await Resource.delete(resource_id=tmp_resource_id, hard_delete=True)
-
-            # Clean up S3 files if any (parquet, etc.)
-            # Note: This would require additional S3 cleanup logic
-
-            log.info(f"Cleaned up temporary data for {url}")
+            file = await helpers.download_from_check(check, data_format)
         except Exception as e:
-            log.warning(f"Failed to clean temporary external data for {url}: {e}")
+            log.warning(f"Failed download resource from  {url}: {e}")
+            return
+        await file.analyse(check=check, debug_insert=debug_insert)
+        log.info("CSV analysis completed")
+
+    finally:
+        if url and tmp_resource_id:
+            # Clean up temporary data created for analysis with external URL
+            try:
+                # Clean up CSV database tables
+                csv_pool = await connection(db_name="csv")
+                table_hash = hashlib.md5(url.encode()).hexdigest()
+
+                await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_hash}"')
+                await csv_pool.execute(f"DELETE FROM tables_index WHERE parsing_table='{table_hash}'")
+
+                # Clean up the temporary resource and temporary check from catalog
+                check = await Check.get_by_resource_id(tmp_resource_id)
+                if check:
+                    await Check.delete(check["id"])
+                await Resource.delete(resource_id=tmp_resource_id, hard_delete=True)
+
+                # Clean up S3 files if any (parquet, etc.)
+                # Note: This would require additional S3 cleanup logic
+
+                log.info(f"Cleaned up temporary data for {url}")
+            except Exception as e:
+                log.warning(f"Failed to clean temporary external data for {url}: {e}")
 
 
 @cli.command(name="analyse-csv")
@@ -451,7 +461,12 @@ async def _analyse_geojson_cli(
     check = await _find_check(check_id=check_id, url=url, resource_id=resource_id)
     if not check:
         return
-    await analyse_geojson(check=check)
+    data_format = await detect_data_format_from_check_or_catalog(check)
+    if data_format != Geojson:
+        log.error("File does not look like geojson, aborting")
+        return
+    file = await helpers.download_from_check(check, Geojson)
+    await file.analyse(check=check)
 
 
 @cli.command(name="analyse-geojson")

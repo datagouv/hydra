@@ -13,7 +13,7 @@ async def test_analyse_geojson_disabled(fake_check):
     """Test that the function returns None when GEOJSON_TO_PMTILES is False"""
     with (
         patch("udata_hydra.config.GEOJSON_TO_PMTILES", False),
-        patch("udata_hydra.data_formats.geojson.export_pmtiles") as mock_func,
+        patch("udata_hydra.analysis.exports.export_pmtiles") as mock_func,
     ):
         check = await fake_check()
         await Geojson(path="tests/data/valid.geojson").analyse(check)
@@ -27,7 +27,7 @@ async def test_analyse_geojson(setup_catalog, db, fake_check, rmock, produce_moc
     with (
         patch("udata_hydra.config.GEOJSON_TO_PMTILES", True),
         patch(
-            "udata_hydra.data_formats.geojson.export_pmtiles",
+            "udata_hydra.analysis.exports.export_pmtiles",
             return_value=None,
         ),
     ):

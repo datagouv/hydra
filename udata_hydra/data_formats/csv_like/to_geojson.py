@@ -5,11 +5,10 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 from json_stream import streamable_list
 
-from udata_hydra.data_formats import CsvLike
 from udata_hydra.utils.casting import iter_tabular_rows
 
 if TYPE_CHECKING:
-    from udata_hydra.data_formats import Geojson
+    from udata_hydra.data_formats import CsvLike, Geojson
 
 log = logging.getLogger("udata-hydra")
 DEFAULT_GEOJSON_FILENAME = "converted_from_db.geojson"
@@ -52,7 +51,7 @@ def _detect_geo_columns(inspection: dict) -> dict[str, str] | None:
     return None
 
 
-async def csv_to_geojson(file: CsvLike) -> "Geojson|None":
+async def csv_to_geojson(file: "CsvLike") -> "Geojson|None":
     """
     Convert a CSV file to GeoJSON format and optionally upload to S3-compatible storage.
 

@@ -11,10 +11,10 @@ from csv_detective import validate_then_detect
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
+from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.crawl.check_resources import check_resource
-from udata_hydra.data_formats import Geojson, Parquet, PMTiles, Table
-from udata_hydra.data_formats.csv_like.analyse import analyse_csv
+from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 
@@ -36,7 +36,8 @@ async def test_analyse_csv_on_catalog(
     assert resource["status_since"] is None
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
@@ -81,7 +82,8 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     assert resource["status"] is None
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
@@ -107,7 +109,8 @@ async def test_error_reporting_csv_detective(
     rmock.get(url, status=200, body="".encode("utf-8"))
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
@@ -129,7 +132,8 @@ async def test_error_reporting_parsing(
     rmock.get(url, status=200, body="a,b,c\n1,2".encode("utf-8"))
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
@@ -156,7 +160,8 @@ async def test_analyse_csv_send_udata_webhook(
     rmock.put(udata_url, status=200)
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
@@ -184,7 +189,7 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
         pass
 
     mocker.patch(
-        "udata_hydra.data_formats.csv_like.analyse.export_parquet", tracking_parquet_export
+        "udata_hydra.analysis.exports.export_parquet", tracking_parquet_export
     )
 
     def capture_enqueue(fn, *args, **kwargs):
@@ -208,7 +213,8 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
         patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
         patch("udata_hydra.config.DB_TO_GEOJSON", False),
     ):
-        await analyse_csv(check=check)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
 
     assert any(f is tracking_parquet_export and p == "low" for f, p in recorded)
 
@@ -442,7 +448,8 @@ async def test_validation(
         "udata_hydra.data_formats.csv_like.validate_then_detect",
         wraps=validate_then_detect,
     ) as mock_func:
-        await analyse_csv(check=check)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
         mock_func.assert_called_once()
 
     # now we check what is inside csv_detective in tables_index
@@ -502,7 +509,8 @@ async def test_too_long_column_name(
     )
     # should fail because one column name is too long
     with patch("udata_hydra.config.NAMEDATALEN", max_len):
-        await analyse_csv(check=check)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
     updated_check = await Check.get_by_id(check["id"])
     assert updated_check is not None
     # analysis failed
@@ -534,7 +542,7 @@ async def test_analyse_csv_parquet_export_enqueue(
     """Parquet export enqueue respects DB_TO_PARQUET, uses low priority, skips geo export."""
     from udata_hydra.analysis.exports import export_geojson_pmtiles as exp_geo
 
-    mock_enqueue = mocker.patch("udata_hydra.data_formats.csv_like.analyse.queue.enqueue")
+    mock_enqueue = mocker.patch("udata_hydra.data_formats.csv_like.queue.enqueue")
 
     check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
@@ -546,7 +554,8 @@ async def test_analyse_csv_parquet_export_enqueue(
         patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
         patch("udata_hydra.config.DB_TO_GEOJSON", False),
     ):
-        await analyse_csv(check=check)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
 
     parquet_jobs = [
         c for c in mock_enqueue.call_args_list if c.args and c.args[0] is export_parquet
@@ -595,10 +604,11 @@ async def test_crash_after_db_insertion(
         patch("udata_hydra.config.DB_TO_PARQUET", True),
         patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
         patch(
-            "udata_hydra.data_formats.csv_like.analyse.queue.enqueue", side_effect=capture_enqueue
+            "udata_hydra.data_formats.csv_like.queue.enqueue", side_effect=capture_enqueue
         ),
     ):
-        await analyse_csv(check=check)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
 
     assert len(queued_parquet_kwargs) == 1
     job_kw = queued_parquet_kwargs[0]
@@ -739,7 +749,8 @@ async def test_file_with_nan(
         body=("a,b,c\n1,1.0,inf\n2,nan,2.0\n3,3.0,3.0\n").encode("utf-8"),
         repeat=True,
     )
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
     # it should all be fine
     rows = await db.fetch(f'SELECT * FROM "{table_name}"')
     assert dict(rows[0])["c"] == float("inf")
