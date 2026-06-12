@@ -109,12 +109,6 @@ class TestOgcAnalysis:
             "format": "wfs",
             # first version tested
             "version": "2.0.0",
-            "layers": [
-                {
-                    "name": "test:layer",
-                    "default_crs": "EPSG:4326",
-                }
-            ],
             "output_formats": ["application/json", "text/xml"],
             "detected_layer": None,
         }
@@ -234,7 +228,6 @@ class TestOgcAnalysis:
         assert result == {
             "format": "wfs",
             "version": "2.0.0",
-            "layers": [],
             "output_formats": [],
             "detected_layer": None,
         }
@@ -398,12 +391,6 @@ class TestOgcAnalysis:
             "format": "wms",
             # first version tested
             "version": "1.3.0",
-            "layers": [
-                {
-                    "name": "test:layer",
-                    "default_crs": "EPSG:4326",
-                }
-            ],
             "output_formats": [],
             "detected_layer": None,
         }
@@ -440,7 +427,6 @@ class TestOgcAnalysis:
         assert result == {
             "format": "wms",
             "version": "1.3.0",
-            "layers": [],
             "output_formats": [],
             "detected_layer": None,
         }

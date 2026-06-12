@@ -36,8 +36,8 @@ async def test_geojson_to_pmtiles_valid_geometry(mocker):
         mocked_s3_client = S3Client(bucket=bucket)
     with (
         patch(
-            "udata_hydra.conversion.geojson_to_pmtiles.s3_client_pmtiles",
-            new=mocked_s3_client,
+            "udata_hydra.conversion.geojson_to_pmtiles.s3_client",
+            return_value=mocked_s3_client,
         ),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):
@@ -83,8 +83,8 @@ async def test_geojson_to_pmtiles_big_file(mocker, input_file: str | None):
 
     with (
         patch(
-            "udata_hydra.conversion.geojson_to_pmtiles.s3_client_pmtiles",
-            new=mocked_s3_client,
+            "udata_hydra.conversion.geojson_to_pmtiles.s3_client",
+            return_value=mocked_s3_client,
         ),
         patch("udata_hydra.config.REMOVE_GENERATED_FILES", False),
     ):

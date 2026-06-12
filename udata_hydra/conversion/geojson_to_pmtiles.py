@@ -5,11 +5,9 @@ from pathlib import Path
 import tippecanoe
 
 from udata_hydra import config
-from udata_hydra.utils.s3 import S3Client
+from udata_hydra.context import s3_client
 
 log = logging.getLogger("udata-hydra")
-
-s3_client_pmtiles = S3Client(bucket=config.S3_BUCKET)
 
 
 async def geojson_to_pmtiles(
@@ -50,7 +48,7 @@ async def geojson_to_pmtiles(
 
     if upload_to_s3:
         log.debug(f"Uploading PMTiles file {output_file_path} to S3")
-        pmtiles_url = s3_client_pmtiles.send_file(
+        pmtiles_url = s3_client().send_file(
             str(output_file_path), delete_source=config.REMOVE_GENERATED_FILES
         )
     else:
