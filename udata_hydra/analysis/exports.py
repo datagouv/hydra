@@ -6,14 +6,17 @@ ParseException handling, and resource status cleanup.
 """
 
 import logging
+from typing import TYPE_CHECKING
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
-from udata_hydra.data_formats import CsvLike, DataFormat, Geojson, Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import ParseException, handle_parse_exception, remove_remainders
 from udata_hydra.utils.s3 import S3Client
+
+if TYPE_CHECKING:
+        from udata_hydra.data_formats import CsvLike, DataFormat, Geojson, Table
 
 log = logging.getLogger("udata-hydra")
 
@@ -21,7 +24,7 @@ s3_client = S3Client(bucket=config.S3_BUCKET)
 
 
 async def _run_export_job(
-    data_object: DataFormat,
+    data_object: "DataFormat",
     check: dict,
     step: str,
     remainder_types: list[str],
@@ -29,10 +32,10 @@ async def _run_export_job(
     upload_to_s3: bool = True,
     delete_output: bool = False,
     delete_input: bool = True,
-) -> DataFormat | None:
+) -> "DataFormat|None":
     output, check_out = None, None
     try:
-        output: DataFormat = await getattr(data_object, export_fn)()
+        output: "DataFormat" = await getattr(data_object, export_fn)()
         if upload_to_s3:
             df_name = output.__class__.__name__
             log.debug(f"Uploading {df_name} file {output.path} to S3")
@@ -76,7 +79,7 @@ async def _run_export_job(
 
 
 async def export_parquet(
-    table: Table,
+    table: "Table",
     check: dict,
 ) -> None:
     """RQ target: parquet export for a db table."""
@@ -90,7 +93,7 @@ async def export_parquet(
 
 
 async def export_pmtiles(
-    geojson_file: Geojson,
+    geojson_file: "Geojson",
     check: dict,
 ) -> None:
     """RQ target: PMTiles export for a geojson."""
@@ -104,7 +107,7 @@ async def export_pmtiles(
 
 
 async def export_geojson_pmtiles(
-    source: Table | CsvLike,
+    source: "Table|CsvLike",
     check: dict,
 ) -> None:
     """RQ target: GeoJSON + PMTiles export for a db table."""

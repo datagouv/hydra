@@ -36,7 +36,6 @@ from udata_hydra.data_formats import (
 )
 from udata_hydra.data_formats.csv_like.analyse import analyse_csv
 from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
-from udata_hydra.data_formats.geojson.analyse import analyse_geojson
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
