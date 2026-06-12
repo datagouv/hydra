@@ -13,6 +13,7 @@ from udata_hydra import config
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.analysis.tables_index import get_previous_analysis, insert_tables_index_entry
+from udata_hydra.context import s3_client
 from udata_hydra.conversion.csv_to_db import csv_to_db
 from udata_hydra.conversion.csv_to_geojson import _detect_geo_columns
 from udata_hydra.conversion.db_to_parquet import db_to_parquet
@@ -27,11 +28,8 @@ from udata_hydra.utils import (
     handle_parse_exception,
     queue,
 )
-from udata_hydra.utils.s3 import S3Client
 
 log = logging.getLogger("udata-hydra")
-
-_parquet_s3_client = S3Client(bucket=config.S3_BUCKET)
 
 
 async def analyse_csv(
@@ -212,7 +210,7 @@ async def export_db_to_parquet(
         output_filename=resource_id,
     )
     parquet_size: int = os.path.getsize(parquet_file)
-    parquet_url: str = _parquet_s3_client.send_file(parquet_file)
+    parquet_url: str = s3_client().send_file(parquet_file)
 
     await Check.update(
         check_id,

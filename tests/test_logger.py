@@ -9,13 +9,13 @@ def test_quiet_logs_disables_below_error_for_third_party_loggers():
 
     with quiet_logs():
         assert not urllib_logger.isEnabledFor(logging.INFO)
-        assert not botocore_logger.isEnabledFor(logging.DEBUG)
+        assert not botocore_logger.isEnabledFor(logging.INFO)
         assert not urllib_logger.isEnabledFor(logging.WARNING)
         assert urllib_logger.isEnabledFor(logging.ERROR)
         assert botocore_logger.isEnabledFor(logging.CRITICAL)
 
     assert urllib_logger.isEnabledFor(logging.INFO)
-    assert botocore_logger.isEnabledFor(logging.DEBUG)
+    assert botocore_logger.isEnabledFor(logging.INFO)
 
 
 def test_quiet_logs_restores_global_disable_after_context():

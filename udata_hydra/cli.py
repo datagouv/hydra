@@ -1072,8 +1072,8 @@ def purge_selected_csv_tables(
     )
 
 
-def run():
-    """Main entry point for the CLI"""
+def run() -> None:
+    """Main entry point for the CLI."""
     cli()
 
 
