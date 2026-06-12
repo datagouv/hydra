@@ -15,30 +15,6 @@ CONTENT_TYPES = {
 }
 
 
-_client: "S3Client | None" = None
-
-
-def get_s3_client() -> "S3Client":
-    """Return a shared S3 client, created on first use.
-
-    Avoids initializing boto3 at import time (e.g. when loading the CLI for
-    commands that never upload to S3).
-    """
-    global _client
-    if _client is None:
-        _client = S3Client(bucket=config.S3_BUCKET)
-    return _client
-
-
-def reset_s3_client() -> None:
-    """Drop the cached client so the next get_s3_client() builds a new one.
-
-    Intended for tests only (isolated mocks between test cases).
-    """
-    global _client
-    _client = None
-
-
 class S3Client:
     def __init__(self, bucket: str):
         self.user = config.S3_ACCESS_KEY_ID

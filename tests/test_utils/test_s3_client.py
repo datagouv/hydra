@@ -5,16 +5,18 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 from pytest_mock import MockerFixture
 
 from udata_hydra import config
-from udata_hydra.utils.s3 import CONTENT_TYPES, S3Client, reset_s3_client
+from udata_hydra.context import context
+from udata_hydra.utils.s3 import CONTENT_TYPES, S3Client
 
 
 @pytest.fixture(autouse=True)
 def _reset_s3_client_cache() -> Iterator[None]:
     yield
-    reset_s3_client()
+    context.pop("s3", None)
 
 
 @pytest.fixture
@@ -59,3 +61,35 @@ def test_s3_client_upload(
         bucket="my-bucket",
         key=f"{extension}/file.{extension}",
     )
+
+
+def test_s3_client_raises_when_bucket_does_not_exist(mocker: MockerFixture) -> None:
+    mocker.patch("udata_hydra.config.S3_ENDPOINT", "s3-example.com")
+    resource = MagicMock()
+    resource.meta.client.head_bucket.side_effect = ClientError(
+        {"Error": {"Code": "NoSuchBucket", "Message": "Not found"}},
+        "HeadBucket",
+    )
+    with patch("udata_hydra.utils.s3.boto3.resource", return_value=resource):
+        with pytest.raises(ValueError, match="does not exist"):
+            S3Client(bucket="missing-bucket")
+
+
+def test_s3_client_send_file_requires_bucket(tmp_path: Path) -> None:
+    client = S3Client.__new__(S3Client)
+    client.bucket = None
+    with pytest.raises(AttributeError, match="bucket has to be specified"):
+        client.send_file(tmp_path / "missing.parquet")
+
+
+def test_s3_client_send_file_raises_when_file_missing(
+    mocker: MockerFixture, tmp_path: Path
+) -> None:
+    mocker.patch("udata_hydra.config.S3_ENDPOINT", "s3-example.com")
+    resource = MagicMock()
+    resource.meta.client.head_bucket.return_value = {}
+    with patch("udata_hydra.utils.s3.boto3.resource", return_value=resource):
+        client = S3Client(bucket="my-bucket")
+        missing_file = tmp_path / "missing.geojson"
+        with pytest.raises(Exception, match="does not exists"):
+            client.send_file(missing_file)

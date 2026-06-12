@@ -135,7 +135,7 @@ async def test_export_db_to_parquet(mocker, parquet_config, clean_db):
         with patch("udata_hydra.utils.s3.boto3.resource", return_value=mocked_resource):
             mocked_s3_client = S3Client(bucket=bucket)
         with patch(
-            "udata_hydra.analysis.csv.get_s3_client",
+            "udata_hydra.analysis.csv.s3_client",
             return_value=mocked_s3_client,
         ):
             result = await run_export()

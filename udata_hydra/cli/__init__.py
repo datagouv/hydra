@@ -1,8 +1,5 @@
 """Hydra Typer CLI: command modules register on `cli` at import time."""
 
-import logging
-import sys
-
 from udata_hydra.cli import analysis, catalog, crawl, db, purge  # noqa: F401
 from udata_hydra.cli.analysis import analyse_csv_cli
 from udata_hydra.cli.catalog import (
@@ -39,9 +36,7 @@ __all__ = [
 
 
 def run() -> None:
-    """CLI entry point: silence logs below ERROR when --quiet is in argv, before loading commands."""
-    if "--quiet" in sys.argv:
-        logging.disable(logging.WARNING)
+    """Main entry point for the CLI."""
     cli()
 
 
