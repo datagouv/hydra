@@ -8,7 +8,6 @@ from owslib.util import ServiceException
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from tests.conftest import RESOURCE_ID
-from udata_hydra.data_formats.ogc.analyse import analyse_ogc
 from udata_hydra.data_formats import (
     Csv,
     Ogc,
@@ -88,12 +87,15 @@ class TestOgcAnalysis:
             mock_config.OGC_ANALYSIS_ENABLED = False
             check = await fake_check()
             data_format = await detect_data_format_from_check_or_catalog(check)
-            result = await analyse_ogc(check=check, data_format=data_format)
-            assert result is None
+            assert data_format is None
 
     async def test_analyse_wfs_success(self, setup_catalog, db, fake_check):
         check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
-        data_format = await detect_data_format_from_check_or_catalog(check)
+        with patch("udata_hydra.data_formats.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            data_format = await detect_data_format_from_check_or_catalog(check)
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms)) and issubclass(data_format, (Wfs, Wms))
 
         mock_crs_4326 = MagicMock(spec=Crs)
         mock_crs_4326.getcode.return_value = "EPSG:4326"
@@ -106,7 +108,6 @@ class TestOgcAnalysis:
         mock_wfs = MagicMock()
         mock_wfs.contents = {"test:layer": mock_layer}
         mock_wfs.getOperationByName.return_value = mock_get_feature
-
         with (
             patch("udata_hydra.data_formats.ogc.analyse.config") as mock_config,
             patch.dict(
@@ -119,7 +120,7 @@ class TestOgcAnalysis:
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
-            result = await analyse_ogc(check=check, data_format=data_format)
+            result = await data_format.analyse(check=check)
 
         expected_metadata = {
             "format": "wfs",
@@ -141,7 +142,11 @@ class TestOgcAnalysis:
 
     async def test_analyse_wfs_connection_error(self, setup_catalog, db, fake_check):
         check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
-        data_format = await detect_data_format_from_check_or_catalog(check)
+        with patch("udata_hydra.data_formats.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            data_format = await detect_data_format_from_check_or_catalog(check)
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms))
 
         with (
             patch("udata_hydra.data_formats.ogc.analyse.config") as mock_config,
@@ -163,7 +168,7 @@ class TestOgcAnalysis:
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
-            result = await analyse_ogc(check=check, data_format=data_format)
+            result = await data_format.analyse(check=check)
 
         assert result is None
 
@@ -179,7 +184,11 @@ class TestOgcAnalysis:
 
     async def test_analyse_wfs_fallback_version(self, setup_catalog, db, fake_check):
         check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
-        data_format = await detect_data_format_from_check_or_catalog(check)
+        with patch("udata_hydra.data_formats.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            data_format = await detect_data_format_from_check_or_catalog(check)
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms))
 
         mock_crs_4326 = MagicMock(spec=Crs)
         mock_crs_4326.getcode.return_value = "EPSG:4326"
@@ -217,7 +226,7 @@ class TestOgcAnalysis:
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
-            result = await analyse_ogc(check=check, data_format=data_format)
+            result = await data_format.analyse(check=check)
 
         assert result is not None
         # second version tested
@@ -225,7 +234,11 @@ class TestOgcAnalysis:
 
     async def test_analyse_wfs_empty_contents(self, setup_catalog, db, fake_check):
         check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
-        data_format = await detect_data_format_from_check_or_catalog(check)
+        with patch("udata_hydra.data_formats.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            data_format = await detect_data_format_from_check_or_catalog(check)
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms))
 
         mock_wfs = MagicMock()
         mock_wfs.contents = {}
@@ -242,7 +255,7 @@ class TestOgcAnalysis:
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
-            result = await analyse_ogc(check=check, data_format=data_format)
+            result = await data_format.analyse(check=check)
 
         assert result == {
             "format": "wfs",
@@ -256,7 +269,11 @@ class TestOgcAnalysis:
         check = await fake_check(
             url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=ns:my_layer"
         )
-        data_format = await detect_data_format_from_check_or_catalog(check)
+        with patch("udata_hydra.data_formats.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            data_format = await detect_data_format_from_check_or_catalog(check)
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms))
 
         mock_layer = MagicMock()
         mock_layer.crsOptions = []
@@ -276,7 +293,7 @@ class TestOgcAnalysis:
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
-            result = await analyse_ogc(check=check, data_format=data_format)
+            result = await data_format.analyse(check=check)
 
         assert result is not None
         assert result["detected_layer"] == {"name": "ns:my_layer", "default_crs": None}
@@ -288,7 +305,11 @@ class TestOgcAnalysis:
         check = await fake_check(
             url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=ns:unknown"
         )
-        data_format = await detect_data_format_from_check_or_catalog(check)
+        with patch("udata_hydra.data_formats.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            data_format = await detect_data_format_from_check_or_catalog(check)
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms))
 
         mock_layer = MagicMock()
         mock_layer.crsOptions = []
@@ -308,7 +329,7 @@ class TestOgcAnalysis:
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
-            result = await analyse_ogc(check=check, data_format=data_format)
+            result = await data_format.analyse(check=check)
 
         assert result is not None
         assert result["detected_layer"] is None
@@ -320,7 +341,11 @@ class TestOgcAnalysis:
         check = await fake_check(
             url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=my_layer"
         )
-        data_format = await detect_data_format_from_check_or_catalog(check)
+        with patch("udata_hydra.data_formats.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            data_format = await detect_data_format_from_check_or_catalog(check)
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms))
 
         mock_layer = MagicMock()
         mock_layer.crsOptions = []
@@ -340,7 +365,7 @@ class TestOgcAnalysis:
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
-            result = await analyse_ogc(check=check, data_format=data_format)
+            result = await data_format.analyse(check=check)
 
         assert result is not None
         assert result["detected_layer"] == {"name": "ns:my_layer", "default_crs": None}
@@ -352,7 +377,11 @@ class TestOgcAnalysis:
         check = await fake_check(
             url="https://example.com/geoserver/wfs?SERVICE=WFS&typeName=my_layer"
         )
-        data_format = await detect_data_format_from_check_or_catalog(check)
+        with patch("udata_hydra.data_formats.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            data_format = await detect_data_format_from_check_or_catalog(check)
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms))
 
         mock_layer = MagicMock()
         mock_layer.crsOptions = []
@@ -372,7 +401,7 @@ class TestOgcAnalysis:
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
-            result = await analyse_ogc(check=check, data_format=data_format)
+            result = await data_format.analyse(check=check)
 
         assert result is not None
         assert result["detected_layer"] is None
@@ -382,12 +411,16 @@ class TestOgcAnalysis:
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs"]
             check = await fake_check()
-            result = await analyse_ogc(check=check, data_format=Wfs)
+            result = await Wms.analyse(check=check)
             assert result is None
 
     async def test_analyse_wms_success(self, setup_catalog, db, fake_check):
         check = await fake_check(url="https://example.com/geoserver/wms?SERVICE=WMS")
-        data_format = await detect_data_format_from_check_or_catalog(check)
+        with patch("udata_hydra.data_formats.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            data_format = await detect_data_format_from_check_or_catalog(check)
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms))
 
         mock_crs_4326 = MagicMock(spec=Crs)
         mock_crs_4326.getcode.return_value = "EPSG:4326"
@@ -409,7 +442,7 @@ class TestOgcAnalysis:
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
-            result = await analyse_ogc(check=check, data_format=data_format)
+            result = await data_format.analyse(check=check)
 
         expected_metadata = {
             "format": "wms",
@@ -431,7 +464,11 @@ class TestOgcAnalysis:
 
     async def test_analyse_wms_empty_contents(self, setup_catalog, db, fake_check):
         check = await fake_check(url="https://example.com/geoserver/wms?SERVICE=WMS")
-        data_format = await detect_data_format_from_check_or_catalog(check)
+        with patch("udata_hydra.data_formats.ogc.config") as mock_config:
+            mock_config.OGC_ANALYSIS_ENABLED = True
+            mock_config.OGC_FORMATS = ["wfs", "wms"]
+            data_format = await detect_data_format_from_check_or_catalog(check)
+            assert data_format is not None and issubclass(data_format, (Wfs, Wms))
 
         mock_wms = MagicMock()
         mock_wms.contents = {}
@@ -447,7 +484,7 @@ class TestOgcAnalysis:
         ):
             mock_config.OGC_ANALYSIS_ENABLED = True
             mock_config.OGC_FORMATS = ["wfs", "wms"]
-            result = await analyse_ogc(check=check, data_format=data_format)
+            result = await data_format.analyse(check=check)
 
         assert result == {
             "format": "wms",

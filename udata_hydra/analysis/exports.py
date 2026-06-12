@@ -30,15 +30,15 @@ async def _run_export_job(
     upload_to_s3: bool = True,
     delete_output: bool = False,
     delete_input: bool = True,
-) -> DataFormat:
-    check_out = None
+) -> DataFormat | None:
+    output, check_out = None, None
     try:
         output: DataFormat = await getattr(data_object, export_fn)()
         if upload_to_s3:
-            df_name = data_object.__class__.__name__
-            log.debug(f"Uploading {df_name} file {data_object.path} to S3")
+            df_name = output.__class__.__name__
+            log.debug(f"Uploading {df_name} file {output.path} to S3")
             upload_url = s3_client.send_file(
-                data_object, delete_source=delete_output and config.REMOVE_GENERATED_FILES
+                output, delete_source=delete_output and config.REMOVE_GENERATED_FILES
             )
             await Check.update(
                 check["id"],
@@ -117,11 +117,12 @@ async def export_geojson_pmtiles(
         remainder_types=["geojson"],
         export_fn="to_geojson",
     )
-    await _run_export_job(
-        data_object=geojson_file,
-        check=check,
-        delete_input=True,
-        step="pmtiles_export",
-        remainder_types=["geojson", "pmtiles", "pmtiles-journal"],
-        export_fn="to_pmtiles",
-    )
+    if geojson_file is not None:
+        await _run_export_job(
+            data_object=geojson_file,
+            check=check,
+            delete_input=True,
+            step="pmtiles_export",
+            remainder_types=["geojson", "pmtiles", "pmtiles-journal"],
+            export_fn="to_pmtiles",
+        )

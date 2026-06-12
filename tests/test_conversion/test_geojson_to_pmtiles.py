@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tests.conftest import RESOURCE_ID
-from udata_hydra.data_formats import Geojson, PMTiles
-from udata_hydra.utils.s3 import S3Client
+from udata_hydra.data_formats import Geojson
+from udata_hydra.data_formats.geojson.to_pmtiles import DEFAULT_PMTILES_FILENAME
 from udata_hydra.utils.timer import Timer
 
 log = logging.getLogger("udata-hydra")
@@ -24,7 +24,7 @@ async def test_geojson_to_pmtiles_invalid_geometry():
 async def test_geojson_to_pmtiles_valid_geometry(mocker):
     """Test handling of valid geometry"""
     # Make sure that we don't crash even if output pmtiles already exists
-    Path(f"{RESOURCE_ID}.pmtiles").touch()
+    Path(DEFAULT_PMTILES_FILENAME).touch()
     with patch("udata_hydra.config.REMOVE_GENERATED_FILES", False):
         pmtiles_file = await Geojson(path="tests/data/valid.geojson").to_pmtiles()
     # very (too?) simple test, we could install a specific library to read the file

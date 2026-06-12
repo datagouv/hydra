@@ -12,7 +12,6 @@ from udata_hydra.analysis import helpers
 from udata_hydra.data_formats.ogc import Ogc, Wfs, Wms
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.types import OgcFormatLiteral
 from udata_hydra.utils import ParseException, handle_parse_exception
 
 log = logging.getLogger("udata-hydra")

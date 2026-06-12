@@ -11,12 +11,10 @@ from csv_detective import validate_then_detect
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
-from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
-from udata_hydra.data_formats import Table
-from udata_hydra.data_formats.csv_like.analyse import analyse_csv
-from udata_hydra.analysis.exports import export_parquet
 from udata_hydra.crawl.check_resources import check_resource
+from udata_hydra.data_formats import Geojson, PMTiles, Parquet, Table
+from udata_hydra.data_formats.csv_like.analyse import analyse_csv
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 
@@ -185,7 +183,7 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
     async def tracking_parquet_export(*args, **kwargs):
         pass
 
-    mocker.patch("udata_hydra.analysis.csv.export_parquet", tracking_parquet_export)
+    mocker.patch("udata_hydra.data_formats.csv_like.analyse.export_parquet", tracking_parquet_export)
 
     def capture_enqueue(fn, *args, **kwargs):
         recorded.append((fn, kwargs.get("_priority")))
@@ -200,7 +198,7 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
 
     mocker.patch("udata_hydra.utils.queue.enqueue", capture_enqueue)
 
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
     with (
@@ -630,14 +628,17 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     remove_remainders = mocker.patch("udata_hydra.analysis.exports.remove_remainders")
     mocker.patch("udata_hydra.analysis.exports.helpers.notify_udata")
     mocker.patch(
-        "udata_hydra.analysis.exports.db_to_geojson_and_pmtiles",
+        "udata_hydra.analysis.exports.Table.to_geojson",
         side_effect=RuntimeError("export failed"),
     )
 
-    await export_geojson_pmtiles("tbl", {}, RESOURCE_ID, check["id"], check["url"])
+    await export_geojson_pmtiles(
+        table=Table(table_name="test", resource_id=RESOURCE_ID),
+        check=check,
+    )
 
     remove_remainders.assert_called_once_with(
-        RESOURCE_ID, ["geojson", "pmtiles", "pmtiles-journal"]
+        RESOURCE_ID, ["geojson"]
     )
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
@@ -656,13 +657,29 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
         new=mocker.AsyncMock(),
     )
     mocker.patch(
-        "udata_hydra.analysis.exports.db_to_geojson_and_pmtiles",
-        new=mocker.AsyncMock(),
+        "udata_hydra.analysis.exports.Table.to_geojson",
+        new=mocker.AsyncMock(return_value=Geojson(path="tests/data/valid.geojson", resource_id=RESOURCE_ID)),
+    )
+    mocker.patch(
+        "udata_hydra.analysis.exports.Geojson.to_pmtiles",
+        new=mocker.AsyncMock(
+            return_value=PMTiles(
+                path="tests/data/valid.geojson",
+                resource_id=RESOURCE_ID,  # the actual file doesn't matter, we just need to be able to get its size on instanciation
+            )
+        ),
+    )
+    mocker.patch(
+        "udata_hydra.analysis.exports.s3_client.send_file",
+        new=MagicMock(),
     )
 
-    await export_geojson_pmtiles("tbl", {}, RESOURCE_ID, check["id"], check["url"])
+    await export_geojson_pmtiles(
+        table=Table(table_name="test", resource_id=RESOURCE_ID),
+        check=check,
+    )
 
-    notify_udata.assert_awaited_once()
+    assert notify_udata.await_count == 2
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
     assert resource["status"] is None
@@ -676,9 +693,24 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
     )
-    mocker.patch("udata_hydra.analysis.csv.export_db_to_parquet", new=mocker.AsyncMock())
+    mocker.patch(
+        "udata_hydra.analysis.exports.Table.to_parquet",
+        new=mocker.AsyncMock(
+            return_value=Parquet(
+                path="tests/data/valid.geojson",
+                resource_id=RESOURCE_ID,  # the actual file doesn't matter, we just need to be able to get its size on instanciation
+            )
+        ),
+    )
+    mocker.patch(
+        "udata_hydra.analysis.exports.s3_client.send_file",
+        new=MagicMock(),
+    )
 
-    await export_parquet("tbl", {}, RESOURCE_ID, check["id"], check["url"])
+    await export_parquet(
+        table=Table(table_name="test", resource_id=RESOURCE_ID),
+        check=check,
+    )
 
     notify_udata.assert_awaited_once()
     resource = await Resource.get(RESOURCE_ID)

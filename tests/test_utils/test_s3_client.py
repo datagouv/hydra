@@ -78,14 +78,15 @@ def test_s3_client_send_file_requires_bucket(tmp_path: Path) -> None:
         client.send_file(tmp_path / "missing.parquet")
 
 
-def test_s3_client_send_file_raises_when_file_missing(
-    mocker: MockerFixture, tmp_path: Path
-) -> None:
+def test_s3_client_send_file_raises_when_file_missing(mocker: MockerFixture) -> None:
     mocker.patch("udata_hydra.config.S3_ENDPOINT", "s3-example.com")
     resource = MagicMock()
     resource.meta.client.head_bucket.return_value = {}
     with patch("udata_hydra.utils.s3.boto3.resource", return_value=resource):
         client = S3Client(bucket="my-bucket")
-        missing_file = tmp_path / "missing.geojson"
+        with patch(
+            "udata_hydra.data_formats.data_format.os.path.getsize", return_value=10
+        ):
+            missing_file = Geojson(path="missing.geojson")
         with pytest.raises(Exception, match="does not exists"):
             client.send_file(missing_file)

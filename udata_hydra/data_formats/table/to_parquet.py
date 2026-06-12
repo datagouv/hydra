@@ -51,7 +51,7 @@ async def db_to_parquet(table: Table) -> "Parquet":
                 stmt = await conn.prepare(f'SELECT {cols_sql} FROM "{table.table_name}"')
                 cursor = await stmt.cursor()
                 while batch := await cursor.fetch(BATCH_SIZE):
-                    table = pa.table(
+                    pq_table = pa.table(
                         {
                             orig: [row[db_col] for row in batch]
                             for orig, db_col in zip(original_cols, db_cols)
@@ -59,7 +59,7 @@ async def db_to_parquet(table: Table) -> "Parquet":
                         schema=schema,
                     )
                     if writer:
-                        writer.write_table(table)
+                        writer.write_table(pq_table)
     finally:
         if writer:
             writer.close()

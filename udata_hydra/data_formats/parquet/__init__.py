@@ -15,15 +15,14 @@ class Parquet(DataFormat):
     standard_mime_type = "application/vnd.apache.parquet"
     valid_mime_types = {standard_mime_type}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["parquet"])
-    file: pq.ParquetFile
     check_url = "parquet"
     further_analysis = True
 
     def inspect(self) -> dict:
-        self.file = pq.ParquetFile(self.path.as_posix())
+        file = pq.ParquetFile(self.path.as_posix())
         columns = {}
         self.inspection = {"header": []}
-        for col in self.file.schema_arrow:
+        for col in file.schema_arrow:
             self.inspection["header"].append(col.name)
             col_type = str(col.type)
             if col_type.startswith("dictionary"):
@@ -45,7 +44,7 @@ class Parquet(DataFormat):
             }
             for col_name, pytype in columns.items()
         }
-        self.inspection["total_lines"] = self.file.metadata.num_rows
+        self.inspection["total_lines"] = file.metadata.num_rows
         return self.inspection
 
     async def analyse(self, check: dict, debug_insert: bool = False):
@@ -53,7 +52,7 @@ class Parquet(DataFormat):
         return await analyse_parquet(check=check, file=self, debug_insert=debug_insert)
 
     async def to_db(
-        self, check: dict, table_indexes: dict[str, str] | None, debug_insert: bool
+        self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False
     ) -> "Table":
         from udata_hydra.data_formats.parquet.to_db import parquet_to_db
         return await parquet_to_db(
