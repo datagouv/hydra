@@ -9,13 +9,14 @@ from botocore.exceptions import ClientError
 from pytest_mock import MockerFixture
 
 from udata_hydra import config
-from udata_hydra.utils.s3 import CONTENT_TYPES, S3Client, reset_s3_client
+from udata_hydra.context import context
+from udata_hydra.utils.s3 import CONTENT_TYPES, S3Client
 
 
 @pytest.fixture(autouse=True)
 def _reset_s3_client_cache() -> Iterator[None]:
     yield
-    reset_s3_client()
+    context.pop("s3", None)
 
 
 @pytest.fixture

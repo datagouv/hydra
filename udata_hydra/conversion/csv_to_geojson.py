@@ -6,8 +6,8 @@ from typing import Any, Iterator
 
 from json_stream import streamable_list
 
+from udata_hydra.context import s3_client
 from udata_hydra.utils.casting import iter_tabular_rows
-from udata_hydra.utils.s3 import get_s3_client
 
 log = logging.getLogger("udata-hydra")
 
@@ -139,7 +139,7 @@ async def csv_to_geojson(
 
     if upload_to_s3:
         log.debug(f"Uploading GeoJSON file {output_file_path} to S3")
-        geojson_url = get_s3_client().send_file(str(output_file_path), delete_source=False)
+        geojson_url = s3_client().send_file(str(output_file_path), delete_source=False)
     else:
         geojson_url = None
 
