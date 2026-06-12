@@ -626,7 +626,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     """When GeoJSON/PMTiles export fails, record the error and reset the resource status.
     Also removes leftover geojson/pmtiles files so a retry does not leave stale artifacts."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_GEOJSON"})
+    await Resource.set_job_status(RESOURCE_ID, "geojson", "CONVERTING_TO_GEOJSON")
     remove_remainders = mocker.patch("udata_hydra.analysis.exports.remove_remainders")
     mocker.patch("udata_hydra.analysis.exports.helpers.notify_udata")
     mocker.patch(
@@ -641,7 +641,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     )
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
     updated_check = await Check.get_by_id(check["id"])
     assert updated_check is not None
     assert updated_check["parsing_error"] is not None
@@ -650,7 +650,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
 async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, fake_check, mocker):
     """When GeoJSON/PMTiles export succeeds, notify udata and clear the resource status."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PMTILES"})
+    await Resource.set_job_status(RESOURCE_ID, "pmtiles", "CONVERTING_TO_PMTILES")
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -665,13 +665,13 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
     notify_udata.assert_awaited_once()
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
 
 async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_check, mocker):
     """When parquet export succeeds, notify udata and clear the resource status."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PARQUET"})
+    await Resource.set_job_status(RESOURCE_ID, "parquet", "CONVERTING_TO_PARQUET")
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -683,7 +683,7 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
     notify_udata.assert_awaited_once()
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
 
 async def test_file_with_nan(
