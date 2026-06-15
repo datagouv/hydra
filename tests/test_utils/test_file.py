@@ -1,5 +1,6 @@
 import gzip
 import os
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -13,15 +14,31 @@ from udata_hydra.utils.file import (
 )
 
 
-def test_remove_remainders_cleans_temporary_folder(mocker, tmp_path):
-    mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", str(tmp_path))
+@pytest.mark.parametrize(
+    "temp_config",
+    (
+        pytest.param("configured", id="configured"),
+        pytest.param("", id="system-temp"),
+    ),
+)
+def test_remove_remainders_cleans_temporary_folder(mocker, tmp_path, temp_config):
+    if temp_config == "configured":
+        mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", str(tmp_path))
+        expected_parent = tmp_path
+    else:
+        mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", "")
+        expected_parent = Path(tempfile.gettempdir())
+
     resource_id = "deadbeef"
-    leftover = temporary_folder() / f"{resource_id}.parquet"
+    leftover = expected_parent / f"{resource_id}.parquet"
     leftover.write_text("leftover")
 
-    remove_remainders(resource_id, ["parquet"])
-
-    assert not leftover.exists()
+    try:
+        remove_remainders(resource_id, ["parquet"])
+        assert not leftover.exists()
+        assert temporary_folder() == expected_parent
+    finally:
+        leftover.unlink(missing_ok=True)
 
 
 def test_remove_remainders_ignores_cwd(mocker, tmp_path):
