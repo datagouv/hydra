@@ -31,7 +31,7 @@ class DataFormat(ABC):
         elif table_name:
             self.table_name = table_name
         else:
-            raise ValueError("A FileFormat must have either a path or a table_name")
+            raise ValueError("A DataFormat must have either a path or a table_name")
         if inspection:
             # passing it on
             self.inspection = inspection
