@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.12.3 (2026-06-15)
+
+- Revert "Introduce data formats ([#430](https://github.com/datagouv/hydra/pull/430))"
+
+
 ## 2.12.2 (2026-06-15)
 
 - fix(cli): make fd var bound (initialize to None) ([#441](https://github.com/datagouv/hydra/pull/441))
