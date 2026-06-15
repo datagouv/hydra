@@ -1,11 +1,17 @@
 import logging
-import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from udata_hydra import context
-from udata_hydra.context import s3_client
-from udata_hydra.conversion.csv_to_geojson import _detect_geo_columns
+from udata_hydra.data_formats import Table
+from udata_hydra.data_formats.csv_like.to_geojson import (
+    DEFAULT_GEOJSON_FILENAME,
+    _detect_geo_columns,
+)
 from udata_hydra.db import db_col_name
+
+if TYPE_CHECKING:
+    from udata_hydra.data_formats import Geojson
 
 log = logging.getLogger("udata-hydra")
 
@@ -94,41 +100,41 @@ def _build_feature_sql(
     return query, params
 
 
-async def db_to_geojson(
-    table_name: str,
-    inspection: dict,
-    output_file_path: Path,
-    upload_to_s3: bool = True,
-) -> tuple[int, str | None] | None:
+async def db_to_geojson(table: Table) -> "Geojson|None":
     """Generate a GeoJSON file by streaming features directly from PostgreSQL.
 
     Uses a server-side cursor to avoid loading all features in memory.
     Rows with NULL geographical columns are skipped.
 
     Args:
-        table_name: Name of the PostgreSQL table containing the CSV data.
-        inspection: CSV detective analysis results with column format detection.
-        output_file_path: Path where the GeoJSON file should be saved.
-        upload_to_s3: Whether to upload to S3-compatible storage (default: True).
+        table: PostgreSQL table containing the CSV data.
 
     Returns:
-        geojson_size: Size of the GeoJSON file in bytes.
-        geojson_url: Public URL of the GeoJSON object. None if not uploaded.
+        geojson_file: a Geojson instance.
     """
-    geo = _detect_geo_columns(inspection)
+    from udata_hydra.data_formats import Geojson
+
+    geo = _detect_geo_columns(table.inspection)
     if geo is None:
         log.debug("No geographical columns found, skipping")
         return None
 
-    columns = list(inspection["columns"].keys())
-    query, params = _build_feature_sql(table_name, geo, columns)
+    geojson_path = Path(
+        f"{table.resource_id}.geojson"
+        if table.resource_id is not None
+        else DEFAULT_GEOJSON_FILENAME
+    )
+    log.debug(f"Converting db table '{table.table_name}' to Geojson file '{geojson_path}'")
+
+    columns = list(table.inspection["columns"].keys())
+    query, params = _build_feature_sql(table.table_name, geo, columns)
 
     db = await context.pool("csv")
     async with db.acquire() as conn:
         async with conn.transaction():
             cursor = conn.cursor(query, *params)
 
-            with output_file_path.open("w") as f:
+            with geojson_path.open("w") as f:
                 f.write('{"type": "FeatureCollection", "features": [')
                 first = True
                 async for row in cursor:
@@ -138,12 +144,9 @@ async def db_to_geojson(
                     first = False
                 f.write("]}")
 
-    geojson_size: int = os.path.getsize(output_file_path)
-
-    if upload_to_s3:
-        log.debug(f"Uploading GeoJSON file {output_file_path} to S3")
-        geojson_url = s3_client().send_file(str(output_file_path), delete_source=False)
-    else:
-        geojson_url = None
-
-    return geojson_size, geojson_url
+    return Geojson(
+        path=geojson_path,
+        inspection=table.inspection,
+        resource_id=table.resource_id,
+        dataset_id=table.dataset_id,
+    )

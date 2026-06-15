@@ -22,7 +22,7 @@ async def test_csv_analysis_from_catalog(
     setup_catalog, rmock, catalog_content, fake_check, produce_mock, entry_mode
 ):
     """Test the analyse-csv CLI command using check_id or URL for a catalog resource."""
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
     if entry_mode == "check_id":
@@ -35,7 +35,7 @@ async def test_csv_analysis_with_debug_insert(setup_catalog, rmock, db, fake_che
     """Test the analyse-csv CLI command with debug insert mode"""
 
     # Create a check for an existing URL
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
 
     # Use simple CSV content instead of catalog_content

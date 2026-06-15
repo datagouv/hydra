@@ -11,9 +11,10 @@ from csv_detective import validate_then_detect
 from yarl import URL
 
 from tests.conftest import RESOURCE_ID, RESOURCE_URL
-from udata_hydra.analysis.csv import analyse_csv
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
+from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.crawl.check_resources import check_resource
+from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 
@@ -23,7 +24,7 @@ pytestmark = pytest.mark.asyncio
 async def test_analyse_csv_on_catalog(
     setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
 ):
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(url, status=200, body=catalog_content)
@@ -35,7 +36,8 @@ async def test_analyse_csv_on_catalog(
     assert resource["status_since"] is None
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
@@ -65,7 +67,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     """
     TEST_CSV_FILE, EXPECTED_COUNT = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
 
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
 
@@ -80,7 +82,8 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     assert resource["status"] is None
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
@@ -101,12 +104,13 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
 async def test_error_reporting_csv_detective(
     rmock, catalog_content, db, setup_catalog, fake_check, produce_mock
 ):
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     rmock.get(url, status=200, body="".encode("utf-8"))
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
@@ -122,13 +126,14 @@ async def test_error_reporting_csv_detective(
 async def test_error_reporting_parsing(
     rmock, catalog_content, db, setup_catalog, fake_check, produce_mock
 ):
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(url, status=200, body="a,b,c\n1,2".encode("utf-8"))
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
@@ -149,13 +154,14 @@ async def test_error_reporting_parsing(
 async def test_analyse_csv_send_udata_webhook(
     setup_catalog, rmock, catalog_content, db, fake_check, udata_url
 ):
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
     rmock.put(udata_url, status=200)
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
@@ -182,7 +188,7 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
     async def tracking_parquet_export(*args, **kwargs):
         pass
 
-    mocker.patch("udata_hydra.analysis.csv.export_parquet", tracking_parquet_export)
+    mocker.patch("udata_hydra.analysis.exports.export_parquet", tracking_parquet_export)
 
     def capture_enqueue(fn, *args, **kwargs):
         recorded.append((fn, kwargs.get("_priority")))
@@ -197,7 +203,7 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
 
     mocker.patch("udata_hydra.utils.queue.enqueue", capture_enqueue)
 
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
     with (
@@ -205,7 +211,8 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
         patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
         patch("udata_hydra.config.DB_TO_GEOJSON", False),
     ):
-        await analyse_csv(check=check)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
 
     assert any(f is tracking_parquet_export and p == "low" for f, p in recorded)
 
@@ -436,10 +443,11 @@ async def test_validation(
     # run analysis
     with patch(
         # wraps because we don't want to change the behaviour, just to know it's been called
-        "udata_hydra.analysis.csv.validate_then_detect",
+        "udata_hydra.data_formats.csv_like.validate_then_detect",
         wraps=validate_then_detect,
     ) as mock_func:
-        await analyse_csv(check=check)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
         mock_func.assert_called_once()
 
     # now we check what is inside csv_detective in tables_index
@@ -484,7 +492,7 @@ async def test_too_long_column_name(
     url = "http://example.com/csv"
     max_len = 10
     col_name = (col * ((max_len // len(col)) + 1))[: max_len if not has_non_ascii else max_len - 3]
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "application/csv"})
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(
@@ -499,7 +507,8 @@ async def test_too_long_column_name(
     )
     # should fail because one column name is too long
     with patch("udata_hydra.config.NAMEDATALEN", max_len):
-        await analyse_csv(check=check)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
     updated_check = await Check.get_by_id(check["id"])
     assert updated_check is not None
     # analysis failed
@@ -531,11 +540,10 @@ async def test_analyse_csv_parquet_export_enqueue(
     """Parquet export enqueue respects DB_TO_PARQUET, uses low priority, skips geo export."""
     from udata_hydra.analysis.exports import export_geojson_pmtiles as exp_geo
 
-    mock_enqueue = mocker.patch("udata_hydra.analysis.csv.queue.enqueue")
+    mock_enqueue = mocker.patch("udata_hydra.data_formats.csv_like.queue.enqueue")
 
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(url, status=200, body=catalog_content)
 
     with (
@@ -543,7 +551,8 @@ async def test_analyse_csv_parquet_export_enqueue(
         patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
         patch("udata_hydra.config.DB_TO_GEOJSON", False),
     ):
-        await analyse_csv(check=check)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
 
     parquet_jobs = [
         c for c in mock_enqueue.call_args_list if c.args and c.args[0] is export_parquet
@@ -554,10 +563,8 @@ async def test_analyse_csv_parquet_export_enqueue(
     if db_to_parquet_enabled:
         kw = parquet_jobs[0].kwargs
         assert kw["_priority"] == "low"
-        assert kw["table_name"] == table_name
-        assert kw["resource_id"] == RESOURCE_ID
-        assert kw["check_id"] == check["id"]
-        assert "inspection" in kw
+        assert kw["check"]["id"] == check["id"]
+        assert "table" in kw
 
 
 async def test_crash_after_db_insertion(
@@ -577,7 +584,7 @@ async def test_crash_after_db_insertion(
             queued_parquet_kwargs.append(dict(kwargs))
         return MagicMock()
 
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "application/csv"})
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(
@@ -593,23 +600,18 @@ async def test_crash_after_db_insertion(
     with (
         patch("udata_hydra.config.DB_TO_PARQUET", True),
         patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
-        patch("udata_hydra.analysis.csv.queue.enqueue", side_effect=capture_enqueue),
+        patch("udata_hydra.data_formats.csv_like.queue.enqueue", side_effect=capture_enqueue),
     ):
-        await analyse_csv(check=check)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
 
     assert len(queued_parquet_kwargs) == 1
     job_kw = queued_parquet_kwargs[0]
     with patch(
-        "udata_hydra.analysis.csv.export_db_to_parquet",
+        "udata_hydra.data_formats.table.to_parquet.db_to_parquet",
         new=_crash,
     ):
-        await export_parquet(
-            table_name=job_kw["table_name"],
-            inspection=job_kw["inspection"],
-            resource_id=job_kw["resource_id"],
-            check_id=job_kw["check_id"],
-            url=job_kw["url"],
-        )
+        await export_parquet(table=job_kw["table"], check=job_kw["check"])
     # we should still have the table and its reference in tables_index
     await db.execute(f'SELECT * FROM "{table_name}"')
     rows = list(
@@ -632,15 +634,16 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     remove_remainders = mocker.patch("udata_hydra.analysis.exports.remove_remainders")
     mocker.patch("udata_hydra.analysis.exports.helpers.notify_udata")
     mocker.patch(
-        "udata_hydra.analysis.exports.db_to_geojson_and_pmtiles",
+        "udata_hydra.analysis.exports.Table.to_geojson",
         side_effect=RuntimeError("export failed"),
     )
 
-    await export_geojson_pmtiles("tbl", {}, RESOURCE_ID, check["id"], check["url"])
-
-    remove_remainders.assert_called_once_with(
-        RESOURCE_ID, ["geojson", "pmtiles", "pmtiles-journal"]
+    await export_geojson_pmtiles(
+        source=Table(table_name="test", resource_id=RESOURCE_ID),
+        check=check,
     )
+
+    remove_remainders.assert_called_once_with(RESOURCE_ID, ["geojson"])
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
     assert resource["status"] is None
@@ -658,13 +661,28 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
         new=mocker.AsyncMock(),
     )
     mocker.patch(
-        "udata_hydra.analysis.exports.db_to_geojson_and_pmtiles",
-        new=mocker.AsyncMock(),
+        "udata_hydra.analysis.exports.Table.to_geojson",
+        new=mocker.AsyncMock(
+            return_value=Geojson(path="tests/data/valid.geojson", resource_id=RESOURCE_ID)
+        ),
+    )
+    mocker.patch(
+        "udata_hydra.analysis.exports.Geojson.to_pmtiles",
+        new=mocker.AsyncMock(
+            return_value=PMTiles(
+                path="tests/data/valid.geojson",
+                resource_id=RESOURCE_ID,  # the actual file doesn't matter, we just need to be able to get its size on instanciation
+            )
+        ),
+    )
+    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=MagicMock())
+
+    await export_geojson_pmtiles(
+        source=Table(table_name="test", resource_id=RESOURCE_ID),
+        check=check,
     )
 
-    await export_geojson_pmtiles("tbl", {}, RESOURCE_ID, check["id"], check["url"])
-
-    notify_udata.assert_awaited_once()
+    assert notify_udata.await_count == 2
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
     assert resource["status"] is None
@@ -678,9 +696,21 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
     )
-    mocker.patch("udata_hydra.analysis.csv.export_db_to_parquet", new=mocker.AsyncMock())
+    mocker.patch(
+        "udata_hydra.analysis.exports.Table.to_parquet",
+        new=mocker.AsyncMock(
+            return_value=Parquet(
+                path="tests/data/valid.geojson",
+                resource_id=RESOURCE_ID,  # the actual file doesn't matter, we just need to be able to get its size on instanciation
+            )
+        ),
+    )
+    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=MagicMock())
 
-    await export_parquet("tbl", {}, RESOURCE_ID, check["id"], check["url"])
+    await export_parquet(
+        table=Table(table_name="test", resource_id=RESOURCE_ID),
+        check=check,
+    )
 
     notify_udata.assert_awaited_once()
     resource = await Resource.get(RESOURCE_ID)
@@ -695,7 +725,7 @@ async def test_file_with_nan(
     fake_check,
     produce_mock,
 ):
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "application/csv"})
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(
@@ -708,7 +738,8 @@ async def test_file_with_nan(
         body=("a,b,c\n1,1.0,inf\n2,nan,2.0\n3,3.0,3.0\n").encode("utf-8"),
         repeat=True,
     )
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
     # it should all be fine
     rows = await db.fetch(f'SELECT * FROM "{table_name}"')
     assert dict(rows[0])["c"] == float("inf")

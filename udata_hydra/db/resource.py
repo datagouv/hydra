@@ -16,9 +16,12 @@ class Resource:
         "ANALYSING_RESOURCE_HEAD": "currently checking for change, type and size from headers",
         "DOWNLOADING_RESOURCE": "currently being downloaded",
         "ANALYSING_DOWNLOADED_RESOURCE": "currently checking for change, type and size from downloaded file",
-        "TO_ANALYSE_CSV": "resource content to be analysed by CSV detective",
-        "ANALYSING_CSV": "resource content currently being analysed by CSV detective",
-        "VALIDATING_CSV": "resource content being validated using the previous analysis",
+        "TO_ANALYSE_CSV": "CSV resource content to be analysed by CSV detective",
+        "TO_ANALYSE_CSVGZ": "CSV.GZ resource content to be analysed by CSV detective",
+        "TO_ANALYSE_XLS": "XLS resource content to be analysed by CSV detective",
+        "TO_ANALYSE_XLSX": "XLSX resource content to be analysed by CSV detective",
+        "ANALYSING_CSV": "CSV-like resource content currently being analysed by CSV detective",
+        "VALIDATING_CSV": "CSV-like resource content being validated using the previous analysis",
         "INSERTING_IN_DB": "currently being inserted in DB",
         "CONVERTING_TO_PARQUET": "currently being converted to Parquet",
         "TO_ANALYSE_GEOJSON": "geojson resource content to be analysed",
@@ -27,8 +30,10 @@ class Resource:
         "CONVERTING_TO_GEOJSON": "csv is currently being converted to geojson",
         "TO_ANALYSE_PARQUET": "parquet resource content to be analysed",
         "ANALYSING_PARQUET": "retrieving parquet column metadata",
-        "TO_ANALYSE_OGC": "OGC service to be analysed",
-        "ANALYSING_OGC": "retrieving OGC service metadata",
+        "TO_ANALYSE_WFS": "WFS service to be analysed",
+        "ANALYSING_WFS": "retrieving WFS service metadata",
+        "TO_ANALYSE_WMS": "WMS service to be analysed",
+        "ANALYSING_WMS": "retrieving WMS service metadata",
     }
 
     @classmethod
