@@ -18,6 +18,7 @@ from udata_hydra.utils import (
     handle_parse_exception,
     remove_remainders,
 )
+from udata_hydra.utils.file import temporary_folder
 
 # Re-exported so that `udata_hydra.analysis.geojson.geojson_to_pmtiles` keeps
 # working as a `mock.patch` target for tests that mock the call site used by
@@ -62,7 +63,7 @@ async def analyse_geojson(
 
         # Convert to PMTiles
         try:
-            pmtiles_filepath = Path(f"{resource_id}.pmtiles")
+            pmtiles_filepath = temporary_folder() / f"{resource_id}.pmtiles"
             pmtiles_size, pmtiles_url = await geojson_to_pmtiles(
                 input_file_path=Path(tmp_file.name),
                 output_file_path=pmtiles_filepath,

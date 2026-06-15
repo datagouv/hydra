@@ -7,6 +7,7 @@ from udata_hydra.conversion.geojson_to_pmtiles import geojson_to_pmtiles
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import Timer
+from udata_hydra.utils.file import temporary_folder
 
 DEFAULT_GEOJSON_FILEPATH = Path("converted_from_db.geojson")
 DEFAULT_PMTILES_FILEPATH = Path("converted_from_geojson.pmtiles")
@@ -26,8 +27,8 @@ async def db_to_geojson_and_pmtiles(
     )
 
     if resource_id:
-        geojson_filepath = Path(f"{resource_id}.geojson")
-        pmtiles_filepath = Path(f"{resource_id}.pmtiles")
+        geojson_filepath = temporary_folder() / f"{resource_id}.geojson"
+        pmtiles_filepath = temporary_folder() / f"{resource_id}.pmtiles"
         # Update resource status for GeoJSON conversion
         await Resource.update(resource_id, {"status": "CONVERTING_TO_GEOJSON"})
     else:

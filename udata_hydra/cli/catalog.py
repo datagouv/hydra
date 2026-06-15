@@ -15,6 +15,7 @@ from udata_hydra.cli.db import _drop_dbs, _migrate
 from udata_hydra.db.resource import Resource
 from udata_hydra.logger import quiet_logs
 from udata_hydra.utils import download_file
+from udata_hydra.utils.file import temporary_folder
 
 
 async def _load_catalog(
@@ -45,9 +46,7 @@ async def _load_catalog(
         fd = None
         try:
             log.info(f"Downloading resources catalog from {url}...")
-            with NamedTemporaryFile(
-                dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False
-            ) as fd:
+            with NamedTemporaryFile(dir=str(temporary_folder()), delete=False) as fd:
                 await download_file(url, fd)
             log.info("Upserting resources catalog in database...")
             # consider everything deleted, deleted will be updated when loading new catalog

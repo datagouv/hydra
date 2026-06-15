@@ -3,6 +3,7 @@ import pyarrow.parquet as pq
 
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.db import db_col_name
+from udata_hydra.utils.file import temporary_folder
 
 BATCH_SIZE = 50_000
 
@@ -29,8 +30,8 @@ async def db_to_parquet(
         ]
     )
 
-    parquet_path = f"{output_filename}.parquet"
-    writer = pq.ParquetWriter(parquet_path, schema, compression="zstd") if output_filename else None
+    parquet_path = temporary_folder() / f"{output_filename}.parquet" if output_filename else None
+    writer = pq.ParquetWriter(parquet_path, schema, compression="zstd") if parquet_path else None
 
     try:
         async with pool.acquire() as conn:
@@ -51,6 +52,6 @@ async def db_to_parquet(
         if writer:
             writer.close()
 
-    if output_filename:
-        return parquet_path, pq.read_table(parquet_path)
-    return parquet_path, table
+    if parquet_path:
+        return str(parquet_path), pq.read_table(parquet_path)
+    return "", table

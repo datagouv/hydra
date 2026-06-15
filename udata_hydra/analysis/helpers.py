@@ -1,11 +1,11 @@
 import json
-import os
 from typing import IO
 
 from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send
+from udata_hydra.utils.file import temporary_folder
 
 
 def get_python_type(column: dict) -> str:
@@ -24,8 +24,7 @@ async def read_or_download_file(
     exception: Record | None,
 ) -> IO[bytes]:
     if filename:
-        temp_dir = config.TEMPORARY_DOWNLOAD_FOLDER or "/tmp"
-        full_path = os.path.join(temp_dir, filename)
+        full_path = temporary_folder() / filename
         try:
             return open(full_path, "rb")
         except FileNotFoundError:

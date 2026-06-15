@@ -5,6 +5,7 @@ import mimetypes
 import os
 import re
 import tempfile
+from pathlib import Path
 from typing import IO
 
 import aiohttp
@@ -14,6 +15,16 @@ from udata_hydra import config
 from udata_hydra.utils import IOException
 
 log = logging.getLogger("udata-hydra")
+
+
+def temporary_folder() -> Path:
+    """Return the configured folder for transient pipeline files."""
+    if config.TEMPORARY_DOWNLOAD_FOLDER:
+        folder = Path(config.TEMPORARY_DOWNLOAD_FOLDER)
+    else:
+        folder = Path(tempfile.gettempdir())
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
 
 
 def compute_checksum_from_file(filename: str) -> str:
@@ -30,7 +41,7 @@ def compute_checksum_from_file(filename: str) -> str:
 def extract_gzip(file_path: str) -> IO[bytes]:
     with gzip.open(file_path, "rb") as gz_file:
         with tempfile.NamedTemporaryFile(
-            dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, mode="wb", delete=False
+            dir=str(temporary_folder()), mode="wb", delete=False
         ) as temp_file:
             temp_file.write(gz_file.read())
     return temp_file
@@ -53,9 +64,7 @@ async def download_resource(
     ):
         raise IOException("File too large to download", url=url)
 
-    tmp_file = tempfile.NamedTemporaryFile(
-        dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False
-    )
+    tmp_file = tempfile.NamedTemporaryFile(dir=str(temporary_folder()), delete=False)
 
     chunk_size = 1024
     i = 0
@@ -124,5 +133,6 @@ async def download_file(url: str, fd):
 def remove_remainders(resource_id: str, extensions: list[str]) -> None:
     """Delete potential remainders from process that crashed"""
     for ext in extensions:
-        if os.path.exists(f"{resource_id}.{ext}"):
-            os.remove(f"{resource_id}.{ext}")
+        path = temporary_folder() / f"{resource_id}.{ext}"
+        if path.exists():
+            path.unlink()
