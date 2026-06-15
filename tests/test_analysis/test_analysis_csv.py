@@ -675,8 +675,7 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
             )
         ),
     )
-    mock_s3 = MagicMock()
-    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=mock_s3)
+    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=MagicMock())
 
     await export_geojson_pmtiles(
         source=Table(table_name="test", resource_id=RESOURCE_ID),
@@ -706,8 +705,7 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
             )
         ),
     )
-    mock_s3 = MagicMock()
-    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=mock_s3)
+    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=MagicMock())
 
     await export_parquet(
         table=Table(table_name="test", resource_id=RESOURCE_ID),
