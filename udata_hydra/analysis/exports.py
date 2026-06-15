@@ -69,7 +69,7 @@ async def _run_export_job(
             if resource is not None and check_out is not None:
                 await helpers.notify_udata(resource, check_out)
             await Resource.update(data_object.resource_id, {"status": None})
-        return output
+    return output
 
 
 async def export_parquet(
