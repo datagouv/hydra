@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import boto3
 from botocore.config import Config
@@ -6,11 +6,13 @@ from botocore.exceptions import ClientError
 
 from udata_hydra import config
 
-if TYPE_CHECKING:
-    from udata_hydra.data_formats import DataFormat
-
 # Match datagouvfr_data_pipelines S3 defaults for slow networks / large uploads.
 _DEFAULT_BOTO_CONFIG = {"connect_timeout": 3600, "read_timeout": 3600}
+CONTENT_TYPES = {
+    "parquet": "application/vnd.apache.parquet",
+    "geojson": "application/geo+json",
+    "pmtiles": "application/vnd.pmtiles",
+}
 
 
 class S3Client:
@@ -40,19 +42,19 @@ class S3Client:
 
     def send_file(
         self,
-        file: "DataFormat",
+        file_path: str | Path,
         delete_source: bool = True,
     ) -> str:
         if self.bucket is None:
             raise AttributeError("A bucket has to be specified.")
-        path = file.path
+        path = Path(file_path)
         if path.is_file():
             object_key = f"{path.suffix[1:]}/{path.name}"
             self._resource.Bucket(self.bucket).upload_file(
                 str(path),
                 object_key,
                 ExtraArgs={
-                    "ContentType": file.standard_mime_type,
+                    "ContentType": CONTENT_TYPES[path.suffix[1:]],
                     "ACL": "public-read",
                 },
             )

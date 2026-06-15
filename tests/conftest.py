@@ -250,13 +250,13 @@ async def db():
 
 @pytest_asyncio.fixture
 async def insert_fake_resource():
-    async def _insert_fake_resource(status: str | None = None, format: str = "csv"):
+    async def _insert_fake_resource(database, status: str | None = None):
         await Resource.insert(
             dataset_id=DATASET_ID,
             resource_id=RESOURCE_ID,
             url=RESOURCE_URL,
             type="main",
-            format=format,
+            format="csv",
             title="Fake resource",
             status=status,
             priority=True,

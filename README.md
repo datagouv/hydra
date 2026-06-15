@@ -94,13 +94,13 @@ Workers process three RQ queues in order: **`high`**, **`default`**, **`low`**.
 | Function | Queue | When it runs |
 |----------|-------|--------------|
 | `analyse_resource` | `default` (priority crawl) or `low` (regular crawl) | After a successful crawl/check |
-| `Csv/Xls/Xlsx(...).analyse` | `default`, or `high` via API/CLI | When a tabular file needs parsing |
-| `Geojson(...).analyse` | `default`, or `high` via API/CLI | When a GeoJSON file needs parsing |
-| `Parquet(...).analyse` | `default`, or `high` via API/CLI | When a Parquet file needs metadata extraction |
-| `Wfs/Wms.analyse` | `default`, or `high` via API/CLI | When an OGC service needs analysis |
+| `analyse_csv` | `default`, or `high` via API/CLI | When a tabular file needs parsing |
+| `analyse_geojson` | `default`, or `high` via API/CLI | When a GeoJSON file needs parsing |
+| `analyse_parquet` | `default`, or `high` via API/CLI | When a Parquet file needs metadata extraction |
+| `analyse_ogc` | `default`, or `high` via API/CLI | When an OGC service needs analysis |
 | `send` | `high` | When hydra informs udata of a resource's changes |
 | `export_parquet` | `low` | After CSV ingest, if `DB_TO_PARQUET` is enabled |
-| `export_geojson_pmtiles` | `low` | After CSV ingest, if `DB_TO_GEOJSON` is enabled and geo columns are detected |
+| `export_geojson_pmtiles` | `low` | After CSV ingest, if geo columns are detected |
 
 Manual checks (`POST /api/checks`, CLI `check-resource`) use **`high`** for the full pipeline. Regular crawls enqueue `analyse_resource` on **`low`**, but follow-up parsing jobs still run on **`default`**.
 
