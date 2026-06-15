@@ -57,7 +57,9 @@ async def download_from_check(check: dict, data_format: type[DataFormat]) -> Dat
         data_format=data_format,
     )
     return data_format(
-        file_name=os.path.basename(tmp_file.name), resource_id=check.get("resource_id"), dataset_id=check.get("dataset_id")
+        file_name=os.path.basename(tmp_file.name),
+        resource_id=check.get("resource_id"),
+        dataset_id=check.get("dataset_id"),
     )
 
 

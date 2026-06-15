@@ -21,8 +21,8 @@ from udata_hydra.utils import (
     ParseException,
     Timer,
     handle_parse_exception,
-    true_path,
     queue,
+    true_path,
 )
 
 if TYPE_CHECKING:

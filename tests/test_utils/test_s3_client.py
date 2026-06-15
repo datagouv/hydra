@@ -1,7 +1,7 @@
 """Unit tests for S3Client (object key prefix / public URL)."""
 
-from collections.abc import Iterator
 import os
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

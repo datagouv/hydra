@@ -271,7 +271,9 @@ async def _analyse_parquet_cli(
         filename=None,
         data_format=Parquet,
     )
-    file = Parquet(file_name=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id"))
+    file = Parquet(
+        file_name=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id")
+    )
     await file.analyse(check=check)
 
 
