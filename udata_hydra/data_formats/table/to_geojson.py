@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from udata_hydra import context
@@ -9,6 +8,7 @@ from udata_hydra.data_formats.csv_like.to_geojson import (
     _detect_geo_columns,
 )
 from udata_hydra.db import db_col_name
+from udata_hydra.utils import true_path
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats import Geojson
@@ -119,12 +119,12 @@ async def db_to_geojson(table: Table) -> "Geojson|None":
         log.debug("No geographical columns found, skipping")
         return None
 
-    geojson_path = Path(
+    geojson_name = (
         f"{table.resource_id}.geojson"
         if table.resource_id is not None
         else DEFAULT_GEOJSON_FILENAME
     )
-    log.debug(f"Converting db table '{table.table_name}' to Geojson file '{geojson_path}'")
+    log.debug(f"Converting db table '{table.table_name}' to Geojson file '{geojson_name}'")
 
     columns = list(table.inspection["columns"].keys())
     query, params = _build_feature_sql(table.table_name, geo, columns)
@@ -134,7 +134,7 @@ async def db_to_geojson(table: Table) -> "Geojson|None":
         async with conn.transaction():
             cursor = conn.cursor(query, *params)
 
-            with geojson_path.open("w") as f:
+            with open(true_path(geojson_name), "w") as f:
                 f.write('{"type": "FeatureCollection", "features": [')
                 first = True
                 async for row in cursor:
@@ -145,7 +145,7 @@ async def db_to_geojson(table: Table) -> "Geojson|None":
                 f.write("]}")
 
     return Geojson(
-        path=geojson_path,
+        file_name=geojson_name,
         inspection=table.inspection,
         resource_id=table.resource_id,
         dataset_id=table.dataset_id,

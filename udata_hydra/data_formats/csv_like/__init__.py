@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from asyncpg import Record
@@ -20,6 +21,7 @@ from udata_hydra.utils import (
     ParseException,
     Timer,
     handle_parse_exception,
+    true_path,
     queue,
 )
 
@@ -42,7 +44,7 @@ class CsvLike(DataFormat):
             if self.resource_id:
                 await Resource.update(self.resource_id, {"status": "VALIDATING_CSV"})
             self.inspection = validate_then_detect(  # ty: ignore[invalid-assignment]
-                file_path=self.path.as_posix(),
+                file_path=true_path(self.file_name),
                 previous_analysis=previous_inspection,
                 output_profile=True,
                 num_rows=-1,
@@ -50,7 +52,7 @@ class CsvLike(DataFormat):
             )
         else:
             self.inspection = csv_detective_routine(  # ty: ignore[invalid-assignment]
-                file_path=self.path.as_posix(),
+                file_path=true_path(self.file_name),
                 output_profile=True,
                 num_rows=-1,
                 save_results=False,
@@ -153,7 +155,7 @@ class CsvLike(DataFormat):
         finally:
             await helpers.notify_udata(resource, check)
             timer.stop()
-            self.path.unlink()
+            Path(true_path(self.file_name)).unlink()
 
             # Reset resource status to None
             await Resource.update(resource_id, {"status": None})

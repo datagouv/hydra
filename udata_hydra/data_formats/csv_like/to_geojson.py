@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 from json_stream import streamable_list
 
+from udata_hydra.utils import true_path
 from udata_hydra.utils.casting import iter_tabular_rows
 
 if TYPE_CHECKING:
@@ -66,7 +67,7 @@ async def csv_to_geojson(file: "CsvLike") -> "Geojson|None":
     """
 
     def get_features(
-        file_path: Path, inspection: dict, geo: dict[str, Any]
+        file_path: str, inspection: dict, geo: dict[str, Any]
     ) -> Iterator[dict[str, Any]]:
         for row in iter_tabular_rows(file_path, inspection, cast_json=False, as_dict=True):
             if "geojson" in geo:
@@ -125,17 +126,17 @@ async def csv_to_geojson(file: "CsvLike") -> "Geojson|None":
 
     template = {"type": "FeatureCollection"}
 
-    template["features"] = streamable_list(get_features(file.path, file.inspection, geo))
+    template["features"] = streamable_list(get_features(true_path(file.file_name), file.inspection, geo))
 
-    geojson_path = Path(
+    geojson_name = (
         f"{file.resource_id}.geojson" if file.resource_id is not None else DEFAULT_GEOJSON_FILENAME
     )
 
-    with geojson_path.open("w") as f:
+    with open(true_path(geojson_name), "w") as f:
         json.dump(template, f, indent=4, ensure_ascii=False, default=str)
 
     return Geojson(
-        path=geojson_path,
+        file_name=geojson_name,
         inspection=file.inspection,
         resource_id=file.resource_id,
         dataset_id=file.dataset_id,

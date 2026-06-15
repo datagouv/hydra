@@ -158,7 +158,7 @@ async def analyse_resource(
                 )
             elif tmp_file:
                 file = data_format(
-                    path=tmp_file.name,
+                    file_name=os.path.basename(tmp_file.name),
                     resource_id=resource_id,
                     dataset_id=dataset_id,
                 )

@@ -161,7 +161,7 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
 
     :csv_filepath: Path to the CSV file to convert
     """
-    csv_file = CsvLike(path=csv_filepath)
+    csv_file = CsvLike(file_name=csv_filepath)
     log.info(f"Processing CSV-like file: {csv_file.path}")
     log.info(f"File size: {csv_file.filesize} bytes")
 
@@ -222,7 +222,7 @@ async def _convert_geojson_to_pmtiles_cli(geojson_filepath: str):
 
     :geojson_filepath: Path to the GeoJSON file to convert
     """
-    geojson_file = Geojson(path=geojson_filepath)
+    geojson_file = Geojson(file_name=geojson_filepath)
     log.info(f"Processing GeoJSON file: {geojson_file.path}")
     log.info(f"File size: {geojson_file.filesize} bytes")
 
@@ -271,7 +271,7 @@ async def _analyse_parquet_cli(
         filename=None,
         data_format=Parquet,
     )
-    file = Parquet(path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id"))
+    file = Parquet(file_name=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id"))
     await file.analyse(check=check)
 
 

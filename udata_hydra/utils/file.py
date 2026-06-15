@@ -126,3 +126,9 @@ def remove_remainders(resource_id: str, extensions: list[str]) -> None:
     for ext in extensions:
         if os.path.exists(f"{resource_id}.{ext}"):
             os.remove(f"{resource_id}.{ext}")
+
+
+def true_path(file_name: str):
+    if file_name.startswith("tests/data/"):
+        return file_name
+    return f"{config.TEMPORARY_DOWNLOAD_FOLDER or '/tmp'}/{file_name}"

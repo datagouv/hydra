@@ -1,11 +1,12 @@
 import json
 import os
 from abc import ABC, abstractmethod
-from pathlib import Path
+
+from udata_hydra.utils import true_path
 
 
 class DataFormat(ABC):
-    path: Path
+    file_name: str
     standard_mime_type: str
     valid_mime_types: set[str]
     filesize: int
@@ -19,19 +20,19 @@ class DataFormat(ABC):
     def __init__(
         self,
         *,
-        path: Path | str | None = None,
+        file_name: str | None = None,
         table_name: str | None = None,
         inspection: dict | None = None,
         resource_id: str | None = None,
         dataset_id: str | None = None,
     ) -> None:
-        if path:
-            self.path = Path(path) if isinstance(path, str) else path
-            self.filesize = os.path.getsize(self.path)
+        if file_name:
+            self.file_name = file_name
+            self.filesize = os.path.getsize(true_path(file_name))
         elif table_name:
             self.table_name = table_name
         else:
-            raise ValueError("A DataFormat must have either a path or a table_name")
+            raise ValueError("A DataFormat must have either a file_name or a table_name")
         if inspection:
             # passing it on
             self.inspection = inspection

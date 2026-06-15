@@ -17,6 +17,7 @@ from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
     ParseException,
     Timer,
+    true_path,
 )
 
 if TYPE_CHECKING:
@@ -33,7 +34,7 @@ class Parquet(DataFormat):
     further_analysis = True
 
     def inspect(self) -> dict:
-        file = pq.ParquetFile(self.path.as_posix())
+        file = pq.ParquetFile(true_path(self.file_name))
         columns = {}
         self.inspection = {"header": []}
         for col in file.schema_arrow:

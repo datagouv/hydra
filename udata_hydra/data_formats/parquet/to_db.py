@@ -16,7 +16,7 @@ from udata_hydra.data_formats import Parquet
 from udata_hydra.db import compute_insert_query, db_col_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import ParseException
+from udata_hydra.utils import ParseException, true_path
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats.table import Table
@@ -107,7 +107,7 @@ async def parquet_to_db(
         try:
             await db.copy_records_to_table(
                 table_name,
-                records=_iter_parquet_rows(pq.ParquetFile(file.path)),
+                records=_iter_parquet_rows(pq.ParquetFile(true_path(file.file_name))),
                 columns=list(columns.keys()),
             )
         except Exception as e:  # I know what I'm doing, pinky swear
@@ -120,7 +120,7 @@ async def parquet_to_db(
     # this inserts rows from iterator one by one, slow but useful for debugging
     else:
         bar = ProgressBar(total=file.inspection["total_lines"])
-        pqf = pq.ParquetFile(file.path)
+        pqf = pq.ParquetFile(true_path(file.file_name))
         for r in bar.iter(_iter_parquet_rows(pqf)):
             data = {k: v for k, v in zip(pqf.schema.names, r)}
             print(data)

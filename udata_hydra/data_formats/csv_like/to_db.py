@@ -13,7 +13,7 @@ from udata_hydra.data_formats import CsvLike
 from udata_hydra.db import compute_insert_query, db_col_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import ParseException
+from udata_hydra.utils import ParseException, true_path
 from udata_hydra.utils.casting import iter_tabular_rows
 
 log = logging.getLogger("udata-hydra")
@@ -86,7 +86,7 @@ async def csv_to_db(
         try:
             await db.copy_records_to_table(
                 table_name,
-                records=iter_tabular_rows(file.path, inspection, cast_json=False),
+                records=iter_tabular_rows(true_path(file.file_name), inspection, cast_json=False),
                 columns=list(columns.keys()),
             )
         except Exception as e:  # I know what I'm doing, pinky swear
@@ -99,7 +99,7 @@ async def csv_to_db(
     # this inserts rows from iterator one by one, slow but useful for debugging
     else:
         bar = ProgressBar(total=inspection["total_lines"])
-        for r in bar.iter(iter_tabular_rows(file.path, inspection, cast_json=False)):
+        for r in bar.iter(iter_tabular_rows(true_path(file.file_name), inspection, cast_json=False)):
             data = {k: v for k, v in zip(inspection["columns"], r)}
             # NB: possible sql injection here, but should not be used in prod
             q = compute_insert_query(table_name=table_name, data=data, returning="__id")

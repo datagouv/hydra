@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import boto3
@@ -5,6 +6,7 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from udata_hydra import config
+from udata_hydra.utils import true_path
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats import DataFormat
@@ -45,7 +47,7 @@ class S3Client:
     ) -> str:
         if self.bucket is None:
             raise AttributeError("A bucket has to be specified.")
-        path = file.path
+        path = Path(true_path(file.file_name))
         if path.is_file():
             object_key = f"{path.suffix[1:]}/{path.name}"
             self._resource.Bucket(self.bucket).upload_file(
