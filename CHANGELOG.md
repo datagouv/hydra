@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.12.2 (2026-06-15)
+
+- fix(cli): make fd var bound (initialize to None) ([#441](https://github.com/datagouv/hydra/pull/441))
+- Introduce data formats ([#430](https://github.com/datagouv/hydra/pull/430))
+
+
 ## 2.12.1 (2026-06-12)
 
 - chore: remove ogc layers in payload ([#440](https://github.com/datagouv/hydra/pull/440))
