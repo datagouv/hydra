@@ -3,13 +3,11 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import cast
 
 import pytest
-from csv_detective import routine as csv_detective_routine
 
-from tests.conftest import RESOURCE_ID
-from udata_hydra.conversion.csv_to_geojson import csv_to_geojson
+from udata_hydra.data_formats import Csv
+from udata_hydra.data_formats.csv_like.to_geojson import DEFAULT_GEOJSON_FILENAME
 
 
 def _build_csv_content(columns: dict, sep: str = ";") -> str:
@@ -25,9 +23,9 @@ async def _geojson_from_csv_columns(
     columns: dict,
     inspection_check: Callable[[dict], None] | None = None,
     sep: str = ";",
-) -> tuple[dict, tuple[int, str | None]]:
+) -> dict:
     """Build CSV from columns, convert to GeoJSON, return (geojson, csv_to_geojson result)."""
-    output_path = Path(f"{RESOURCE_ID}.geojson")
+    output_path = Path(DEFAULT_GEOJSON_FILENAME)
     try:
         output_path.unlink()
     except FileNotFoundError:
@@ -36,28 +34,20 @@ async def _geojson_from_csv_columns(
     with NamedTemporaryFile(delete=False, suffix=".csv") as fp:
         fp.write(_build_csv_content(columns, sep).encode("utf-8"))
         fp.seek(0)
-        csv_path = fp.name
-        inspection = cast(
-            dict,
-            csv_detective_routine(
-                file_path=csv_path,
-                output_profile=True,
-                num_rows=-1,
-                save_results=False,
-            ),
-        )
+        csv_file = Csv(path=fp.name)
+        await csv_file.inspect()
         if inspection_check is not None:
-            inspection_check(inspection)
+            inspection_check(csv_file.inspection)
 
-        result = await csv_to_geojson(csv_path, inspection, output_path, upload_to_s3=False)
+        geojson_file = await csv_file.to_geojson()
 
-    assert result is not None
-    with open(output_path) as f:
+    assert geojson_file is not None
+    with open(geojson_file.path) as f:
         geojson: dict = json.load(f)
 
-    output_path.unlink()
-    os.unlink(csv_path)
-    return geojson, result
+    geojson_file.path.unlink()
+    os.unlink(csv_file.path)
+    return geojson
 
 
 def _assert_lonlat_format(inspection: dict) -> None:
@@ -86,10 +76,7 @@ async def test_csv_to_geojson(geo_columns):
         "nombre": range(1, 6),
         "score": [0.01, 1.2, 34.5, 678.9, 10],
     }
-    geojson, result = await _geojson_from_csv_columns(columns=other_columns | geo_columns)
-    geojson_size, geojson_url = result
-    assert geojson_url is None
-    assert geojson_size > 0
+    geojson = await _geojson_from_csv_columns(columns=other_columns | geo_columns)
 
     assert geojson["type"] == "FeatureCollection"
     assert len(geojson["features"]) == 5
@@ -110,7 +97,7 @@ async def test_csv_to_geojson_lonlat():
     """lonlat format ("[lon, lat]") should produce correct GeoJSON coordinates [lon, lat]."""
     lons = [20.0 * k * (-1) ** k for k in range(1, 6)]
     lats = [10.0 * k * (-1) ** k for k in range(1, 6)]
-    geojson, _ = await _geojson_from_csv_columns(
+    geojson = await _geojson_from_csv_columns(
         columns={
             "nombre": range(1, 6),
             "geopoint": [f"[{lon}, {lat}]" for lon, lat in zip(lons, lats)],
@@ -134,7 +121,7 @@ async def test_csv_to_geojson_geojson_column():
         {"type": "Point", "coordinates": [10 * k * (-1) ** k, 20 * k * (-1) ** k]}
         for k in range(1, 6)
     ]
-    geojson, _ = await _geojson_from_csv_columns(
+    geojson = await _geojson_from_csv_columns(
         columns={
             "nombre": range(1, 6),
             "polyg": [json.dumps(g) for g in geometries],
@@ -152,7 +139,7 @@ async def test_csv_to_geojson_geojson_column():
 @pytest.mark.asyncio
 async def test_csv_to_geojson_skips_rows_with_missing_latlon():
     """Rows with empty latlon values should be skipped."""
-    geojson, _ = await _geojson_from_csv_columns(
+    geojson = await _geojson_from_csv_columns(
         columns={
             "nombre": range(1, 4),
             "coords": ["1.0,2.0", "", "3.0,4.0"],
@@ -167,7 +154,7 @@ async def test_csv_to_geojson_skips_rows_with_missing_latlon():
 @pytest.mark.asyncio
 async def test_csv_to_geojson_skips_rows_with_missing_latitude_longitude():
     """Rows with empty latitude or longitude should be skipped."""
-    geojson, _ = await _geojson_from_csv_columns(
+    geojson = await _geojson_from_csv_columns(
         columns={
             "nombre": range(1, 4),
             "lat": [1.0, "", 3.0],
@@ -183,7 +170,7 @@ async def test_csv_to_geojson_skips_rows_with_missing_latitude_longitude():
 @pytest.mark.asyncio
 async def test_csv_to_geojson_returns_none_without_geo_columns():
     """Return None when csv-detective finds no geographical columns."""
-    output_path = Path(f"{RESOURCE_ID}.geojson")
+    output_path = Path(DEFAULT_GEOJSON_FILENAME)
     try:
         output_path.unlink()
     except FileNotFoundError:
@@ -191,20 +178,12 @@ async def test_csv_to_geojson_returns_none_without_geo_columns():
 
     with NamedTemporaryFile(delete=False, suffix=".csv") as fp:
         fp.write(b"nombre;score\n1;0.5\n2;1.0\n")
-        csv_path = fp.name
+        fp.seek(0)
+        csv_file = Csv(path=fp.name)
+        await csv_file.inspect()
 
-    inspection = cast(
-        dict,
-        csv_detective_routine(
-            file_path=csv_path,
-            output_profile=True,
-            num_rows=-1,
-            save_results=False,
-        ),
-    )
+        geojson_file = await csv_file.to_geojson()
 
-    result = await csv_to_geojson(csv_path, inspection, output_path, upload_to_s3=False)
-
-    assert result is None
+    assert geojson_file is None
     assert not output_path.exists()
-    os.unlink(csv_path)
+    os.unlink(csv_file.path)

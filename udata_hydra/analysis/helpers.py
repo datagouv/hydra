@@ -1,10 +1,10 @@
-import json
 import os
 from typing import IO
 
 from asyncpg import Record
 
 from udata_hydra import config
+from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.codec import parse_json_value
 from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send
 
@@ -21,8 +21,8 @@ def get_python_type(column: dict) -> str:
 async def read_or_download_file(
     check: Record | dict,
     filename: str | None,
-    file_format: str,
-    exception: Record | None,
+    data_format: "type[DataFormat]|None",
+    exception: Record | None = None,
 ) -> IO[bytes]:
     if filename:
         temp_dir = config.TEMPORARY_DOWNLOAD_FOLDER or "/tmp"
@@ -41,11 +41,24 @@ async def read_or_download_file(
             headers=parse_json_value(check.get("headers"), {}),
             max_size_allowed=None
             if exception
-            else int(
-                config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED)
+            else (
+                data_format.max_filesize_allowed
+                if data_format is not None
+                else config.DEFAULT_MAX_FILESIZE_ALLOWED
             ),
         )
         return tmp_file
+
+
+async def download_from_check(check: dict, data_format: type[DataFormat]) -> DataFormat:
+    tmp_file = await read_or_download_file(
+        check=check,
+        filename=None,
+        data_format=data_format,
+    )
+    return data_format(
+        path=tmp_file.name, resource_id=check.get("resource_id"), dataset_id=check.get("dataset_id")
+    )
 
 
 async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:
@@ -78,8 +91,7 @@ async def notify_udata(resource: Record | None, check: Record | dict | None) -> 
         payload["document"]["analysis:parsing:geojson_size"] = check.get("geojson_size")
     if config.OGC_ANALYSIS_ENABLED and check.get("ogc_metadata"):
         ogc_metadata = check.get("ogc_metadata")
-        if isinstance(ogc_metadata, str):
-            ogc_metadata = json.loads(ogc_metadata)
+        ogc_metadata = parse_json_value(ogc_metadata)
         payload["document"]["analysis:parsing:ogc_metadata"] = ogc_metadata
     payload["document"] = UdataPayload(payload["document"])
     queue.enqueue(send, _priority="high", **payload)

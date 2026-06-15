@@ -8,11 +8,15 @@ from asyncpg import Record
 from dateparser import parse as date_parser
 
 from udata_hydra import config, context
-from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.analysis.geojson import analyse_geojson
-from udata_hydra.analysis.ogc import analyse_ogc
-from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
+from udata_hydra.data_formats import (
+    CsvLike,
+    DataFormat,
+    Geojson,
+    Ogc,
+    Parquet,
+)
+from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.db.check import Check
 from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
@@ -22,10 +26,6 @@ from udata_hydra.utils import (
     Timer,
     UdataPayload,
     compute_checksum_from_file,
-    detect_geojson_from_headers,
-    detect_ogc,
-    detect_parquet_from_headers,
-    detect_tabular_from_headers,
     download_resource,
     queue,
     send,
@@ -39,6 +39,18 @@ class Change(Enum):
 
 
 log = logging.getLogger("udata-hydra")
+
+
+def _analysis_job_and_state(data_format: type[DataFormat]) -> tuple[str, str]:
+    if issubclass(data_format, Ogc):
+        return "ogc", "TO_ANALYSE_OGC"
+    if issubclass(data_format, CsvLike):
+        return "csv", "TO_ANALYSE_CSV"
+    if issubclass(data_format, Geojson):
+        return "geojson", "TO_ANALYSE_GEOJSON"
+    if issubclass(data_format, Parquet):
+        return "parquet", "TO_ANALYSE_PARQUET"
+    raise ValueError(f"Unknown data format: {data_format!r}")
 
 
 async def analyse_resource(
@@ -80,31 +92,14 @@ async def analyse_resource(
 
     # could it be a CSV, parquet, GeoJSON or OGC service (WFS)?
     # If we get hints, we will analyse the file further depending on change status
-    is_tabular, is_geojson, is_parquet, is_ogc = False, False, False, False
-    is_tabular, file_format = detect_tabular_from_headers(check)
-    if not is_tabular:
-        # getting the format from the catalog in priority
-        pool = await context.pool()
-        async with pool.acquire() as connection:
-            row: Record = await connection.fetchrow(
-                "SELECT format FROM catalog WHERE resource_id = $1", f"{check['resource_id']}"
-            )
-        is_geojson: bool = row["format"] == "geojson" or await detect_geojson_from_headers(check)
-        if is_geojson:
-            file_format = "geojson"
-        if not is_geojson:
-            is_parquet: bool = row["format"] == "parquet" or await detect_parquet_from_headers(
-                check
-            )
-            if is_parquet:
-                file_format = "parquet"
-        if not is_geojson and not is_parquet and config.OGC_ANALYSIS_ENABLED:
-            is_ogc, file_format = detect_ogc(check, row["format"])
+    data_format: type[DataFormat] | None = await detect_data_format_from_check_or_catalog(check)
 
     max_size_allowed = (
         None
         if exception
-        else int(config.MAX_FILESIZE_ALLOWED.get(file_format, config.DEFAULT_MAX_FILESIZE_ALLOWED))
+        else data_format.max_filesize_allowed
+        if data_format is not None
+        else config.DEFAULT_MAX_FILESIZE_ALLOWED
     )
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
@@ -133,7 +128,7 @@ async def analyse_resource(
                 )
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
-            if tmp_file and not (is_tabular or is_geojson or is_parquet):
+            if tmp_file and (data_format is None or not data_format.further_analysis):
                 os.remove(tmp_file.name)
             await Check.update(
                 check["id"],
@@ -165,48 +160,28 @@ async def analyse_resource(
     timer.stop()
 
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
-        if is_tabular and tmp_file:
-            # Change status to TO_ANALYSE_CSV
-            await Resource.update_job_status(resource_id, "crawler", "csv", "TO_ANALYSE_CSV")
-            # Analyse CSV and create a table in the CSV database
-            queue.enqueue(
-                analyse_csv,
-                check=check,
-                filename=os.path.basename(tmp_file.name),
-                _priority="high" if worker_priority == "high" else "default",
-                _exception=bool(exception),
-            )
-        elif is_geojson and tmp_file:
-            await Resource.update_job_status(
-                resource_id, "crawler", "geojson", "TO_ANALYSE_GEOJSON"
-            )
-            queue.enqueue(
-                analyse_geojson,
-                check=check,
-                filename=os.path.basename(tmp_file.name),
-                _priority="high" if worker_priority == "high" else "default",
-                _exception=bool(exception),
-            )
-        elif is_parquet and tmp_file:
-            await Resource.update_job_status(
-                resource_id, "crawler", "parquet", "TO_ANALYSE_PARQUET"
-            )
-            queue.enqueue(
-                analyse_parquet,
-                check=check,
-                filename=os.path.basename(tmp_file.name),
-                _priority="high" if worker_priority == "high" else "default",
-                _exception=bool(exception),
-            )
-        elif is_ogc:
-            await Resource.update_job_status(resource_id, "crawler", "ogc", "TO_ANALYSE_OGC")
-            queue.enqueue(
-                analyse_ogc,
-                check=check,
-                format=file_format,
-                _priority="high" if worker_priority == "high" else "default",
-                _exception=bool(exception),
-            )
+        if data_format is not None:
+            job, state = _analysis_job_and_state(data_format)
+            await Resource.update_job_status(resource_id, "crawler", job, state)
+            if issubclass(data_format, Ogc):
+                queue.enqueue(
+                    data_format,
+                    check=check,
+                    _priority="high" if worker_priority == "high" else "default",
+                    _exception=bool(exception),
+                )
+            elif tmp_file:
+                file = data_format(
+                    path=tmp_file.name,
+                    resource_id=resource_id,
+                    dataset_id=dataset_id,
+                )
+                queue.enqueue(
+                    file.analyse,
+                    check=check,
+                    _priority="high" if worker_priority == "high" else "default",
+                    _exception=bool(exception),
+                )
         else:
             await Resource.clear_job_status(resource_id, "crawler")
 

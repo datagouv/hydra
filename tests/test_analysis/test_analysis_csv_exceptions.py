@@ -5,7 +5,8 @@ import pytest
 from asyncpg import Record
 
 from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_EXCEPTION_TABLE_INDEXES
-from udata_hydra.analysis.csv import analyse_csv
+from udata_hydra.analysis.helpers import download_from_check
+from udata_hydra.data_formats import Csv
 from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils.db import get_columns_with_indexes
@@ -40,7 +41,8 @@ async def test_exception_analysis(
     assert resource["status"] == {}
 
     # Analyse the CSV
-    await analyse_csv(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
 
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_EXCEPTION_ID)

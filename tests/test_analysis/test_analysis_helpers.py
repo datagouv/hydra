@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from udata_hydra.analysis import helpers
+from udata_hydra.data_formats import Csv
 from udata_hydra.utils import IOException
 
 
@@ -28,7 +29,7 @@ async def test_read_or_download_filename_resolution(mocker):
 
         basename = os.path.basename(tmp_file_path)
         result = await helpers.read_or_download_file(
-            check=mock_check, filename=basename, file_format="csv", exception=None
+            check=mock_check, filename=basename, data_format=Csv, exception=None
         )
 
         assert result.read() == b"test content"
@@ -52,7 +53,7 @@ async def test_read_or_download_file_missing_file():
         await helpers.read_or_download_file(
             check=mock_check,
             filename="non_existent_file.csv",
-            file_format="csv",
+            data_format=Csv,
             exception=None,
         )
 
