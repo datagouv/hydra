@@ -6,6 +6,7 @@ import pytest
 
 from udata_hydra.data_formats import Geojson
 from udata_hydra.data_formats.geojson.to_pmtiles import DEFAULT_PMTILES_FILENAME
+from udata_hydra.utils import true_path
 from udata_hydra.utils.timer import Timer
 
 log = logging.getLogger("udata-hydra")
@@ -16,7 +17,7 @@ pytestmark = pytest.mark.asyncio
 async def test_geojson_to_pmtiles_invalid_geometry():
     """Test handling of invalid geometry"""
     with pytest.raises(Exception):
-        await Geojson(path="tests/data/invalid.geojson").to_pmtiles()
+        await Geojson(file_name="tests/data/invalid.geojson").to_pmtiles()
 
 
 async def test_geojson_to_pmtiles_valid_geometry():
@@ -24,14 +25,14 @@ async def test_geojson_to_pmtiles_valid_geometry():
     # Make sure that we don't crash even if output pmtiles already exists
     Path(DEFAULT_PMTILES_FILENAME).touch()
     with patch("udata_hydra.config.REMOVE_GENERATED_FILES", False):
-        pmtiles_file = await Geojson(path="tests/data/valid.geojson").to_pmtiles()
+        pmtiles_file = await Geojson(file_name="tests/data/valid.geojson").to_pmtiles()
     # very (too?) simple test, we could install a specific library to read the file
-    with open(pmtiles_file.path, "rb") as f:
+    with open(true_path(pmtiles_file.file_name), "rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
     # size slightly differs depending on the env
     assert 820 <= pmtiles_file.filesize <= 900
-    pmtiles_file.path.unlink()
+    Path(true_path(pmtiles_file.file_name)).unlink()
 
 
 @pytest.mark.slow
@@ -44,7 +45,7 @@ async def test_geojson_to_pmtiles_big_file(input_file: str | None):
         pytest.skip(reason="No input_file provided, skipping performance test")
         return
 
-    geojson_file = Geojson(path="tests/data" / Path(input_file))
+    geojson_file = Geojson(file_name=f"tests/data/{input_file}")
 
     # Create timer for performance measurement
     timer = Timer("geojson-to-pmtiles-performance-test")
@@ -55,7 +56,7 @@ async def test_geojson_to_pmtiles_big_file(input_file: str | None):
         timer.mark("pmtiles-conversion")
 
     # Verify the PMTiles file was created correctly
-    with pmtiles_file.path.open("rb") as f:
+    with open(true_path(pmtiles_file.file_name), "rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
 
@@ -75,4 +76,4 @@ async def test_geojson_to_pmtiles_big_file(input_file: str | None):
     )
 
     # Clean up using pathlib
-    pmtiles_file.path.unlink(missing_ok=True)
+    Path(true_path(pmtiles_file.file_name)).unlink(missing_ok=True)

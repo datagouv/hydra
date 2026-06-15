@@ -82,12 +82,7 @@ async def test_analyse_parquet(
         "bina": {"python": "binary", "pg": "bytea"},
     }
     rmock.get(url, status=200, body=df.to_parquet())
-    tmp_file = await helpers.read_or_download_file(
-        check=check,
-        filename=None,
-        data_format=Parquet,
-    )
-    file = Parquet(path=tmp_file.name, resource_id=RESOURCE_ID)
+    file = await helpers.download_from_check(check, Parquet)
     with patch("udata_hydra.config.PARQUET_TO_DB", True):
         table = await file.analyse(check=check)
     assert table is not None
@@ -136,7 +131,7 @@ async def test_parquet_to_db_rejects_too_long_column_name(fake_check):
         patch("udata_hydra.config.NAMEDATALEN", 10),
         patch("udata_hydra.data_formats.data_format.os.path.getsize", return_value=10),
     ):
-        file = Parquet(path="file.parquet", inspection=inspection)
+        file = Parquet(file_name="file.parquet", inspection=inspection)
         with pytest.raises(ParseException) as exc:
             await file.to_db(check=check)
     assert exc.value.step == "scan_column_names"
@@ -160,7 +155,7 @@ async def test_parquet_to_db_copy_failure_raises_parse_exception(fake_check, moc
         "total_lines": 1,
     }
     with patch("udata_hydra.data_formats.data_format.os.path.getsize", return_value=10):
-        file = Parquet(path="file.parquet", inspection=inspection)
+        file = Parquet(file_name="file.parquet", inspection=inspection)
     with pytest.raises(ParseException) as exc:
         await file.to_db(check=check)
     assert exc.value.step == "copy_records_to_table"
@@ -186,7 +181,7 @@ async def test_parquet_to_db_create_table_failure_raises_parse_exception(fake_ch
         "total_lines": 1,
     }
     with patch("udata_hydra.data_formats.data_format.os.path.getsize", return_value=10):
-        file = Parquet(path="file.parquet", inspection=inspection)
+        file = Parquet(file_name="file.parquet", inspection=inspection)
     with pytest.raises(ParseException) as exc:
         await file.to_db(check=check)
     assert exc.value.step == "create_table_query"

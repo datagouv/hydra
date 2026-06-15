@@ -2,12 +2,14 @@ import json
 import os
 from collections.abc import Callable
 from pathlib import Path
+import os
 from tempfile import NamedTemporaryFile
 
 import pytest
 
 from udata_hydra.data_formats import Csv
 from udata_hydra.data_formats.csv_like.to_geojson import DEFAULT_GEOJSON_FILENAME
+from udata_hydra.utils import true_path
 
 
 def _build_csv_content(columns: dict, sep: str = ";") -> str:
@@ -34,7 +36,7 @@ async def _geojson_from_csv_columns(
     with NamedTemporaryFile(delete=False, suffix=".csv") as fp:
         fp.write(_build_csv_content(columns, sep).encode("utf-8"))
         fp.seek(0)
-        csv_file = Csv(path=fp.name)
+        csv_file = Csv(file_name=os.path.basename(fp.name))
         await csv_file.inspect()
         if inspection_check is not None:
             inspection_check(csv_file.inspection)
@@ -42,11 +44,12 @@ async def _geojson_from_csv_columns(
         geojson_file = await csv_file.to_geojson()
 
     assert geojson_file is not None
-    with open(geojson_file.path) as f:
+    geojson_path = true_path(geojson_file.file_name)
+    with open(geojson_path) as f:
         geojson: dict = json.load(f)
 
-    geojson_file.path.unlink()
-    os.unlink(csv_file.path)
+    Path(geojson_path).unlink()
+    os.unlink(true_path(csv_file.file_name))
     return geojson
 
 
@@ -179,11 +182,11 @@ async def test_csv_to_geojson_returns_none_without_geo_columns():
     with NamedTemporaryFile(delete=False, suffix=".csv") as fp:
         fp.write(b"nombre;score\n1;0.5\n2;1.0\n")
         fp.seek(0)
-        csv_file = Csv(path=fp.name)
+        csv_file = Csv(file_name=os.path.basename(fp.name))
         await csv_file.inspect()
 
         geojson_file = await csv_file.to_geojson()
 
     assert geojson_file is None
     assert not output_path.exists()
-    os.unlink(csv_file.path)
+    os.unlink(true_path(csv_file.file_name))
