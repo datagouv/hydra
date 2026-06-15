@@ -42,6 +42,7 @@ async def _load_catalog(
                 for row in bar.iter(rows):
                     yield row
 
+        fd = None
         try:
             log.info(f"Downloading resources catalog from {url}...")
             with NamedTemporaryFile(
@@ -94,8 +95,9 @@ async def _load_catalog(
         except Exception as e:
             raise e
         finally:
-            fd.close()
-            os.unlink(fd.name)
+            if fd:
+                fd.close()
+                os.unlink(fd.name)
 
 
 @cli.command()
