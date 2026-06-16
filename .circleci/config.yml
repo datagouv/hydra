@@ -71,11 +71,11 @@ jobs:
           at: .
       - run:
           name: Lint and format code and sort imports
-          # ruff check --select I . : check linting and imports sorting without fixing (to fix, use --fix)
+          # ruff check --extend-select I . : check linting and imports sorting without fixing (to fix, use --fix)
           # ruff format --check . : check code formatting without fixing (to fix, remove --check)
           command: |
             uv run ruff --version
-            uv run ruff check --select I .
+            uv run ruff check --extend-select I .
             uv run ruff format --check .
       - run:
           name: Type check
