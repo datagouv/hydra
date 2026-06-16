@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Any, Iterator
 
 from csv_detective.output.dataframe import cast
@@ -24,7 +25,7 @@ def _smart_cast(_type: str, value, cast_json: bool = True, failsafe: bool = Fals
 
 
 def iter_tabular_rows(
-    file_path: str, inspection: dict, cast_json: bool = True, as_dict: bool = False
+    file_path: Path, inspection: dict, cast_json: bool = True, as_dict: bool = False
 ) -> Iterator[list | dict]:
     # because we need the iterator multiple times, not possible to
     # handle db, parquet and geojson through the same iteration

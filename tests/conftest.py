@@ -21,6 +21,7 @@ from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.logger import stop_sentry
+from udata_hydra.utils import storage_path
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
@@ -110,7 +111,7 @@ def setup():
         WEBHOOK_ENABLED=True,
         SENTRY_DSN=None,
         # Align download_resource with read_or_download_file basename lookup (or "" uses OS temp vs /tmp).
-        TEMPORARY_DOWNLOAD_FOLDER="/tmp",
+        TEMPORARY_DOWNLOAD_FOLDER=storage_path("").as_posix(),
     )
     # prevent sentry from sending events in tests (config override is not enough)
     stop_sentry()
@@ -250,13 +251,13 @@ async def db():
 
 @pytest_asyncio.fixture
 async def insert_fake_resource():
-    async def _insert_fake_resource(database, status: str | None = None):
+    async def _insert_fake_resource(status: str | None = None, format: str = "csv"):
         await Resource.insert(
             dataset_id=DATASET_ID,
             resource_id=RESOURCE_ID,
             url=RESOURCE_URL,
             type="main",
-            format="csv",
+            format=format,
             title="Fake resource",
             status=status,
             priority=True,
