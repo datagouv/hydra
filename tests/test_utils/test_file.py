@@ -2,11 +2,14 @@ import gzip
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
+from tests.conftest import RESOURCE_ID
+from udata_hydra.data_formats import Geojson
 from udata_hydra.utils import IOException
-from udata_hydra.utils.file import download_resource, extract_gzip, storage_path
+from udata_hydra.utils.file import download_resource, extract_gzip, remove_remainders, storage_path
 
 
 @pytest.mark.parametrize("case", ("configured", "system-temp", "test-data"))
@@ -52,3 +55,19 @@ async def test_download_resource_rejects_oversized_while_streaming(rmock):
 
     with pytest.raises(IOException, match="File too large to download"):
         await download_resource(url=url, max_size_allowed=500)
+
+
+async def test_remove_remainders():
+    def _crash(*args, **kwargs):
+        raise Exception("BOOM")
+
+    geojson_file = Geojson(file_name="tests/data/valid.geojson", resource_id=RESOURCE_ID)
+    with patch(
+        "udata_hydra.data_formats.PMTiles",
+        new=_crash,
+    ):
+        with pytest.raises(Exception):
+            await geojson_file.to_pmtiles()
+    assert storage_path(f"{RESOURCE_ID}.pmtiles").exists()
+    remove_remainders(RESOURCE_ID, ["pmtiles"])
+    assert not storage_path(f"{RESOURCE_ID}.pmtiles").exists()
