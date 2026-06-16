@@ -131,4 +131,4 @@ def remove_remainders(resource_id: str, extensions: list[str]) -> None:
 def true_path(file_name: str):
     if file_name.startswith("tests/data/"):
         return file_name
-    return f"{config.TEMPORARY_DOWNLOAD_FOLDER or '/tmp'}/{file_name}"
+    return os.path.join(config.TEMPORARY_DOWNLOAD_FOLDER or tempfile.gettempdir(), file_name)
