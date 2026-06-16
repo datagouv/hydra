@@ -9,7 +9,7 @@ from udata_hydra.cli.common import _make_async_wrapper, cli, log
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.crawl.check_resources import probe_cors
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import download_resource
+from udata_hydra.utils import download_resource, true_path
 
 
 async def _crawl_url(
@@ -52,8 +52,7 @@ async def _download_resource_cli(resource_id: str, output_dir: str | None = None
     try:
         tmp_file, file_extension = await download_resource(resource["url"])
         output_path = (
-            Path(output_dir or config.TEMPORARY_DOWNLOAD_FOLDER or ".")
-            / f"{resource_id}{file_extension}"
+            Path(output_dir or true_path("").as_posix()) / f"{resource_id}{file_extension}"
         )
         # Move the temporary file to the desired output location
         Path(tmp_file.name).rename(output_path)
