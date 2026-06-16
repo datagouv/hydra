@@ -6,7 +6,6 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
-from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis import helpers
 from udata_hydra.data_formats import Parquet
 from udata_hydra.db.codec import parse_json_value
