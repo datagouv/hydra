@@ -44,7 +44,11 @@ async def _run_export_job(
                     f"{df_name.lower()}_size": output.filesize,
                 },
             )
-            if delete_input and config.REMOVE_GENERATED_FILES:
+            if (
+                delete_input
+                and config.REMOVE_GENERATED_FILES
+                and getattr(data_object, "file_name", None)
+            ):
                 data_object.path.unlink()
     except Exception as e:
         if data_object.resource_id:

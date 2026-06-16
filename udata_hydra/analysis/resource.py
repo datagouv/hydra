@@ -165,8 +165,8 @@ async def analyse_resource(
             await Resource.update_job_status(resource_id, "crawler", job, state)
             if issubclass(data_format, Ogc):
                 queue.enqueue(
-                    data_format,
-                    check=check,
+                    data_format.analyse,
+                    check=dict(check),
                     _priority="high" if worker_priority == "high" else "default",
                     _exception=bool(exception),
                 )
@@ -178,7 +178,7 @@ async def analyse_resource(
                 )
                 queue.enqueue(
                     file.analyse,
-                    check=check,
+                    check=dict(check),
                     _priority="high" if worker_priority == "high" else "default",
                     _exception=bool(exception),
                 )
