@@ -6,6 +6,7 @@ from .file import (
     download_resource,
     extract_gzip,
     remove_remainders,
+    storage_path,
 )
 from .http import UdataPayload, get_request_params, send
 from .queue import enqueue
@@ -24,6 +25,7 @@ __all__ = [
     "UdataPayload",
     "get_request_params",
     "send",
+    "storage_path",
     "enqueue",
     "Timer",
 ]

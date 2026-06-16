@@ -6,6 +6,7 @@ import pytest
 
 from udata_hydra.data_formats import Geojson
 from udata_hydra.data_formats.geojson.to_pmtiles import DEFAULT_PMTILES_FILENAME
+from udata_hydra.utils import storage_path
 from udata_hydra.utils.timer import Timer
 
 log = logging.getLogger("udata-hydra")
@@ -16,17 +17,17 @@ pytestmark = pytest.mark.asyncio
 async def test_geojson_to_pmtiles_invalid_geometry():
     """Test handling of invalid geometry"""
     with pytest.raises(Exception):
-        await Geojson(path="tests/data/invalid.geojson").to_pmtiles()
+        await Geojson(file_name="tests/data/invalid.geojson").to_pmtiles()
 
 
 async def test_geojson_to_pmtiles_valid_geometry():
     """Test handling of valid geometry"""
     # Make sure that we don't crash even if output pmtiles already exists
-    Path(DEFAULT_PMTILES_FILENAME).touch()
+    storage_path(DEFAULT_PMTILES_FILENAME).touch()
     with patch("udata_hydra.config.REMOVE_GENERATED_FILES", False):
-        pmtiles_file = await Geojson(path="tests/data/valid.geojson").to_pmtiles()
+        pmtiles_file = await Geojson(file_name="tests/data/valid.geojson").to_pmtiles()
     # very (too?) simple test, we could install a specific library to read the file
-    with open(pmtiles_file.path, "rb") as f:
+    with pmtiles_file.path.open("rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
     # size slightly differs depending on the env
@@ -44,7 +45,7 @@ async def test_geojson_to_pmtiles_big_file(input_file: str | None):
         pytest.skip(reason="No input_file provided, skipping performance test")
         return
 
-    geojson_file = Geojson(path="tests/data" / Path(input_file))
+    geojson_file = Geojson(file_name=f"tests/data/{input_file}")
 
     # Create timer for performance measurement
     timer = Timer("geojson-to-pmtiles-performance-test")

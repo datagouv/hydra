@@ -661,14 +661,14 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
     mocker.patch(
         "udata_hydra.analysis.exports.Table.to_geojson",
         new=mocker.AsyncMock(
-            return_value=Geojson(path="tests/data/valid.geojson", resource_id=RESOURCE_ID)
+            return_value=Geojson(file_name="tests/data/valid.geojson", resource_id=RESOURCE_ID)
         ),
     )
     mocker.patch(
         "udata_hydra.analysis.exports.Geojson.to_pmtiles",
         new=mocker.AsyncMock(
             return_value=PMTiles(
-                path="tests/data/valid.geojson",
+                file_name="tests/data/valid.geojson",
                 resource_id=RESOURCE_ID,  # the actual file doesn't matter, we just need to be able to get its size on instanciation
             )
         ),
@@ -698,7 +698,7 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
         "udata_hydra.analysis.exports.Table.to_parquet",
         new=mocker.AsyncMock(
             return_value=Parquet(
-                path="tests/data/valid.geojson",
+                file_name="tests/data/valid.geojson",
                 resource_id=RESOURCE_ID,  # the actual file doesn't matter, we just need to be able to get its size on instanciation
             )
         ),

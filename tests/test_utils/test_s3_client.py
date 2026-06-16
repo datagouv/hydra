@@ -1,5 +1,6 @@
 """Unit tests for S3Client (object key prefix / public URL)."""
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -11,6 +12,7 @@ from pytest_mock import MockerFixture
 from udata_hydra import config
 from udata_hydra.context import context
 from udata_hydra.data_formats import DataFormat, Geojson, Parquet, PMTiles
+from udata_hydra.utils import storage_path
 from udata_hydra.utils.s3 import S3Client
 
 
@@ -41,15 +43,14 @@ def mock_s3(mocker: MockerFixture) -> Iterator[MagicMock]:
 )
 def test_s3_client_upload(
     mock_s3: MagicMock,
-    tmp_path: Path,
     data_format: DataFormat,
     patched_config: tuple[str, str],
     mocker,
 ) -> None:
     extension = data_format.__class__.__name__.lower()
-    f = tmp_path / f"file.{extension}"
+    f = storage_path(f"file.{extension}")
     f.write_bytes(b"x")
-    file = data_format(path=f.as_posix())
+    file = data_format(file_name=os.path.basename(f.name))
     if patched_config:
         mocker.patch(*patched_config)
     client = S3Client(bucket="my-bucket")
@@ -96,6 +97,6 @@ def test_s3_client_send_file_raises_when_file_missing(mocker: MockerFixture) -> 
     with patch("udata_hydra.utils.s3.boto3.resource", return_value=resource):
         client = S3Client(bucket="my-bucket")
         with patch("udata_hydra.data_formats.data_format.os.path.getsize", return_value=10):
-            missing_file = Geojson(path="missing.geojson")
+            missing_file = Geojson(file_name="missing.geojson")
         with pytest.raises(Exception, match="does not exists"):
             client.send_file(missing_file)

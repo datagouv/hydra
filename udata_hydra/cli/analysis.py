@@ -161,8 +161,8 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
 
     :csv_filepath: Path to the CSV file to convert
     """
-    csv_file = CsvLike(path=csv_filepath)
-    log.info(f"Processing CSV-like file: {csv_file.path}")
+    csv_file = CsvLike(file_name=csv_filepath)
+    log.info(f"Processing CSV-like file: {csv_file.file_name}")
     log.info(f"File size: {csv_file.filesize} bytes")
 
     # Analyze the CSV with csv_detective
@@ -190,7 +190,7 @@ async def _convert_csv_to_geojson_cli(csv_filepath: str):
 
             if geojson_file:
                 log.info("Conversion successful!")
-                log.info(f"GeoJSON file: {geojson_file.path}")
+                log.info(f"GeoJSON file: {geojson_file.file_name}")
                 log.info(f"GeoJSON file size: {geojson_file.filesize} bytes")
             else:
                 log.warning("No geographical data found in CSV, skipping conversion")
@@ -222,14 +222,14 @@ async def _convert_geojson_to_pmtiles_cli(geojson_filepath: str):
 
     :geojson_filepath: Path to the GeoJSON file to convert
     """
-    geojson_file = Geojson(path=geojson_filepath)
-    log.info(f"Processing GeoJSON file: {geojson_file.path}")
+    geojson_file = Geojson(file_name=geojson_filepath)
+    log.info(f"Processing GeoJSON file: {geojson_file.file_name}")
     log.info(f"File size: {geojson_file.filesize} bytes")
 
     # Convert to PMTiles
     log.info("Converting to PMTiles...")
 
-    pmtiles_filepath = Path(f"{geojson_file.path.stem}.pmtiles")
+    pmtiles_filepath = Path(f"{Path(geojson_file.file_name).stem}.pmtiles")
 
     try:
         # Convert to PMTiles (no S3 upload, no database updates)
@@ -271,7 +271,9 @@ async def _analyse_parquet_cli(
         filename=None,
         data_format=Parquet,
     )
-    file = Parquet(path=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id"))
+    file = Parquet(
+        file_name=tmp_file.name, resource_id=resource_id, dataset_id=check.get("dataset_id")
+    )
     await file.analyse(check=check)
 
 

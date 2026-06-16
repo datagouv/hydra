@@ -1,4 +1,5 @@
 import json
+import os
 from collections.abc import Callable
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -8,6 +9,7 @@ import pytest
 from tests.conftest import RESOURCE_ID
 from udata_hydra.data_formats import Csv
 from udata_hydra.data_formats.csv_like.to_geojson import _cast_latlon, _detect_geo_columns
+from udata_hydra.utils import storage_path
 
 
 def _build_csv_content(columns: dict, sep: str = ";") -> str:
@@ -28,9 +30,9 @@ async def _geojson_from_columns(
     fake_check,
 ) -> dict:
     """Build CSV from columns, convert to DB + GeoJSON, return (geojson, db_to_geojson result)."""
-    output_path = Path(f"{RESOURCE_ID}.geojson")
+    output_path = storage_path(f"{RESOURCE_ID}.geojson")
     try:
-        output_path.unlink()
+        Path(output_path).unlink()
     except FileNotFoundError:
         pass
 
@@ -38,7 +40,7 @@ async def _geojson_from_columns(
     with NamedTemporaryFile(delete=False) as fp:
         fp.write(_build_csv_content(columns, sep).encode("utf-8"))
         fp.seek(0)
-        file = Csv(path=fp.name, resource_id=RESOURCE_ID)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
         inspection = await file.inspect()
         if inspection_check is not None:
             inspection_check(inspection)
@@ -48,7 +50,7 @@ async def _geojson_from_columns(
         assert geojson_file is not None
     with open(output_path) as f:
         geojson: dict = json.load(f)
-    output_path.unlink()
+    Path(output_path).unlink()
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
     return geojson
 

@@ -6,7 +6,14 @@ from asyncpg import Record
 from udata_hydra import config
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.codec import parse_json_value
-from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send
+from udata_hydra.utils import (
+    IOException,
+    UdataPayload,
+    download_resource,
+    queue,
+    send,
+    storage_path,
+)
 
 
 def get_python_type(column: dict) -> str:
@@ -25,8 +32,7 @@ async def read_or_download_file(
     exception: Record | None = None,
 ) -> IO[bytes]:
     if filename:
-        temp_dir = config.TEMPORARY_DOWNLOAD_FOLDER or "/tmp"
-        full_path = os.path.join(temp_dir, filename)
+        full_path = storage_path("") / filename
         try:
             return open(full_path, "rb")
         except FileNotFoundError:
@@ -57,7 +63,9 @@ async def download_from_check(check: dict, data_format: type[DataFormat]) -> Dat
         data_format=data_format,
     )
     return data_format(
-        path=tmp_file.name, resource_id=check.get("resource_id"), dataset_id=check.get("dataset_id")
+        file_name=os.path.basename(tmp_file.name),
+        resource_id=check.get("resource_id"),
+        dataset_id=check.get("dataset_id"),
     )
 
 

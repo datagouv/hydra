@@ -30,10 +30,10 @@ async def _run_export_job(
 ) -> DataFormat | None:
     output, check_out = None, None
     try:
-        output: "DataFormat" = await getattr(data_object, export_fn)()
+        output: DataFormat = await getattr(data_object, export_fn)()
         if upload_to_s3:
             df_name = output.__class__.__name__
-            log.debug(f"Uploading {df_name} file {output.path} to S3")
+            log.debug(f"Uploading {df_name} file {output.file_name} to S3")
             upload_url = context.s3_client().send_file(
                 output, delete_source=delete_output and config.REMOVE_GENERATED_FILES
             )

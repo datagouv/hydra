@@ -3,10 +3,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 from udata_hydra.db.codec import parse_json_value
+from udata_hydra.utils import storage_path
 
 
 class DataFormat(ABC):
-    path: Path
+    file_name: str
     standard_mime_type: str
     valid_mime_types: set[str]
     filesize: int
@@ -20,19 +21,19 @@ class DataFormat(ABC):
     def __init__(
         self,
         *,
-        path: Path | str | None = None,
+        file_name: str | None = None,
         table_name: str | None = None,
         inspection: dict | None = None,
         resource_id: str | None = None,
         dataset_id: str | None = None,
     ) -> None:
-        if path:
-            self.path = Path(path) if isinstance(path, str) else path
+        if file_name:
+            self.file_name = file_name
             self.filesize = os.path.getsize(self.path)
         elif table_name:
             self.table_name = table_name
         else:
-            raise ValueError("A DataFormat must have either a path or a table_name")
+            raise ValueError("A DataFormat must have either a file_name or a table_name")
         if inspection:
             # passing it on
             self.inspection = inspection
@@ -41,13 +42,17 @@ class DataFormat(ABC):
         if dataset_id:
             self.dataset_id = dataset_id
 
+    @property
+    def path(self) -> Path:
+        return storage_path(self.file_name)
+
     def __call__(self, *args, **kwargs):
         return self.__class__(*args, **kwargs)
 
     @classmethod
     def detect_from_check(cls, check: dict, **kwargs) -> bool:
         # this method may require other arguments for specific formats
-        headers: dict = parse_json_value(check.get("headers"), {})
+        headers: dict = parse_json_value(check.get("headers") or "{}")
         return any(
             headers.get("content-type", "").lower().startswith(ct) for ct in cls.valid_mime_types
         ) or (cls.check_url is not None and cls.check_url in check.get("url", ""))

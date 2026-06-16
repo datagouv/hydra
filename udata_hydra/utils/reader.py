@@ -1,5 +1,6 @@
 import csv as stdcsv
 from io import BytesIO
+from pathlib import Path
 from typing import Generator
 
 import openpyxl
@@ -16,8 +17,8 @@ def generate_dialect(inspection: dict) -> stdcsv.Dialect:
 
 
 class Reader:
-    def __init__(self, file_path, inspection):
-        self.file_path = file_path
+    def __init__(self, file_path: Path | str, inspection: dict):
+        self.file_path = file_path if isinstance(file_path, str) else file_path.as_posix()
         self.inspection = inspection
         self.nb_skip = self.inspection["header_row_idx"]
         self.mapping = {

@@ -36,7 +36,7 @@ class Parquet(DataFormat):
     further_analysis = True
 
     def inspect(self) -> dict:
-        file = pq.ParquetFile(self.path.as_posix())
+        file = pq.ParquetFile(self.path)
         columns = {}
         self.inspection = {"header": []}
         for col in file.schema_arrow:

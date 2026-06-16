@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import date, datetime, timedelta, timezone
 from tempfile import NamedTemporaryFile
 
@@ -29,7 +30,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db, fake_c
     with NamedTemporaryFile() as fp:
         fp.write(f"{header}\n{line}".encode("utf-8"))
         fp.seek(0)
-        file = Csv(path=fp.name, resource_id=RESOURCE_ID)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
         inspection = await file.inspect()
         assert inspection["separator"] == separator
         table = await file.to_db(check=check)
@@ -71,7 +72,7 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db, fake_
     with NamedTemporaryFile() as fp:
         fp.write(f"json;date;datetime;aware_datetime\n{line}".encode("utf-8"))
         fp.seek(0)
-        file = Csv(path=fp.name, resource_id=RESOURCE_ID)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
         await file.inspect()
         table = await file.to_db(check=check)
     res = list(await db.fetch(f'SELECT * FROM "{table.table_name}"'))
@@ -89,7 +90,7 @@ async def test_basic_sql_injection(db, clean_db, fake_check):
         # we enough columns so that the ";" is not considered as separator by csv-detective
         fp.write(f"int,{injection},col1,col2\n1,test,2,3".encode("utf-8"))
         fp.seek(0)
-        file = Csv(path=fp.name, resource_id=RESOURCE_ID)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
         await file.inspect()
         table = await file.to_db(check=check)
     res = await db.fetchrow(f'SELECT * FROM "{table.table_name}"')
@@ -101,7 +102,7 @@ async def test_percentage_column(db, clean_db, fake_check):
     with NamedTemporaryFile() as fp:
         fp.write("int,% mon pourcent\n1,test".encode("utf-8"))
         fp.seek(0)
-        file = Csv(path=fp.name, resource_id=RESOURCE_ID)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
         await file.inspect()
         table = await file.to_db(check=check)
     res = await db.fetchrow(f'SELECT * FROM "{table.table_name}"')
@@ -113,7 +114,7 @@ async def test_reserved_column_name(db, clean_db, fake_check):
     with NamedTemporaryFile() as fp:
         fp.write("int,xmin\n1,test".encode("utf-8"))
         fp.seek(0)
-        file = Csv(path=fp.name, resource_id=RESOURCE_ID)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
         await file.inspect()
         table = await file.to_db(check=check)
     res = await db.fetchrow(f'SELECT * FROM "{table.table_name}"')

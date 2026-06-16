@@ -34,7 +34,7 @@ async def _geojson_from_csv_columns(
     with NamedTemporaryFile(delete=False, suffix=".csv") as fp:
         fp.write(_build_csv_content(columns, sep).encode("utf-8"))
         fp.seek(0)
-        csv_file = Csv(path=fp.name)
+        csv_file = Csv(file_name=os.path.basename(fp.name))
         await csv_file.inspect()
         if inspection_check is not None:
             inspection_check(csv_file.inspection)
@@ -46,7 +46,7 @@ async def _geojson_from_csv_columns(
         geojson: dict = json.load(f)
 
     geojson_file.path.unlink()
-    os.unlink(csv_file.path)
+    csv_file.path.unlink()
     return geojson
 
 
@@ -179,11 +179,11 @@ async def test_csv_to_geojson_returns_none_without_geo_columns():
     with NamedTemporaryFile(delete=False, suffix=".csv") as fp:
         fp.write(b"nombre;score\n1;0.5\n2;1.0\n")
         fp.seek(0)
-        csv_file = Csv(path=fp.name)
+        csv_file = Csv(file_name=os.path.basename(fp.name))
         await csv_file.inspect()
 
         geojson_file = await csv_file.to_geojson()
 
     assert geojson_file is None
     assert not output_path.exists()
-    os.unlink(csv_file.path)
+    csv_file.path.unlink()
