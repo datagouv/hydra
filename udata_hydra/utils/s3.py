@@ -47,7 +47,7 @@ class S3Client:
     ) -> str:
         if self.bucket is None:
             raise AttributeError("A bucket has to be specified.")
-        path = Path(true_path(file.file_name))
+        path = file.path
         if path.is_file():
             object_key = f"{path.suffix[1:]}/{path.name}"
             self._resource.Bucket(self.bucket).upload_file(

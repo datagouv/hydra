@@ -44,7 +44,7 @@ class CsvLike(DataFormat):
             if self.resource_id:
                 await Resource.update(self.resource_id, {"status": "VALIDATING_CSV"})
             self.inspection = validate_then_detect(  # ty: ignore[invalid-assignment]
-                file_path=true_path(self.file_name),
+                file_path=self.path.as_posix(),
                 previous_analysis=previous_inspection,
                 output_profile=True,
                 num_rows=-1,
@@ -52,7 +52,7 @@ class CsvLike(DataFormat):
             )
         else:
             self.inspection = csv_detective_routine(  # ty: ignore[invalid-assignment]
-                file_path=true_path(self.file_name),
+                file_path=self.path.as_posix(),
                 output_profile=True,
                 num_rows=-1,
                 save_results=False,
@@ -155,7 +155,7 @@ class CsvLike(DataFormat):
         finally:
             await helpers.notify_udata(resource, check)
             timer.stop()
-            Path(true_path(self.file_name)).unlink()
+            self.path.unlink()
 
             # Reset resource status to None
             await Resource.update(resource_id, {"status": None})

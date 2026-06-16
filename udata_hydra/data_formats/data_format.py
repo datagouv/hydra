@@ -1,3 +1,6 @@
+from pathlib import Path
+
+
 import json
 import os
 from abc import ABC, abstractmethod
@@ -28,7 +31,7 @@ class DataFormat(ABC):
     ) -> None:
         if file_name:
             self.file_name = file_name
-            self.filesize = os.path.getsize(true_path(file_name))
+            self.filesize = os.path.getsize(self.path)
         elif table_name:
             self.table_name = table_name
         else:
@@ -40,6 +43,10 @@ class DataFormat(ABC):
             self.resource_id = resource_id
         if dataset_id:
             self.dataset_id = dataset_id
+
+    @property
+    def path(self) -> Path:
+        return true_path(self.file_name)
 
     def __call__(self, *args, **kwargs):
         return self.__class__(*args, **kwargs)

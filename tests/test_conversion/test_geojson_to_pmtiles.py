@@ -23,16 +23,16 @@ async def test_geojson_to_pmtiles_invalid_geometry():
 async def test_geojson_to_pmtiles_valid_geometry():
     """Test handling of valid geometry"""
     # Make sure that we don't crash even if output pmtiles already exists
-    Path(true_path(DEFAULT_PMTILES_FILENAME)).touch()
+    true_path(DEFAULT_PMTILES_FILENAME).touch()
     with patch("udata_hydra.config.REMOVE_GENERATED_FILES", False):
         pmtiles_file = await Geojson(file_name="tests/data/valid.geojson").to_pmtiles()
     # very (too?) simple test, we could install a specific library to read the file
-    with open(true_path(pmtiles_file.file_name), "rb") as f:
+    with pmtiles_file.path.open("rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
     # size slightly differs depending on the env
     assert 820 <= pmtiles_file.filesize <= 900
-    Path(true_path(pmtiles_file.file_name)).unlink()
+    pmtiles_file.path.unlink()
 
 
 @pytest.mark.slow
@@ -56,7 +56,7 @@ async def test_geojson_to_pmtiles_big_file(input_file: str | None):
         timer.mark("pmtiles-conversion")
 
     # Verify the PMTiles file was created correctly
-    with open(true_path(pmtiles_file.file_name), "rb") as f:
+    with pmtiles_file.path.open("rb") as f:
         header = f.read(7)
     assert header == b"PMTiles"
 
@@ -76,4 +76,4 @@ async def test_geojson_to_pmtiles_big_file(input_file: str | None):
     )
 
     # Clean up using pathlib
-    Path(true_path(pmtiles_file.file_name)).unlink(missing_ok=True)
+    pmtiles_file.path.unlink(missing_ok=True)

@@ -67,7 +67,7 @@ async def csv_to_geojson(file: "CsvLike") -> "Geojson|None":
     """
 
     def get_features(
-        file_path: str, inspection: dict, geo: dict[str, Any]
+        file_path: Path, inspection: dict, geo: dict[str, Any]
     ) -> Iterator[dict[str, Any]]:
         for row in iter_tabular_rows(file_path, inspection, cast_json=False, as_dict=True):
             if "geojson" in geo:
@@ -127,7 +127,7 @@ async def csv_to_geojson(file: "CsvLike") -> "Geojson|None":
     template = {"type": "FeatureCollection"}
 
     template["features"] = streamable_list(
-        get_features(true_path(file.file_name), file.inspection, geo)
+        get_features(file.path, file.inspection, geo)
     )
 
     geojson_name = (

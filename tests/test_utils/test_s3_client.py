@@ -48,7 +48,7 @@ def test_s3_client_upload(
     mocker,
 ) -> None:
     extension = data_format.__class__.__name__.lower()
-    f = Path(true_path(f"file.{extension}"))
+    f = true_path(f"file.{extension}")
     f.write_bytes(b"x")
     file = data_format(file_name=os.path.basename(f.name))
     if patched_config:

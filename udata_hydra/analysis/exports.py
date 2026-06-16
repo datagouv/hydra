@@ -30,7 +30,7 @@ async def _run_export_job(
 ) -> DataFormat | None:
     output, check_out = None, None
     try:
-        output: "DataFormat" = await getattr(data_object, export_fn)()
+        output: DataFormat = await getattr(data_object, export_fn)()
         if upload_to_s3:
             df_name = output.__class__.__name__
             log.debug(f"Uploading {df_name} file {output.file_name} to S3")
@@ -45,7 +45,7 @@ async def _run_export_job(
                 },
             )
             if delete_input and config.REMOVE_GENERATED_FILES:
-                Path(true_path(data_object.file_name)).unlink()
+                data_object.path.unlink()
     except Exception as e:
         if data_object.resource_id:
             remove_remainders(data_object.resource_id, remainder_types)

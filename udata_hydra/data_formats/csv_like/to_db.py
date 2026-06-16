@@ -86,7 +86,7 @@ async def csv_to_db(
         try:
             await db.copy_records_to_table(
                 table_name,
-                records=iter_tabular_rows(true_path(file.file_name), inspection, cast_json=False),
+                records=iter_tabular_rows(file.path, inspection, cast_json=False),
                 columns=list(columns.keys()),
             )
         except Exception as e:  # I know what I'm doing, pinky swear
@@ -100,7 +100,7 @@ async def csv_to_db(
     else:
         bar = ProgressBar(total=inspection["total_lines"])
         for r in bar.iter(
-            iter_tabular_rows(true_path(file.file_name), inspection, cast_json=False)
+            iter_tabular_rows(file.path, inspection, cast_json=False)
         ):
             data = {k: v for k, v in zip(inspection["columns"], r)}
             # NB: possible sql injection here, but should not be used in prod

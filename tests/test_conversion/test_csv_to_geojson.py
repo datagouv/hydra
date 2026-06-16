@@ -43,12 +43,11 @@ async def _geojson_from_csv_columns(
         geojson_file = await csv_file.to_geojson()
 
     assert geojson_file is not None
-    geojson_path = true_path(geojson_file.file_name)
-    with open(geojson_path) as f:
+    with open(geojson_file.path) as f:
         geojson: dict = json.load(f)
 
-    Path(geojson_path).unlink()
-    os.unlink(true_path(csv_file.file_name))
+    geojson_file.path.unlink()
+    csv_file.path.unlink()
     return geojson
 
 
@@ -188,4 +187,4 @@ async def test_csv_to_geojson_returns_none_without_geo_columns():
 
     assert geojson_file is None
     assert not output_path.exists()
-    os.unlink(true_path(csv_file.file_name))
+    csv_file.path.unlink()

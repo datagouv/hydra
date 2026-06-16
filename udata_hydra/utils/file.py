@@ -3,6 +3,7 @@ import hashlib
 import logging
 import mimetypes
 import os
+from pathlib import Path
 import re
 import tempfile
 from typing import IO
@@ -16,10 +17,10 @@ from udata_hydra.utils import IOException
 log = logging.getLogger("udata-hydra")
 
 
-def true_path(file_name: str):
+def true_path(file_name: str)  -> Path:
     if file_name.startswith("tests/data/"):
-        return file_name
-    return os.path.join(config.TEMPORARY_DOWNLOAD_FOLDER or tempfile.gettempdir(), file_name)
+        return Path(file_name)
+    return Path(config.TEMPORARY_DOWNLOAD_FOLDER or tempfile.gettempdir()) / file_name
 
 
 def compute_checksum_from_file(filename: str) -> str:

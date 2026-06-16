@@ -107,7 +107,7 @@ async def parquet_to_db(
         try:
             await db.copy_records_to_table(
                 table_name,
-                records=_iter_parquet_rows(pq.ParquetFile(true_path(file.file_name))),
+                records=_iter_parquet_rows(pq.ParquetFile(file.path)),
                 columns=list(columns.keys()),
             )
         except Exception as e:  # I know what I'm doing, pinky swear
@@ -120,7 +120,7 @@ async def parquet_to_db(
     # this inserts rows from iterator one by one, slow but useful for debugging
     else:
         bar = ProgressBar(total=file.inspection["total_lines"])
-        pqf = pq.ParquetFile(true_path(file.file_name))
+        pqf = pq.ParquetFile(file.path)
         for r in bar.iter(_iter_parquet_rows(pqf)):
             data = {k: v for k, v in zip(pqf.schema.names, r)}
             print(data)

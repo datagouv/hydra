@@ -25,8 +25,7 @@ async def read_or_download_file(
     exception: Record | None = None,
 ) -> IO[bytes]:
     if filename:
-        temp_dir = true_path("")
-        full_path = os.path.join(temp_dir, filename)
+        full_path = true_path("") / filename
         try:
             return open(full_path, "rb")
         except FileNotFoundError:

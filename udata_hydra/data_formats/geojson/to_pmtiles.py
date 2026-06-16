@@ -37,7 +37,7 @@ def geojson_to_pmtiles(file: Geojson) -> "PMTiles":
         "--force",  # don't crash if output file already exists, override it
         "--coalesce-densest-as-needed",
         "--extend-zooms-if-still-dropping",
-        true_path(file.file_name),
+        file.path.as_posix(),
     ]
     exit_code = tippecanoe._program("tippecanoe", *command)
     if exit_code:

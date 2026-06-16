@@ -15,7 +15,7 @@ from udata_hydra.utils.casting import iter_tabular_rows
 pytestmark = pytest.mark.asyncio
 
 
-def _reference_table_from_csv(file_path: str, inspection: dict) -> pa.Table:
+def _reference_table_from_csv(file_path: Path, inspection: dict) -> pa.Table:
     """Build an Arrow table from a tabular file for assertions against ``db_to_parquet`` output.
 
     Uses ``iter_tabular_rows`` (``cast_json=False``) and ``PYTHON_TYPE_TO_PA`` for schema alignment.
@@ -44,7 +44,7 @@ async def test_reference_table_from_csv(file_and_count):
     file = CsvLike(file_name=f"tests/data/{filename}")
     inspection = await file.inspect()
 
-    table = _reference_table_from_csv(true_path(file.file_name), inspection)
+    table = _reference_table_from_csv(file.path, inspection)
     assert table.num_rows == expected_count
 
     fake_file = BytesIO()
@@ -66,15 +66,15 @@ async def test_db_to_parquet(clean_db, fake_check, mocker):
     ) as pa_table_func:
         parquet = await table.to_parquet()
     assert parquet is not None
-    table_from_db = pq.ParquetFile(true_path(parquet.file_name)).read()
+    table_from_db = pq.ParquetFile(parquet.path).read()
 
-    table_from_csv = _reference_table_from_csv(true_path(file.file_name), inspection)
+    table_from_csv = _reference_table_from_csv(file.path, inspection)
 
     assert table_from_db.num_rows == table_from_csv.num_rows
     assert table_from_db.to_pydict() == table_from_csv.to_pydict()
     # can't compare with table_from_db.schema as the reload can make the types differ (date32 VS date64 for instance)
     assert pa_table_func.call_args.kwargs["schema"] == table_from_csv.schema
-    Path(true_path(DEFAULT_PARQUET_FILENAME)).unlink()
+    parquet.path.unlink()
 
 
 @pytest.mark.parametrize(
@@ -106,4 +106,4 @@ async def test_export_db_to_parquet(fake_check, mocker, parquet_config, clean_db
     else:
         parquet = await run_export()
         assert isinstance(parquet, Parquet)
-        Path(true_path(DEFAULT_PARQUET_FILENAME)).unlink()
+        parquet.path.unlink()
