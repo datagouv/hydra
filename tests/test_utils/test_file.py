@@ -61,10 +61,7 @@ async def test_remove_remainders():
     def _crash(*args, **kwargs):
         raise Exception("BOOM")
 
-    geojson_file = Geojson(
-        file_name="tests/data/valid.geojson",
-        resource_id=RESOURCE_ID
-    )
+    geojson_file = Geojson(file_name="tests/data/valid.geojson", resource_id=RESOURCE_ID)
     with patch(
         "udata_hydra.data_formats.PMTiles",
         new=_crash,
