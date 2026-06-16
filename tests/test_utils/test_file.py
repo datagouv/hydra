@@ -44,3 +44,11 @@ async def test_download_resource_rejects_oversized_content_length():
             headers={"content-length": "1000"},
             max_size_allowed=500,
         )
+
+
+async def test_download_resource_rejects_oversized_while_streaming(rmock):
+    url = "http://example.com/file.csv"
+    rmock.get(url, status=200, body=b"x" * 2048)
+
+    with pytest.raises(IOException, match="File too large to download"):
+        await download_resource(url=url, max_size_allowed=500)
