@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 from json_stream import streamable_list
 
-from udata_hydra.utils import true_path
+from udata_hydra.utils import storage_path
 from udata_hydra.utils.casting import iter_tabular_rows
 
 if TYPE_CHECKING:
@@ -132,7 +132,7 @@ async def csv_to_geojson(file: "CsvLike") -> "Geojson|None":
         f"{file.resource_id}.geojson" if file.resource_id is not None else DEFAULT_GEOJSON_FILENAME
     )
 
-    with open(true_path(geojson_name), "w") as f:
+    with open(storage_path(geojson_name), "w") as f:
         json.dump(template, f, indent=4, ensure_ascii=False, default=str)
 
     return Geojson(

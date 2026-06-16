@@ -7,7 +7,7 @@ import pyarrow.parquet as pq
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.data_formats import Table
 from udata_hydra.db import db_col_name
-from udata_hydra.utils import true_path
+from udata_hydra.utils import storage_path
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats import Parquet
@@ -43,7 +43,7 @@ async def db_to_parquet(table: Table) -> "Parquet":
         if table.resource_id is not None
         else DEFAULT_PARQUET_FILENAME
     )
-    writer = pq.ParquetWriter(true_path(parquet_name), schema, compression="zstd")
+    writer = pq.ParquetWriter(storage_path(parquet_name), schema, compression="zstd")
 
     try:
         async with pool.acquire() as conn:

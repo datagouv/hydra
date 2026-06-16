@@ -6,7 +6,7 @@ import pytest
 
 from udata_hydra.data_formats import Geojson
 from udata_hydra.data_formats.geojson.to_pmtiles import DEFAULT_PMTILES_FILENAME
-from udata_hydra.utils import true_path
+from udata_hydra.utils import storage_path
 from udata_hydra.utils.timer import Timer
 
 log = logging.getLogger("udata-hydra")
@@ -23,7 +23,7 @@ async def test_geojson_to_pmtiles_invalid_geometry():
 async def test_geojson_to_pmtiles_valid_geometry():
     """Test handling of valid geometry"""
     # Make sure that we don't crash even if output pmtiles already exists
-    true_path(DEFAULT_PMTILES_FILENAME).touch()
+    storage_path(DEFAULT_PMTILES_FILENAME).touch()
     with patch("udata_hydra.config.REMOVE_GENERATED_FILES", False):
         pmtiles_file = await Geojson(file_name="tests/data/valid.geojson").to_pmtiles()
     # very (too?) simple test, we could install a specific library to read the file

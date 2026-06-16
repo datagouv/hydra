@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import tippecanoe
 
 from udata_hydra.data_formats import Geojson
-from udata_hydra.utils import true_path
+from udata_hydra.utils import storage_path
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats import PMTiles
@@ -33,7 +33,7 @@ def geojson_to_pmtiles(file: Geojson) -> "PMTiles":
     command = [
         "--maximum-zoom=g",  # guess
         "-o",
-        true_path(pmtiles_name),
+        storage_path(pmtiles_name),
         "--force",  # don't crash if output file already exists, override it
         "--coalesce-densest-as-needed",
         "--extend-zooms-if-still-dropping",

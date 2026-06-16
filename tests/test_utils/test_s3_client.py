@@ -12,7 +12,7 @@ from pytest_mock import MockerFixture
 from udata_hydra import config
 from udata_hydra.context import context
 from udata_hydra.data_formats import DataFormat, Geojson, Parquet, PMTiles
-from udata_hydra.utils import true_path
+from udata_hydra.utils import storage_path
 from udata_hydra.utils.s3 import S3Client
 
 
@@ -48,7 +48,7 @@ def test_s3_client_upload(
     mocker,
 ) -> None:
     extension = data_format.__class__.__name__.lower()
-    f = true_path(f"file.{extension}")
+    f = storage_path(f"file.{extension}")
     f.write_bytes(b"x")
     file = data_format(file_name=os.path.basename(f.name))
     if patched_config:

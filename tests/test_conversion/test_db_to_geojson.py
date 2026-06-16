@@ -9,7 +9,7 @@ import pytest
 from tests.conftest import RESOURCE_ID
 from udata_hydra.data_formats import Csv
 from udata_hydra.data_formats.csv_like.to_geojson import _cast_latlon, _detect_geo_columns
-from udata_hydra.utils import true_path
+from udata_hydra.utils import storage_path
 
 
 def _build_csv_content(columns: dict, sep: str = ";") -> str:
@@ -30,7 +30,7 @@ async def _geojson_from_columns(
     fake_check,
 ) -> dict:
     """Build CSV from columns, convert to DB + GeoJSON, return (geojson, db_to_geojson result)."""
-    output_path = true_path(f"{RESOURCE_ID}.geojson")
+    output_path = storage_path(f"{RESOURCE_ID}.geojson")
     try:
         Path(output_path).unlink()
     except FileNotFoundError:

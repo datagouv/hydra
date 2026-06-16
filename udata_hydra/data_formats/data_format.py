@@ -3,7 +3,7 @@ import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from udata_hydra.utils import true_path
+from udata_hydra.utils import storage_path
 
 
 class DataFormat(ABC):
@@ -44,7 +44,7 @@ class DataFormat(ABC):
 
     @property
     def path(self) -> Path:
-        return true_path(self.file_name)
+        return storage_path(self.file_name)
 
     def __call__(self, *args, **kwargs):
         return self.__class__(*args, **kwargs)

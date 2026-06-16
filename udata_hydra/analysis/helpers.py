@@ -6,7 +6,7 @@ from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.data_formats.data_format import DataFormat
-from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send, true_path
+from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send, storage_path
 
 
 def get_python_type(column: dict) -> str:
@@ -25,7 +25,7 @@ async def read_or_download_file(
     exception: Record | None = None,
 ) -> IO[bytes]:
     if filename:
-        full_path = true_path("") / filename
+        full_path = storage_path("") / filename
         try:
             return open(full_path, "rb")
         except FileNotFoundError:

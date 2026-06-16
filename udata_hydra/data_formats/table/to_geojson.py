@@ -8,7 +8,7 @@ from udata_hydra.data_formats.csv_like.to_geojson import (
     _detect_geo_columns,
 )
 from udata_hydra.db import db_col_name
-from udata_hydra.utils import true_path
+from udata_hydra.utils import storage_path
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats import Geojson
@@ -134,7 +134,7 @@ async def db_to_geojson(table: Table) -> "Geojson|None":
         async with conn.transaction():
             cursor = conn.cursor(query, *params)
 
-            with open(true_path(geojson_name), "w") as f:
+            with open(storage_path(geojson_name), "w") as f:
                 f.write('{"type": "FeatureCollection", "features": [')
                 first = True
                 async for row in cursor:
