@@ -4,7 +4,6 @@ import aiohttp
 import asyncpg
 import typer
 
-from udata_hydra import config
 from udata_hydra.cli.common import _make_async_wrapper, cli, log
 from udata_hydra.crawl.check_resources import check_resource as crawl_check_resource
 from udata_hydra.crawl.check_resources import probe_cors
