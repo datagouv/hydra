@@ -37,7 +37,7 @@ def compute_checksum_from_file(filename: str) -> str:
 def extract_gzip(file_path: str) -> IO[bytes]:
     with gzip.open(file_path, "rb") as gz_file:
         with tempfile.NamedTemporaryFile(
-            dir=true_path("").as_posix(), mode="wb", delete=False
+            dir=true_path(""), mode="wb", delete=False
         ) as temp_file:
             temp_file.write(gz_file.read())
     return temp_file
@@ -60,7 +60,7 @@ async def download_resource(
     ):
         raise IOException("File too large to download", url=url)
 
-    tmp_file = tempfile.NamedTemporaryFile(dir=true_path("").as_posix(), delete=False)
+    tmp_file = tempfile.NamedTemporaryFile(dir=true_path(""), delete=False)
 
     chunk_size = 1024
     i = 0
