@@ -126,7 +126,7 @@ class CsvLike(DataFormat):
                     queue.enqueue(
                         export_parquet,
                         table=table,
-                        check=check,
+                        check=dict(check),
                         _priority="low",
                         _exception=bool(exception),
                     )
@@ -141,7 +141,7 @@ class CsvLike(DataFormat):
                     queue.enqueue(
                         export_geojson_pmtiles,
                         table=table,
-                        check=check,
+                        check=dict(check),
                         _priority="low",
                         _exception=bool(exception),
                     )
