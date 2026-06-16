@@ -6,7 +6,14 @@ from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.data_formats.data_format import DataFormat
-from udata_hydra.utils import IOException, UdataPayload, download_resource, queue, send, storage_path
+from udata_hydra.utils import (
+    IOException,
+    UdataPayload,
+    download_resource,
+    queue,
+    send,
+    storage_path,
+)
 
 
 def get_python_type(column: dict) -> str:
