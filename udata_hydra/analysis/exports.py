@@ -6,14 +6,13 @@ ParseException handling, and resource status cleanup.
 """
 
 import logging
-from pathlib import Path
 
 from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.data_formats import CsvLike, DataFormat, Geojson, Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import ParseException, handle_parse_exception, remove_remainders, true_path
+from udata_hydra.utils import ParseException, handle_parse_exception, remove_remainders
 
 log = logging.getLogger("udata-hydra")
 

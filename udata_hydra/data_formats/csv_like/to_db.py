@@ -13,7 +13,7 @@ from udata_hydra.data_formats import CsvLike
 from udata_hydra.db import compute_insert_query, db_col_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import ParseException, true_path
+from udata_hydra.utils import ParseException
 from udata_hydra.utils.casting import iter_tabular_rows
 
 log = logging.getLogger("udata-hydra")

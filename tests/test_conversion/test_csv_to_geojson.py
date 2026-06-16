@@ -8,7 +8,6 @@ import pytest
 
 from udata_hydra.data_formats import Csv
 from udata_hydra.data_formats.csv_like.to_geojson import DEFAULT_GEOJSON_FILENAME
-from udata_hydra.utils import true_path
 
 
 def _build_csv_content(columns: dict, sep: str = ";") -> str:

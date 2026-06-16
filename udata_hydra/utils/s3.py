@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import boto3
@@ -6,7 +5,6 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from udata_hydra import config
-from udata_hydra.utils import true_path
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats import DataFormat

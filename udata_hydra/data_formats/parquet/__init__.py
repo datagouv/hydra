@@ -17,7 +17,6 @@ from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
     ParseException,
     Timer,
-    true_path,
 )
 
 if TYPE_CHECKING:

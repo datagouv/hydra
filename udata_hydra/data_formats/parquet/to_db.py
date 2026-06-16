@@ -16,7 +16,7 @@ from udata_hydra.data_formats import Parquet
 from udata_hydra.db import compute_insert_query, db_col_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import ParseException, true_path
+from udata_hydra.utils import ParseException
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats.table import Table

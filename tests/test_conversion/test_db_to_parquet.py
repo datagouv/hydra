@@ -9,7 +9,6 @@ import pytest
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.data_formats import CsvLike, Parquet
 from udata_hydra.data_formats.table.to_parquet import DEFAULT_PARQUET_FILENAME
-from udata_hydra.utils import true_path
 from udata_hydra.utils.casting import iter_tabular_rows
 
 pytestmark = pytest.mark.asyncio
