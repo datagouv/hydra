@@ -3,9 +3,9 @@ import hashlib
 import logging
 import mimetypes
 import os
-from pathlib import Path
 import re
 import tempfile
+from pathlib import Path
 from typing import IO
 
 import aiohttp
@@ -17,7 +17,7 @@ from udata_hydra.utils import IOException
 log = logging.getLogger("udata-hydra")
 
 
-def true_path(file_name: str)  -> Path:
+def true_path(file_name: str) -> Path:
     if file_name.startswith("tests/data/"):
         return Path(file_name)
     return Path(config.TEMPORARY_DOWNLOAD_FOLDER or tempfile.gettempdir()) / file_name

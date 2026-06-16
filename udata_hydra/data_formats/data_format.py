@@ -1,9 +1,7 @@
-from pathlib import Path
-
-
 import json
 import os
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 from udata_hydra.utils import true_path
 
