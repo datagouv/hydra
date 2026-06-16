@@ -151,7 +151,7 @@ async def analyse_resource(
             )
             if issubclass(data_format, Ogc):
                 queue.enqueue(
-                    data_format,
+                    data_format.analyse,
                     check=check,
                     _priority="high" if worker_priority == "high" else "default",
                     _exception=bool(exception),
