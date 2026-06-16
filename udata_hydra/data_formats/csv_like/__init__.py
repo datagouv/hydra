@@ -140,7 +140,7 @@ class CsvLike(DataFormat):
 
                     queue.enqueue(
                         export_geojson_pmtiles,
-                        table=table,
+                        source=table,
                         check=dict(check),
                         _priority="low",
                         _exception=bool(exception),
