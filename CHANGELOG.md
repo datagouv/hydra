@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.13.0 (2026-06-17)
+
+- Don't try to delete a file from a table ([#447](https://github.com/datagouv/hydra/pull/447))
+- Ensure we pass dicts to enqueue ([#446](https://github.com/datagouv/hydra/pull/446))
+- fix: enqueue Ogc subclass analysis ([#444](https://github.com/datagouv/hydra/pull/444))
+- fix: fix linting check in CI and remove unused imports ([#445](https://github.com/datagouv/hydra/pull/445))
+- Remove remainders targets `storage_path` ([#450](https://github.com/datagouv/hydra/pull/450))
+- test: add file.py unit tests ([#449](https://github.com/datagouv/hydra/pull/449))
+- Un-revert data formats and fix file routing ([#443](https://github.com/datagouv/hydra/pull/443))
+- Use the correct kwarg in Geojson + PMTiles export ([#448](https://github.com/datagouv/hydra/pull/448))
+
+
 ## 2.12.3 (2026-06-15)
 
 - Revert "Introduce data formats ([#430](https://github.com/datagouv/hydra/pull/430))"

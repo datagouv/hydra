@@ -129,5 +129,4 @@ async def download_file(url: str, fd):
 def remove_remainders(resource_id: str, extensions: list[str]) -> None:
     """Delete potential remainders from process that crashed"""
     for ext in extensions:
-        if os.path.exists(f"{resource_id}.{ext}"):
-            os.remove(f"{resource_id}.{ext}")
+        storage_path(f"{resource_id}.{ext}").unlink(missing_ok=True)
