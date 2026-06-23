@@ -23,6 +23,7 @@ async def _run_export_job(
     step: str,
     remainder_types: list[str],
     export_fn: str,
+    job_keys: tuple[str, ...],
     upload_to_s3: bool = True,
     delete_output: bool = False,
     delete_input: bool = True,
@@ -72,7 +73,8 @@ async def _run_export_job(
             resource = await Resource.get(data_object.resource_id)
             if resource is not None and check_out is not None:
                 await helpers.notify_udata(resource, check_out)
-            await Resource.update(data_object.resource_id, {"status": None})
+            for job in job_keys:
+                await Resource.clear_job_status(data_object.resource_id, job)
     return output
 
 
@@ -81,12 +83,15 @@ async def export_parquet(
     check: dict,
 ) -> None:
     """RQ target: parquet export for a db table."""
+    if table.resource_id:
+        await Resource.set_job_status(table.resource_id, "parquet", "CONVERTING_TO_PARQUET")
     await _run_export_job(
         data_object=table,
         check=check,
         step="parquet_export",
         remainder_types=["parquet"],
         export_fn="to_parquet",
+        job_keys=("parquet",),
     )
 
 
@@ -95,12 +100,15 @@ async def export_pmtiles(
     check: dict,
 ) -> None:
     """RQ target: PMTiles export for a geojson."""
+    if geojson_file.resource_id:
+        await Resource.set_job_status(geojson_file.resource_id, "pmtiles", "CONVERTING_TO_PMTILES")
     await _run_export_job(
         data_object=geojson_file,
         check=check,
         step="pmtiles_export",
         remainder_types=["geojson", "pmtiles", "pmtiles-journal"],
         export_fn="to_pmtiles",
+        job_keys=("pmtiles",),
     )
 
 
@@ -109,6 +117,9 @@ async def export_geojson_pmtiles(
     check: dict,
 ) -> None:
     """RQ target: GeoJSON + PMTiles export for a db table."""
+    resource_id = source.resource_id
+    if resource_id:
+        await Resource.set_job_status(resource_id, "geojson", "CONVERTING_TO_GEOJSON")
     geojson_file = await _run_export_job(
         data_object=source,
         check=check,
@@ -116,13 +127,20 @@ async def export_geojson_pmtiles(
         step="geojson_export",
         remainder_types=["geojson"],
         export_fn="to_geojson",
+        job_keys=(),
     )
-    if geojson_file is not None:
-        await _run_export_job(
-            data_object=geojson_file,
-            check=check,
-            delete_input=True,
-            step="pmtiles_export",
-            remainder_types=["geojson", "pmtiles", "pmtiles-journal"],
-            export_fn="to_pmtiles",
-        )
+    if geojson_file is None:
+        if resource_id:
+            await Resource.clear_job_status(resource_id, "geojson")
+        return
+    if resource_id:
+        await Resource.update_job_status(resource_id, "geojson", "pmtiles", "CONVERTING_TO_PMTILES")
+    await _run_export_job(
+        data_object=geojson_file,
+        check=check,
+        delete_input=True,
+        step="pmtiles_export",
+        remainder_types=["geojson", "pmtiles", "pmtiles-journal"],
+        export_fn="to_pmtiles",
+        job_keys=("pmtiles",),
+    )

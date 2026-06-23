@@ -1,6 +1,5 @@
 import asyncio
 import hashlib
-import json
 import logging
 import os
 import uuid
@@ -18,6 +17,7 @@ from udata_hydra import config
 from udata_hydra.app import app_factory
 from udata_hydra.cli import drop_dbs, load_catalog, migrate
 from udata_hydra.db.check import Check
+from udata_hydra.db.codec import init_connection
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.logger import stop_sentry
@@ -121,7 +121,7 @@ def setup():
 async def mock_pool(mocker):
     """This avoids having different pools attached to different event loops"""
     m = mocker.patch("udata_hydra.context.pool")
-    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50)
+    pool = await asyncpg.create_pool(dsn=DATABASE_URL, max_size=50, init=init_connection)
     m.return_value = pool
     yield
     await pool.close()
@@ -245,6 +245,7 @@ def rmock():
 @pytest_asyncio.fixture
 async def db():
     conn = await asyncpg.connect(dsn=DATABASE_URL)
+    await init_connection(conn)
     yield conn
     await conn.close()
 
@@ -259,9 +260,10 @@ async def insert_fake_resource():
             type="main",
             format=format,
             title="Fake resource",
-            status=status,
             priority=True,
         )
+        if status is not None:
+            await Resource.set_job_status(RESOURCE_ID, Resource.job_for_state(status), status)
 
     return _insert_fake_resource
 
@@ -300,7 +302,10 @@ async def fake_check():
             "url": _url,
             "domain": domain,
             "status": status,
-            "headers": json.dumps(headers),
+            # Pass as dict, not json.dumps: asyncpg's JSONB codec encodes native dicts
+            # into JSON objects; pre-serialized strings would be stored as JSON strings
+            # and break SQL operators like headers->>'content-type'.
+            "headers": headers,
             "timeout": timeout,
             "response_time": 0.1,
             "resource_id": resource_id,

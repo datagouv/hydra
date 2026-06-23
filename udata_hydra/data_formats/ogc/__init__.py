@@ -112,9 +112,7 @@ class Ogc(DataFormat):
 
         resource: Record | None = None
         if resource_id:
-            resource = await Resource.update(
-                str(resource_id), {"status": f"ANALYSING_{format.upper()}"}
-            )
+            resource = await Resource.set_job_status(str(resource_id), "ogc", "ANALYSING_OGC")
 
         metadata: OgcMetadata | None = None
         try:
@@ -245,7 +243,7 @@ class Ogc(DataFormat):
             if resource and check_id:
                 await helpers.notify_udata(resource, check)
             if resource_id:
-                await Resource.update(str(resource_id), {"status": None})
+                await Resource.clear_job_status(str(resource_id), "ogc")
 
     @staticmethod
     def is_valid_layer_name(name: str) -> bool:

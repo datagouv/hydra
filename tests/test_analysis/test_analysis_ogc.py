@@ -1,4 +1,3 @@
-import json
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -15,6 +14,7 @@ from udata_hydra.data_formats import (
     Wms,
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
+from udata_hydra.db.codec import parse_json_value
 
 pytestmark = pytest.mark.asyncio
 
@@ -131,7 +131,7 @@ class TestOgcAnalysis:
 
         # Verify metadata was stored in the database
         res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
-        assert json.loads(res["ogc_metadata"]) == expected_metadata
+        assert parse_json_value(res["ogc_metadata"]) == expected_metadata
         assert res["parsing_started_at"] is not None
         assert res["parsing_finished_at"] is not None
 
@@ -436,7 +436,7 @@ class TestOgcAnalysis:
 
         # Verify metadata was stored in the database
         res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
-        assert json.loads(res["ogc_metadata"]) == expected_metadata
+        assert parse_json_value(res["ogc_metadata"]) == expected_metadata
         assert res["parsing_started_at"] is not None
         assert res["parsing_finished_at"] is not None
 

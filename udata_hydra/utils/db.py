@@ -1,7 +1,5 @@
 from asyncpg import Record
 
-from udata_hydra import context
-
 
 async def get_columns_with_indexes(table_name: str) -> list[Record]:
     """
@@ -11,6 +9,8 @@ async def get_columns_with_indexes(table_name: str) -> list[Record]:
         - index_name
         - column_name
     """
+    from udata_hydra import context
+
     pool = await context.pool()
     async with pool.acquire() as connection:
         q = """

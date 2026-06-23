@@ -20,7 +20,7 @@ async def test_catalog_deleted(setup_catalog, db, rmock):
     assert len(res) == 1
     assert res[0]["url"] == RESOURCE_URL
     assert res[0]["dataset_id"] == DATASET_ID
-    assert res[0]["status"] is None
+    assert res[0]["status"] == {}
 
     res = await db.fetch("SELECT id FROM catalog WHERE deleted = FALSE")
     assert len(res) == 1

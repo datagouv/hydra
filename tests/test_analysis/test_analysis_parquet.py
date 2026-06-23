@@ -1,5 +1,4 @@
 import io
-import json
 from datetime import datetime
 from unittest.mock import patch
 
@@ -9,6 +8,7 @@ import pytest
 
 from udata_hydra.analysis import helpers
 from udata_hydra.data_formats import Parquet
+from udata_hydra.db.codec import parse_json_value
 from udata_hydra.utils import ParseException
 
 pytestmark = pytest.mark.asyncio
@@ -103,7 +103,7 @@ async def test_analyse_parquet(
     res = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    inspection = json.loads(res["csv_detective"])
+    inspection = parse_json_value(res["csv_detective"])
     assert inspection["total_lines"] == len(df)
     assert inspection["header"] == list(df.columns)
 
@@ -148,7 +148,9 @@ async def test_parquet_to_db_copy_failure_raises_parse_exception(fake_check, moc
         "udata_hydra.data_formats.parquet.to_db.context.pool",
         new=mocker.AsyncMock(return_value=mock_pool),
     )
-    mocker.patch("udata_hydra.data_formats.parquet.to_db.Resource.update", new=mocker.AsyncMock())
+    mocker.patch(
+        "udata_hydra.data_formats.parquet.to_db.Resource.set_job_status", new=mocker.AsyncMock()
+    )
     inspection = {
         "columns": {"name": {"python_type": "string", "format": set()}},
         "total_lines": 1,
@@ -174,7 +176,9 @@ async def test_parquet_to_db_create_table_failure_raises_parse_exception(fake_ch
         "udata_hydra.data_formats.parquet.to_db.context.pool",
         new=mocker.AsyncMock(return_value=mock_pool),
     )
-    mocker.patch("udata_hydra.data_formats.parquet.to_db.Resource.update", new=mocker.AsyncMock())
+    mocker.patch(
+        "udata_hydra.data_formats.parquet.to_db.Resource.set_job_status", new=mocker.AsyncMock()
+    )
     inspection = {
         "columns": {"name": {"python_type": "string", "format": set()}},
         "total_lines": 1,
