@@ -151,7 +151,7 @@ async def _dump_tables_index(
     include_deleted: bool = False,
     resource_id: str | None = None,
 ) -> None:
-    """Export tables_index rows from the CSV database to a CSV file."""
+    """Export the latest tables_index row per resource_id from the CSV database."""
     conn = await connection("csv")
 
     conditions: list[str] = []
@@ -175,8 +175,24 @@ async def _dump_tables_index(
             created_at,
             indexes::text,
             deleted_at
-        FROM tables_index
-        {where_clause}
+        FROM (
+            -- DISTINCT ON keeps one row per resource_id. PostgreSQL picks the first
+            -- row of each group, so ORDER BY must start with resource_id then
+            -- created_at DESC to retain the latest analysis per resource.
+            SELECT DISTINCT ON (resource_id)
+                id,
+                parsing_table,
+                csv_detective,
+                resource_id,
+                dataset_id,
+                url,
+                created_at,
+                indexes,
+                deleted_at
+            FROM tables_index
+            {where_clause}
+            ORDER BY resource_id, created_at DESC
+        ) AS latest
         ORDER BY created_at DESC
     """
 
@@ -196,7 +212,7 @@ def dump_tables_index(
     ),
     resource_id: str | None = typer.Option(None, help="Filter by resource ID"),
 ):
-    """Export tables_index metadata from the CSV database to a CSV file."""
+    """Export the latest tables_index row per resource_id to a CSV file."""
     return _make_async_wrapper(_dump_tables_index)(
         output=output,
         include_deleted=include_deleted,

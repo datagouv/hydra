@@ -1,5 +1,6 @@
 import csv
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import nest_asyncio2 as nest_asyncio
@@ -23,6 +24,8 @@ CSV_HEADERS = [
     "deleted_at",
 ]
 
+_NOW = datetime.now(timezone.utc)
+
 
 async def _insert_tables_index_row(
     db,
@@ -32,12 +35,13 @@ async def _insert_tables_index_row(
     csv_detective: dict | None = None,
     indexes: dict | None = None,
     deleted: bool = False,
+    created_at: datetime | None = None,
 ) -> None:
     await db.execute(
         """
         INSERT INTO tables_index(
-            parsing_table, csv_detective, resource_id, dataset_id, url, indexes
-        ) VALUES($1, $2, $3, $4, $5, $6)
+            parsing_table, csv_detective, resource_id, dataset_id, url, indexes, created_at
+        ) VALUES($1, $2, $3, $4, $5, $6, COALESCE($7, NOW()))
         """,
         parsing_table,
         json.dumps(csv_detective or {"columns": {"id": {"python_type": "int"}}}),
@@ -45,6 +49,7 @@ async def _insert_tables_index_row(
         DATASET_ID,
         RESOURCE_URL,
         json.dumps(indexes) if indexes is not None else None,
+        created_at,
     )
     if deleted:
         await db.execute(
@@ -105,17 +110,30 @@ async def test_dump_tables_index_exports_rows(clean_db, db, tmp_path):
             {"match"},
             id="filter_by_resource_id",
         ),
+        pytest.param(
+            [
+                ("older", RESOURCE_ID, False, _NOW - timedelta(days=1)),
+                ("latest", RESOURCE_ID, False, _NOW),
+            ],
+            {},
+            1,
+            {"latest"},
+            id="keeps_latest_per_resource_id",
+        ),
     ],
 )
 async def test_dump_tables_index_filters(
     clean_db, db, tmp_path, rows, kwargs, expected_count, expected_tables
 ):
-    for parsing_table, resource_id, deleted in rows:
+    for row in rows:
+        parsing_table, resource_id, deleted = row[:3]
+        created_at = row[3] if len(row) > 3 else None
         await _insert_tables_index_row(
             db,
             parsing_table=parsing_table,
             resource_id=resource_id,
             deleted=deleted,
+            created_at=created_at,
         )
 
     output = tmp_path / "tables_index.csv"
