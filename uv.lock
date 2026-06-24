@@ -458,7 +458,7 @@ wheels = [
 
 [[package]]
 name = "csv-detective"
-version = "0.11.3.dev16"
+version = "0.11.3.dev17"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "charset-normalizer" },
@@ -478,7 +478,7 @@ dependencies = [
     { name = "xlrd" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/86/fb/fba822c75b0e2e6c0663322194f728834eb5a50c2e1def4a20c4f9ed0b59/csv_detective-0.11.3.dev16-py3-none-any.whl", hash = "sha256:808b287b0f29f7718bf72a13733606b553cafd09e7501ff9fa56b1beace503a7", size = 222584, upload-time = "2026-06-24T12:23:30.994Z" },
+    { url = "https://files.pythonhosted.org/packages/33/93/119b3039a7450ccb93318eacea9ae0c14e7649d2b798cef2ad315ebc8c72/csv_detective-0.11.3.dev17-py3-none-any.whl", hash = "sha256:fcd6fd1c06abd750482354b0fa3e2c734f0f8b2615ad7a955f4cb381975f6ceb", size = 222652, upload-time = "2026-06-24T17:42:18.829Z" },
 ]
 
 [[package]]
@@ -2093,7 +2093,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "boto3", specifier = ">=1.35.0" },
     { name = "coloredlogs", specifier = ">=15.0.1" },
-    { name = "csv-detective", specifier = "==0.11.3.dev16" },
+    { name = "csv-detective", specifier = "==0.11.3.dev17" },
     { name = "dateparser", specifier = ">=1.1.7" },
     { name = "humanfriendly", specifier = ">=10.0" },
     { name = "json-stream", specifier = ">=2.3.3" },
