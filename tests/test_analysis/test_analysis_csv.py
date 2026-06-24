@@ -15,6 +15,7 @@ from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
+from udata_hydra.data_formats.csv_like import NA_VALUES
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 
@@ -735,7 +736,9 @@ async def test_file_with_nan(
             "content-type": "application/csv",
             "content-length": "100",
         },
-        body=("a,b,c\n1,1.0,inf\n2,nan,2.0\n3,3.0,3.0\n").encode("utf-8"),
+        body=(f"a,b,c\n1,1.0,inf\n2,nan,2.0\n3,3.0,3.0\n{list(NA_VALUES)[-1]},4.0,4.0\n").encode(
+            "utf-8"
+        ),
         repeat=True,
     )
     file = await download_from_check(check, Csv)

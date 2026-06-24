@@ -16,6 +16,7 @@ from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
+    NA_VALUES,
     IOException,
     ParseException,
     Timer,
@@ -47,6 +48,7 @@ class CsvLike(DataFormat):
                 output_profile=True,
                 num_rows=-1,
                 save_results=False,
+                na_values=NA_VALUES,
             )
         else:
             self.inspection = csv_detective_routine(  # ty: ignore[invalid-assignment]
@@ -54,6 +56,7 @@ class CsvLike(DataFormat):
                 output_profile=True,
                 num_rows=-1,
                 save_results=False,
+                na_values=NA_VALUES,
             )
         return self.inspection
 
