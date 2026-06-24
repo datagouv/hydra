@@ -61,6 +61,10 @@ Install udata-hydra dependencies and cli (see Installation section above), then 
 
 `uv run udata-hydra load-catalog`
 
+### Export tables_index metadata to CSV
+
+`uv run udata-hydra dump-tables-index -o tables_index.csv`
+
 ## 🕷️ Crawler
 
 `uv run udata-hydra-crawl`

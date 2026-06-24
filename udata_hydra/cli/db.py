@@ -144,3 +144,66 @@ def migrate(
 ):
     """Migrate the database(s)"""
     return _make_async_wrapper(_migrate)(skip_errors=skip_errors, dbs=dbs)
+
+
+async def _dump_tables_index(
+    output: Path,
+    include_deleted: bool = False,
+    resource_id: str | None = None,
+    limit: int | None = None,
+) -> None:
+    """Export tables_index rows from the CSV database to a CSV file."""
+    conn = await connection("csv")
+
+    conditions: list[str] = []
+    args: list[str] = []
+    if not include_deleted:
+        conditions.append("deleted_at IS NULL")
+    if resource_id is not None:
+        conditions.append(f"resource_id = ${len(args) + 1}")
+        args.append(resource_id)
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    limit_clause = f"LIMIT {int(limit)}" if limit is not None else ""
+
+    query = f"""
+        SELECT
+            id,
+            parsing_table,
+            csv_detective::text,
+            resource_id,
+            dataset_id,
+            url,
+            created_at,
+            indexes::text,
+            deleted_at
+        FROM tables_index
+        {where_clause}
+        ORDER BY created_at DESC
+        {limit_clause}
+    """
+
+    output.parent.mkdir(exist_ok=True, parents=True)
+    with output.open("wb") as ofile:
+        row_count = await conn.copy_from_query(
+            query, *args, output=ofile, format="csv", header=True
+        )
+    log.info(f"Exported {row_count} rows to {output}")
+
+
+@cli.command()
+def dump_tables_index(
+    output: Path = typer.Option(..., "-o", "--output", help="Output CSV file path"),
+    include_deleted: bool = typer.Option(
+        False, help="Include soft-deleted rows (deleted_at IS NOT NULL)"
+    ),
+    resource_id: str | None = typer.Option(None, help="Filter by resource ID"),
+    limit: int | None = typer.Option(None, help="Maximum number of rows to export"),
+):
+    """Export tables_index metadata from the CSV database to a CSV file."""
+    return _make_async_wrapper(_dump_tables_index)(
+        output=output,
+        include_deleted=include_deleted,
+        resource_id=resource_id,
+        limit=limit,
+    )
