@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from datetime import date, datetime, timedelta, timezone
@@ -7,6 +8,7 @@ import pytest
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.data_formats import Csv
+from udata_hydra.utils import ParseException, storage_path
 
 pytestmark = pytest.mark.asyncio
 
@@ -27,7 +29,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db, fake_c
     check = await fake_check()
     line, expected, separator = line_expected
     header = separator.join(["int", "float", "string", "bool"])
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
         fp.write(f"{header}\n{line}".encode("utf-8"))
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
@@ -69,7 +71,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db, fake_c
 async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db, fake_check):
     check = await fake_check()
     line, expected = line_expected
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
         fp.write(f"json;date;datetime;aware_datetime\n{line}".encode("utf-8"))
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
@@ -86,7 +88,7 @@ async def test_basic_sql_injection(db, clean_db, fake_check):
     # tries to execute
     # CREATE TABLE table_name("int" integer, "col_name" text);DROP TABLE toto;--)
     injection = 'col_name" text);DROP TABLE toto;--'
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
         # we enough columns so that the ";" is not considered as separator by csv-detective
         fp.write(f"int,{injection},col1,col2\n1,test,2,3".encode("utf-8"))
         fp.seek(0)
@@ -99,7 +101,7 @@ async def test_basic_sql_injection(db, clean_db, fake_check):
 
 async def test_percentage_column(db, clean_db, fake_check):
     check = await fake_check()
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
         fp.write("int,% mon pourcent\n1,test".encode("utf-8"))
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
@@ -111,7 +113,7 @@ async def test_percentage_column(db, clean_db, fake_check):
 
 async def test_reserved_column_name(db, clean_db, fake_check):
     check = await fake_check()
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
         fp.write("int,xmin\n1,test".encode("utf-8"))
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
@@ -119,6 +121,8 @@ async def test_reserved_column_name(db, clean_db, fake_check):
         table = await file.to_db(check=check)
     res = await db.fetchrow(f'SELECT * FROM "{table.table_name}"')
     assert res["xmin__hydra_renamed"] == "test"
+
+
 async def test_csv_to_db_transaction_rollback_on_create_failure(db, clean_db, fake_check, mocker):
     check = await fake_check()
     table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
