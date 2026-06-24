@@ -736,7 +736,9 @@ async def test_file_with_nan(
             "content-type": "application/csv",
             "content-length": "100",
         },
-        body=(f"a,b,c\n1,1.0,inf\n2,nan,2.0\n3,3.0,3.0\n{list(NA_VALUES)[-1]},4.0,4.0\n").encode("utf-8"),
+        body=(f"a,b,c\n1,1.0,inf\n2,nan,2.0\n3,3.0,3.0\n{list(NA_VALUES)[-1]},4.0,4.0\n").encode(
+            "utf-8"
+        ),
         repeat=True,
     )
     file = await download_from_check(check, Csv)

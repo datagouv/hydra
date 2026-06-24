@@ -4,7 +4,7 @@ from typing import Any, Iterator
 
 from csv_detective.output.dataframe import cast
 
-from udata_hydra.utils import Reader, NA_VALUES
+from udata_hydra.utils import NA_VALUES, Reader
 
 log = logging.getLogger("udata-hydra")
 

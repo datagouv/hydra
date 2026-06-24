@@ -16,12 +16,12 @@ from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
+    NA_VALUES,
     IOException,
     ParseException,
     Timer,
     handle_parse_exception,
     queue,
-    NA_VALUES,
 )
 
 if TYPE_CHECKING:
