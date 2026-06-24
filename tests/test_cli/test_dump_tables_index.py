@@ -105,16 +105,6 @@ async def test_dump_tables_index_exports_rows(clean_db, db, tmp_path):
             {"match"},
             id="filter_by_resource_id",
         ),
-        pytest.param(
-            [
-                ("first", "11111111-1111-1111-1111-111111111111", False),
-                ("second", "22222222-2222-2222-2222-222222222222", False),
-            ],
-            {"limit": 1},
-            1,
-            None,
-            id="limit",
-        ),
     ],
 )
 async def test_dump_tables_index_filters(

@@ -150,7 +150,6 @@ async def _dump_tables_index(
     output: Path,
     include_deleted: bool = False,
     resource_id: str | None = None,
-    limit: int | None = None,
 ) -> None:
     """Export tables_index rows from the CSV database to a CSV file."""
     conn = await connection("csv")
@@ -164,7 +163,6 @@ async def _dump_tables_index(
         args.append(resource_id)
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    limit_clause = f"LIMIT {int(limit)}" if limit is not None else ""
 
     query = f"""
         SELECT
@@ -180,7 +178,6 @@ async def _dump_tables_index(
         FROM tables_index
         {where_clause}
         ORDER BY created_at DESC
-        {limit_clause}
     """
 
     output.parent.mkdir(exist_ok=True, parents=True)
@@ -198,12 +195,10 @@ def dump_tables_index(
         False, help="Include soft-deleted rows (deleted_at IS NOT NULL)"
     ),
     resource_id: str | None = typer.Option(None, help="Filter by resource ID"),
-    limit: int | None = typer.Option(None, help="Maximum number of rows to export"),
 ):
     """Export tables_index metadata from the CSV database to a CSV file."""
     return _make_async_wrapper(_dump_tables_index)(
         output=output,
         include_deleted=include_deleted,
         resource_id=resource_id,
-        limit=limit,
     )
