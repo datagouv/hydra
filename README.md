@@ -65,6 +65,8 @@ Install udata-hydra dependencies and cli (see Installation section above), then 
 
 `uv run udata-hydra dump-tables-index -o tables_index.csv`
 
+Exports `resource_id`, `url`, `csv_detective` and `created_at` by default. Use `--columns` to pick others.
+
 ## 🕷️ Crawler
 
 `uv run udata-hydra-crawl`

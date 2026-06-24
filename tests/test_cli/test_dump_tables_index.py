@@ -7,22 +7,10 @@ import nest_asyncio2 as nest_asyncio
 import pytest
 
 from tests.conftest import DATASET_ID, NOT_EXISTING_RESOURCE_ID, RESOURCE_ID, RESOURCE_URL
-from udata_hydra.cli.db import _dump_tables_index
+from udata_hydra.cli.db import DEFAULT_TABLES_INDEX_EXPORT_COLUMNS, _dump_tables_index
 
 pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
-
-CSV_HEADERS = [
-    "id",
-    "parsing_table",
-    "csv_detective",
-    "resource_id",
-    "dataset_id",
-    "url",
-    "created_at",
-    "indexes",
-    "deleted_at",
-]
 
 _NOW = datetime.now(timezone.utc)
 
@@ -65,25 +53,34 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
 
 async def test_dump_tables_index_exports_rows(clean_db, db, tmp_path):
     profile = {"columns": {"name": {"python_type": "string"}}}
-    indexes = {"name": "index"}
     await _insert_tables_index_row(
         db,
         parsing_table="abc123",
         csv_detective=profile,
-        indexes=indexes,
     )
 
+    # Test default columns
     output = tmp_path / "tables_index.csv"
     await _dump_tables_index(output=output)
 
     rows = _read_csv(output)
-    assert list(rows[0].keys()) == CSV_HEADERS
+    assert list(rows[0].keys()) == DEFAULT_TABLES_INDEX_EXPORT_COLUMNS
     assert len(rows) == 1
-    assert rows[0]["parsing_table"] == "abc123"
-    assert json.loads(rows[0]["csv_detective"]) == profile
-    assert json.loads(rows[0]["indexes"]) == indexes
     assert rows[0]["resource_id"] == RESOURCE_ID
-    assert rows[0]["deleted_at"] == ""
+    assert rows[0]["url"] == RESOURCE_URL
+    assert json.loads(rows[0]["csv_detective"]) == profile
+    assert rows[0]["created_at"]
+
+    # Test custom subset of columns
+    output_subset = tmp_path / "subset.csv"
+    await _dump_tables_index(output=output_subset, columns=["resource_id", "url"])
+    subset = _read_csv(output_subset)
+    assert list(subset[0].keys()) == ["resource_id", "url"]
+
+
+async def test_dump_tables_index_unknown_column(tmp_path):
+    with pytest.raises(ValueError, match="Unknown column"):
+        await _dump_tables_index(output=tmp_path / "out.csv", columns=["invalid"])
 
 
 @pytest.mark.parametrize(
@@ -137,7 +134,7 @@ async def test_dump_tables_index_filters(
         )
 
     output = tmp_path / "tables_index.csv"
-    await _dump_tables_index(output=output, **kwargs)
+    await _dump_tables_index(output=output, columns=["parsing_table"], **kwargs)
 
     result = _read_csv(output)
     assert len(result) == expected_count

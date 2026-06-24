@@ -146,13 +146,54 @@ def migrate(
     return _make_async_wrapper(_migrate)(skip_errors=skip_errors, dbs=dbs)
 
 
+DEFAULT_TABLES_INDEX_EXPORT_COLUMNS = [
+    "resource_id",
+    "url",
+    "csv_detective",
+    "created_at",
+]
+
+TABLES_INDEX_COLUMNS = [
+    "id",
+    "parsing_table",
+    "csv_detective",
+    "resource_id",
+    "dataset_id",
+    "url",
+    "created_at",
+    "indexes",
+    "deleted_at",
+]
+
+_JSONB_EXPORT_COLUMNS = {"csv_detective", "indexes"}
+
+
+def _normalize_export_columns(columns: list[str]) -> list[str]:
+    """Validate the columns requested for CSV export."""
+    unknown = set(columns) - set(TABLES_INDEX_COLUMNS)
+    if unknown:
+        available = ", ".join(TABLES_INDEX_COLUMNS)
+        raise ValueError(
+            f"Unknown column(s): {', '.join(sorted(unknown))}. Available columns: {available}"
+        )
+    return list(dict.fromkeys(columns))
+
+
 async def _dump_tables_index(
     output: Path,
     include_deleted: bool = False,
     resource_id: str | None = None,
+    columns: list[str] = DEFAULT_TABLES_INDEX_EXPORT_COLUMNS,
 ) -> None:
     """Export the latest tables_index row per resource_id from the CSV database."""
     conn = await connection("csv")
+    selected_columns = _normalize_export_columns(columns)
+    select_clause = ",\n            ".join(
+        f"latest.{column}::text AS {column}"
+        if column in _JSONB_EXPORT_COLUMNS
+        else f"latest.{column} AS {column}"
+        for column in selected_columns
+    )
 
     conditions: list[str] = []
     args: list[str] = []
@@ -163,32 +204,17 @@ async def _dump_tables_index(
         args.append(resource_id)
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    inner_select = ",\n                ".join(TABLES_INDEX_COLUMNS)
 
     query = f"""
         SELECT
-            id,
-            parsing_table,
-            csv_detective::text,
-            resource_id,
-            dataset_id,
-            url,
-            created_at,
-            indexes::text,
-            deleted_at
+            {select_clause}
         FROM (
             -- DISTINCT ON keeps one row per resource_id. PostgreSQL picks the first
             -- row of each group, so ORDER BY must start with resource_id then
             -- created_at DESC to retain the latest analysis per resource.
             SELECT DISTINCT ON (resource_id)
-                id,
-                parsing_table,
-                csv_detective,
-                resource_id,
-                dataset_id,
-                url,
-                created_at,
-                indexes,
-                deleted_at
+                {inner_select}
             FROM tables_index
             {where_clause}
             ORDER BY resource_id, created_at DESC
@@ -211,10 +237,22 @@ def dump_tables_index(
         False, help="Include soft-deleted rows (deleted_at IS NOT NULL)"
     ),
     resource_id: str | None = typer.Option(None, help="Filter by resource ID"),
+    columns: list[str] | None = typer.Option(
+        None,
+        help=(
+            "Columns to export (repeat the flag for each column). "
+            f"Available: {', '.join(TABLES_INDEX_COLUMNS)}. "
+            f"Default: {', '.join(DEFAULT_TABLES_INDEX_EXPORT_COLUMNS)}."
+        ),
+    ),
 ):
     """Export the latest tables_index row per resource_id to a CSV file."""
-    return _make_async_wrapper(_dump_tables_index)(
-        output=output,
-        include_deleted=include_deleted,
-        resource_id=resource_id,
-    )
+    try:
+        return _make_async_wrapper(_dump_tables_index)(
+            output=output,
+            include_deleted=include_deleted,
+            resource_id=resource_id,
+            columns=columns if columns is not None else DEFAULT_TABLES_INDEX_EXPORT_COLUMNS,
+        )
+    except ValueError as e:
+        raise typer.BadParameter(str(e)) from e
