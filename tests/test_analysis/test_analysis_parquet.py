@@ -179,7 +179,9 @@ async def test_parquet_to_db_copy_failure_raises_parse_exception(db, clean_db, f
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
 
-async def test_parquet_to_db_create_table_failure_raises_parse_exception(db, clean_db, fake_check, mocker):
+async def test_parquet_to_db_create_table_failure_raises_parse_exception(
+    db, clean_db, fake_check, mocker
+):
     """Wrap CREATE TABLE failures in a ParseException for consistent error handling."""
     check = await fake_check()
     table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
