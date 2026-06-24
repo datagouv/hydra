@@ -1,6 +1,9 @@
+import hashlib
 import io
 import json
+import os
 from datetime import datetime
+from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
 import pandas as pd
@@ -9,7 +12,7 @@ import pytest
 
 from udata_hydra.analysis import helpers
 from udata_hydra.data_formats import Parquet
-from udata_hydra.utils import ParseException
+from udata_hydra.utils import ParseException, storage_path
 
 pytestmark = pytest.mark.asyncio
 
@@ -136,51 +139,74 @@ async def test_parquet_to_db_rejects_too_long_column_name(fake_check):
     assert exc.value.step == "scan_column_names"
 
 
-async def test_parquet_to_db_copy_failure_raises_parse_exception(fake_check, mocker):
+async def test_parquet_to_db_copy_failure_raises_parse_exception(db, clean_db, fake_check, mocker):
     """Wrap PostgreSQL COPY failures in a ParseException for consistent error handling."""
     check = await fake_check()
-    mock_pool = mocker.MagicMock()
-    mock_pool.execute = mocker.AsyncMock()
-    mock_pool.copy_records_to_table = mocker.AsyncMock(
-        side_effect=RuntimeError("copy failed"),
-    )
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+
+    await db.execute(f'CREATE TABLE "{table_name}" (__id SERIAL PRIMARY KEY, val text)')
+    await db.execute(f"INSERT INTO \"{table_name}\" (val) VALUES ('original-data')")
+
+    def make_failing_iter(*args, **kwargs):
+        def _gen():
+            raise RuntimeError("simulated copy failure")
+            yield
+
+        return _gen()
+
     mocker.patch(
-        "udata_hydra.data_formats.parquet.to_db.context.pool",
-        new=mocker.AsyncMock(return_value=mock_pool),
+        "udata_hydra.data_formats.parquet.to_db._iter_parquet_rows",
+        make_failing_iter,
     )
-    mocker.patch("udata_hydra.data_formats.parquet.to_db.Resource.update", new=mocker.AsyncMock())
+
     inspection = {
         "columns": {"name": {"python_type": "string", "format": set()}},
         "total_lines": 1,
     }
-    with patch("udata_hydra.data_formats.data_format.os.path.getsize", return_value=10):
-        file = Parquet(file_name="file.parquet", inspection=inspection)
-    with pytest.raises(ParseException) as exc:
-        await file.to_db(check=check)
+    df = pd.DataFrame({"name": ["test"]})
+    with NamedTemporaryFile(suffix=".parquet", dir=storage_path("")) as fp:
+        df.to_parquet(fp.name)
+        file = Parquet(file_name=os.path.basename(fp.name), inspection=inspection)
+        with pytest.raises(ParseException) as exc:
+            await file.to_db(check=check)
+
     assert exc.value.step == "copy_records_to_table"
 
+    res = await db.fetch(f'SELECT * FROM "{table_name}"')
+    assert len(res) == 1
+    assert res[0]["val"] == "original-data"
 
-async def test_parquet_to_db_create_table_failure_raises_parse_exception(fake_check, mocker):
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+
+
+async def test_parquet_to_db_create_table_failure_raises_parse_exception(db, clean_db, fake_check, mocker):
     """Wrap CREATE TABLE failures in a ParseException for consistent error handling."""
     check = await fake_check()
-    mock_pool = mocker.MagicMock()
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
 
-    async def execute(q: str, *args: object) -> None:
-        if "CREATE TABLE" in q.upper():
-            raise RuntimeError("ddl failed")
+    await db.execute(f'CREATE TABLE "{table_name}" (__id SERIAL PRIMARY KEY, val text)')
+    await db.execute(f"INSERT INTO \"{table_name}\" (val) VALUES ('original-data')")
 
-    mock_pool.execute = mocker.AsyncMock(side_effect=execute)
     mocker.patch(
-        "udata_hydra.data_formats.parquet.to_db.context.pool",
-        new=mocker.AsyncMock(return_value=mock_pool),
+        "udata_hydra.data_formats.parquet.to_db.compute_create_table_query",
+        return_value="NOT A VALID SQL STATEMENT",
     )
-    mocker.patch("udata_hydra.data_formats.parquet.to_db.Resource.update", new=mocker.AsyncMock())
+
     inspection = {
         "columns": {"name": {"python_type": "string", "format": set()}},
         "total_lines": 1,
     }
-    with patch("udata_hydra.data_formats.data_format.os.path.getsize", return_value=10):
-        file = Parquet(file_name="file.parquet", inspection=inspection)
-    with pytest.raises(ParseException) as exc:
-        await file.to_db(check=check)
+    df = pd.DataFrame({"name": ["test"]})
+    with NamedTemporaryFile(suffix=".parquet", dir=storage_path("")) as fp:
+        df.to_parquet(fp.name)
+        file = Parquet(file_name=os.path.basename(fp.name), inspection=inspection)
+        with pytest.raises(ParseException) as exc:
+            await file.to_db(check=check)
+
     assert exc.value.step == "create_table_query"
+
+    res = await db.fetch(f'SELECT * FROM "{table_name}"')
+    assert len(res) == 1
+    assert res[0]["val"] == "original-data"
+
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
