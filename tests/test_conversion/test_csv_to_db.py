@@ -119,3 +119,68 @@ async def test_reserved_column_name(db, clean_db, fake_check):
         table = await file.to_db(check=check)
     res = await db.fetchrow(f'SELECT * FROM "{table.table_name}"')
     assert res["xmin__hydra_renamed"] == "test"
+async def test_csv_to_db_transaction_rollback_on_create_failure(db, clean_db, fake_check, mocker):
+    check = await fake_check()
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+
+    # Simulate a previous successful import
+    await db.execute(f'CREATE TABLE "{table_name}" (__id SERIAL PRIMARY KEY, val text)')
+    await db.execute(f'INSERT INTO "{table_name}" (val) VALUES (\'original-data\')')
+
+    # Make CREATE fail so the transaction rolls back the DROP
+    mocker.patch(
+        "udata_hydra.data_formats.csv_like.to_db.compute_create_table_query",
+        return_value="NOT A VALID SQL STATEMENT",
+    )
+
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
+        fp.write(b"val\nnew-data")
+        fp.seek(0)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
+        await file.inspect()
+        with pytest.raises(ParseException):
+            await file.to_db(check=check)
+
+    # Old table and data must survive the rollback
+    res = await db.fetch(f'SELECT * FROM "{table_name}"')
+    assert len(res) == 1
+    assert res[0]["val"] == "original-data"
+
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+
+
+async def test_csv_to_db_transaction_rollback_on_copy_failure(db, clean_db, fake_check, mocker):
+    """When copy_records_to_table fails, the whole transaction rolls back."""
+    check = await fake_check()
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+
+    # Simulate a previous successful import
+    await db.execute(f'CREATE TABLE "{table_name}" (__id SERIAL PRIMARY KEY, val text)')
+    await db.execute(f'INSERT INTO "{table_name}" (val) VALUES (\'original-data\')')
+
+    # Make iter_tabular_rows return a generator that raises on iteration
+    def make_failing_iter(*args, **kwargs):
+        def _gen():
+            raise RuntimeError("simulated copy failure")
+            yield  # never reached
+        return _gen()
+
+    mocker.patch(
+        "udata_hydra.data_formats.csv_like.to_db.iter_tabular_rows",
+        make_failing_iter,
+    )
+
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
+        fp.write(b"val\nnew-data")
+        fp.seek(0)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
+        await file.inspect()
+        with pytest.raises(ParseException):
+            await file.to_db(check=check)
+
+    # Old table and data must survive the rollback
+    res = await db.fetch(f'SELECT * FROM "{table_name}"')
+    assert len(res) == 1
+    assert res[0]["val"] == "original-data"
+
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
