@@ -70,7 +70,9 @@ async def csv_to_db(
         async with db.acquire() as conn:
             async with conn.transaction():
                 await conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
-                q_create = compute_create_table_query(table_name=table_name, columns=columns, indexes=table_indexes)
+                q_create = compute_create_table_query(
+                    table_name=table_name, columns=columns, indexes=table_indexes
+                )
                 await conn.execute(q_create)
 
                 step = "copy_records_to_table"

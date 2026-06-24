@@ -129,7 +129,7 @@ async def test_csv_to_db_transaction_rollback_on_create_failure(db, clean_db, fa
 
     # Simulate a previous successful import
     await db.execute(f'CREATE TABLE "{table_name}" (__id SERIAL PRIMARY KEY, val text)')
-    await db.execute(f'INSERT INTO "{table_name}" (val) VALUES (\'original-data\')')
+    await db.execute(f"INSERT INTO \"{table_name}\" (val) VALUES ('original-data')")
 
     # Make CREATE fail so the transaction rolls back the DROP
     mocker.patch(
@@ -160,13 +160,14 @@ async def test_csv_to_db_transaction_rollback_on_copy_failure(db, clean_db, fake
 
     # Simulate a previous successful import
     await db.execute(f'CREATE TABLE "{table_name}" (__id SERIAL PRIMARY KEY, val text)')
-    await db.execute(f'INSERT INTO "{table_name}" (val) VALUES (\'original-data\')')
+    await db.execute(f"INSERT INTO \"{table_name}\" (val) VALUES ('original-data')")
 
     # Make iter_tabular_rows return a generator that raises on iteration
     def make_failing_iter(*args, **kwargs):
         def _gen():
             raise RuntimeError("simulated copy failure")
             yield  # never reached
+
         return _gen()
 
     mocker.patch(
