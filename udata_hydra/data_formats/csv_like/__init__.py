@@ -21,6 +21,7 @@ from udata_hydra.utils import (
     Timer,
     handle_parse_exception,
     queue,
+    NA_VALUES,
 )
 
 if TYPE_CHECKING:
@@ -47,6 +48,7 @@ class CsvLike(DataFormat):
                 output_profile=True,
                 num_rows=-1,
                 save_results=False,
+                na_values=NA_VALUES,
             )
         else:
             self.inspection = csv_detective_routine(  # ty: ignore[invalid-assignment]
@@ -54,6 +56,7 @@ class CsvLike(DataFormat):
                 output_profile=True,
                 num_rows=-1,
                 save_results=False,
+                na_values=NA_VALUES,
             )
         return self.inspection
 

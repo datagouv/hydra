@@ -4,14 +4,14 @@ from typing import Any, Iterator
 
 from csv_detective.output.dataframe import cast
 
-from udata_hydra.utils.reader import Reader
+from udata_hydra.utils import Reader, NA_VALUES
 
 log = logging.getLogger("udata-hydra")
 
 
 def _smart_cast(_type: str, value, cast_json: bool = True, failsafe: bool = False) -> Any:
     try:
-        if value is None or value == "":
+        if value is None or value == "" or value in NA_VALUES:
             return None
         if _type == "json" and not cast_json:
             # handing JSON as string to postgres, which casts it itself
