@@ -64,46 +64,35 @@ async def csv_to_db(
     # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {db_col_name(c): helpers.get_python_type(v) for c, v in inspection["columns"].items()}
 
-    q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
-    await db.execute(q)
-
-    # Create table
-    q = compute_create_table_query(table_name=table_name, columns=columns, indexes=table_indexes)
+    step = "create_table_query"
     try:
-        await db.execute(q)
+        async with db.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+                q_create = compute_create_table_query(table_name=table_name, columns=columns, indexes=table_indexes)
+                await conn.execute(q_create)
+
+                step = "copy_records_to_table"
+                if not debug_insert:
+                    await conn.copy_records_to_table(
+                        table_name,
+                        records=iter_tabular_rows(file.path, inspection, cast_json=False),
+                        columns=list(columns.keys()),
+                    )
+                else:
+                    bar = ProgressBar(total=inspection["total_lines"])
+                    for r in bar.iter(iter_tabular_rows(file.path, inspection, cast_json=False)):
+                        data = {k: v for k, v in zip(inspection["columns"], r)}
+                        q = compute_insert_query(table_name=table_name, data=data, returning="__id")
+                        await conn.execute(q, *data.values())
     except Exception as e:
         raise ParseException(
             message=str(e),
-            step="create_table_query",
+            step=step,
             resource_id=file.resource_id,
             table_name=table_name,
         ) from e
-
-    # this use postgresql COPY from an iterator, it's fast but might be difficult to debug
-    if not debug_insert:
-        # NB: also see copy_to_table for a file source
-        try:
-            await db.copy_records_to_table(
-                table_name,
-                records=iter_tabular_rows(file.path, inspection, cast_json=False),
-                columns=list(columns.keys()),
-            )
-        except Exception as e:  # I know what I'm doing, pinky swear
-            raise ParseException(
-                message=str(e),
-                step="copy_records_to_table",
-                resource_id=file.resource_id,
-                table_name=table_name,
-            ) from e
-    # this inserts rows from iterator one by one, slow but useful for debugging
-    else:
-        bar = ProgressBar(total=inspection["total_lines"])
-        for r in bar.iter(iter_tabular_rows(file.path, inspection, cast_json=False)):
-            data = {k: v for k, v in zip(inspection["columns"], r)}
-            # NB: possible sql injection here, but should not be used in prod
-            q = compute_insert_query(table_name=table_name, data=data, returning="__id")
-            await db.execute(q, *data.values())
 
     check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
     await insert_tables_index_entry(table_name, file.inspection, check, file.dataset_id)
