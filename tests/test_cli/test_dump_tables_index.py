@@ -5,7 +5,7 @@ from pathlib import Path
 import nest_asyncio2 as nest_asyncio
 import pytest
 
-from tests.conftest import DATASET_ID, RESOURCE_ID, RESOURCE_URL
+from tests.conftest import DATASET_ID, NOT_EXISTING_RESOURCE_ID, RESOURCE_ID, RESOURCE_URL
 from udata_hydra.cli.db import _dump_tables_index
 
 pytestmark = pytest.mark.asyncio
@@ -81,64 +81,57 @@ async def test_dump_tables_index_exports_rows(clean_db, db, tmp_path):
     assert rows[0]["deleted_at"] == ""
 
 
-async def test_dump_tables_index_excludes_deleted_by_default(clean_db, db, tmp_path):
-    await _insert_tables_index_row(db, parsing_table="active", deleted=False)
-    await _insert_tables_index_row(
-        db,
-        parsing_table="deleted",
-        resource_id="5d0b2b91-b21b-4120-83ef-83f818ba2451",
-        deleted=True,
-    )
+@pytest.mark.parametrize(
+    "rows,kwargs,expected_count,expected_tables",
+    [
+        pytest.param(
+            [("active", RESOURCE_ID, False), ("deleted", NOT_EXISTING_RESOURCE_ID, True)],
+            {},
+            1,
+            {"active"},
+            id="exclude_deleted_by_default",
+        ),
+        pytest.param(
+            [("active", RESOURCE_ID, False), ("deleted", NOT_EXISTING_RESOURCE_ID, True)],
+            {"include_deleted": True},
+            2,
+            {"active", "deleted"},
+            id="include_deleted",
+        ),
+        pytest.param(
+            [("match", RESOURCE_ID, False), ("other", NOT_EXISTING_RESOURCE_ID, False)],
+            {"resource_id": RESOURCE_ID},
+            1,
+            {"match"},
+            id="filter_by_resource_id",
+        ),
+        pytest.param(
+            [
+                ("first", "11111111-1111-1111-1111-111111111111", False),
+                ("second", "22222222-2222-2222-2222-222222222222", False),
+            ],
+            {"limit": 1},
+            1,
+            None,
+            id="limit",
+        ),
+    ],
+)
+async def test_dump_tables_index_filters(
+    clean_db, db, tmp_path, rows, kwargs, expected_count, expected_tables
+):
+    for parsing_table, resource_id, deleted in rows:
+        await _insert_tables_index_row(
+            db,
+            parsing_table=parsing_table,
+            resource_id=resource_id,
+            deleted=deleted,
+        )
 
     output = tmp_path / "tables_index.csv"
-    await _dump_tables_index(output=output)
+    await _dump_tables_index(output=output, **kwargs)
 
-    rows = _read_csv(output)
-    assert len(rows) == 1
-    assert rows[0]["parsing_table"] == "active"
-
-
-async def test_dump_tables_index_include_deleted(clean_db, db, tmp_path):
-    await _insert_tables_index_row(db, parsing_table="active", deleted=False)
-    await _insert_tables_index_row(
-        db,
-        parsing_table="deleted",
-        resource_id="5d0b2b91-b21b-4120-83ef-83f818ba2451",
-        deleted=True,
-    )
-
-    output = tmp_path / "tables_index.csv"
-    await _dump_tables_index(output=output, include_deleted=True)
-
-    rows = _read_csv(output)
-    assert len(rows) == 2
-    parsing_tables = {row["parsing_table"] for row in rows}
-    assert parsing_tables == {"active", "deleted"}
-
-
-async def test_dump_tables_index_filter_by_resource_id(clean_db, db, tmp_path):
-    other_resource_id = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
-    await _insert_tables_index_row(db, parsing_table="match", resource_id=RESOURCE_ID)
-    await _insert_tables_index_row(db, parsing_table="other", resource_id=other_resource_id)
-
-    output = tmp_path / "tables_index.csv"
-    await _dump_tables_index(output=output, resource_id=RESOURCE_ID)
-
-    rows = _read_csv(output)
-    assert len(rows) == 1
-    assert rows[0]["parsing_table"] == "match"
-
-
-async def test_dump_tables_index_limit(clean_db, db, tmp_path):
-    await _insert_tables_index_row(
-        db, parsing_table="first", resource_id="11111111-1111-1111-1111-111111111111"
-    )
-    await _insert_tables_index_row(
-        db, parsing_table="second", resource_id="22222222-2222-2222-2222-222222222222"
-    )
-
-    output = tmp_path / "tables_index.csv"
-    await _dump_tables_index(output=output, limit=1)
-
-    rows = _read_csv(output)
-    assert len(rows) == 1
+    result = _read_csv(output)
+    assert len(result) == expected_count
+    if expected_tables is not None:
+        assert {row["parsing_table"] for row in result} == expected_tables
