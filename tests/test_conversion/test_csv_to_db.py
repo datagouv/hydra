@@ -142,8 +142,10 @@ async def test_csv_to_db_transaction_rollback_on_create_failure(db, clean_db, fa
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
         await file.inspect()
-        with pytest.raises(ParseException):
+        with pytest.raises(ParseException) as exc:
             await file.to_db(check=check)
+
+        assert exc.value.step == "create_table_query"
 
     # Old table and data must survive the rollback
     res = await db.fetch(f'SELECT * FROM "{table_name}"')
@@ -180,8 +182,10 @@ async def test_csv_to_db_transaction_rollback_on_copy_failure(db, clean_db, fake
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
         await file.inspect()
-        with pytest.raises(ParseException):
+        with pytest.raises(ParseException) as exc:
             await file.to_db(check=check)
+
+        assert exc.value.step == "copy_records_to_table"
 
     # Old table and data must survive the rollback
     res = await db.fetch(f'SELECT * FROM "{table_name}"')

@@ -65,11 +65,12 @@ async def csv_to_db(
     columns = {db_col_name(c): helpers.get_python_type(v) for c, v in inspection["columns"].items()}
 
     db = await context.pool("csv")
-    step = "create_table_query"
+    step = "drop_table"
     try:
         async with db.acquire() as conn:
             async with conn.transaction():
                 await conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+                step = "create_table_query"
                 q_create = compute_create_table_query(
                     table_name=table_name, columns=columns, indexes=table_indexes
                 )
