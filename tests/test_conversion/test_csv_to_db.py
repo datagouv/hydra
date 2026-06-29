@@ -1,12 +1,16 @@
+import hashlib
 import json
 import os
 from datetime import date, datetime, timedelta, timezone
 from tempfile import NamedTemporaryFile
 
 import pytest
+from slugify import slugify
 
 from tests.conftest import RESOURCE_ID
+from udata_hydra import config
 from udata_hydra.data_formats import Csv
+from udata_hydra.utils import ParseException, storage_path
 
 pytestmark = pytest.mark.asyncio
 
@@ -27,7 +31,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db, fake_c
     check = await fake_check()
     line, expected, separator = line_expected
     header = separator.join(["int", "float", "string", "bool"])
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
         fp.write(f"{header}\n{line}".encode("utf-8"))
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
@@ -69,7 +73,7 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db, fake_c
 async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db, fake_check):
     check = await fake_check()
     line, expected = line_expected
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
         fp.write(f"json;date;datetime;aware_datetime\n{line}".encode("utf-8"))
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
@@ -86,7 +90,7 @@ async def test_basic_sql_injection(db, clean_db, fake_check):
     # tries to execute
     # CREATE TABLE table_name("int" integer, "col_name" text);DROP TABLE toto;--)
     injection = 'col_name" text);DROP TABLE toto;--'
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
         # we enough columns so that the ";" is not considered as separator by csv-detective
         fp.write(f"int,{injection},col1,col2\n1,test,2,3".encode("utf-8"))
         fp.seek(0)
@@ -99,7 +103,7 @@ async def test_basic_sql_injection(db, clean_db, fake_check):
 
 async def test_percentage_column(db, clean_db, fake_check):
     check = await fake_check()
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
         fp.write("int,% mon pourcent\n1,test".encode("utf-8"))
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
@@ -111,7 +115,7 @@ async def test_percentage_column(db, clean_db, fake_check):
 
 async def test_reserved_column_name(db, clean_db, fake_check):
     check = await fake_check()
-    with NamedTemporaryFile() as fp:
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
         fp.write("int,xmin\n1,test".encode("utf-8"))
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
@@ -119,3 +123,112 @@ async def test_reserved_column_name(db, clean_db, fake_check):
         table = await file.to_db(check=check)
     res = await db.fetchrow(f'SELECT * FROM "{table.table_name}"')
     assert res["xmin__hydra_renamed"] == "test"
+
+
+async def test_csv_to_db_indexes_renamed(db, clean_db, fake_check):
+    """Indexes created with shadow table names are renamed to the real table name."""
+    check = await fake_check()
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
+        fp.write(b"name,score,category\nAlice,100,Science\nBob,90,Arts\n")
+        fp.seek(0)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
+        await file.inspect()
+        table_indexes = {"name": "index", "category": "index"}
+        table = await file.to_db(check=check, table_indexes=table_indexes)
+
+    assert table.table_name == table_name
+
+    rows = await db.fetch(
+        "SELECT indexname FROM pg_indexes WHERE tablename = $1 AND schemaname = $2",
+        table_name,
+        config.DATABASE_SCHEMA,
+    )
+    index_names = [r["indexname"] for r in rows]
+
+    assert not any(name.startswith(f"{table_name}_s") for name in index_names), (
+        f"Index names still contain shadow suffix: {index_names}"
+    )
+
+    for col in ("name", "category"):
+        expected = f"{table_name}_{slugify(col)}_idx"
+        assert expected in index_names, f"Expected index {expected} not found in {index_names}"
+
+    res = list(await db.fetch(f'SELECT * FROM "{table_name}" ORDER BY name'))
+    assert len(res) == 2
+    assert res[0]["name"] == "Alice"
+    assert res[1]["name"] == "Bob"
+
+
+async def test_csv_to_db_transaction_rollback_on_create_failure(db, clean_db, fake_check, mocker):
+    """When CREATE TABLE fails on the shadow table, the real table is untouched."""
+    check = await fake_check()
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+
+    # Simulate a previous successful import
+    await db.execute(f'CREATE TABLE "{table_name}" (__id SERIAL PRIMARY KEY, val text)')
+    await db.execute(f"INSERT INTO \"{table_name}\" (val) VALUES ('original-data')")
+
+    # Make CREATE fail so the real table is never touched
+    mocker.patch(
+        "udata_hydra.data_formats.csv_like.to_db.compute_create_table_query",
+        return_value="NOT A VALID SQL STATEMENT",
+    )
+
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
+        fp.write(b"val\nnew-data")
+        fp.seek(0)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
+        await file.inspect()
+        with pytest.raises(ParseException) as exc:
+            await file.to_db(check=check)
+
+        assert exc.value.step == "create_table_query"
+
+    # Old table and data must survive
+    res = await db.fetch(f'SELECT * FROM "{table_name}"')
+    assert len(res) == 1
+    assert res[0]["val"] == "original-data"
+
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+
+
+async def test_csv_to_db_transaction_rollback_on_copy_failure(db, clean_db, fake_check, mocker):
+    """When copy_records_to_table fails, the shadow table is dropped and the real table is untouched."""
+    check = await fake_check()
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+
+    # Simulate a previous successful import
+    await db.execute(f'CREATE TABLE "{table_name}" (__id SERIAL PRIMARY KEY, val text)')
+    await db.execute(f"INSERT INTO \"{table_name}\" (val) VALUES ('original-data')")
+
+    # Make iter_tabular_rows return a generator that raises on iteration
+    def make_failing_iter(*args, **kwargs):
+        def _gen():
+            raise RuntimeError("simulated copy failure")
+            yield  # never reached
+
+        return _gen()
+
+    mocker.patch(
+        "udata_hydra.data_formats.csv_like.to_db.iter_tabular_rows",
+        make_failing_iter,
+    )
+
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
+        fp.write(b"val\nnew-data")
+        fp.seek(0)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
+        await file.inspect()
+        with pytest.raises(ParseException) as exc:
+            await file.to_db(check=check)
+
+        assert exc.value.step == "copy_records_to_table"
+
+    # Old table and data must survive
+    res = await db.fetch(f'SELECT * FROM "{table_name}"')
+    assert len(res) == 1
+    assert res[0]["val"] == "original-data"
+
+    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
