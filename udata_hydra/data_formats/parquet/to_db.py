@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import uuid
 from typing import TYPE_CHECKING, Iterator
 
 import numpy as np
@@ -85,33 +86,59 @@ async def parquet_to_db(
         db_col_name(c): helpers.get_python_type(v) for c, v in file.inspection["columns"].items()
     }
 
+    shadow_table_name = f"{table_name}_s{uuid.uuid4().hex[:4]}"
     db = await context.pool("csv")
-    step = "create_table_query"
+
+    step = None
     try:
+        step = "create_table_query"
         async with db.acquire() as conn:
             async with conn.transaction():
-                await conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
                 q_create = compute_create_table_query(
-                    table_name=table_name, columns=columns, indexes=table_indexes
+                    table_name=shadow_table_name, columns=columns, indexes=table_indexes
                 )
                 await conn.execute(q_create)
 
-                step = "copy_records_to_table"
-                if not debug_insert:
-                    await conn.copy_records_to_table(
-                        table_name,
-                        records=_iter_parquet_rows(pq.ParquetFile(file.path)),
-                        columns=list(columns.keys()),
+        step = "copy_records_to_table"
+        async with db.acquire() as conn:
+            if not debug_insert:
+                await conn.copy_records_to_table(
+                    shadow_table_name,
+                    records=_iter_parquet_rows(pq.ParquetFile(file.path)),
+                    columns=list(columns.keys()),
+                )
+            else:
+                bar = ProgressBar(total=file.inspection["total_lines"])
+                pqf = pq.ParquetFile(file.path)
+                for r in bar.iter(_iter_parquet_rows(pqf)):
+                    data = {k: v for k, v in zip(pqf.schema.names, r)}
+                    q = compute_insert_query(
+                        table_name=shadow_table_name, data=data, returning="__id"
                     )
-                else:
-                    bar = ProgressBar(total=file.inspection["total_lines"])
-                    pqf = pq.ParquetFile(file.path)
-                    for r in bar.iter(_iter_parquet_rows(pqf)):
-                        data = {k: v for k, v in zip(pqf.schema.names, r)}
-                        print(data)
-                        q = compute_insert_query(table_name=table_name, data=data, returning="__id")
-                        await conn.execute(q, *data.values())
+                    await conn.execute(q, *data.values())
+
+        step = "swap_tables"
+        async with db.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+                await conn.execute(f'ALTER TABLE "{shadow_table_name}" RENAME TO "{table_name}"')
+                rows = await conn.fetch(
+                    "SELECT indexname FROM pg_indexes WHERE tablename = $1 AND schemaname = $2",
+                    table_name,
+                    config.DATABASE_SCHEMA,
+                )
+                for row in rows:
+                    if row["indexname"].startswith(shadow_table_name):
+                        new_name = f"{table_name}{row['indexname'][len(shadow_table_name) :]}"
+                        if new_name != row["indexname"]:
+                            q = f'"{config.DATABASE_SCHEMA}"."{row["indexname"]}"'
+                            await conn.execute(f'ALTER INDEX IF EXISTS {q} RENAME TO "{new_name}"')
     except Exception as e:
+        try:
+            async with db.acquire() as conn:
+                await conn.execute(f'DROP TABLE IF EXISTS "{shadow_table_name}"')
+        except Exception:
+            log.warning("Failed to clean up shadow table %s", shadow_table_name)
         raise ParseException(
             message=str(e),
             step=step,

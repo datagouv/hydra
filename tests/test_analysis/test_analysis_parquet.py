@@ -9,7 +9,9 @@ from unittest.mock import patch
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
+from slugify import slugify
 
+from udata_hydra import config
 from udata_hydra.analysis import helpers
 from udata_hydra.data_formats import Parquet
 from udata_hydra.utils import ParseException, storage_path
@@ -212,3 +214,48 @@ async def test_parquet_to_db_create_table_failure_raises_parse_exception(
     assert res[0]["val"] == "original-data"
 
     await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+
+
+async def test_parquet_to_db_indexes_renamed(db, clean_db, fake_check):
+    """Indexes created with shadow table names are renamed to the real table name."""
+    check = await fake_check()
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+
+    df = pd.DataFrame(
+        {"name": ["Alice", "Bob"], "score": [100, 90], "category": ["Science", "Arts"]}
+    )
+    inspection = {
+        "columns": {
+            "name": {"python_type": "string", "format": set()},
+            "score": {"python_type": "int", "format": set()},
+            "category": {"python_type": "string", "format": set()},
+        },
+        "total_lines": 2,
+    }
+    table_indexes = {"name": "index", "category": "index"}
+    with NamedTemporaryFile(suffix=".parquet", dir=storage_path("")) as fp:
+        df.to_parquet(fp.name)
+        file = Parquet(file_name=os.path.basename(fp.name), inspection=inspection)
+        table = await file.to_db(check=check, table_indexes=table_indexes)
+
+    assert table.table_name == table_name
+
+    rows = await db.fetch(
+        "SELECT indexname FROM pg_indexes WHERE tablename = $1 AND schemaname = $2",
+        table_name,
+        config.DATABASE_SCHEMA,
+    )
+    index_names = [r["indexname"] for r in rows]
+
+    assert not any(name.startswith(f"{table_name}_s") for name in index_names), (
+        f"Index names still contain shadow suffix: {index_names}"
+    )
+
+    for col in ("name", "category"):
+        expected = f"{table_name}_{slugify(col)}_idx"
+        assert expected in index_names, f"Expected index {expected} not found in {index_names}"
+
+    res = list(await db.fetch(f'SELECT * FROM "{table_name}" ORDER BY name'))
+    assert len(res) == 2
+    assert res[0]["name"] == "Alice"
+    assert res[1]["name"] == "Bob"

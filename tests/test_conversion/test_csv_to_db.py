@@ -5,8 +5,10 @@ from datetime import date, datetime, timedelta, timezone
 from tempfile import NamedTemporaryFile
 
 import pytest
+from slugify import slugify
 
 from tests.conftest import RESOURCE_ID
+from udata_hydra import config
 from udata_hydra.data_formats import Csv
 from udata_hydra.utils import ParseException, storage_path
 
@@ -123,7 +125,44 @@ async def test_reserved_column_name(db, clean_db, fake_check):
     assert res["xmin__hydra_renamed"] == "test"
 
 
+async def test_csv_to_db_indexes_renamed(db, clean_db, fake_check):
+    """Indexes created with shadow table names are renamed to the real table name."""
+    check = await fake_check()
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+
+    with NamedTemporaryFile(dir=storage_path("")) as fp:
+        fp.write(b"name,score,category\nAlice,100,Science\nBob,90,Arts\n")
+        fp.seek(0)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
+        await file.inspect()
+        table_indexes = {"name": "index", "category": "index"}
+        table = await file.to_db(check=check, table_indexes=table_indexes)
+
+    assert table.table_name == table_name
+
+    rows = await db.fetch(
+        "SELECT indexname FROM pg_indexes WHERE tablename = $1 AND schemaname = $2",
+        table_name,
+        config.DATABASE_SCHEMA,
+    )
+    index_names = [r["indexname"] for r in rows]
+
+    assert not any(name.startswith(f"{table_name}_s") for name in index_names), (
+        f"Index names still contain shadow suffix: {index_names}"
+    )
+
+    for col in ("name", "category"):
+        expected = f"{table_name}_{slugify(col)}_idx"
+        assert expected in index_names, f"Expected index {expected} not found in {index_names}"
+
+    res = list(await db.fetch(f'SELECT * FROM "{table_name}" ORDER BY name'))
+    assert len(res) == 2
+    assert res[0]["name"] == "Alice"
+    assert res[1]["name"] == "Bob"
+
+
 async def test_csv_to_db_transaction_rollback_on_create_failure(db, clean_db, fake_check, mocker):
+    """When CREATE TABLE fails on the shadow table, the real table is untouched."""
     check = await fake_check()
     table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
 
@@ -131,7 +170,7 @@ async def test_csv_to_db_transaction_rollback_on_create_failure(db, clean_db, fa
     await db.execute(f'CREATE TABLE "{table_name}" (__id SERIAL PRIMARY KEY, val text)')
     await db.execute(f"INSERT INTO \"{table_name}\" (val) VALUES ('original-data')")
 
-    # Make CREATE fail so the transaction rolls back the DROP
+    # Make CREATE fail so the real table is never touched
     mocker.patch(
         "udata_hydra.data_formats.csv_like.to_db.compute_create_table_query",
         return_value="NOT A VALID SQL STATEMENT",
@@ -147,7 +186,7 @@ async def test_csv_to_db_transaction_rollback_on_create_failure(db, clean_db, fa
 
         assert exc.value.step == "create_table_query"
 
-    # Old table and data must survive the rollback
+    # Old table and data must survive
     res = await db.fetch(f'SELECT * FROM "{table_name}"')
     assert len(res) == 1
     assert res[0]["val"] == "original-data"
@@ -156,7 +195,7 @@ async def test_csv_to_db_transaction_rollback_on_create_failure(db, clean_db, fa
 
 
 async def test_csv_to_db_transaction_rollback_on_copy_failure(db, clean_db, fake_check, mocker):
-    """When copy_records_to_table fails, the whole transaction rolls back."""
+    """When copy_records_to_table fails, the shadow table is dropped and the real table is untouched."""
     check = await fake_check()
     table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
 
@@ -187,7 +226,7 @@ async def test_csv_to_db_transaction_rollback_on_copy_failure(db, clean_db, fake
 
         assert exc.value.step == "copy_records_to_table"
 
-    # Old table and data must survive the rollback
+    # Old table and data must survive
     res = await db.fetch(f'SELECT * FROM "{table_name}"')
     assert len(res) == 1
     assert res[0]["val"] == "original-data"
