@@ -757,3 +757,51 @@ async def test_file_with_nan(
     # inf does for max, mean and std
     assert all(profile["c"][method] is None for method in ["max", "mean", "std"])
     assert profile["c"]["min"] is not None
+
+
+CODE_COMMUNE_CSV_CONTENT = (
+    "code_commune,number\n75056,1\n13055,2\n69123,3\n75056,4\n"
+).encode("utf-8")
+
+
+async def test_analyse_csv_extracts_code_commune_values(
+    setup_catalog, rmock, db, fake_check, udata_url
+):
+    check = await fake_check(headers={"content-type": "text/csv"})
+    url = check["url"]
+    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    rmock.get(url, status=200, body=CODE_COMMUNE_CSV_CONTENT)
+    rmock.put(udata_url, status=200)
+
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
+
+    res = await db.fetchrow("SELECT * FROM checks")
+    assert res["parsing_table"] == table_name
+    values = res["code_commune_values"]
+    if isinstance(values, str):
+        values = json.loads(values)
+    assert values == {"code_commune": ["13055", "69123", "75056"]}
+
+    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    assert webhook.get("analysis:parsing:code_commune_values") == {
+        "code_commune": ["13055", "69123", "75056"]
+    }
+
+
+async def test_analyse_csv_no_code_commune_column_skips_extraction(
+    setup_catalog, rmock, catalog_content, db, fake_check, udata_url
+):
+    check = await fake_check(headers={"content-type": "text/csv"})
+    url = check["url"]
+    rmock.get(url, status=200, body=catalog_content)
+    rmock.put(udata_url, status=200)
+
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
+
+    res = await db.fetchrow("SELECT * FROM checks")
+    assert res["code_commune_values"] is None
+
+    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    assert webhook.get("analysis:parsing:code_commune_values") is None

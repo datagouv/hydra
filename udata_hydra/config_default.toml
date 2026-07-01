@@ -75,6 +75,10 @@ CSV_ANALYSIS = true
 CSV_TO_DB = true
 TEMPORARY_DOWNLOAD_FOLDER = ""
 
+# -- Code commune (INSEE) distinct values extraction settings -- #
+CODE_COMMUNE_ANALYSIS_ENABLED = true
+MAX_CODE_COMMUNE_VALUES = 40000  # there are ~35 000 communes in France; cap slightly above that
+
 # -- Worker settings -- #
 RQ_DEFAULT_TIMEOUT = 180
 RQ_DEFAULT_FAILURE_TTL = 864000  # How long failed jobs are kept in redis: 10 days.

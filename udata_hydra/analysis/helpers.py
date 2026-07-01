@@ -102,5 +102,10 @@ async def notify_udata(resource: Record | None, check: Record | dict | None) -> 
         if isinstance(ogc_metadata, str):
             ogc_metadata = json.loads(ogc_metadata)
         payload["document"]["analysis:parsing:ogc_metadata"] = ogc_metadata
+    if config.CODE_COMMUNE_ANALYSIS_ENABLED and check.get("code_commune_values"):
+        code_commune_values = check.get("code_commune_values")
+        if isinstance(code_commune_values, str):
+            code_commune_values = json.loads(code_commune_values)
+        payload["document"]["analysis:parsing:code_commune_values"] = code_commune_values
     payload["document"] = UdataPayload(payload["document"])
     queue.enqueue(send, _priority="high", **payload)

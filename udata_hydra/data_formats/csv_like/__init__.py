@@ -116,6 +116,25 @@ class CsvLike(DataFormat):
                 },
             )
 
+            if config.CSV_TO_DB and table is not None:
+                try:
+                    from udata_hydra.data_formats.csv_like.code_commune import (
+                        extract_code_commune_values,
+                    )
+
+                    code_commune_values = await extract_code_commune_values(table)
+                    if code_commune_values:
+                        check = await Check.update(  # type: ignore[assignment]
+                            check_id=check["id"],
+                            data={"code_commune_values": code_commune_values},
+                        )
+                except Exception as e:
+                    # Supplementary metadata only — never fail the whole analysis for this.
+                    log.warning(
+                        f"Failed to extract code_commune distinct values for "
+                        f"{table.table_name if table else '?'}: {e}"
+                    )
+
             if config.CSV_TO_DB:
                 if (
                     config.DB_TO_PARQUET
