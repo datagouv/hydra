@@ -77,7 +77,7 @@ TEMPORARY_DOWNLOAD_FOLDER = ""
 
 # -- Code commune (INSEE) distinct values extraction settings -- #
 CODE_COMMUNE_ANALYSIS_ENABLED = true
-MAX_CODE_COMMUNE_VALUES = 40000  # there are ~35 000 communes in France; cap slightly above that
+MAX_CODE_COMMUNE_VALUES = 40000
 
 # -- Worker settings -- #
 RQ_DEFAULT_TIMEOUT = 180
