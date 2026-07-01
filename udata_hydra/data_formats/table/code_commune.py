@@ -25,6 +25,8 @@ async def extract_code_commune_values(table: Table) -> dict[str, list[str]] | No
     if not columns:
         return None
 
+    log.debug(f"Detected code_commune column(s) {list(columns)} for table {table.table_name}")
+
     db = await context.pool("csv")
     result: dict[str, list[str]] = {}
     cap = config.MAX_CODE_COMMUNE_VALUES
@@ -46,5 +48,9 @@ async def extract_code_commune_values(table: Table) -> dict[str, list[str]] | No
             continue
         if values:
             result[original_col] = sorted(str(v) for v in values)
+            log.debug(
+                f"Extracted {len(values)} distinct code_commune value(s) for column "
+                f"'{original_col}' on table {table.table_name}"
+            )
 
     return result or None
