@@ -116,7 +116,7 @@ class CsvLike(DataFormat):
                 },
             )
 
-            if config.CSV_TO_DB and table is not None:
+            if config.CSV_TO_DB and config.CODE_COMMUNE_ANALYSIS_ENABLED and table is not None:
                 try:
                     code_commune_values = await table.get_code_commune_values()
                     if code_commune_values:
