@@ -47,6 +47,7 @@ class UdataPayload:
             "geojson_size",
             "geojson_url",
             "ogc_metadata",
+            "code_commune_values",
         ],
     }
 
