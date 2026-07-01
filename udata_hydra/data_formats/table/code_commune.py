@@ -1,7 +1,7 @@
 import logging
 
 from udata_hydra import config, context
-from udata_hydra.data_formats.table import Table
+from udata_hydra.data_formats import Table
 from udata_hydra.db import db_col_name
 
 log = logging.getLogger("udata-hydra")
@@ -18,12 +18,9 @@ def _detect_code_commune_columns(inspection: dict) -> dict[str, str]:
 
 
 async def extract_code_commune_values(table: Table) -> dict[str, list[str]] | None:
-    """Query the just-populated parsing table for distinct values of every
-    code_commune column. Returns None if there are no such columns, or if
-    none of them yielded a usable (within-cap) result."""
-    if not config.CODE_COMMUNE_ANALYSIS_ENABLED:
-        return None
-
+    """Query the parsing table for distinct values of every code_commune column.
+    Returns None if there are no such columns, or if none of them yielded a
+    usable (within-cap) result."""
     columns = _detect_code_commune_columns(table.inspection)
     if not columns:
         return None

@@ -118,11 +118,7 @@ class CsvLike(DataFormat):
 
             if config.CSV_TO_DB and table is not None:
                 try:
-                    from udata_hydra.data_formats.csv_like.code_commune import (
-                        extract_code_commune_values,
-                    )
-
-                    code_commune_values = await extract_code_commune_values(table)
+                    code_commune_values = await table.get_code_commune_values()
                     if code_commune_values:
                         check = await Check.update(  # type: ignore[assignment]
                             check_id=check["id"],
