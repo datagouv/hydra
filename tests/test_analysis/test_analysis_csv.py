@@ -759,9 +759,9 @@ async def test_file_with_nan(
     assert profile["c"]["min"] is not None
 
 
-CODE_COMMUNE_CSV_CONTENT = (
-    "code_commune,number\n75056,1\n13055,2\n69123,3\n75056,4\n"
-).encode("utf-8")
+CODE_COMMUNE_CSV_CONTENT = ("code_commune,number\n75056,1\n13055,2\n69123,3\n75056,4\n").encode(
+    "utf-8"
+)
 
 
 async def test_analyse_csv_extracts_code_commune_values(
