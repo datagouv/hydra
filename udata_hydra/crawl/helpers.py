@@ -50,6 +50,13 @@ def has_nice_head(resp) -> bool:
         return False
     if not any([k in resp.headers for k in ("content-length", "last-modified")]):
         return False
+    content_type = resp.headers.get("content-type", "").lower()
+    if content_type.startswith("text/html"):
+        try:
+            if int(resp.headers.get("content-length", 0)) < 4096:
+                return False
+        except (TypeError, ValueError):
+            return False
     return True
 
 
