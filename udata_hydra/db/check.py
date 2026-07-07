@@ -3,7 +3,7 @@ from datetime import date
 from asyncpg import Record
 
 from udata_hydra import context
-from udata_hydra.db import compute_insert_query, update_table_record
+from udata_hydra.utils.db import compute_insert_query, update_table_record
 
 
 class Check:

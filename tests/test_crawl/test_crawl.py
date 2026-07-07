@@ -235,18 +235,29 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
     [
         pytest.param(501, None, id="invalid_status"),
         pytest.param(200, {}, id="missing_size_headers"),
+        pytest.param(
+            200,
+            {"content-type": "text/html", "content-length": "247"},
+            id="waf_html_headers",
+        ),
     ],
 )
-async def test_switch_head_to_get(setup_catalog, rmock, produce_mock, head_status, head_headers):
+async def test_switch_head_to_get(
+    setup_catalog, rmock, produce_mock, analysis_mock, db, head_status, head_headers
+):
     rurl = RESOURCE_URL
     head_kwargs = {"status": head_status}
     if head_headers is not None:
         head_kwargs["headers"] = head_headers
     rmock.head(rurl, **head_kwargs)
-    rmock.get(rurl, status=200)
+    rmock.get(rurl, status=200, headers={"content-length": "10"})
     await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
     assert ("GET", URL(rurl)) in rmock.requests
+
+    res = await db.fetchrow("SELECT * FROM checks WHERE url = $1", rurl)
+    assert res["status"] == 200
+    assert not res["error"]
 
 
 async def test_no_switch_head_to_get(setup_catalog, rmock, produce_mock, analysis_mock):

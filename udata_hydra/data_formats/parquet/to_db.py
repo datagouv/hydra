@@ -13,10 +13,10 @@ from udata_hydra.analysis import helpers
 from udata_hydra.analysis.tables_index import insert_tables_index_entry
 from udata_hydra.conversion.schema import compute_create_table_query
 from udata_hydra.data_formats import Parquet
-from udata_hydra.db import compute_insert_query, db_col_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import ParseException
+from udata_hydra.utils.db import compute_insert_query, db_col_name
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats.table import Table

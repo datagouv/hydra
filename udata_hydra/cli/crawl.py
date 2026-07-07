@@ -75,7 +75,7 @@ def download_resource_cli(resource_id: str, output_dir: str | None = None):
 
 async def _check_resource(
     resource_id: str,
-    method: str = "get",
+    method: str = "head",
     force_analysis: bool = True,
 ):
     """Trigger a complete check for a given resource_id"""
@@ -97,7 +97,7 @@ async def _check_resource(
 @cli.command()
 def check_resource(
     resource_id: str = typer.Argument(..., help="Resource ID to check"),
-    method: str = typer.Option("get", help="HTTP method to use"),
+    method: str = typer.Option("head", help="HTTP method to use"),
     force_analysis: bool = typer.Option(
         True, help="Force analysis even if resource hasn't changed"
     ),
