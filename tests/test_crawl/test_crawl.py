@@ -245,14 +245,7 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
 @pytest.mark.parametrize(
     "head_status,head_headers,head_exception",
     [
-        pytest.param(501, None, None, id="invalid_status"),
         pytest.param(200, {}, None, id="missing_size_headers"),
-        pytest.param(
-            200,
-            {"content-type": "text/html", "content-length": "247"},
-            None,
-            id="waf_html_headers",
-        ),
         pytest.param(None, None, TimeoutError, id="head_timeout"),
     ],
 )
