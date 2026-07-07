@@ -2,7 +2,6 @@ import hashlib
 import json
 import logging
 
-import asyncpg
 import pytest
 from asyncpg import Record
 
@@ -10,40 +9,12 @@ from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_EXCEPTION_TABLE_INDEX
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv
 from udata_hydra.db.resource import Resource
+from udata_hydra.utils.db import get_columns_with_indexes
 
 pytestmark = pytest.mark.asyncio
 
 
 log = logging.getLogger("udata-hydra")
-
-
-async def _get_columns_with_indexes(
-    connection: asyncpg.Connection, table_name: str
-) -> list[Record]:
-    return await connection.fetch(
-        """
-            SELECT
-                table_class.relname AS table_name,
-                index_class.relname AS index_name,
-                attribute.attname AS column_name
-            FROM
-                pg_class table_class,
-                pg_class index_class,
-                pg_index index_relation,
-                pg_attribute attribute
-            WHERE
-                table_class.oid = index_relation.indrelid
-                AND index_class.oid = index_relation.indexrelid
-                AND attribute.attrelid = table_class.oid
-                AND attribute.attnum = ANY(index_relation.indkey)
-                AND table_class.relkind = 'r'
-                AND table_class.relname = $1
-            ORDER BY
-                table_class.relname,
-                index_class.relname;
-        """,
-        table_name,
-    )
 
 
 async def test_exception_analysis(
@@ -85,7 +56,7 @@ async def test_exception_analysis(
     # Check if indexes have been created for the table
     expected_columns_with_indexes = list(RESOURCE_EXCEPTION_TABLE_INDEXES.keys())
     expected_columns_with_indexes.append("__id")
-    indexes: list[Record] = await _get_columns_with_indexes(db, table_name)
+    indexes: list[Record] | None = await get_columns_with_indexes(table_name)
     assert indexes
     for idx in indexes:
         assert idx["table_name"] == table_name
