@@ -2,42 +2,36 @@ from asyncpg import Record
 
 from udata_hydra import context
 
-# PostgreSQL system columns and hydra's own __id that must be renamed when
-# a user CSV happens to use them as headers.  Shared across csv, parquet and
-# geojson modules.
-RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
 
-
-def db_col_name(col: str) -> str:
-    """Map a CSV column name to its actual PostgreSQL column name."""
-    return f"{col}__hydra_renamed" if col.lower() in RESERVED_COLS else col
-
-
-def compute_insert_query(table_name: str, data: dict, returning: str = "id") -> str:
-    columns = ",".join([f'"{k}"' for k in data.keys()])
-    # $1, $2...
-    placeholders = ",".join([f"${x + 1}" for x in range(len(data.values()))])
-    return f"""
-        INSERT INTO "{table_name}" ({columns})
-        VALUES ({placeholders})
-        RETURNING {returning};
+async def get_columns_with_indexes(table_name: str) -> list[Record]:
     """
-
-
-def compute_update_query(table_name: str, data: dict, returning: str = "*") -> str:
-    columns = data.keys()
-    # $1, $2...
-    placeholders = [f"${x + 1}" for x in range(len(data.values()))]
-    set_clause = ",".join([f"{c} = {v}" for c, v in zip(columns, placeholders)])
-    return f"""
-        UPDATE "{table_name}"
-        SET {set_clause}
-        WHERE id = ${len(placeholders) + 1}
-        RETURNING {returning};
+    Get the columns of a table which have indexes
+    Return a list of records with the following columns:
+        - table_name
+        - index_name
+        - column_name
     """
-
-
-async def update_table_record(table_name: str, record_id: int, data: dict) -> Record | None:
-    q = compute_update_query(table_name, data)
     pool = await context.pool()
-    return await pool.fetchrow(q, *data.values(), record_id)
+    async with pool.acquire() as connection:
+        q = """
+            SELECT
+                table_class.relname AS table_name,
+                index_class.relname AS index_name,
+                attribute.attname AS column_name
+            FROM
+                pg_class table_class,
+                pg_class index_class,
+                pg_index index_relation,
+                pg_attribute attribute
+            WHERE
+                table_class.oid = index_relation.indrelid
+                AND index_class.oid = index_relation.indexrelid
+                AND attribute.attrelid = table_class.oid
+                AND attribute.attnum = ANY(index_relation.indkey)
+                AND table_class.relkind = 'r'
+                AND table_class.relname = $1
+            ORDER BY
+                table_class.relname,
+                index_class.relname;
+        """
+        return await connection.fetch(q, table_name)
