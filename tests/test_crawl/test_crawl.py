@@ -44,7 +44,7 @@ async def mock_download_resource(url, headers, max_size_allowed):
         (None, False, ClientError("client error")),
         (None, False, AssertionError),
         (None, False, UnicodeError),
-        (None, True, TimeoutError),
+        (200, False, TimeoutError),
         (
             429,
             False,
@@ -60,14 +60,18 @@ async def mock_download_resource(url, headers, max_size_allowed):
 async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_url):
     status, timeout, exception = resource
     rurl = RESOURCE_URL
-    params = {
-        "status": status,
-        "headers": {"Content-LENGTH": "10", "X-Do": "you"},
-        "exception": exception,
-    }
-    rmock.head(rurl, **params)
-    # mock for head fallback
-    rmock.get(rurl, **params)
+    ok_headers = {"Content-LENGTH": "10", "X-Do": "you"}
+    if exception is TimeoutError:
+        rmock.head(rurl, exception=TimeoutError)
+        rmock.get(rurl, status=200, headers=ok_headers)
+    else:
+        params = {
+            "status": status,
+            "headers": ok_headers,
+            "exception": exception,
+        }
+        rmock.head(rurl, **params)
+        rmock.get(rurl, **params)
     rmock.options(
         rurl,
         status=204,
@@ -95,6 +99,8 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
     assert res["timeout"] == timeout
     if isinstance(exception, ClientError):
         assert res["error"] == "client error"
+    elif exception is TimeoutError:
+        assert not res["error"]
     elif status == 500:
         assert res["error"] == "Internal Server Error"
     else:
@@ -105,7 +111,11 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
     webhook = next(p for p in payloads if "check:id" in p)
     assert webhook.get("check:date")
     datetime.fromisoformat(webhook["check:date"])
-    if exception or status == 500:
+    if exception is TimeoutError:
+        assert webhook.get("check:available")
+        assert webhook.get("check:headers:content-type") == "application/json"
+        assert webhook.get("check:headers:content-length") == 10
+    elif exception or status == 500:
         if status == 429:
             # In the case of a 429 status code, the error is on the crawler side and we can't give an availability status.
             # We expect check:available to be None.
@@ -122,7 +132,9 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
         assert webhook.get("check:timeout") is False
 
     # CORS headers
-    expect_cors = status and status < 400 and not timeout and not exception
+    expect_cors = (
+        status and status < 400 and not timeout and (not exception or exception is TimeoutError)
+    )
     if expect_cors:
         assert webhook.get("check:cors:status") == 204
         assert webhook.get("check:cors:allow-origin") == "*"
@@ -231,25 +243,37 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
 
 
 @pytest.mark.parametrize(
-    "head_status,head_headers",
+    "head_status,head_headers,head_exception",
     [
-        pytest.param(501, None, id="invalid_status"),
-        pytest.param(200, {}, id="missing_size_headers"),
+        pytest.param(501, None, None, id="invalid_status"),
+        pytest.param(200, {}, None, id="missing_size_headers"),
         pytest.param(
             200,
             {"content-type": "text/html", "content-length": "247"},
+            None,
             id="waf_html_headers",
         ),
+        pytest.param(None, None, TimeoutError, id="head_timeout"),
     ],
 )
 async def test_switch_head_to_get(
-    setup_catalog, rmock, produce_mock, analysis_mock, db, head_status, head_headers
+    setup_catalog,
+    rmock,
+    produce_mock,
+    analysis_mock,
+    db,
+    head_status,
+    head_headers,
+    head_exception,
 ):
     rurl = RESOURCE_URL
-    head_kwargs = {"status": head_status}
-    if head_headers is not None:
-        head_kwargs["headers"] = head_headers
-    rmock.head(rurl, **head_kwargs)
+    if head_exception:
+        rmock.head(rurl, exception=head_exception)
+    else:
+        head_kwargs = {"status": head_status}
+        if head_headers is not None:
+            head_kwargs["headers"] = head_headers
+        rmock.head(rurl, **head_kwargs)
     rmock.get(rurl, status=200, headers={"content-length": "10"})
     await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
@@ -258,6 +282,19 @@ async def test_switch_head_to_get(
     res = await db.fetchrow("SELECT * FROM checks WHERE url = $1", rurl)
     assert res["status"] == 200
     assert not res["error"]
+
+
+async def test_head_timeout_get_also_fails(setup_catalog, rmock, db, produce_mock):
+    rurl = RESOURCE_URL
+    rmock.head(rurl, exception=TimeoutError)
+    rmock.get(rurl, exception=TimeoutError)
+    await start_checks(iterations=1)
+    assert ("HEAD", URL(rurl)) in rmock.requests
+    assert ("GET", URL(rurl)) in rmock.requests
+
+    res = await db.fetchrow("SELECT * FROM checks WHERE url = $1", rurl)
+    assert res["timeout"] is True
+    assert res["status"] is None
 
 
 async def test_no_switch_head_to_get(setup_catalog, rmock, produce_mock, analysis_mock):
