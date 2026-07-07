@@ -5,6 +5,10 @@ from multidict import CIMultiDictProxy
 
 from udata_hydra import config, context
 
+# WAF block pages often return HTTP 200 on HEAD with text/html and a tiny body
+# (e.g. "Request Rejected", ~247 bytes). Treat those as unreliable HEAD responses.
+SUSPICIOUS_HTML_HEAD_MAX_BYTES = 4096
+
 
 async def get_content_type_from_header(headers: dict) -> str:
     """
@@ -53,7 +57,7 @@ def has_nice_head(resp) -> bool:
     content_type = resp.headers.get("content-type", "").lower()
     if content_type.startswith("text/html"):
         try:
-            if int(resp.headers.get("content-length", 0)) < 4096:
+            if int(resp.headers.get("content-length", 0)) < SUSPICIOUS_HTML_HEAD_MAX_BYTES:
                 return False
         except (TypeError, ValueError):
             return False
