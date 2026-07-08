@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.13.1 (2026-07-08)
+
+- chore(CI): use recommended UV_PUBLISH_TOKEN ([#451](https://github.com/datagouv/hydra/pull/451))
+- feat: align check resource CLI with API ([#459](https://github.com/datagouv/hydra/pull/459))
+- feat: upgrade csv-detective to 0.12.0 ([#463](https://github.com/datagouv/hydra/pull/463))
+- fix: check head request fallback ([#460](https://github.com/datagouv/hydra/pull/460))
+- refactor: DB utils split ([#452](https://github.com/datagouv/hydra/pull/452))
+- Revert "refactor: DB utils split ([#452](https://github.com/datagouv/hydra/pull/452))"
+
+
 ## 2.13.0 (2026-06-17)
 
 - Don't try to delete a file from a table ([#447](https://github.com/datagouv/hydra/pull/447))
