@@ -1,5 +1,4 @@
 import hashlib
-import json
 import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
@@ -21,6 +20,7 @@ from udata_hydra.crawl import start_checks
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.crawl.preprocess_check_data import get_content_type_from_header
 from udata_hydra.db.check import Check
+from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -86,7 +86,7 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
     assert res["url"] == rurl
     assert res["status"] == status
     if not exception:
-        assert json.loads(res["headers"]) == {
+        assert parse_json_value(res["headers"], {}) == {
             "x-do": "you",
             # added by aioresponses :shrug:
             "content-type": "application/json",
@@ -350,11 +350,7 @@ async def test_analyse_resource_from_crawl(setup_catalog, rmock, db, udata_url):
     assert res[0]["status"] is not None
     # Verify CORS headers are stored in DB
     assert res[0]["cors_headers"] is not None
-    cors_headers = (
-        json.loads(res[0]["cors_headers"])
-        if isinstance(res[0]["cors_headers"], str)
-        else res[0]["cors_headers"]
-    )
+    cors_headers = parse_json_value(res[0]["cors_headers"])
     assert cors_headers["status"] == 204
     assert cors_headers["allow-origin"] == "*"
 
@@ -695,24 +691,38 @@ async def test_content_type_from_header(content_type):
     )
 
 
-@pytest.mark.parametrize("resource_status", list(Resource.STATUSES.keys()) + [None])
+async def _set_catalog_status_for_test(db, resource_id: str, resource_status: str | None) -> None:
+    if resource_status is None:
+        await db.execute(
+            "UPDATE catalog SET status = '{}'::jsonb WHERE resource_id = $1",
+            resource_id,
+        )
+    else:
+        await Resource.set_job_status(
+            resource_id, Resource.job_for_state(resource_status), resource_status
+        )
+
+
+@pytest.mark.parametrize(
+    "resource_status",
+    [s for states in Resource.JOB_STATUSES.values() for s in states],
+)
 async def test_dont_check_resources_with_status(
     rmock, db, produce_mock, setup_catalog, resource_status
 ):
-    await Resource.update(resource_id=RESOURCE_ID, data={"status": resource_status})
+    await _set_catalog_status_for_test(db, RESOURCE_ID, resource_status)
     rurl = RESOURCE_URL
     await start_checks(iterations=1)
 
-    if resource_status == "BACKOFF" or resource_status is None:
+    if resource_status == "BACKOFF":
         # HEAD should have been called
         assert ("HEAD", URL(rurl)) in rmock.requests
 
-        # Status should have been reset to None
-        resource: dict = await db.fetchrow(
+        # Status should have been reset (crawler job cleared)
+        resource = await db.fetchrow(
             "SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID
         )
-        assert resource["status"] is None
-
+        assert resource["status"] == {}
     else:
         # Don't check urls that have a status state pending
 
@@ -722,10 +732,20 @@ async def test_dont_check_resources_with_status(
         assert ("GET", URL(rurl)) not in rmock.requests
 
         # Status should have stayed the same
-        resource: dict = await db.fetchrow(
+        resource = await db.fetchrow(
             "SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID
         )
-        assert resource["status"] == resource_status
+        job = Resource.job_for_state(resource_status)
+        assert resource["status"][job]["state"] == resource_status
+
+
+async def test_dont_check_resources_with_idle_status(rmock, db, produce_mock, setup_catalog):
+    await _set_catalog_status_for_test(db, RESOURCE_ID, None)
+    rurl = RESOURCE_URL
+    await start_checks(iterations=1)
+    assert ("HEAD", URL(rurl)) in rmock.requests
+    resource = await db.fetchrow("SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID)
+    assert resource["status"] == {}
 
 
 @pytest.mark.parametrize(
@@ -796,15 +816,28 @@ async def test_reset_statuses(fake_check, db, setup_catalog, check_duration):
         resource_id=RESOURCE_ID, created_at=datetime.now() - timedelta(seconds=check_duration)
     )
     status = "ANALYSING_CSV"
-    await db.execute(f"UPDATE catalog SET status = '{status}' WHERE resource_id = $1", RESOURCE_ID)
+    stuck_since = datetime.now(timezone.utc) - timedelta(seconds=check_duration)
+    await db.execute(
+        """
+        UPDATE catalog
+        SET status = jsonb_build_object(
+            'csv',
+            jsonb_build_object('state', $2::text, 'since', $3::timestamptz)
+        )
+        WHERE resource_id = $1
+        """,
+        RESOURCE_ID,
+        status,
+        stuck_since,
+    )
     row = await db.fetchrow("SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID)
-    assert row["status"] == status
+    assert row["status"]["csv"]["state"] == status
     await Resource.clean_up_statuses()
     row = await db.fetchrow("SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID)
     if check_duration > config.STUCK_THRESHOLD_SECONDS:
-        assert row["status"] is None
+        assert row["status"] == {}
     else:
-        assert row["status"] == status
+        assert row["status"]["csv"]["state"] == status
 
 
 @pytest.mark.parametrize(

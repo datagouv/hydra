@@ -20,9 +20,13 @@ class ResourceDocumentSchema(Schema):
     harvest = fields.Dict()
 
 
+class JobStatusSchema(Schema):
+    state = fields.Str(required=True)
+    since = fields.DateTime(required=True)
+
+
 class ResourceSchema(Schema):
     dataset_id = fields.Str(required=True)
     resource_id = fields.Str(required=True)
-    status = fields.Str(required=False)
-    status_since = fields.DateTime(required=False)
+    status = fields.Dict(keys=fields.Str(), values=fields.Nested(JobStatusSchema()), required=False)
     document = fields.Nested(ResourceDocumentSchema(), allow_none=True)

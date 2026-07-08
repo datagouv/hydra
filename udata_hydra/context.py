@@ -6,6 +6,7 @@ import redis
 from rq import Queue
 
 from udata_hydra import config
+from udata_hydra.db.codec import init_connection
 
 log = logging.getLogger("udata-hydra")
 
@@ -37,6 +38,7 @@ async def pool(db: str = "main") -> asyncpg.pool.Pool:
             dsn=dsn,
             max_size=config.MAX_POOL_SIZE,
             server_settings={"search_path": config.DATABASE_SCHEMA},
+            init=init_connection,
         )
     return context["databases"][db]
 

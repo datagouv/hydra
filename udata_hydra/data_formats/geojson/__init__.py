@@ -3,10 +3,11 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from udata_hydra import config
+from udata_hydra.analysis import helpers
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import Timer
+from udata_hydra.utils import ParseException, Timer, handle_parse_exception
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats.pmtiles import PMTiles
@@ -32,21 +33,27 @@ class Geojson(DataFormat):
         resource_id: str = str(check["resource_id"])
         url = check["url"]
 
-        # Update resource status to ANALYSING_GEOJSON
-        await Resource.update(resource_id, {"status": "ANALYSING_GEOJSON"})
+        resource = await Resource.set_job_status(resource_id, "geojson", "ANALYSING_GEOJSON")
 
         timer = Timer("analyse-geojson", resource_id)
         assert any(_ is not None for _ in (check["id"], url))
 
-        # Convert to PMTiles
-        await export_pmtiles(geojson_file=self, check=check)
-        timer.mark("geojson-to-pmtiles")
-        check = await Check.update(  # type: ignore[assignment]
-            check_id=check["id"],
-            data={
-                "parsing_finished_at": datetime.now(timezone.utc),
-            },
-        )
+        try:
+            await export_pmtiles(geojson_file=self, check=check)
+            timer.mark("geojson-to-pmtiles")
+            check = await Check.update(  # type: ignore[assignment]
+                check_id=check["id"],
+                data={
+                    "parsing_finished_at": datetime.now(timezone.utc),
+                },
+            )
+        except ParseException as e:
+            check = await handle_parse_exception(e, None, check)  # type: ignore[assignment]
+        finally:
+            await helpers.notify_udata(resource, check)
+            timer.stop()
+            self.path.unlink()
+            await Resource.clear_job_status(resource_id, "geojson")
 
     async def to_pmtiles(self) -> "PMTiles":
         from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles

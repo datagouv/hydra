@@ -384,10 +384,12 @@ $ curl -s "http://localhost:8000/api/resources/stats" | json_pp
    "total_count" : 100,
    "deleted_count" : 3,
    "statuses_count" : {
-      "null" : 85,
-      "BACKOFF" : 2,
-      "CRAWLING_URL" : 1,
-      ...
+      "idle" : 85,
+      "jobs" : {
+         "crawler" : { "BACKOFF" : 2, "CRAWLING_URL" : 1 },
+         "csv" : { "ANALYSING_CSV" : 3 },
+         ...
+      }
    }
 }
 ```

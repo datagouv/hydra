@@ -1,8 +1,8 @@
-import json
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from udata_hydra.db.codec import parse_json_value
 from udata_hydra.utils import storage_path
 
 
@@ -52,7 +52,7 @@ class DataFormat(ABC):
     @classmethod
     def detect_from_check(cls, check: dict, **kwargs) -> bool:
         # this method may require other arguments for specific formats
-        headers: dict = json.loads(check.get("headers") or "{}")
+        headers: dict = parse_json_value(check.get("headers") or "{}")
         return any(
             headers.get("content-type", "").lower().startswith(ct) for ct in cls.valid_mime_types
         ) or (cls.check_url is not None and cls.check_url in check.get("url", ""))

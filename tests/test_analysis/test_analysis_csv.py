@@ -1,5 +1,4 @@
 import hashlib
-import json
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -16,6 +15,7 @@ from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
 from udata_hydra.db.check import Check
+from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -32,8 +32,7 @@ async def test_analyse_csv_on_catalog(
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
-    assert resource["status_since"] is None
+    assert resource["status"] == {}
 
     # Analyse the CSV
     file = await download_from_check(check, Csv)
@@ -42,8 +41,7 @@ async def test_analyse_csv_on_catalog(
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
-    assert isinstance(resource["status_since"], datetime)
+    assert resource["status"] == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table_name
@@ -54,7 +52,7 @@ async def test_analyse_csv_on_catalog(
     assert row["id"] == RESOURCE_ID
     assert row["url"] == RESOURCE_URL
     res = await db.fetchrow("SELECT * from tables_index")
-    inspection = json.loads(res["csv_detective"])
+    inspection = parse_json_value(res["csv_detective"])
     assert all(k in inspection["columns"] for k in ["id", "url"])
 
 
@@ -79,7 +77,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     # Analyse the CSV
     file = await download_from_check(check, Csv)
@@ -88,14 +86,14 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == EXPECTED_COUNT
     profile = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    profile = json.loads(profile["csv_detective"])
+    profile = parse_json_value(profile["csv_detective"])
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == EXPECTED_COUNT
@@ -115,7 +113,7 @@ async def test_error_reporting_csv_detective(
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -138,7 +136,7 @@ async def test_error_reporting_parsing(
     # Check resource status after analysis attempt
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -166,7 +164,7 @@ async def test_analyse_csv_send_udata_webhook(
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("analysis:parsing:started_at")
@@ -422,7 +420,7 @@ async def test_validation(
     await db.execute(
         "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)",
         table_name,
-        json.dumps(previous_analysis),
+        previous_analysis,
         check.get("resource_id"),
         check.get("dataset_id"),
         check.get("url"),
@@ -461,7 +459,7 @@ async def test_validation(
     assert all(row["url"] == check["url"] for row in res)
     assert all(row["dataset_id"] == check["dataset_id"] for row in res)
     assert all(row["deleted_at"] is None for row in res)  # Should be NULL for new records
-    latest_analysis = json.loads(res[0]["csv_detective"])
+    latest_analysis = parse_json_value(res[0]["csv_detective"])
     # check that latest analysis is in line with expectation
     for key in current_analysis.keys():
         if current_analysis[key] is not None:
@@ -630,7 +628,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     """When GeoJSON/PMTiles export fails, record the error and reset the resource status.
     Also removes leftover geojson/pmtiles files so a retry does not leave stale artifacts."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_GEOJSON"})
+    await Resource.set_job_status(RESOURCE_ID, "geojson", "CONVERTING_TO_GEOJSON")
     remove_remainders = mocker.patch("udata_hydra.analysis.exports.remove_remainders")
     mocker.patch("udata_hydra.analysis.exports.helpers.notify_udata")
     mocker.patch(
@@ -646,7 +644,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     remove_remainders.assert_called_once_with(RESOURCE_ID, ["geojson"])
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
     updated_check = await Check.get_by_id(check["id"])
     assert updated_check is not None
     assert updated_check["parsing_error"] is not None
@@ -655,7 +653,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
 async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, fake_check, mocker):
     """When GeoJSON/PMTiles export succeeds, notify udata and clear the resource status."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PMTILES"})
+    await Resource.set_job_status(RESOURCE_ID, "pmtiles", "CONVERTING_TO_PMTILES")
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -685,13 +683,13 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
     assert notify_udata.await_count == 2
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
 
 async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_check, mocker):
     """When parquet export succeeds, notify udata and clear the resource status."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PARQUET"})
+    await Resource.set_job_status(RESOURCE_ID, "parquet", "CONVERTING_TO_PARQUET")
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -715,7 +713,7 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
     notify_udata.assert_awaited_once()
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
 
 async def test_file_with_nan(
@@ -744,7 +742,7 @@ async def test_file_with_nan(
     rows = await db.fetch(f'SELECT * FROM "{table_name}"')
     assert dict(rows[0])["c"] == float("inf")
     assert dict(rows[1])["b"] is None
-    profile = json.loads(
+    profile = parse_json_value(
         list(
             await db.fetch(
                 "SELECT * FROM tables_index WHERE resource_id = $1", check["resource_id"]
