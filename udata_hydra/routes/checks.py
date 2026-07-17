@@ -17,9 +17,6 @@ async def get_latest_check(request: web.Request) -> web.Response:
     """Get the latest check for a given URL or resource_id"""
 
     url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
-    if not url and not resource_id:
-        raise web.HTTPBadRequest()
-
     data: Record | None = await Check.get_latest(url, resource_id)
     if not data:
         raise web.HTTPNotFound()
@@ -33,9 +30,6 @@ async def get_latest_check(request: web.Request) -> web.Response:
 
 async def get_all_checks(request: web.Request) -> web.Response:
     url, resource_id = get_request_params(request, params_names=["url", "resource_id"])
-    if not url and not resource_id:
-        raise web.HTTPBadRequest()
-
     data: list | None = await Check.get_all(url, resource_id)
     if not data:
         raise web.HTTPNotFound()
