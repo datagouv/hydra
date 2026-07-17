@@ -64,6 +64,11 @@ async def test_get_latest_check(setup_catalog, client, query, expected, fake_che
         "pmtiles_size": None,
         "geojson_url": None,
         "geojson_size": None,
+        "detected_last_modified_at": None,
+        "analysis_error": None,
+        "checksum": None,
+        "filesize": None,
+        "mime_type": None,
     }
 
     # Test deleted resource
