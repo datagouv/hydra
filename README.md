@@ -135,46 +135,56 @@ These benchmarks help identify performance regressions and improvements across d
 
 #### How it works
 
-Performance benchmarks are automatically executed on CI runners when pushing to the `benchmarks` branch. The benchmarks test three key operations:
+Benchmarks test three key operations on large files:
 
-1. **CSV analysis** on large files using integrated test data
-2. **CSV to GeoJSON conversion** on large files using the `TEST_GEOCSV_URL` configured in CI
-3. **GeoJSON to PMTiles conversion** on large files using the `TEST_GEOCSV_URL` configured in CI
+1. **CSV analysis** on [`20190618-annuaire-diagnostiqueurs.csv`](tests/data/20190618-annuaire-diagnostiqueurs.csv)
+2. **CSV to GeoJSON conversion** on [`H_01_1990-1999.csv.gz`](tests/data/H_01_1990-1999.csv.gz)
+3. **GeoJSON to PMTiles conversion** using the GeoJSON produced in step 2
+
+Tests are marked `@pytest.mark.slow` and excluded from the regular CI test suite.
 
 #### Benchmark execution
 
-Benchmarks run on:
-- **[CircleCI](https://app.circleci.com/pipelines/github/datagouv/hydra)** ([workflow file](https://github.com/datagouv/hydra/blob/main/.circleci/config.yml)) - available as a manually triggerable pipeline after a push to `benchmarks` branch
-- **[GitHub Actions](https://github.com/datagouv/hydra/actions/workflows/benchmark.yml)** ([workflow file](https://github.com/datagouv/hydra/blob/main/.github/workflows/benchmark.yml)) - triggered automatically on pushes to `benchmarks` branch
+Benchmarks run manually on **[CircleCI](https://app.circleci.com/pipelines/github/datagouv/hydra)**:
 
-Using two different CI systems allows for performance comparison across different environments and gives a way to avoid exhausting CI time limits.
+1. Go to **Trigger Pipeline**
+2. Set the pipeline parameter `run-benchmarks` to `true`
+3. Download the results from the job artifact (`.benchmarks/benchmarks.csv`)
+
+This runs only the benchmark workflow, without lint, tests, or deploy.
 
 #### Metrics collected
 
-Each benchmark run collects **execution time** in seconds, **commit information** (hash, author) and **runner specifications** (CPU cores, memory, Python version, runner class), which are stored in [`.benchmarks/benchmarks.csv`](https://github.com/datagouv/hydra/blob/benchmarks/.benchmarks/benchmarks.csv).
+Each benchmark run collects **execution time** in seconds, **commit information** (hash, author) and **runner specifications** (CPU cores, memory, Python version, runner class).
 
 More specifically:
 - `datetime` - when the test was run
 - `test_name` - which test was executed
-- `input_file` - URL or path of the input test data file used
-- `ci` - which CI system ran the test (github or circleci)
+- `input_file` - path of the input test data file used
+- `ci` - which CI system ran the test (`circleci` or `local`)
 - `execution_time_seconds` - performance measurement
-- `commit_author` - who made the commit
+- `commit_author` - who triggered the pipeline
 - `commit_id` - the commit hash (7 characters)
-- `runner_class` - CircleCI/GitHub Actions runner type
+- `runner_class` - CircleCI runner type
 - `runner_cpu` - number of CPU cores
 - `runner_memory` - available memory in MB
 - `python_version` - Python version used
 
-Results are committed and pushed back to the `benchmarks` branch, creating a historical performance tracking dataset.
-
-#### Viewing results
-
-You can view the current benchmark results at: [benchmarks.csv](https://github.com/datagouv/hydra/blob/benchmarks/.benchmarks/benchmarks.csv)
+Results are published as a CircleCI job artifact. Historical data from the legacy `benchmarks` branch is seeded from [`.benchmarks/benchmarks.history.csv`](.benchmarks/benchmarks.history.csv) on each run.
 
 #### Running benchmarks locally
 
-To run performance benchmarks locally, you can use the CLI commands:
+```bash
+uv run pytest tests/test_benchmark.py -v -s -m slow --no-cov
+```
+
+To exclude slow tests from a local full test run:
+
+```bash
+uv run pytest -m "not slow" tests/
+```
+
+You can also use the CLI commands for ad-hoc conversion timing:
 
 ```bash
 # Convert CSV to GeoJSON
@@ -183,8 +193,6 @@ uv run udata-hydra convert-csv-to-geojson /path/to/large/file.csv
 # Convert GeoJSON to PMTiles
 uv run udata-hydra convert-geojson-to-pmtiles /path/to/large/file.geojson
 ```
-
-These commands allow you to test performance improvements locally before pushing to the benchmarks branch.
 
 ## 🔌 API
 
