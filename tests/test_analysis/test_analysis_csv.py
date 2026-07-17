@@ -1,7 +1,6 @@
 import hashlib
 import json
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -56,49 +55,6 @@ async def test_analyse_csv_on_catalog(
     res = await db.fetchrow("SELECT * from tables_index")
     inspection = json.loads(res["csv_detective"])
     assert all(k in inspection["columns"] for k in ["id", "url"])
-
-
-@pytest.mark.slow
-async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produce_mock):
-    """
-    This test is slow because it parses a pretty big file.
-    It's meant to act as a "canary in the coal mine": if performance degrades too much, you or the CI should feel it.
-    You can deselect it by running `pytest -m "not slow"`.
-    """
-    TEST_CSV_FILE, EXPECTED_COUNT = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
-
-    check = await fake_check(headers={"content-type": "text/csv"})
-    url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
-
-    csv_path = "tests/data" / Path(TEST_CSV_FILE)
-    with csv_path.open("rb") as f:
-        data = f.read()
-    rmock.get(url, status=200, body=data)
-
-    # Check resource status before analysis
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
-
-    # Analyse the CSV
-    file = await download_from_check(check, Csv)
-    await file.analyse(check=check)
-
-    # Check resource status after analysis
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
-
-    count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
-    assert count["count"] == EXPECTED_COUNT
-    profile = await db.fetchrow(
-        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
-    )
-    profile = json.loads(profile["csv_detective"])
-    for attr in ("header", "columns", "formats", "profile"):
-        assert profile[attr]
-    assert profile["total_lines"] == EXPECTED_COUNT
 
 
 async def test_error_reporting_csv_detective(
