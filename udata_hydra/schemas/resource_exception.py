@@ -1,13 +1,17 @@
-from marshmallow import Schema, fields
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
 
 from udata_hydra import config
 
 
-class ResourceExceptionSchema(Schema):
-    id = fields.Str(required=True)
-    resource_id = fields.Str(required=True)
-    table_indexes = fields.Str(allow_none=True)
-    comment = fields.Str(allow_none=True)
+class ResourceExceptionSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int  # In DB, this is SERIAL PRIMARY KEY (which is an integer), but it was a str in the schema before
+    resource_id: UUID
+    table_indexes: str | None = None
+    comment: str | None = None
 
     @staticmethod
     def are_table_indexes_valid(table_indexes: dict[str, str]) -> tuple[bool, str | None]:
@@ -20,10 +24,9 @@ class ResourceExceptionSchema(Schema):
         if not isinstance(table_indexes, dict):
             return (False, "table_indexes must be a dictionary")
         if table_indexes:
+            supported_types = config.SQL_INDEXES_TYPES_SUPPORTED or []
             for index_type in table_indexes.values():
-                if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
-                    error: str = "error, index type must be one of: " + ", ".join(
-                        config.SQL_INDEXES_TYPES_SUPPORTED
-                    )
+                if index_type not in supported_types:
+                    error: str = "error, index type must be one of: " + ", ".join(supported_types)
                     return (False, error)
         return (True, None)
