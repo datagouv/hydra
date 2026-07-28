@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 
 from aiohttp import web
@@ -7,6 +8,8 @@ from asyncpg import Record
 from udata_hydra.db.resource import Resource
 from udata_hydra.routes.status import get_resources_status_counts
 from udata_hydra.schemas import ResourceDocumentSchema, ResourceSchema
+
+log = logging.getLogger("udata-hydra")
 
 
 async def get_resource(request: web.Request) -> web.Response:
@@ -78,6 +81,20 @@ async def update_resource(request: web.Request) -> web.Response:
 
     dataset_id: str = valid_payload["dataset_id"]
     resource_id: str = valid_payload["resource_id"]
+    new_url: str = document["url"]
+
+    existing: Record | None = await Resource.get(resource_id)
+    if existing:
+        old_url: str = existing["url"]
+        url_changed: bool = old_url != new_url
+        log.info(
+            f"[resource_id={resource_id}] update_resource webhook: "
+            f"url_changed={url_changed} old={old_url} new={new_url} priority=True"
+        )
+    else:
+        log.info(
+            f"[resource_id={resource_id}] update_resource webhook: created url={new_url} priority=True"
+        )
 
     await Resource.update_or_insert(
         dataset_id=dataset_id,
