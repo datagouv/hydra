@@ -40,6 +40,35 @@ def test_extract_gzip_writes_to_storage_path(mocker, tmp_path):
         os.remove(extracted.name)
 
 
+def test_extract_gzip_raises_ioerror_on_truncated_file(mocker, tmp_path):
+    mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", str(tmp_path))
+    gz_path = tmp_path / "truncated.csv.gz"
+    gz_path.write_bytes(gzip.compress(b"col\nval")[:10])
+
+    with pytest.raises(IOException, match="Corrupted or truncated gzip file"):
+        extract_gzip(str(gz_path))
+
+
+def test_extract_gzip_raises_ioerror_on_invalid_file(mocker, tmp_path):
+    mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", str(tmp_path))
+    gz_path = tmp_path / "invalid.csv.gz"
+    gz_path.write_bytes(b"this is not gzip at all")
+
+    with pytest.raises(IOException, match="Corrupted or truncated gzip file"):
+        extract_gzip(str(gz_path))
+
+
+async def test_download_resource_corrupted_gzip_raises_ioerror(rmock, mocker, tmp_path):
+    mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", str(tmp_path))
+    url = "http://example.com/file.csv.gz"
+    rmock.get(url, status=200, body=gzip.compress(b"col\nval")[:10])
+
+    with pytest.raises(IOException, match="Corrupted or truncated gzip file"):
+        await download_resource(url=url)
+
+    assert not list(tmp_path.iterdir())
+
+
 async def test_download_resource_rejects_oversized_content_length():
     with pytest.raises(IOException, match="File too large to download"):
         await download_resource(

@@ -34,12 +34,18 @@ def compute_checksum_from_file(filename: str) -> str:
     return sha1sum.hexdigest()
 
 
-def extract_gzip(file_path: str) -> IO[bytes]:
-    with gzip.open(file_path, "rb") as gz_file:
-        with tempfile.NamedTemporaryFile(
-            dir=storage_path(""), mode="wb", delete=False
-        ) as temp_file:
-            temp_file.write(gz_file.read())
+def extract_gzip(file_path: str, url: str | None = None) -> IO[bytes]:
+    temp_file = None
+    try:
+        with gzip.open(file_path, "rb") as gz_file:
+            with tempfile.NamedTemporaryFile(
+                dir=storage_path(""), mode="wb", delete=False
+            ) as temp_file:
+                temp_file.write(gz_file.read())
+    except (EOFError, gzip.BadGzipFile) as e:
+        if temp_file is not None:
+            os.remove(temp_file.name)
+        raise IOException("Corrupted or truncated gzip file", url=url) from e
     return temp_file
 
 
@@ -97,9 +103,10 @@ async def download_resource(
     ]:
         # It's compressed - extract and determine extension from URL
         gzip_tmp_file_name = tmp_file.name
-        tmp_file = extract_gzip(tmp_file.name)
-        # Remove the gzip original temporary file
-        os.remove(gzip_tmp_file_name)
+        try:
+            tmp_file = extract_gzip(gzip_tmp_file_name, url=url)
+        finally:
+            os.remove(gzip_tmp_file_name)
 
         # Extract any extension before .gz using regex
         match = re.search(r"\.([^.]+)\.gz$", url)
