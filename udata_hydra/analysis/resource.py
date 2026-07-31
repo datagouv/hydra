@@ -95,8 +95,8 @@ async def analyse_resource(
             await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
             tmp_file, _ = await download_resource(url, headers, max_size_allowed)
             timer.mark("download-resource")
-        except IOException:
-            dl_analysis["analysis:error"] = "File too large to download"
+        except IOException as e:
+            dl_analysis["analysis:error"] = str(e)
         else:
             await Resource.update(resource_id, data={"status": "ANALYSING_DOWNLOADED_RESOURCE"})
             # Get file size
