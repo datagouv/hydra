@@ -44,7 +44,7 @@ def extract_gzip(file_path: str, url: str | None = None) -> IO[bytes]:
                 temp_file.write(gz_file.read())
     except (EOFError, gzip.BadGzipFile) as e:
         if temp_file is not None:
-            os.remove(temp_file.name)
+            Path(temp_file.name).unlink(missing_ok=True)
         raise IOException("Corrupted or truncated gzip file", url=url) from e
     return temp_file
 
@@ -88,11 +88,10 @@ async def download_resource(
         download_error = e
     finally:
         tmp_file.close()
-        if too_large:
-            os.remove(tmp_file.name)
-            raise IOException("File too large to download", url=url)
-        if download_error:
-            os.remove(tmp_file.name)
+        if too_large or download_error:
+            Path(tmp_file.name).unlink(missing_ok=True)
+            if too_large:
+                raise IOException("File too large to download", url=url)
             raise IOException("Error downloading CSV", url=url) from download_error
 
     detected_extension = ""
@@ -106,7 +105,7 @@ async def download_resource(
         try:
             tmp_file = extract_gzip(gzip_tmp_file_name, url=url)
         finally:
-            os.remove(gzip_tmp_file_name)
+            Path(gzip_tmp_file_name).unlink(missing_ok=True)
 
         # Extract any extension before .gz using regex
         match = re.search(r"\.([^.]+)\.gz$", url)
