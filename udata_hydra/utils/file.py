@@ -2,7 +2,6 @@ import gzip
 import hashlib
 import logging
 import mimetypes
-import os
 import re
 import tempfile
 from pathlib import Path
