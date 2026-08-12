@@ -458,8 +458,8 @@ wheels = [
 
 [[package]]
 name = "csv-detective"
-version = "0.12.1.dev18"
-source = { git = "https://github.com/datagouv/csv-detective?branch=improve_date_parsing#3bc5e6dfc9ce772b94a9f35c2b00850aa90519e3" }
+version = "0.12.1.dev20"
+source = { git = "https://github.com/datagouv/csv-detective?branch=improve_date_parsing#79e3685f342aaa0ecfa7d2f9fdbd559c2e48124e" }
 dependencies = [
     { name = "charset-normalizer" },
     { name = "dateparser" },
