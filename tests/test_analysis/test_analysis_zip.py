@@ -64,6 +64,21 @@ async def assert_analysis_failed(db, check: dict, error_fragment: str) -> None:
         await db.fetch(f'SELECT * FROM "{table_name}"')
 
 
+async def assert_not_analysed(db, check: dict) -> None:
+    """Holding nothing analysable is not a failure: no error must be recorded"""
+    res = await db.fetchrow("SELECT * FROM checks")
+    assert res["parsing_error"] is None
+    assert res["parsing_table"] is None
+
+    resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
+    assert resource["status"] is None
+
+    table_name: str = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    with pytest.raises(UndefinedTableError):
+        await db.fetch(f'SELECT * FROM "{table_name}"')
+
+
 async def test_analyse_zip_with_single_csv(setup_catalog, rmock, db, fake_check, produce_mock):
     check = await fake_check(headers={"content-type": "application/zip"})
     await analyse_zip(check, rmock, make_zip({"data.csv": CSV_CONTENT}))
@@ -100,17 +115,26 @@ async def test_analyse_zip_ignores_macos_resource_fork(
 
 
 async def test_analyse_zip_with_several_csv(setup_catalog, rmock, db, fake_check, produce_mock):
+    """A dataset split in several csv is not a broken resource, we just leave it alone"""
     check = await fake_check(headers={"content-type": "application/zip"})
     await analyse_zip(check, rmock, make_zip({"first.csv": CSV_CONTENT, "second.csv": CSV_CONTENT}))
-    await assert_analysis_failed(db, check, "Several analysable files")
+    await assert_not_analysed(db, check)
 
 
 async def test_analyse_zip_without_analysable_file(
-    setup_catalog, rmock, db, fake_check, produce_mock
+    setup_catalog, rmock, db, fake_check, produce_mock, mocker
 ):
+    """A shapefile bundle or a set of documents is not analysable, and not a failure either:
+    udata must not be told the parsing failed"""
+    notify_udata = mocker.patch(
+        "udata_hydra.data_formats.zip.helpers.notify_udata", new=mocker.AsyncMock()
+    )
     check = await fake_check(headers={"content-type": "application/zip"})
-    await analyse_zip(check, rmock, make_zip({"doc.pdf": b"%PDF-1.4", "logo.png": b"\x89PNG"}))
-    await assert_analysis_failed(db, check, "No analysable file")
+    await analyse_zip(
+        check, rmock, make_zip({"parcels.shp": b"\x00\x00'\n", "parcels.dbf": b"\x03d"})
+    )
+    await assert_not_analysed(db, check)
+    notify_udata.assert_not_awaited()
 
 
 async def test_analyse_zip_corrupted_archive(setup_catalog, rmock, db, fake_check, produce_mock):

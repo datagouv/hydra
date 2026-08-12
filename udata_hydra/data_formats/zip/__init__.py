@@ -73,9 +73,12 @@ class Zip(DataFormat):
         )
 
     def select_member(
-        self, archive: zipfile.ZipFile, check: dict
-    ) -> tuple[zipfile.ZipInfo, type[DataFormat]]:
-        """Pick the one file of the archive we know how to analyse, if there is exactly one."""
+        self, archive: zipfile.ZipFile
+    ) -> tuple[zipfile.ZipInfo, type[DataFormat]] | None:
+        """Pick the one file of the archive we know how to analyse, or None if there isn't exactly
+        one. An archive of shapefiles, of pictures, or a dataset split in several csv is not a
+        broken resource: there is simply nothing for us to analyse, and saying so as a parsing
+        error would report a failure where hydra never committed to analysing anything."""
         members: list[zipfile.ZipInfo] = [
             info for info in archive.infolist() if is_data_member(info)
         ]
@@ -91,10 +94,12 @@ class Zip(DataFormat):
                 break
 
         if not candidates:
-            raise self.io_error("No analysable file in the zip archive", check)
+            log.debug("No analysable file in the zip archive, skipping.")
+            return None
         if len(candidates) > 1:
             names = ", ".join(info.filename[:MAX_MEMBER_NAME_LENGTH] for info, _ in candidates[:5])
-            raise self.io_error(f"Several analysable files in the zip archive: {names}", check)
+            log.debug(f"Several analysable files in the zip archive, skipping: {names}")
+            return None
 
         return candidates[0]
 
@@ -138,8 +143,9 @@ class Zip(DataFormat):
 
         return Path(destination.name)
 
-    def extract(self, check: dict) -> DataFormat:
-        """Extract the single analysable file of the archive, as the format able to analyse it"""
+    def extract(self, check: dict) -> DataFormat | None:
+        """Extract the single analysable file of the archive, as the format able to analyse it,
+        or None if the archive holds nothing we know how to analyse"""
         try:
             archive = zipfile.ZipFile(self.path)
         except Exception as e:
@@ -148,7 +154,10 @@ class Zip(DataFormat):
             raise self.io_error("Could not open the zip archive", check) from e
 
         with archive:
-            member, data_format = self.select_member(archive, check)
+            selected = self.select_member(archive)
+            if selected is None:
+                return None
+            member, data_format = selected
             extracted: Path = self.extract_member(
                 archive, member, data_format.max_filesize_allowed, check
             )
@@ -164,15 +173,18 @@ class Zip(DataFormat):
         resource_id: str = str(check["resource_id"])
         resource: Record | None = await Resource.update(resource_id, {"status": "EXTRACTING_ZIP"})
 
+        file: DataFormat | None = None
         try:
-            file: DataFormat = self.extract(check)
+            file = self.extract(check)
         except IOException as e:
             check = await handle_parse_exception(e, None, check)  # type: ignore[assignment]
             await helpers.notify_udata(resource, check)
-            await Resource.update(resource_id, {"status": None})
-            return
         finally:
             self.path.unlink(missing_ok=True)
+
+        if file is None:
+            await Resource.update(resource_id, {"status": None})
+            return
 
         log.debug(f"Extracted {file.file_name} from archive, analysing it as {type(file).__name__}")
         await file.analyse(check=check)
