@@ -56,6 +56,7 @@ async def assert_analysis_failed(db, check: dict, error_fragment: str) -> None:
 
     # the resource must not stay stuck in an analysis status
     resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
     assert resource["status"] is None
 
     table_name: str = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
