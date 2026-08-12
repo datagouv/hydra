@@ -1,11 +1,14 @@
-from unittest.mock import patch
-
 import pytest
 
-from udata_hydra.db import build_db_columns_mapping, truncate_utf8
+from udata_hydra.db import (
+    PG_MAX_IDENTIFIER_BYTES,
+    RESERVED_COLS,
+    build_db_columns_mapping,
+    db_col_name,
+    truncate_utf8,
+)
 
-# Postgres' actual limit, i.e. the default config.NAMEDATALEN - 1
-LIMIT = 63
+LIMIT = PG_MAX_IDENTIFIER_BYTES
 
 
 def db_names(columns: list[str]) -> list[str]:
@@ -61,18 +64,28 @@ def test_reserved_column_is_renamed():
     }
 
 
-def test_reserved_column_rename_respects_the_limit():
-    # the __hydra_renamed suffix is 15 bytes: it must fit in the budget too
-    with patch("udata_hydra.config.NAMEDATALEN", 10):
-        assert build_db_columns_mapping(["xmin"]) == {"xmin": "xmi__col0"}
+def test_every_reserved_column_still_fits_once_renamed():
+    # the __hydra_renamed suffix is 15 bytes: renaming must never overflow the limit,
+    # which is what lets the reserved rename be unconditional
+    mapping = build_db_columns_mapping(list(RESERVED_COLS))
+    assert all(name.endswith("__hydra_renamed") for name in mapping.values())
+    assert all(len(name.encode("utf-8")) <= LIMIT for name in mapping.values())
 
 
-def test_reserved_column_at_the_limit_is_truncated():
-    col = "xmin" + "a" * (LIMIT - len("xmin__hydra_renamed"))
-    # the source name fits, but the renamed one doesn't
-    assert len(col.encode("utf-8")) <= LIMIT
-    (db_col,) = db_names([col])
-    assert len(db_col.encode("utf-8")) <= LIMIT
+def test_a_name_looking_like_a_generated_one_is_renamed():
+    # kept names must never end with a generated suffix, otherwise a source name could be
+    # named exactly like the truncated form of another column
+    assert build_db_columns_mapping(["a__col3", "b__hydra_renamed"]) == {
+        "a__col3": "a__col3__col0",
+        "b__hydra_renamed": "b__hydra_renamed__col1",
+    }
+
+
+def test_column_name_at_the_limit_is_kept_as_is():
+    col = "xmin" + "a" * (LIMIT - len("xmin"))
+    assert len(col.encode("utf-8")) == LIMIT
+    # it merely starts with a reserved name, so it is not renamed
+    assert build_db_columns_mapping([col]) == {col: col}
 
 
 def test_long_columns_sharing_a_prefix_get_distinct_names():
@@ -108,7 +121,15 @@ def test_order_is_preserved():
     assert list(build_db_columns_mapping(columns)) == columns
 
 
-def test_raises_when_the_budget_is_too_small_for_a_suffix():
-    with patch("udata_hydra.config.NAMEDATALEN", 7):
-        with pytest.raises(ValueError, match="too small"):
-            build_db_columns_mapping(["a" * 20])
+def test_db_col_name_resolves_through_the_mapping():
+    assert db_col_name("a", {"a": "a__col0"}) == "a__col0"
+    assert db_col_name("b", {"a": "a__col0"}) == "b"
+
+
+def test_db_col_name_falls_back_to_the_reserved_rule_without_a_mapping():
+    # an inspection stored before columns_mapping existed has no mapping at all, yet its
+    # reserved columns were already renamed. `SELECT "xmin"` would silently return the
+    # system column instead of failing.
+    assert db_col_name("xmin", {}) == "xmin__hydra_renamed"
+    assert db_col_name("XMax", {}) == "XMax__hydra_renamed"
+    assert db_col_name("regular", {}) == "regular"

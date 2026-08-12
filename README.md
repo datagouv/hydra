@@ -113,7 +113,8 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 A source column name cannot always be used as-is as a PostgreSQL column name: identifiers are limited to 63 bytes, and some names are reserved by PostgreSQL (`xmin`, `ctid`…) or by hydra (`__id`). Such columns are renamed:
 
 - a reserved name gets a `__hydra_renamed` suffix;
-- a name that doesn't fit in 63 bytes is truncated (on a UTF-8 character boundary) and suffixed with `__col<position>`, the position of the column in the file.
+- a name that doesn't fit in 63 bytes is truncated (on a UTF-8 character boundary) and suffixed with `__col<position>`, the position of the column in the file;
+- a name that already ends with one of those two suffixes gets the `__col<position>` treatment too, even though it would fit: this is what guarantees a source name can never be renamed to the name of another column.
 
 The resulting mapping is published in the inspection stored in `tables_index.csv_detective`, under the `columns_mapping` key, as `{"source name": "PostgreSQL name"}`. **Only the renamed columns are listed: a column missing from the mapping keeps its source name.** The key itself is always written, so an analysis with nothing to rename has `"columns_mapping": {}` — a missing key means the row predates this feature.
 

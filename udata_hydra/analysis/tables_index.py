@@ -23,7 +23,7 @@ async def get_previous_inspection(resource_id: str) -> dict | None:
     inspection = json.loads(res[0]["csv_detective"])
     # make sure the table is still there and holds data, otherwise a full analysis is needed
     try:
-        rows: list[Record] = await db.fetch(f'SELECT * FROM "{res[0]["parsing_table"]}" LIMIT 1')
+        rows = await db.fetch(f'SELECT 1 FROM "{res[0]["parsing_table"]}" LIMIT 1')
     except UndefinedTableError:
         log.error(f"Could not find table {res[0]['parsing_table']} for resource {resource_id}")
         return None
@@ -37,8 +37,6 @@ async def get_previous_inspection(resource_id: str) -> dict | None:
         log.error(f"header/columns mismatch for resource {resource_id}, forcing a full analysis")
         return None
     inspection["columns"] = {col: inspection["columns"][col] for col in header}
-    # always recomputed by to_db, and it would be stale if the columns changed
-    inspection.pop("columns_mapping", None)
     return inspection
 
 

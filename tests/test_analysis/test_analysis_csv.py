@@ -15,6 +15,7 @@ from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
+from udata_hydra.db import PG_MAX_IDENTIFIER_BYTES
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 
@@ -474,10 +475,11 @@ async def test_validation(
 
 
 @pytest.mark.parametrize(
-    "params",
+    "col_name",
     (
-        ("col", False, "col__col0"),
-        ("çà€", True, "ç__col0"),
+        "col" * 30,
+        # 3 bytes per character: 30 of them already overflow the 63 bytes limit
+        "çà€" * 10,
     ),
 )
 async def test_too_long_column_name_is_truncated(
@@ -486,11 +488,9 @@ async def test_too_long_column_name_is_truncated(
     db,
     fake_check,
     produce_mock,
-    params,
+    col_name,
 ):
-    col, has_non_ascii, expected_db_col = params
-    max_len = 10
-    col_name = (col * ((max_len // len(col)) + 1))[: max_len if not has_non_ascii else max_len - 3]
+    assert len(col_name.encode("utf-8")) > PG_MAX_IDENTIFIER_BYTES
     check = await fake_check(headers={"content-type": "application/csv"})
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
@@ -504,17 +504,19 @@ async def test_too_long_column_name_is_truncated(
         body=f"{col_name},b,c\n1,2,3".encode("utf-8"),
         repeat=True,
     )
-    with patch("udata_hydra.config.NAMEDATALEN", max_len):
-        file = await download_from_check(check, Csv)
-        await file.analyse(check=check)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
     updated_check = await Check.get_by_id(check["id"])
     assert updated_check is not None
     assert updated_check["parsing_error"] is None
 
     # the too long column has been truncated, the short ones are untouched
+    expected_db_col = file.inspection["columns_mapping"][col_name]
     row = await db.fetchrow(f'SELECT * FROM "{table_name}"')
     assert [c for c in row.keys() if c != "__id"] == [expected_db_col, "b", "c"]
-    assert len(expected_db_col.encode("utf-8")) <= max_len - 1
+    assert expected_db_col.endswith("__col0")
+    assert col_name.startswith(expected_db_col[: -len("__col0")])
+    assert len(expected_db_col.encode("utf-8")) <= PG_MAX_IDENTIFIER_BYTES
 
     # only the renamed column is published in the mapping
     res = await db.fetchrow(

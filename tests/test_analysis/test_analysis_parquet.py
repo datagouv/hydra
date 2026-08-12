@@ -143,6 +143,24 @@ async def test_parquet_to_db_truncates_too_long_column_name(
     assert list(table.inspection["columns_mapping"]) == [long_col]
 
 
+async def test_parquet_index_on_a_column_the_file_does_not_have(
+    setup_catalog, rmock, db, fake_check, produce_mock
+):
+    """table_indexes is filled by hand and the file it points at can change: an index asked
+    on a column that is not there must surface as a ParseException, not as a raw SQLAlchemy
+    error escaping to_db."""
+    df = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+    check = await fake_check(url="http://example.com/file.parquet")
+    rmock.get(check["url"], status=200, body=df.to_parquet())
+
+    file = await helpers.download_from_check(check, Parquet)
+    file.inspect()
+    with pytest.raises(ParseException) as exc:
+        await file.to_db(check=check, table_indexes={"colonne_absente": "index"})
+    assert exc.value.step == "create_table_query"
+    assert "colonne_absente" in str(exc.value.__cause__)
+
+
 async def test_parquet_to_db_copy_failure_raises_parse_exception(fake_check, mocker):
     """Wrap PostgreSQL COPY failures in a ParseException for consistent error handling."""
     check = await fake_check()

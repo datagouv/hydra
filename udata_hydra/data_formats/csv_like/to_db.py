@@ -45,15 +45,7 @@ async def csv_to_db(
         f"to db for {table_name}"
     )
 
-    try:
-        db_cols: dict[str, str] = build_db_columns_mapping(inspection["columns"])
-    except ValueError as e:
-        raise ParseException(
-            step="scan_column_names",
-            resource_id=file.resource_id,
-            table_name=table_name,
-        ) from e
-
+    db_cols: dict[str, str] = build_db_columns_mapping(inspection["columns"])
     # published for consumers reading the inspection back (tabular API), so they can expose
     # the source names. Only the renamed columns are listed: a missing entry means identity.
     inspection["columns_mapping"] = {s: pg for s, pg in db_cols.items() if s != pg}
@@ -73,9 +65,7 @@ async def csv_to_db(
         q = compute_create_table_query(
             table_name=table_name,
             columns=columns,
-            indexes={db_cols.get(c, c): t for c, t in table_indexes.items()}
-            if table_indexes
-            else None,
+            indexes={db_cols.get(c, c): t for c, t in (table_indexes or {}).items()},
         )
         await db.execute(q)
     except Exception as e:

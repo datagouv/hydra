@@ -51,8 +51,6 @@ async def test_previous_inspection_with_a_renamed_column(db, clean_db):
     previous = await get_previous_inspection(RESOURCE_ID)
     assert previous is not None
     assert list(previous["columns"]) == ["xmin", "other"]
-    # the mapping is always recomputed by to_db, a stale one must not be carried over
-    assert "columns_mapping" not in previous
 
 
 async def test_previous_inspection_ignored_when_header_and_columns_disagree(db, clean_db):
