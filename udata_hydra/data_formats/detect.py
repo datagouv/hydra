@@ -6,6 +6,7 @@ from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.geojson import Geojson
 from udata_hydra.data_formats.ogc import Wfs, Wms
 from udata_hydra.data_formats.parquet import Parquet
+from udata_hydra.data_formats.zip import Zip
 
 
 async def detect_data_format_from_check_or_catalog(check: dict) -> type[DataFormat] | None:
@@ -16,6 +17,8 @@ async def detect_data_format_from_check_or_catalog(check: dict) -> type[DataForm
         )
     resource_format = row["format"] if row is not None else None
     for fmt in [
+        # first, so that a "*.zip" catalog format wins over another format's mime type
+        Zip,
         Csv,
         Csvgz,
         Xls,

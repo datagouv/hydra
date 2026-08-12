@@ -34,6 +34,8 @@ class Resource:
         "ANALYSING_WFS": "retrieving WFS service metadata",
         "TO_ANALYSE_WMS": "WMS service to be analysed",
         "ANALYSING_WMS": "retrieving WMS service metadata",
+        "TO_ANALYSE_ZIP": "zip archive to be extracted before analysing what it holds",
+        "EXTRACTING_ZIP": "currently extracting the analysable file of a zip archive",
     }
 
     @classmethod
