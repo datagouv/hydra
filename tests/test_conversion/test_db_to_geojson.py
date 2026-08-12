@@ -127,6 +127,27 @@ async def test_db_to_geojson_with_reserved_column(db, clean_db, fake_check, mock
 
 
 @pytest.mark.asyncio
+async def test_db_to_geojson_with_long_column_name(db, clean_db, fake_check, mocker):
+    mocker.patch("udata_hydra.config.DB_TO_GEOJSON", True)
+    """A column name too long for PG must still appear under its source name in the GeoJSON."""
+    long_col = "Nombre de logements sociaux conventionnés livrés au cours de l'année 2023"
+    assert len(long_col.encode("utf-8")) > 63
+    geojson = await _geojson_from_columns(
+        db,
+        columns={
+            long_col: range(1, 6),
+            "lat": [10.0 * k * (-1) ** k for k in range(1, 6)],
+            "long": [20.0 * k * (-1) ** k for k in range(1, 6)],
+        },
+        table_name="test_geojson_long_col",
+        fake_check=fake_check,
+    )
+
+    assert len(geojson["features"]) == 5
+    assert [feat["properties"][long_col] for feat in geojson["features"]] == list(range(1, 6))
+
+
+@pytest.mark.asyncio
 async def test_db_to_geojson_with_quote_in_column_name(db, clean_db, fake_check, mocker):
     mocker.patch("udata_hydra.config.DB_TO_GEOJSON", True)
     """A CSV with a single quote in a column name should not break the SQL query."""

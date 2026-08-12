@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import asyncpg
 from sqlalchemy.schema import CreateIndex, CreateTable, Index
 
 from udata_hydra import config
+from udata_hydra.db import PG_MAX_IDENTIFIER_BYTES
 
 log = logging.getLogger("udata-hydra")
 
@@ -77,7 +78,7 @@ def compute_create_table_query(
 
     indexes_labels = {}
     if indexes:
-        for col_name, index_type in indexes.items():
+        for position, (col_name, index_type) in enumerate(indexes.items()):
             if index_type not in config.SQL_INDEXES_TYPES_SUPPORTED:
                 log.error(
                     f'Index type "{index_type}" is unknown or not supported yet! '
@@ -87,15 +88,20 @@ def compute_create_table_query(
 
             else:
                 if index_type == "index":
-                    index_name = f"{table_name}_{slugify(col_name)}_idx"
+                    # the table name alone is a 32-character md5, so a verbose column name
+                    # overflows Postgres' identifier limit. The position keeps the fallback
+                    # unique, and also covers a column name slugify empties out entirely
+                    # (one made only of characters it cannot transliterate).
+                    # slugify transliterates to ASCII, so len() here is both chars and bytes.
+                    slug = slugify(col_name)
+                    index_name = f"{table_name}_{slug}_idx"
+                    if not slug or len(index_name) > PG_MAX_IDENTIFIER_BYTES:
+                        index_name = f"{table_name}_{slug[:20]}_{position}_idx"
                     indexes_labels[index_name] = {"column": col_name, "type": index_type}
-                    try:
-                        table.append_constraint(Index(index_name, col_name))
-                    except KeyError:
-                        raise KeyError(
-                            f'Error creating index "{index_name}" on column "{col_name}". '
-                            f'Does the column "{col_name}" exist in the table?'
-                        )
+                    # an index asked on a column the file doesn't have raises
+                    # ConstraintColumnNotFoundError, whose message already names the column;
+                    # callers turn it into a ParseException(step="create_table_query")
+                    table.append_constraint(Index(index_name, col_name))
                 # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
 
     compiled_query = CreateTable(table).compile(dialect=asyncpg.dialect())

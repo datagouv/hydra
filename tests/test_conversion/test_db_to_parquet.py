@@ -1,5 +1,7 @@
+import os
 from io import BytesIO
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
 import pyarrow as pa
@@ -73,6 +75,27 @@ async def test_db_to_parquet(clean_db, fake_check, mocker):
     assert table_from_db.to_pydict() == table_from_csv.to_pydict()
     # can't compare with table_from_db.schema as the reload can make the types differ (date32 VS date64 for instance)
     assert pa_table_func.call_args.kwargs["schema"] == table_from_csv.schema
+    parquet.path.unlink()
+
+
+async def test_db_to_parquet_with_renamed_columns(clean_db, fake_check, mocker):
+    """The exported Parquet keeps the source column names, even when PG renamed them."""
+    mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
+    mocker.patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1)
+    long_col = "Nombre de logements sociaux conventionnés livrés au cours de l'année 2023"
+    check = await fake_check()
+    with NamedTemporaryFile() as fp:
+        fp.write(f"xmin,{long_col}\n1,test".encode("utf-8"))
+        fp.seek(0)
+        file = CsvLike(file_name=os.path.basename(fp.name))
+        await file.inspect()
+        table = await file.to_db(check=check)
+        parquet = await table.to_parquet()
+
+    assert parquet is not None
+    exported = pq.ParquetFile(parquet.path).read()
+    assert exported.column_names == ["xmin", long_col]
+    assert exported.to_pydict()[long_col] == ["test"]
     parquet.path.unlink()
 
 

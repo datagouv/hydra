@@ -119,21 +119,28 @@ def _parquet_file(df: pd.DataFrame) -> pq.ParquetFile:
     return pq.ParquetFile(buffer)
 
 
-async def test_parquet_to_db_rejects_too_long_column_name(fake_check):
-    """Reject parquet files whose column names exceed Postgres NAMEDATALEN."""
-    inspection = {
-        "columns": {"abcdefghijk": {"python_type": "int"}},
-        "total_lines": 1,
-    }
-    check = await fake_check()
-    with (
-        patch("udata_hydra.config.NAMEDATALEN", 10),
-        patch("udata_hydra.data_formats.data_format.os.path.getsize", return_value=10),
-    ):
-        file = Parquet(file_name="file.parquet", inspection=inspection)
-        with pytest.raises(ParseException) as exc:
-            await file.to_db(check=check)
-    assert exc.value.step == "scan_column_names"
+async def test_parquet_to_db_truncates_too_long_column_name(
+    setup_catalog, rmock, db, fake_check, produce_mock
+):
+    """Parquet column names that don't fit in Postgres are truncated, not rejected."""
+    long_col = "Nombre de logements sociaux conventionnés livrés au cours de l'année 2023"
+    assert len(long_col.encode("utf-8")) > 63
+    df = pd.DataFrame({long_col: [1, 2], "short": ["a", "b"]})
+    check = await fake_check(url="http://example.com/file.parquet")
+    rmock.get(check["url"], status=200, body=df.to_parquet())
+
+    file = await helpers.download_from_check(check, Parquet)
+    with patch("udata_hydra.config.PARQUET_TO_DB", True):
+        table = await file.analyse(check=check)
+    assert table is not None
+
+    row = await db.fetchrow(f'SELECT * FROM "{table.table_name}"')
+    db_col = table.inspection["columns_mapping"][long_col]
+    assert [c for c in row.keys() if c != "__id"] == [db_col, "short"]
+    assert db_col.endswith("__col0")
+    assert len(db_col.encode("utf-8")) <= 63
+    # only the renamed column is published
+    assert list(table.inspection["columns_mapping"]) == [long_col]
 
 
 async def test_parquet_to_db_copy_failure_raises_parse_exception(fake_check, mocker):

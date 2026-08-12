@@ -476,11 +476,11 @@ async def test_validation(
 @pytest.mark.parametrize(
     "params",
     (
-        ("col", False),
-        ("çà€", True),
+        ("col", False, "col__col0"),
+        ("çà€", True, "ç__col0"),
     ),
 )
-async def test_too_long_column_name(
+async def test_too_long_column_name_is_truncated(
     setup_catalog,
     rmock,
     db,
@@ -488,8 +488,7 @@ async def test_too_long_column_name(
     produce_mock,
     params,
 ):
-    col, has_non_ascii = params
-    url = "http://example.com/csv"
+    col, has_non_ascii, expected_db_col = params
     max_len = 10
     col_name = (col * ((max_len // len(col)) + 1))[: max_len if not has_non_ascii else max_len - 3]
     check = await fake_check(headers={"content-type": "application/csv"})
@@ -505,19 +504,64 @@ async def test_too_long_column_name(
         body=f"{col_name},b,c\n1,2,3".encode("utf-8"),
         repeat=True,
     )
-    # should fail because one column name is too long
     with patch("udata_hydra.config.NAMEDATALEN", max_len):
         file = await download_from_check(check, Csv)
         await file.analyse(check=check)
     updated_check = await Check.get_by_id(check["id"])
     assert updated_check is not None
-    # analysis failed
-    assert updated_check["parsing_error"].startswith("scan_column_names:")
-    # table was not created
-    tables = await db.fetch(
-        "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'public';"
+    assert updated_check["parsing_error"] is None
+
+    # the too long column has been truncated, the short ones are untouched
+    row = await db.fetchrow(f'SELECT * FROM "{table_name}"')
+    assert [c for c in row.keys() if c != "__id"] == [expected_db_col, "b", "c"]
+    assert len(expected_db_col.encode("utf-8")) <= max_len - 1
+
+    # only the renamed column is published in the mapping
+    res = await db.fetchrow(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    assert table_name not in [r["table_name"] for r in tables]
+    inspection = json.loads(res["csv_detective"])
+    assert inspection["columns_mapping"] == {col_name: expected_db_col}
+    # the source names are what stays exposed in the inspection. JSONB reorders the keys of
+    # `columns`, so `header` is the one carrying the column order.
+    assert sorted(inspection["columns"]) == sorted([col_name, "b", "c"])
+    assert inspection["header"] == [col_name, "b", "c"]
+
+
+async def test_long_column_name_analysed_twice(setup_catalog, rmock, db, fake_check, produce_mock):
+    """The second analysis reuses the previous one via validate_then_detect: it must not choke
+    on the renamed columns, and must produce the very same mapping."""
+    long_col = "Nombre de logements sociaux conventionnés livrés au cours de l'année 2023"
+    check = await fake_check(headers={"content-type": "application/csv"})
+    url = check["url"]
+    rmock.get(
+        url,
+        status=200,
+        headers={"content-type": "application/csv", "content-length": "100"},
+        body=f"{long_col},b\n1,2".encode("utf-8"),
+        repeat=True,
+    )
+
+    mappings = []
+    for _ in range(2):
+        file = await download_from_check(check, Csv)
+        with patch(
+            "udata_hydra.data_formats.csv_like.validate_then_detect",
+            wraps=validate_then_detect,
+        ) as mock_func:
+            await file.analyse(check=check)
+        mappings.append(file.inspection["columns_mapping"])
+
+    # the second pass went through the incremental validation path
+    mock_func.assert_called_once()
+    assert mappings[0] == mappings[1]
+    assert list(mappings[0]) == [long_col]
+
+    updated_check = await Check.get_by_id(check["id"])
+    assert updated_check is not None
+    assert updated_check["parsing_error"] is None
+    row = await db.fetchrow(f'SELECT * FROM "{hashlib.md5(url.encode("utf-8")).hexdigest()}"')
+    assert row[mappings[0][long_col]] == 1
 
 
 @pytest.mark.parametrize(

@@ -108,6 +108,17 @@ Manual checks (`POST /api/checks`, CLI `check-resource`) use **`high`** for the 
 
 Converted CSV tables will be stored in the database specified via `config.DATABASE_URL_CSV`. For tests it's the same database as for the catalog. Locally, `docker compose` will launch two distinct database containers.
 
+### Column names
+
+A source column name cannot always be used as-is as a PostgreSQL column name: identifiers are limited to 63 bytes, and some names are reserved by PostgreSQL (`xmin`, `ctid`…) or by hydra (`__id`). Such columns are renamed:
+
+- a reserved name gets a `__hydra_renamed` suffix;
+- a name that doesn't fit in 63 bytes is truncated (on a UTF-8 character boundary) and suffixed with `__col<position>`, the position of the column in the file.
+
+The resulting mapping is published in the inspection stored in `tables_index.csv_detective`, under the `columns_mapping` key, as `{"source name": "PostgreSQL name"}`. **Only the renamed columns are listed: a column missing from the mapping keeps its source name.** The key itself is always written, so an analysis with nothing to rename has `"columns_mapping": {}` — a missing key means the row predates this feature.
+
+Consumers reading the table (the tabular API) should use that mapping to keep exposing the source names. Note that the PostgreSQL name of a truncated column depends on the column's position, so it is **not stable across revisions of a resource** and must not be cached: the table is dropped and recreated on every analysis.
+
 ## 🧪 Tests
 
 To run the tests, you need to launch the test database with `docker compose --profile test up -d`.

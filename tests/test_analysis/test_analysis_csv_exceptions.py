@@ -70,3 +70,5 @@ async def test_exception_analysis(
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == expected_count
+    # every column name of that file fits in Postgres, so nothing was renamed
+    assert profile["columns_mapping"] == {}

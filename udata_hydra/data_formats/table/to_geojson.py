@@ -27,14 +27,14 @@ def _clean_pair_sql(col: str) -> str:
 
 
 def _build_feature_sql(
-    table_name: str, geo: dict[str, str], columns: list[str]
+    table_name: str, geo: dict[str, str], columns: list[str], mapping: dict[str, str]
 ) -> tuple[str, list[str]]:
     """Build a SQL query that generates GeoJSON features directly in PostgreSQL.
 
     Column names in `columns` and `geo` are the original CSV names. They are
-    mapped to their actual DB names (handling RESERVED_COLS renaming) for the
-    SQL identifiers, while the original names are passed as query parameters
-    for the JSON keys so the GeoJSON output matches what the CSV path produces.
+    mapped through `mapping` to their actual DB names for the SQL identifiers,
+    while the original names are passed as query parameters for the JSON keys
+    so the GeoJSON output matches what the CSV path produces.
 
     Returns (query, params) where params are the original column names used as
     JSON keys via $1, $2… placeholders.
@@ -46,7 +46,7 @@ def _build_feature_sql(
         params.append(col)
         # $N::text parameters are JSON *keys* (column names), not values.
         # Values come from the quoted column identifiers and keep their native PG types.
-        properties_fragments.append(f"${idx + 1}::text, {_quote_ident(db_col_name(col))}")
+        properties_fragments.append(f"${idx + 1}::text, {_quote_ident(db_col_name(col, mapping))}")
 
     # PostgreSQL's json_build_object accepts max 100 arguments (50 key-value pairs).
     # Split into chunks and merge with || when needed.
@@ -62,12 +62,12 @@ def _build_feature_sql(
         properties_sql = f"({' || '.join(parts)})::json"
 
     if "geojson" in geo:
-        col = db_col_name(geo["geojson"])
+        col = db_col_name(geo["geojson"], mapping)
         geometry_sql = f"({_quote_ident(col)})::json"
         where = ""
     elif "latlon" in geo or "lonlat" in geo:
         pair_key = "latlon" if "latlon" in geo else "lonlat"
-        col = db_col_name(geo[pair_key])
+        col = db_col_name(geo[pair_key], mapping)
         # latlon = "lat,lon" → GeoJSON needs [lon, lat] so swap indices
         # lonlat = "lon,lat" → already in GeoJSON order
         lon_idx, lat_idx = ("2", "1") if pair_key == "latlon" else ("1", "2")
@@ -80,8 +80,8 @@ def _build_feature_sql(
             )"""
         where = f"WHERE {_quote_ident(col)} IS NOT NULL"
     else:
-        lon_col = db_col_name(geo["longitude"])
-        lat_col = db_col_name(geo["latitude"])
+        lon_col = db_col_name(geo["longitude"], mapping)
+        lat_col = db_col_name(geo["latitude"], mapping)
         geometry_sql = f"""json_build_object(
                 'type', 'Point',
                 'coordinates', json_build_array({_quote_ident(lon_col)}, {_quote_ident(lat_col)})
@@ -127,7 +127,8 @@ async def db_to_geojson(table: Table) -> "Geojson|None":
     log.debug(f"Converting db table '{table.table_name}' to Geojson file '{geojson_name}'")
 
     columns = list(table.inspection["columns"].keys())
-    query, params = _build_feature_sql(table.table_name, geo, columns)
+    mapping: dict[str, str] = table.inspection.get("columns_mapping", {})
+    query, params = _build_feature_sql(table.table_name, geo, columns, mapping)
 
     db = await context.pool("csv")
     async with db.acquire() as conn:
