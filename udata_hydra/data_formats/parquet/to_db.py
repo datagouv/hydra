@@ -8,12 +8,12 @@ import pandas as pd
 import pyarrow.parquet as pq
 from progressist import ProgressBar
 
-from udata_hydra import config, context
+from udata_hydra import context
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.tables_index import insert_tables_index_entry
 from udata_hydra.conversion.schema import compute_create_table_query
 from udata_hydra.data_formats import Parquet
-from udata_hydra.db import compute_insert_query, db_col_name
+from udata_hydra.db import build_db_columns_mapping, compute_insert_query
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import ParseException
@@ -64,25 +64,17 @@ async def parquet_to_db(
 
     log.debug(f"Converting from parquet to db for {table_name}")
 
-    if any(
-        sum(len(char.encode("utf-8")) for char in col) > config.NAMEDATALEN - 1
-        for col in file.inspection["columns"]
-    ):
-        raise ParseException(
-            step="scan_column_names",
-            resource_id=file.resource_id,
-            table_name=table_name,
-        ) from ValueError(
-            f"Column names cannot exceed {config.NAMEDATALEN - 1} characters in Postgres"
-        )
+    db_cols: dict[str, str] = build_db_columns_mapping(file.inspection["columns"])
+    # published for consumers reading the inspection back (tabular API), so they can expose
+    # the source names. Only the renamed columns are listed: a missing entry means identity.
+    file.inspection["columns_mapping"] = {s: pg for s, pg in db_cols.items() if s != pg}
 
     if file.resource_id:
         # Update resource status to INSERTING_IN_DB
         await Resource.update(file.resource_id, {"status": "INSERTING_IN_DB"})
 
-    # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {
-        db_col_name(c): helpers.get_python_type(v) for c, v in file.inspection["columns"].items()
+        db_cols[c]: helpers.get_python_type(v) for c, v in file.inspection["columns"].items()
     }
 
     q = f'DROP TABLE IF EXISTS "{table_name}"'
@@ -90,8 +82,12 @@ async def parquet_to_db(
     await db.execute(q)
 
     # Create table
-    q = compute_create_table_query(table_name=table_name, columns=columns, indexes=table_indexes)
     try:
+        q = compute_create_table_query(
+            table_name=table_name,
+            columns=columns,
+            indexes={db_cols.get(c, c): t for c, t in (table_indexes or {}).items()},
+        )
         await db.execute(q)
     except Exception as e:
         raise ParseException(
@@ -122,8 +118,7 @@ async def parquet_to_db(
         bar = ProgressBar(total=file.inspection["total_lines"])
         pqf = pq.ParquetFile(file.path)
         for r in bar.iter(_iter_parquet_rows(pqf)):
-            data = {k: v for k, v in zip(pqf.schema.names, r)}
-            print(data)
+            data = {k: v for k, v in zip(columns.keys(), r)}
             # NB: possible sql injection here, but should not be used in prod
             q = compute_insert_query(table_name=table_name, data=data, returning="__id")
             await db.execute(q, *data.values())

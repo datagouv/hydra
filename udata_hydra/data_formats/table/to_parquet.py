@@ -28,7 +28,8 @@ async def db_to_parquet(table: Table) -> "Parquet":
     pool = await context.pool("csv")
 
     original_cols = list(table.inspection["columns"].keys())
-    db_cols = [db_col_name(c) for c in original_cols]
+    mapping: dict[str, str] = table.inspection.get("columns_mapping", {})
+    db_cols = [db_col_name(c, mapping) for c in original_cols]
     cols_sql = ", ".join(f'"{c}"' for c in db_cols)
 
     schema = pa.schema(
