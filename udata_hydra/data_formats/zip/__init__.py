@@ -1,4 +1,5 @@
 import logging
+import shutil
 import zipfile
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -32,6 +33,12 @@ DATA_EXTENSIONS: dict[str, type[DataFormat]] = {
 FALLBACK_EXTENSIONS: dict[str, type[DataFormat]] = {".txt": Csv}
 
 EXTRACTION_CHUNK_SIZE = 1024 * 1024
+
+# The only two methods whose output zipfile bounds while decompressing: it passes our read size
+# down to the deflate decompressor, and a stored member is copied as is. For bzip2 and lzma it
+# hands the whole compressed chunk over and truncates the result afterwards, so a member lying
+# about its file_size would have allocated gigabytes before we get a chance to count anything.
+SAFE_COMPRESSION_METHODS = {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}
 
 # Member names end up in parsing_error, which we send to udata: never relay an arbitrary long string
 MAX_MEMBER_NAME_LENGTH = 100
@@ -107,39 +114,33 @@ class Zip(DataFormat):
         self, archive: zipfile.ZipFile, member: zipfile.ZipInfo, max_size: int, check: dict
     ) -> Path:
         """Write a member of the archive next to it, without ever letting it grow over :max_size:"""
-        too_large = self.io_error(
-            f"Extracted file too large: {member.filename[:MAX_MEMBER_NAME_LENGTH]}", check
-        )
-        # This is what caps a decompression bomb: zipfile stops decompressing at the announced
-        # file_size (and fails the CRC check if the content does not match it), so an archive
-        # cannot deliver more bytes than it declares here.
+        if member.compress_type not in SAFE_COMPRESSION_METHODS:
+            raise self.io_error(
+                f"Unsupported compression method in the zip archive: {member.compress_type}", check
+            )
+
+        # Together with the check above, this is what caps a decompression bomb: for those two
+        # methods zipfile stops decompressing at the announced file_size (and fails the CRC check
+        # if the content does not match it), so an archive cannot deliver more bytes than it
+        # declares here.
         if member.file_size > max_size:
-            raise too_large
+            raise self.io_error(
+                f"Extracted file too large: {member.filename[:MAX_MEMBER_NAME_LENGTH]}", check
+            )
 
         destination = NamedTemporaryFile(dir=storage_path(""), delete=False)
         try:
-            # never `archive.extract()`: the member name is attacker-controlled and could escape the
-            # download folder ("../../etc/passwd"), while a generated name cannot
-            with archive.open(member) as source:
-                written = 0
-                while chunk := source.read(EXTRACTION_CHUNK_SIZE):
-                    # belt and braces: the check above holds as long as zipfile honours file_size,
-                    # counting what we actually write holds regardless
-                    written += len(chunk)
-                    if written > max_size:
-                        raise too_large
-                    destination.write(chunk)
-        except IOException:
-            Path(destination.name).unlink(missing_ok=True)
-            raise
+            # never `archive.extract()`: it would write the member under the name the archive
+            # chose, wherever that name points to inside the shared download folder, while the
+            # rest of the pipeline expects the generated one
+            with destination, archive.open(member) as source:
+                shutil.copyfileobj(source, destination, EXTRACTION_CHUNK_SIZE)
         except Exception as e:
             Path(destination.name).unlink(missing_ok=True)
             raise self.io_error(
                 f"Could not extract {member.filename[:MAX_MEMBER_NAME_LENGTH]} from the zip archive",
                 check,
             ) from e
-        finally:
-            destination.close()
 
         return Path(destination.name)
 
@@ -147,6 +148,11 @@ class Zip(DataFormat):
         """Extract the single analysable file of the archive, as the format able to analyse it,
         or None if the archive holds nothing we know how to analyse"""
         try:
+            # Opening an archive reads its whole central directory into memory, one ZipInfo per
+            # entry and no cap: an archive made of nothing but entry headers costs roughly ten
+            # times its own size in RSS. Bounding that would mean parsing the end of central
+            # directory record ourselves before handing the file to zipfile — the amplification
+            # stays bounded by MAX_FILESIZE_ALLOWED.zip, so we live with it.
             archive = zipfile.ZipFile(self.path)
         except Exception as e:
             # BadZipFile, but also RuntimeError (encrypted archive), NotImplementedError (unsupported

@@ -16,9 +16,15 @@ async def detect_data_format_from_check_or_catalog(check: dict) -> type[DataForm
             "SELECT format FROM catalog WHERE resource_id = $1", f"{check['resource_id']}"
         )
     resource_format = row["format"] if row is not None else None
+
+    # A "*.zip" catalog format wins over another format's mime type: an archive announced as such
+    # stays an archive whatever it is served as. The reverse would be wrong, hence the two halves:
+    # an xlsx is a zip container, so a resource declared xlsx and served as "application/zip" must
+    # keep being analysed as an xlsx. Zip only gets to win on its mime type below, last.
+    if Zip.detect_from_catalog_format(resource_format):
+        return Zip
+
     for fmt in [
-        # first, so that a "*.zip" catalog format wins over another format's mime type
-        Zip,
         Csv,
         Csvgz,
         Xls,
@@ -27,6 +33,7 @@ async def detect_data_format_from_check_or_catalog(check: dict) -> type[DataForm
         Parquet,
         Wfs,
         Wms,
+        Zip,
     ]:
         if fmt.detect_from_check(
             check, resource_format=resource_format
