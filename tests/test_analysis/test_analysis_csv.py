@@ -382,7 +382,12 @@ def create_analysis(scan: dict) -> dict:
                 "rows": [["1", "2022-11-03"], ["5", "2025-11-02"]],
                 "columns": {
                     "a": {"score": 1.0, "format": "int", "python_type": "int"},
-                    "b": {"score": 1.0, "format": "date", "python_type": "date"},
+                    "b": {
+                        "score": 1.0,
+                        "format": "date",
+                        "python_type": "date",
+                        "date_format": "%Y-%m-%d",
+                    },
                 },
                 "formats": {"int": ["a"], "date": ["b"]},
             },
