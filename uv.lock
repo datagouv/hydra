@@ -458,8 +458,8 @@ wheels = [
 
 [[package]]
 name = "csv-detective"
-version = "0.12.0"
-source = { registry = "https://pypi.org/simple" }
+version = "0.12.1.dev18"
+source = { git = "https://github.com/datagouv/csv-detective?branch=improve_date_parsing#3bc5e6dfc9ce772b94a9f35c2b00850aa90519e3" }
 dependencies = [
     { name = "charset-normalizer" },
     { name = "dateparser" },
@@ -476,9 +476,6 @@ dependencies = [
     { name = "rstr" },
     { name = "unidecode" },
     { name = "xlrd" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/62/a6/53a360a34f4d42d9cbe9fc03a8c42bb0db535e74d49b0c4a72df29d77bbe/csv_detective-0.12.0-py3-none-any.whl", hash = "sha256:9c5f6c9715061b1912cadb04de6f2ef3e49b1210ed176660b5674b0b30e1ec50", size = 222567, upload-time = "2026-07-08T13:26:13.488Z" },
 ]
 
 [[package]]
@@ -2089,7 +2086,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "boto3", specifier = ">=1.35.0" },
     { name = "coloredlogs", specifier = ">=15.0.1" },
-    { name = "csv-detective", specifier = "==0.12.0" },
+    { name = "csv-detective", git = "https://github.com/datagouv/csv-detective?branch=improve_date_parsing" },
     { name = "dateparser", specifier = ">=1.1.7" },
     { name = "humanfriendly", specifier = ">=10.0" },
     { name = "json-stream", specifier = ">=2.3.3" },

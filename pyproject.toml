@@ -12,7 +12,7 @@ dependencies = [
     "aiohttp>=3.10.3",
     "asyncpg>=0.29.0",
     "coloredlogs>=15.0.1",
-    "csv-detective==0.12.0",
+    "csv-detective",
     "dateparser>=1.1.7",
     "humanfriendly>=10.0",
     "json-stream>=2.3.3",
@@ -93,6 +93,11 @@ local_scheme = "no-local-version"
 # Provisional: drop when sentry-sdk requires a patched urllib3 lower bound (GHSA-mf9v-mfxr-j63j).
 [tool.uv]
 constraint-dependencies = ["urllib3>=2.7.0"]
+
+# `cast()` only takes the inferred date format from that branch on. Pin it back to a released
+# version once datagouv/csv-detective#245 is merged and published.
+[tool.uv.sources]
+csv-detective = { git = "https://github.com/datagouv/csv-detective", branch = "improve_date_parsing" }
 
 [tool.uv.build-backend]
 module-name = "udata_hydra"
