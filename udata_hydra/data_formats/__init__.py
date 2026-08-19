@@ -5,3 +5,4 @@ from udata_hydra.data_formats.ogc import Ogc, Wfs, Wms  # noqa
 from udata_hydra.data_formats.parquet import Parquet  # noqa
 from udata_hydra.data_formats.pmtiles import PMTiles  # noqa
 from udata_hydra.data_formats.table import Table  # noqa
+from udata_hydra.data_formats.zip import Zip  # noqa

@@ -122,7 +122,8 @@ async def handle_parse_exception(
     if check:
         # e.__cause__ let us access the "inherited" error of the Exception (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
-        err = f"{e.step}:{str(e.__cause__)}"
+        # exceptions raised without a chained cause carry their explanation in the message
+        err = f"{e.step}:{str(e.__cause__) if e.__cause__ else e.message}"
         if e.sentry_event_id:
             err = f"{e.step}:sentry:{e.sentry_event_id}"
         check = await Check.update(

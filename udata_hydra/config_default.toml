@@ -65,6 +65,8 @@ MAX_FILESIZE_ALLOWED.geojson = 104857600
 MAX_FILESIZE_ALLOWED.parquet = 52428800
 MAX_FILESIZE_ALLOWED.wms = 1048576     # 1 MB
 MAX_FILESIZE_ALLOWED.wfs = 1048576     # 1 MB
+# applies to the archive itself; once extracted, the file must fit its own format's limit
+MAX_FILESIZE_ALLOWED.zip = 104857600
 
 DEFAULT_MAX_FILESIZE_ALLOWED = 52428800
 
