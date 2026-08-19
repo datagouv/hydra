@@ -136,6 +136,10 @@ dmypy.json
 config.toml
 tests/data/.*
 
+# Benchmark outputs (history seed is tracked)
+.benchmarks/*
+!.benchmarks/benchmarks.history.csv
+
 # vscode/codium
 .vscode/
 
