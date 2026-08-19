@@ -232,7 +232,7 @@ class Resource:
                 q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
             await connection.execute(q)
 
-    @classmethod
+    @staticmethod
     def get_excluded_clause(cls) -> str:
         """Return the WHERE clause to get only resources from the checks which:
         - don't have a URL in the excluded URLs patterns
