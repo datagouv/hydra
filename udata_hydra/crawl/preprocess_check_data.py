@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from asyncpg import Record
@@ -9,6 +10,8 @@ from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import UdataPayload, queue, send
 from udata_hydra.utils.http import CORS_HEADER_FIELDS
+
+log = logging.getLogger("udata-hydra")
 
 
 async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict, dict | None]:
@@ -33,8 +36,23 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
         last_check = dict(last_check_record)
 
     has_changed: bool = await has_check_changed(check_data, last_check)
+    url_differs_from_last_check: bool = last_check is not None and check_data.get(
+        "url"
+    ) != last_check.get("url")
     check_data["next_check_at"] = calculate_next_check_date(has_changed, last_check, None)
     new_check: dict = await Check.insert(data=check_data, returning="*")
+
+    log.info(
+        f"[resource_id={check_data['resource_id']}] preprocess_check_data: "
+        f"check_id={new_check['id']} has_changed={has_changed} "
+        f"url_differs_from_last_check={url_differs_from_last_check}"
+    )
+    if url_differs_from_last_check and not has_changed:
+        log.warning(
+            f"[resource_id={check_data['resource_id']}] preprocess_check_data: "
+            "URL changed but has_check_changed=False "
+            "(URL is not included in change detection)"
+        )
 
     if has_changed:
         payload = {
