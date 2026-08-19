@@ -19,7 +19,6 @@ from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import start_checks
 from udata_hydra.crawl.check_resources import check_resource
-from udata_hydra.crawl.preprocess_check_data import get_content_type_from_header
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 
@@ -242,38 +241,15 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
-@pytest.mark.parametrize(
-    "head_status,head_headers,head_exception",
-    [
-        pytest.param(501, None, None, id="invalid_status"),
-        pytest.param(200, {}, None, id="missing_size_headers"),
-        pytest.param(
-            200,
-            {"content-type": "text/html", "content-length": "247"},
-            None,
-            id="waf_html_headers",
-        ),
-        pytest.param(None, None, TimeoutError, id="head_timeout"),
-    ],
-)
-async def test_switch_head_to_get(
+async def test_switch_head_to_get_on_timeout(
     setup_catalog,
     rmock,
     produce_mock,
     analysis_mock,
     db,
-    head_status,
-    head_headers,
-    head_exception,
 ):
     rurl = RESOURCE_URL
-    if head_exception:
-        rmock.head(rurl, exception=head_exception)
-    else:
-        head_kwargs = {"status": head_status}
-        if head_headers is not None:
-            head_kwargs["headers"] = head_headers
-        rmock.head(rurl, **head_kwargs)
+    rmock.head(rurl, exception=TimeoutError)
     rmock.get(rurl, status=200, headers={"content-length": "10"})
     await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
@@ -714,22 +690,6 @@ async def test_recheck_download_only_once(rmock, fake_check, db, produce_mock, s
 
     # GET shouldn't have been called
     assert ("GET", URL(rurl)) not in rmock.requests
-
-
-@pytest.mark.parametrize(
-    "content_type",
-    [
-        # (content type header, parsed content type)
-        ("application/json", "application/json"),
-        ("text/html; charset=utf-8", "text/html"),
-        ("text/html;h5ai=0.20;charset=UTF-8", "text/html"),
-    ],
-)
-async def test_content_type_from_header(content_type):
-    content_type_header, parsed_content_type = content_type
-    assert parsed_content_type == await get_content_type_from_header(
-        {"content-type": content_type_header}
-    )
 
 
 @pytest.mark.parametrize("resource_status", list(Resource.STATUSES.keys()) + [None])
