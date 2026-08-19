@@ -8,7 +8,7 @@ from .file import (
     remove_remainders,
     storage_path,
 )
-from .http import UdataPayload, get_request_params, send
+from .http import UdataPayload, get_http_client, get_request_params, send
 from .queue import enqueue
 from .timer import Timer
 
@@ -24,6 +24,7 @@ __all__ = [
     "remove_remainders",
     "UdataPayload",
     "get_request_params",
+    "get_http_client",
     "send",
     "storage_path",
     "enqueue",

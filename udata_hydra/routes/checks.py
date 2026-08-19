@@ -1,16 +1,15 @@
 import json
 from datetime import date
 
-import aiohttp
 from aiohttp import web
 from asyncpg import Record
 
-from udata_hydra import config, context
+from udata_hydra import context
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.schemas import CheckGroupBy, CheckSchema
-from udata_hydra.utils import get_request_params
+from udata_hydra.utils import get_http_client, get_request_params
 
 
 async def get_latest_check(request: web.Request) -> web.Response:
@@ -76,18 +75,15 @@ async def create_check(request: web.Request) -> web.Response:
 
     context.monitor().set_status(f'Crawling url "{url}"...')
 
-    async with aiohttp.ClientSession(
-        timeout=None,
-        headers={"user-agent": config.USER_AGENT_FULL},
-    ) as session:
-        status: str = await check_resource(
-            url=url,
-            resource=resource,
-            force_analysis=force_analysis,
-            session=session,
-            worker_priority="high",
-        )
-        context.monitor().refresh(status)
+    session = await get_http_client()
+    status: str = await check_resource(
+        url=url,
+        resource=resource,
+        force_analysis=force_analysis,
+        session=session,
+        worker_priority="high",
+    )
+    context.monitor().refresh(status)
 
     check: Record | None = await Check.get_latest(url, resource_id)
     if not check:
