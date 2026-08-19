@@ -79,6 +79,8 @@ async def update_resource(request: web.Request) -> web.Response:
     if not document:
         raise web.HTTPBadRequest(text="Missing document body")
 
+    # Temporary debug for https://github.com/datagouv/data.gouv.fr/issues/2048
+    # (hydra#466). Remove once the check-notify gap is understood.
     dataset_id: str = valid_payload["dataset_id"]
     resource_id: str = valid_payload["resource_id"]
     new_url: str = document["url"]
