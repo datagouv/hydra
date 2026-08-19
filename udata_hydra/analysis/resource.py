@@ -95,8 +95,8 @@ async def analyse_resource(
             await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
             tmp_file, _ = await download_resource(url, headers, max_size_allowed)
             timer.mark("download-resource")
-        except IOException:
-            dl_analysis["analysis:error"] = "File too large to download"
+        except IOException as e:
+            dl_analysis["analysis:error"] = str(e)
         else:
             await Resource.update(resource_id, data={"status": "ANALYSING_DOWNLOADED_RESOURCE"})
             # Get file size
@@ -146,6 +146,9 @@ async def analyse_resource(
 
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
         if data_format is not None:
+            log.info(
+                f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
+            )
             await Resource.update(
                 resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
             )
@@ -181,6 +184,11 @@ async def analyse_resource(
         )
 
     else:
+        log.info(
+            f"[resource_id={resource_id}] analyse_resource: skipped re-parse and analysis udata notify "
+            f"(change_status={change_status.name}, last_parsing_table="
+            f"{last_check.get('parsing_table') if last_check else None})"
+        )
         await Resource.update(resource_id, data={"status": None})
 
 
