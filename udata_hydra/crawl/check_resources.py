@@ -171,6 +171,15 @@ async def check_resource(
             return RESOURCE_RESPONSE_STATUSES["OK"]
 
     except asyncio.exceptions.TimeoutError:
+        if method == "head":
+            return await check_resource(
+                url,
+                resource,
+                session,
+                force_analysis=force_analysis,
+                method="get",
+                worker_priority=worker_priority,
+            )
         # Process the check data. If it has changed, it will be sent to udata
         await preprocess_check_data(
             dataset_id=resource["dataset_id"],
