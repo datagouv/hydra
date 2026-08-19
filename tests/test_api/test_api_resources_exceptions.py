@@ -120,6 +120,14 @@ async def test_update_resource_exception(
     )
     assert resp.status == 404
 
+    # Test API call with a resource which is in the catalog but has no exception
+    resp = await client.put(
+        path=f"/api/resources-exceptions/{RESOURCE_ID}",
+        headers=api_headers,
+        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
+    )
+    assert resp.status == 404
+
     # Test API call success
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
