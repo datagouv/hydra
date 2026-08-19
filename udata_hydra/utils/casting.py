@@ -31,31 +31,38 @@ def iter_tabular_rows(
 ) -> Iterator[list | dict]:
     # because we need the iterator multiple times, not possible to
     # handle db, parquet and geojson through the same iteration
-    columns = {
-        col: (v["python_type"], v.get("date_format")) for col, v in inspection["columns"].items()
-    }
+    column_names: list[str] = []
+    python_types: list[str] = []
+    date_formats: list[str | None] = []
+    for col, spec in inspection["columns"].items():
+        column_names.append(col)
+        python_types.append(spec["python_type"])
+        date_formats.append(spec.get("date_format"))
+
     with Reader(file_path, inspection) as reader:
         for line in reader:
             if line:
                 if not as_dict:
                     yield [
                         _smart_cast(
-                            _type,
+                            python_type,
                             date_format,
                             value if isinstance(value, str) or value is None else str(value),
                             cast_json=cast_json,
                             failsafe=False,
                         )
-                        for (_type, date_format), value in zip(columns.values(), line)
+                        for python_type, date_format, value in zip(python_types, date_formats, line)
                     ]
                 else:
                     yield {
                         col: _smart_cast(
-                            _type,
+                            python_type,
                             date_format,
                             value if isinstance(value, str) or value is None else str(value),
                             cast_json=cast_json,
                             failsafe=False,
                         )
-                        for (col, (_type, date_format)), value in zip(columns.items(), line)
+                        for col, python_type, date_format, value in zip(
+                            column_names, python_types, date_formats, line
+                        )
                     }
