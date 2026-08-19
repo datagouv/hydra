@@ -8,6 +8,7 @@ from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_sta
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import UdataPayload, queue, send
+from udata_hydra.utils.http import CORS_HEADER_FIELDS
 
 
 async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict, dict | None]:
@@ -36,27 +37,35 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
     new_check: dict = await Check.insert(data=check_data, returning="*")
 
     if has_changed:
+        payload = {
+            "check:id": new_check["id"],
+            "check:available": is_valid_status(check_data.get("status")),
+            "check:status": check_data.get("status"),
+            "check:timeout": check_data["timeout"],
+            "check:date": datetime.now(timezone.utc).isoformat(),
+            "check:error": check_data.get("error"),
+            "check:headers:content-type": await get_content_type_from_header(
+                check_data.get("headers", {})
+            ),
+            "check:headers:content-length": int(
+                check_data.get("headers", {}).get("content-length", 0)
+            )
+            or None,
+        }
+
+        # Add CORS headers to payload if available
+        cors_headers = check_data.get("cors_headers")
+        if cors_headers:
+            payload["check:cors:status"] = cors_headers.get("status")
+            payload["check:cors:error"] = cors_headers.get("error")
+            for field in CORS_HEADER_FIELDS:
+                payload[f"check:cors:{field}"] = cors_headers.get(field)
+
         queue.enqueue(
             send,
             dataset_id=dataset_id,
             resource_id=check_data["resource_id"],
-            document=UdataPayload(
-                {
-                    "check:id": new_check["id"],
-                    "check:available": is_valid_status(check_data.get("status")),
-                    "check:status": check_data.get("status"),
-                    "check:timeout": check_data["timeout"],
-                    "check:date": datetime.now(timezone.utc).isoformat(),
-                    "check:error": check_data.get("error"),
-                    "check:headers:content-type": await get_content_type_from_header(
-                        check_data.get("headers", {})
-                    ),
-                    "check:headers:content-length": int(
-                        check_data.get("headers", {}).get("content-length", 0)
-                    )
-                    or None,
-                }
-            ),
+            document=UdataPayload(payload),
             _priority="high",
         )
 
@@ -94,6 +103,15 @@ async def has_check_changed(check_data: dict, last_check_data: dict | None) -> b
         or current_headers.get("content-type") != last_check_headers.get("content-type")
     )
 
+    # Check if CORS headers have changed
+    current_cors_headers = check_data.get("cors_headers")
+    last_check_cors_headers = None
+    if last_check_data:
+        cors_headers_value = last_check_data.get("cors_headers")
+        if cors_headers_value:
+            last_check_cors_headers = json.loads(cors_headers_value)
+    cors_has_changed = last_check_data and current_cors_headers != last_check_cors_headers
+
     # TODO: Instead of computing criterions here, store payload and compare with previous one.
     # It would make debugging easier.
     criterions = {
@@ -102,6 +120,7 @@ async def has_check_changed(check_data: dict, last_check_data: dict | None) -> b
         "status_no_longer_available": status_no_longer_available,
         "timeout_has_changed": timeout_has_changed,
         "content_has_changed": content_has_changed,
+        "cors_has_changed": cors_has_changed,
     }
 
     return any(criterions.values())

@@ -5,6 +5,10 @@ from multidict import CIMultiDictProxy
 
 from udata_hydra import config, context
 
+# WAF block pages often return HTTP 200 on HEAD with text/html and a tiny body
+# (e.g. "Request Rejected", ~247 bytes). Treat those as unreliable HEAD responses.
+SUSPICIOUS_HTML_HEAD_MAX_BYTES = 4096
+
 
 async def get_content_type_from_header(headers: dict) -> str:
     """
@@ -12,7 +16,7 @@ async def get_content_type_from_header(headers: dict) -> str:
     """
     content_type = headers.get("content-type")
     if not content_type or ";" not in content_type:
-        return content_type
+        return content_type or ""
     try:
         content_type, _ = content_type.split(";")
     except ValueError:
@@ -21,7 +25,7 @@ async def get_content_type_from_header(headers: dict) -> str:
     return content_type
 
 
-def convert_headers(headers: CIMultiDictProxy) -> dict:
+def convert_headers(headers: CIMultiDictProxy[str] | dict | Any) -> dict:
     """Convert headers from aiohttp CIMultiDict type to dict type.
 
     :warning: this will only take the first value for a given header key but multidict is not json serializable
@@ -50,10 +54,17 @@ def has_nice_head(resp) -> bool:
         return False
     if not any([k in resp.headers for k in ("content-length", "last-modified")]):
         return False
+    content_type = resp.headers.get("content-type", "").lower()
+    if content_type.startswith("text/html"):
+        try:
+            if int(resp.headers.get("content-length", 0)) < SUSPICIOUS_HTML_HEAD_MAX_BYTES:
+                return False
+        except (TypeError, ValueError):
+            return False
     return True
 
 
-def is_valid_status(status: str) -> bool | None:
+def is_valid_status(status: str | None) -> bool | None:
     if not status:
         return False
     status_nb = int(status)

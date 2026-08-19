@@ -3,23 +3,29 @@ NB: we can't use pytest-aiohttp helpers because
 it will interfere with the rest of our async code
 """
 
+import platform
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
-from udata_hydra.db.resource import Resource
+from udata_hydra import config
 
 pytestmark = pytest.mark.asyncio
 
 
 async def test_get_crawler_status(setup_catalog, client, fake_check):
-    expected_resources_statuses_count = {s: 0 for s in Resource.STATUSES if s}
-    expected_resources_statuses_count["null"] = 1
     expected_data = {
-        "total": 1,
-        "pending_checks": 1,
-        "fresh_checks": 0,
-        "checks_percentage": 0.0,
-        "fresh_checks_percentage": 0.0,
-        "resources_statuses_count": expected_resources_statuses_count,
+        "checks": {
+            "in_progress_count": 0,
+            "in_progress_percentage": 0.0,
+            "needs_check_count": 1,
+            "needs_check_percentage": 100.0,
+            "up_to_date_check_count": 0,
+            "up_to_date_check_percentage": 0.0,
+        },
+        "resources": {
+            "total_eligible_count": 1,
+        },
     }
 
     resp = await client.get("/api/status/crawler")
@@ -27,26 +33,37 @@ async def test_get_crawler_status(setup_catalog, client, fake_check):
     data: dict = await resp.json()
     assert data == expected_data
 
-    expected_resources_statuses_count = {s: 0 for s in Resource.STATUSES if s}
-    expected_resources_statuses_count["null"] = 1
     expected_data = {
-        "total": 1,
-        "pending_checks": 0,
-        "fresh_checks": 1,
-        "checks_percentage": 100.0,
-        "fresh_checks_percentage": 100.0,
-        "resources_statuses_count": expected_resources_statuses_count,
+        "checks": {
+            "in_progress_count": 0,
+            "in_progress_percentage": 0.0,
+            "needs_check_count": 0,
+            "needs_check_percentage": 0.0,
+            "up_to_date_check_count": 1,
+            "up_to_date_check_percentage": 100.0,
+        },
+        "resources": {
+            "total_eligible_count": 1,
+        },
     }
 
     await fake_check()
     resp = await client.get("/api/status/crawler")
     assert resp.status == 200
-    data: dict = await resp.json()
+    data = await resp.json()
     assert data == expected_data
+
+    # Outdated check (next_check_at in the past) → needs_check, not up_to_date
+    await fake_check(next_check_at=datetime.now(timezone.utc) - timedelta(hours=1))
+    resp = await client.get("/api/status/crawler")
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["checks"]["needs_check_count"] == 1
+    assert data["checks"]["up_to_date_check_count"] == 0
 
 
 async def test_get_stats(setup_catalog, client, fake_check):
-    resp = await client.get("/api/stats")
+    resp = await client.get("/api/checks/stats")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == {
@@ -62,9 +79,9 @@ async def test_get_stats(setup_catalog, client, fake_check):
     await fake_check()
     await fake_check(timeout=True, status=None)
     await fake_check(status=500, error="error")
-    resp = await client.get("/api/stats")
+    resp = await client.get("/api/checks/stats")
     assert resp.status == 200
-    data: dict = await resp.json()
+    data = await resp.json()
     assert data == {
         "status": [
             {"label": "error", "count": 1, "percentage": 100.0},
@@ -78,3 +95,17 @@ async def test_get_stats(setup_catalog, client, fake_check):
 async def test_get_health(client) -> None:
     resp = await client.get("/api/health")
     assert resp.status == 200
+    data = await resp.json()
+
+    datetime.fromisoformat(data.pop("uptime_since"))
+    assert data == {
+        "version": config.APP_VERSION,
+        "python_version": platform.python_version(),
+        "environment": config.ENVIRONMENT or "unknown",
+        "csv_analysis": config.CSV_ANALYSIS,
+        "csv_to_db": config.CSV_TO_DB,
+        "db_to_parquet": config.DB_TO_PARQUET,
+        "db_to_geojson": config.DB_TO_GEOJSON,
+        "geojson_to_pmtiles": config.GEOJSON_TO_PMTILES,
+        "parquet_to_db": config.PARQUET_TO_DB,
+    }

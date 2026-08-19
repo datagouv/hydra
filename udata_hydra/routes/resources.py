@@ -5,6 +5,7 @@ from aiohttp import web
 from asyncpg import Record
 
 from udata_hydra.db.resource import Resource
+from udata_hydra.routes.status import get_resources_status_counts
 from udata_hydra.schemas import ResourceDocumentSchema, ResourceSchema
 
 
@@ -52,6 +53,7 @@ async def create_resource(request: web.Request) -> web.Response:
         type=document["type"],
         format=document["format"],
         priority=True,
+        title=document["title"],
     )
 
     return web.json_response(ResourceDocumentSchema().dump(dict(document)), status=201)
@@ -83,6 +85,7 @@ async def update_resource(request: web.Request) -> web.Response:
         url=document["url"],
         type=document["type"],
         format=document["format"],
+        title=document["title"],
     )
 
     return web.json_response(ResourceDocumentSchema().dump(document), status=200)
@@ -102,3 +105,90 @@ async def delete_resource(request: web.Request) -> web.Response:
     await Resource.delete(resource_id=resource_id)
 
     return web.HTTPNoContent()
+
+
+async def get_resources_stats(request: web.Request) -> web.Response:
+    """Aggregate statistics about resources in catalog (counts and crawler status breakdown)."""
+    q_total = """
+        SELECT
+            COALESCE(COUNT(*), 0) AS total_resources,
+            COALESCE(SUM(CASE WHEN catalog.deleted = True THEN 1 ELSE 0 END), 0) AS deleted_resources
+        FROM catalog
+    """
+    stats_resources: dict = await request.app["pool"].fetchrow(q_total)
+    return web.json_response(
+        {
+            "total_count": stats_resources["total_resources"],
+            "deleted_count": stats_resources["deleted_resources"],
+            "statuses_count": await get_resources_status_counts(request),
+        }
+    )
+
+
+async def get_resources_stats_cors(request: web.Request) -> web.Response:
+    """CORS-related statistics for external resources (URLs not on data.gouv.fr)."""
+    q = """
+        -- External resources only; count how many have ≥1 check with CORS data and coverage %.
+        SELECT
+            COUNT(DISTINCT resource_id) FILTER (WHERE has_cors_check) AS resources_with_cors_data,
+            COUNT(DISTINCT resource_id) FILTER (WHERE NOT has_cors_check) AS resources_without_cors_data,
+            ROUND(
+                COUNT(DISTINCT resource_id) FILTER (WHERE has_cors_check) * 100.0 / NULLIF(COUNT(DISTINCT resource_id), 0),
+                2
+            ) AS coverage_percentage
+        FROM (
+            SELECT
+                c.resource_id,
+                BOOL_OR(ch.cors_headers IS NOT NULL) AS has_cors_check
+            FROM catalog c
+            LEFT JOIN checks ch ON c.resource_id = ch.resource_id
+            WHERE c.url NOT LIKE '%data.gouv.fr%'
+            AND c.deleted = False
+            GROUP BY c.resource_id
+        ) resources_summary
+    """
+    row = await request.app["pool"].fetchrow(q)
+    q_dist = """
+        -- Among external resources with ≥1 CORS check, classify by allow-origin and aggregate counts/percentages.
+        SELECT
+            access_status,
+            COUNT(*) AS unique_resources_count,
+            ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS percentage
+        FROM (
+            SELECT
+                c.resource_id,
+                CASE
+                    WHEN BOOL_OR(ch.cors_headers->>'allow-origin' = '*') THEN 'Accessible (Wildcard *)'
+                    WHEN BOOL_OR(ch.cors_headers->>'allow-origin' ILIKE '%data.gouv.fr%') THEN 'Accessible (Specific Whitelist)'
+                    WHEN BOOL_AND(ch.cors_headers->>'allow-origin' IS NULL OR ch.cors_headers->>'allow-origin' = '') THEN 'Blocked (Missing Header)'
+                    ELSE 'Blocked (Other Domain Only)'
+                END AS access_status
+            FROM catalog c
+            INNER JOIN checks ch ON c.resource_id = ch.resource_id
+            WHERE c.url NOT LIKE '%data.gouv.fr%'
+            AND c.deleted = False
+            AND ch.cors_headers IS NOT NULL
+            GROUP BY c.resource_id
+        ) unique_resources_summary
+        GROUP BY access_status
+        ORDER BY access_status
+    """
+    rows_dist = await request.app["pool"].fetch(q_dist)
+    allow_origin_distribution = [
+        {
+            "access_status": r["access_status"],
+            "unique_resources_count": r["unique_resources_count"],
+            "percentage": float(r["percentage"]) if r["percentage"] is not None else None,
+        }
+        for r in rows_dist
+    ]
+    return web.json_response(
+        {
+            "external_resources_with_cors_data": row["resources_with_cors_data"] or 0,
+            "external_resources_without_cors_data": row["resources_without_cors_data"] or 0,
+            "external_resources_cors_coverage_percentage": float(row["coverage_percentage"])
+            if row["coverage_percentage"] is not None
+            else None,
+            "external_resources_allow_origin_distribution": allow_origin_distribution,
+        }
+    )

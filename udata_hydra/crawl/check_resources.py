@@ -17,6 +17,7 @@ from udata_hydra.crawl.helpers import (
 from udata_hydra.crawl.preprocess_check_data import preprocess_check_data
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import get_http_client, queue
+from udata_hydra.utils.http import CORS_HEADER_FIELDS, CORS_HEADER_PREFIX
 
 RESOURCE_RESPONSE_STATUSES = {
     "OK": "ok",
@@ -111,6 +112,29 @@ async def check_resource(
                 )
             resp.raise_for_status()
 
+            # Collect CORS headers via an OPTIONS preflight request before preprocessing check data.
+            # Only store successful CORS probe results (status 200-399, no errors) in the database.
+            # This filters out failed probes, timeouts, and non-permissive CORS configurations
+            cors_probe_result: dict | None = await probe_cors(session, url)
+            cors_headers: dict | None = None
+            if cors_probe_result and not cors_probe_result.get("error"):
+                status: int | None = cors_probe_result.get("status")
+                if status is not None:
+                    try:
+                        # Only store CORS headers for successful preflight responses (2xx, 3xx status codes)
+                        if 200 <= int(status) < 400:
+                            cors_headers = {
+                                "status": int(status),
+                                "error": cors_probe_result.get("error"),
+                                **{
+                                    field: cors_probe_result.get(field)
+                                    for field in CORS_HEADER_FIELDS
+                                },
+                            }
+                    except (TypeError, ValueError):
+                        # Skip invalid status values (should not happen, but handle gracefully)
+                        pass
+
             # Preprocess the check data. If it has changed, it will be sent to udata
             new_check, last_check = await preprocess_check_data(
                 dataset_id=resource["dataset_id"],
@@ -120,6 +144,7 @@ async def check_resource(
                     "domain": domain,
                     "status": resp.status,
                     "headers": convert_headers(resp.headers),
+                    "cors_headers": cors_headers,
                     "timeout": False,
                     "response_time": end - start,
                 },
@@ -159,13 +184,14 @@ async def check_resource(
 
         return RESOURCE_RESPONSE_STATUSES["TIMEOUT"]
 
-    # TODO: debug AssertionError, should be caught in DB now
-    # File "[...]aiohttp/connector.py", line 991, in _create_direct_connection
-    # assert port is not None
-    # UnicodeError: encoding with 'idna' codec failed (UnicodeError: label too long)
-    # eg http://%20Localisation%20des%20acc%C3%A8s%20des%20offices%20de%20tourisme
+    # Catch HTTP/HTTPS errors and related exceptions:
+    # - ClientError: covers all aiohttp client exceptions (connection, SSL, DNS, etc.)
+    # - AssertionError: can occur in aiohttp connector (e.g., "assert port is not None" in connector.py:991)
+    # - UnicodeError: can occur when encoding domain names with IDNA codec (e.g., "label too long")
+    #   Example problematic URL: http://%20Localisation%20des%20acc%C3%A8s%20des%20offices%20de%20tourisme
+    # All errors are logged and saved to the database via preprocess_check_data()
     except (
-        aiohttp.client_exceptions.ClientError,
+        aiohttp.ClientError,
         AssertionError,
         UnicodeError,
     ) as e:
@@ -213,7 +239,7 @@ async def handle_wrong_resource_url(
     worker_priority: str,
 ):
     resource_id = resource["resource_id"]
-    stable_resource_url = f"{config.UDATA_URI.replace('api/2', 'fr')}/datasets/r/{resource_id}"
+    stable_resource_url = f"{config.UDATA_URI.replace('api/2', 'api/1')}/datasets/r/{resource_id}"
     async with session.head(stable_resource_url) as resp:
         resp.raise_for_status()
         actual_url = resp.headers.get("location")
@@ -228,3 +254,43 @@ async def handle_wrong_resource_url(
             worker_priority=worker_priority,
         )
     return
+
+
+async def probe_cors(session, url: str) -> dict | None:
+    """Send an OPTIONS preflight to collect CORS headers, skipping requests that lack a configured origin."""
+    origin: str | None = getattr(config, "CORS_PROBE_ORIGIN", None)
+    if not origin:
+        return None
+
+    request_headers: dict[str, str] = {
+        "Origin": origin,
+        "Access-Control-Request-Method": "GET",
+    }
+    request_header_names: list[str] | None = getattr(config, "CORS_PROBE_REQUEST_HEADERS", None)
+    if request_header_names:
+        request_headers["Access-Control-Request-Headers"] = ",".join(request_header_names)
+
+    timeout_seconds = int(getattr(config, "CORS_PROBE_TIMEOUT_SECONDS", 5) or 5)
+    probe_timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+
+    try:
+        async with session.options(
+            url,
+            headers=request_headers,
+            timeout=probe_timeout,
+            allow_redirects=True,
+        ) as cors_resp:
+            cors_headers = convert_headers(cors_resp.headers)
+            return {
+                "status": cors_resp.status,
+                **{
+                    field: cors_headers.get(f"{CORS_HEADER_PREFIX}{field}")
+                    for field in CORS_HEADER_FIELDS
+                },
+            }
+    except asyncio.TimeoutError:
+        return {"status": None, "error": "timeout"}
+    except aiohttp.ClientError as exc:
+        error: str = getattr(exc, "message", None) or str(exc)
+        status: int | None = getattr(exc, "status", None)
+        return {"status": status, "error": fix_surrogates(error)}

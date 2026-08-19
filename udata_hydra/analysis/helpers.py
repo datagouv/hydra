@@ -1,10 +1,19 @@
 import json
+import os
 from typing import IO
 
 from asyncpg import Record
 
 from udata_hydra import config
-from udata_hydra.utils import UdataPayload, download_resource, queue, send
+from udata_hydra.data_formats.data_format import DataFormat
+from udata_hydra.utils import (
+    IOException,
+    UdataPayload,
+    download_resource,
+    queue,
+    send,
+    storage_path,
+)
 
 
 def get_python_type(column: dict) -> str:
@@ -17,26 +26,53 @@ def get_python_type(column: dict) -> str:
 
 
 async def read_or_download_file(
-    check: dict,
-    file_path: str,
-    file_format: str,
-    exception: Record | None,
+    check: Record | dict,
+    filename: str | None,
+    data_format: "type[DataFormat]|None",
+    exception: Record | None = None,
 ) -> IO[bytes]:
-    if file_path:
-        return open(file_path, "rb")
+    if filename:
+        full_path = storage_path("") / filename
+        try:
+            return open(full_path, "rb")
+        except FileNotFoundError:
+            raise IOException(
+                f"Temporary file not found: {full_path}",
+                resource_id=check["resource_id"],
+                url=check["url"],
+            )
     else:
         tmp_file, _ = await download_resource(
             url=check["url"],
             headers=json.loads(check.get("headers") or "{}"),
             max_size_allowed=None
             if exception
-            else int(config.MAX_FILESIZE_ALLOWED.get(file_format, "csv")),
+            else (
+                data_format.max_filesize_allowed
+                if data_format is not None
+                else config.DEFAULT_MAX_FILESIZE_ALLOWED
+            ),
         )
         return tmp_file
 
 
-async def notify_udata(resource: Record, check: dict) -> None:
+async def download_from_check(check: dict, data_format: type[DataFormat]) -> DataFormat:
+    tmp_file = await read_or_download_file(
+        check=check,
+        filename=None,
+        data_format=data_format,
+    )
+    return data_format(
+        file_name=os.path.basename(tmp_file.name),
+        resource_id=check.get("resource_id"),
+        dataset_id=check.get("dataset_id"),
+    )
+
+
+async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:
     """Notify udata of the result of a parsing"""
+    if check is None or resource is None:
+        raise ValueError("Tried to notify udata without resource nor URL")
     payload = {
         "resource_id": check["resource_id"],
         "dataset_id": resource["dataset_id"],
@@ -52,14 +88,19 @@ async def notify_udata(resource: Record, check: dict) -> None:
     }
     if config.CSV_TO_DB and check.get("parsing_table"):
         payload["document"]["analysis:parsing:parsing_table"] = check.get("parsing_table")
-    if config.CSV_TO_PARQUET and check.get("parquet_url"):
+    if config.DB_TO_PARQUET and check.get("parquet_url"):
         payload["document"]["analysis:parsing:parquet_url"] = check.get("parquet_url")
         payload["document"]["analysis:parsing:parquet_size"] = check.get("parquet_size")
     if config.GEOJSON_TO_PMTILES and check.get("pmtiles_url"):
         payload["document"]["analysis:parsing:pmtiles_url"] = check.get("pmtiles_url")
         payload["document"]["analysis:parsing:pmtiles_size"] = check.get("pmtiles_size")
-    if config.CSV_TO_GEOJSON and check.get("geojson_url"):
+    if config.DB_TO_GEOJSON and check.get("geojson_url"):
         payload["document"]["analysis:parsing:geojson_url"] = check.get("geojson_url")
         payload["document"]["analysis:parsing:geojson_size"] = check.get("geojson_size")
+    if config.OGC_ANALYSIS_ENABLED and check.get("ogc_metadata"):
+        ogc_metadata = check.get("ogc_metadata")
+        if isinstance(ogc_metadata, str):
+            ogc_metadata = json.loads(ogc_metadata)
+        payload["document"]["analysis:parsing:ogc_metadata"] = ogc_metadata
     payload["document"] = UdataPayload(payload["document"])
     queue.enqueue(send, _priority="high", **payload)

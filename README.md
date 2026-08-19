@@ -13,6 +13,9 @@ Since it's called _hydra_, it also has mythical powers embedded:
 - analyse remote resource metadata over time to detect changes in the smartest way possible
 - if the remote resource is tabular (csv or excel-like), convert it to a PostgreSQL table, ready for APIfication, and to parquet to offer another distribution of the data
 - if the remote resource is a geojson, convert it to PMTiles to offer another distribution of the data
+- if the remote resource is parquet, ingest it into a PostgreSQL table for API exposition (similarly to csv/excel resources)
+- if the remote resource is an OGC service (WFS or WMS), fetch capabilities and extract layer metadata
+- probe CORS headers on external resources during crawling
 - send crawl and analysis info to a udata instance
 
 ## 🏗️ Architecture schema
@@ -28,28 +31,39 @@ The hydra crawler is one of the components of the architecture. It will check if
 
 ## 📦 Dependencies
 
-This project uses `libmagic`, which needs to be installed on your system, eg:
+This project uses `libmagic`, which needs to be installed on your system, e.g.:
 
-`brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on linux.
+`brew install libmagic` on MacOS, or `sudo apt-get install libmagic-dev` on Linux.
 
-This project uses Python >=3.11 and [Poetry](https://python-poetry.org) >= 2.0.0 to manage dependencies.
+This project uses Python >=3.11,<3.15 (3.14 recommended) and [uv](https://docs.astral.sh/uv/) to manage dependencies.
+
+## 🚀 Installation
+
+### With uv (recommended)
+```bash
+uv sync
+```
+
+### With pip
+```bash
+pip3 install -e .
+```
 
 ## 🖥️ CLI
 
 ### Create database structure
 
-Install udata-hydra dependencies and cli.
-`poetry install`
+Install udata-hydra dependencies and cli (see Installation section above), then migrate the DB with:
 
-`poetry run udata-hydra migrate`
+`uv run udata-hydra migrate`
 
 ### Load (UPSERT) latest catalog version from data.gouv.fr
 
-`poetry run udata-hydra load-catalog`
+`uv run udata-hydra load-catalog`
 
 ## 🕷️ Crawler
 
-`poetry run udata-hydra-crawl`
+`uv run udata-hydra-crawl`
 
 It will crawl (forever) the catalog according to the config set in `config.toml`, with a default config in `udata_hydra/config_default.toml`.
 
@@ -65,15 +79,30 @@ If an URL matches one of the `EXCLUDED_PATTERNS`, it will never be checked.
 
 A job queuing system is used to process long-running tasks. Launch the worker with the following command:
 
-`poetry run rq worker -c udata_hydra.worker`
+`uv run rq worker -c udata_hydra.worker`
 
 To monitor worker status:
 
-`poetry run rq info -c udata_hydra.worker --interval 1`
+`uv run rq info -c udata_hydra.worker --interval 1`
 
 To empty all the queues:
 
-`poetry run rq empty -c udata_hydra.worker low default high`
+`uv run rq empty -c udata_hydra.worker low default high`
+
+Workers process three RQ queues in order: **`high`**, **`default`**, **`low`**.
+
+| Function | Queue | When it runs |
+|----------|-------|--------------|
+| `analyse_resource` | `default` (priority crawl) or `low` (regular crawl) | After a successful crawl/check |
+| `Csv/Xls/Xlsx(...).analyse` | `default`, or `high` via API/CLI | When a tabular file needs parsing |
+| `Geojson(...).analyse` | `default`, or `high` via API/CLI | When a GeoJSON file needs parsing |
+| `Parquet(...).analyse` | `default`, or `high` via API/CLI | When a Parquet file needs metadata extraction |
+| `Wfs/Wms.analyse` | `default`, or `high` via API/CLI | When an OGC service needs analysis |
+| `send` | `high` | When hydra informs udata of a resource's changes |
+| `export_parquet` | `low` | After CSV ingest, if `DB_TO_PARQUET` is enabled |
+| `export_geojson_pmtiles` | `low` | After CSV ingest, if `DB_TO_GEOJSON` is enabled and geo columns are detected |
+
+Manual checks (`POST /api/checks`, CLI `check-resource`) use **`high`** for the full pipeline. Regular crawls enqueue `analyse_resource` on **`low`**, but follow-up parsing jobs still run on **`default`**.
 
 ## 📊 CSV conversion to database
 
@@ -81,17 +110,17 @@ Converted CSV tables will be stored in the database specified via `config.DATABA
 
 ## 🧪 Tests
 
-To run the tests, you need to launch the database, the test database, and the Redis broker with `docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.broker.yml up -d`.
+To run the tests, you need to launch the test database with `docker compose --profile test up -d`.
 
-Make sure the dev dependencies are installed with `poetry install --extras dev`.
+Make sure the dependencies are installed (including dev dependencies) with `uv sync` (see Installation section above).
 
-Then you can run the tests with `poetry run pytest`.
+Then you can run the tests with `uv run pytest`.
 
-To run a specific test file, you can pass the path to the file to pytest, like this: `poetry run pytest tests/test_file.py`.
+To run a specific test file, you can pass the path to the file to pytest, like this: `uv run pytest tests/test_file.py`.
 
-To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `poetry run pytest tests/test_api/test_api_checks.py::test_get_latest_check`.
+To run a specific test function, you can pass the path to the file and the name of the function to pytest, like this: `uv run pytest tests/test_api/test_api_checks.py::test_get_latest_check`.
 
-If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`poetry run pytest -s`). However, note that this can sometimes be difficult to parse.
+If you would like to see print statements as they are executed, you can pass the -s flag to pytest (`uv run pytest -s`). However, note that this can sometimes be difficult to parse.
 
 ### 🎯 Tests coverage
 
@@ -149,10 +178,10 @@ To run performance benchmarks locally, you can use the CLI commands:
 
 ```bash
 # Convert CSV to GeoJSON
-poetry run udata-hydra convert-csv-to-geojson /path/to/large/file.csv
+uv run udata-hydra convert-csv-to-geojson /path/to/large/file.csv
 
 # Convert GeoJSON to PMTiles
-poetry run udata-hydra convert-geojson-to-pmtiles /path/to/large/file.geojson
+uv run udata-hydra convert-geojson-to-pmtiles /path/to/large/file.geojson
 ```
 
 These commands allow you to test performance improvements locally before pushing to the benchmarks branch.
@@ -177,8 +206,8 @@ RESOURCES_ANALYSER_API_KEY = "api_key_to_change"
 ### 🚀 Run
 
 ```bash
-poetry install
-poetry run adev runserver udata_hydra/app.py
+# Install dependencies (see Installation section above)
+uv run adev runserver udata_hydra/app.py
 ```
 By default, the app will listen on `localhost:8000`.
 You can check the status of the app with `curl http://localhost:8000/api/health`.
@@ -191,17 +220,16 @@ The API serves the following endpoints:
 - `GET` on `/api/checks/latest?url={url}&resource_id={resource_id}` to get the latest check for a given URL and/or `resource_id`
 - `GET` on `/api/checks/all?url={url}&resource_id={resource_id}` to get all checks for a given URL and/or `resource_id`
 - `GET` on `/api/checks/aggregate?group_by={column}&created_at={date}` to get checks occurrences grouped by a `column` for a specific `date`
+- `GET` on `/api/checks/stats` to get aggregates for the latest HTTP check per eligible resource (ok / error / timeout counts and HTTP status code distribution)
+- `POST` on `/api/checks` to trigger an on-demand crawl and analysis for a given `resource_id` (returns the created check)
 
 *Related to resources:*
 - `GET` on `/api/resources/{resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
+- `GET` on `/api/resources/stats` to get aggregate statistics about resources (counts and breakdown by catalog `status`)
+- `GET` on `/api/resources/stats/cors` to get CORS coverage statistics for external resources (URLs not on data.gouv.fr)
 - `POST` on `/api/resources` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
 - `PUT` on `/api/resources/{resource_id}` to update a resource in the DB "catalog" table
 - `DELETE` on `/api/resources/{resource_id}` to delete a resource in the DB "catalog" table
-
-> :warning: **Warning: the following routes are deprecated and will be removed in the future:**
-> - `POST` on `/api/resource/created` -> use `POST` on `/api/resources/` instead
-> - `POST` on `/api/resource/updated` -> use `PUT` on `/api/resources/` instead
-> - `POST` on `/api/resource/deleted` -> use `DELETE` on `/api/resources/` instead
 
 *Related to resources exceptions:*
 - `GET` on `/api/resources-exceptions` to get the list of all resources exceptions
@@ -212,11 +240,21 @@ The API serves the following endpoints:
 *Related to some status and health check:*
 - `GET` on `/api/status/crawler` to get the crawling status
 - `GET` on `/api/status/worker` to get the worker status
-- `GET` on `/api/stats` to get the crawling stats
-- `GET` on `/api/health` to get the API version number and environment
+- `GET` on `/api/health` to get version, Python version, environment, uptime, and enabled feature flags
 
 You may want to use a helper such as [Bruno](https://www.usebruno.com/) to handle API calls, in which case all the endpoints are ready to use [here](https://github.com/datagouv/api-calls).
 More details about some endpoints are provided below with examples, but not for all of them:
+
+#### Create a check (on-demand crawl)
+
+Requires a Bearer token. Accepts a JSON body with `resource_id` and optional `force_analysis` (defaults to `true`).
+
+```bash
+$ curl -X POST http://localhost:8000/api/checks \
+       -H 'Authorization: Bearer <myAPIkey>' \
+       -H 'Content-Type: application/json' \
+       -d '{"resource_id": "b3678c59-5b35-43ad-9379-fce29e5b56fe"}' | json_pp
+```
 
 #### Get latest check
 
@@ -338,6 +376,38 @@ $ curl -s "http://localhost:8000/api/checks/aggregate?group_by=domain&created_at
 ]
 ```
 
+#### Get resources stats
+
+```bash
+$ curl -s "http://localhost:8000/api/resources/stats" | json_pp
+{
+   "total_count" : 100,
+   "deleted_count" : 3,
+   "statuses_count" : {
+      "null" : 85,
+      "BACKOFF" : 2,
+      "CRAWLING_URL" : 1,
+      ...
+   }
+}
+```
+
+#### Get resources CORS stats (external URLs)
+
+```bash
+$ curl -s "http://localhost:8000/api/resources/stats/cors" | json_pp
+{
+   "external_resources_with_cors_data" : 42,
+   "external_resources_without_cors_data" : 55,
+   "external_resources_cors_coverage_percentage" : 43.3,
+   "external_resources_allow_origin_distribution" : [
+      { "access_status" : "Accessible (Wildcard *)", "unique_resources_count" : 15, "percentage" : 35.71 },
+      { "access_status" : "Accessible (Specific Whitelist)", "unique_resources_count" : 20, "percentage" : 47.62 },
+      ...
+   ]
+}
+```
+
 #### Adding a resource exception
 
 ```bash
@@ -355,7 +425,7 @@ $ curl   -X POST http://localhost:8000/api/resources-exceptions \
 ...or, if you don't want to add table indexes and a comment:
 ```bash
 $ curl  -X POST localhost:8000/api/resources-exceptions \
-        -H 'Authorization: Bearer <myAPIkey>" \
+        -H 'Authorization: Bearer <myAPIkey>' \
         -d '{"resource_id": "f868cca6-8da1-4369-a78d-47463f19a9a3"}'
 ```
 
@@ -385,22 +455,17 @@ $ curl  -X DELETE http://localhost:8000/api/resources-exceptions/f868cca6-8da1-4
 ```bash
 $ curl -s "http://localhost:8000/api/status/crawler" | json_pp
 {
-   "fresh_checks_percentage" : 0.4,
-   "pending_checks" : 142153,
-   "total" : 142687,
-   "fresh_checks" : 534,
-   "checks_percentage" : 0.4,
-   "resources_statuses_count": {
-      "null": 195339,
-      "BACKOFF": 0,
-      "CRAWLING_URL": 0,
-      "TO_ANALYSE_RESOURCE": 1,
-      "ANALYSING_RESOURCE": 0,
-      "TO_ANALYSE_CSV": 0,
-      "ANALYSING_CSV": 0,
-      "INSERTING_IN_DB": 0,
-      "CONVERTING_TO_PARQUET": 0
-  }
+   "checks" : {
+      "in_progress_count" : 5,
+      "in_progress_percentage" : 4.76,
+      "needs_check_count" : 60,
+      "needs_check_percentage" : 63.16,
+      "up_to_date_check_count" : 35,
+      "up_to_date_check_percentage" : 36.84
+   },
+   "resources" : {
+      "total_eligible_count" : 95
+   }
 }
 ```
 
@@ -417,10 +482,10 @@ $ curl -s "http://localhost:8000/api/status/worker" | json_pp
 }
 ```
 
-#### Get crawling stats
+#### Get checks stats (latest check per eligible resource)
 
 ```bash
-$ curl -s "http://localhost:8000/api/stats" | json_pp
+$ curl -s "http://localhost:8000/api/checks/stats" | json_pp
 {
    "status" : [
       {
@@ -469,9 +534,27 @@ $ curl -s "http://localhost:8000/api/stats" | json_pp
 }
 ```
 
+#### Get health status
+
+```bash
+$ curl -s "http://localhost:8000/api/health" | json_pp
+{
+   "version" : "2.12.0",
+   "python_version" : "3.14.0",
+   "environment" : "local",
+   "uptime_since" : "2026-06-09T10:00:00.123456+00:00",
+   "csv_analysis" : true,
+   "csv_to_db" : true,
+   "db_to_parquet" : false,
+   "db_to_geojson" : false,
+   "geojson_to_pmtiles" : false,
+   "parquet_to_db" : false
+}
+```
+
 ## 🔗 Using Webhook integration
 
-** Set the config values**
+**Set the config values**
 
 Create a `config.toml` where your service and commands are launched, or specify a path to a TOML file via the `HYDRA_SETTINGS` environment variable. `config.toml` or equivalent will override values from `udata_hydra/config_default.toml`, lookup there for values that can/need to be defined.
 
@@ -502,24 +585,34 @@ The payload should look something like:
 
 ## 🛠️ Development
 
-### 🐳 docker compose
+### 🐳 Docker compose
 
-Multiple docker-compose files are provided:
-- a minimal `docker-compose.yml` with two PostgreSQL containers (one for catalog and metadata, the other for converted CSV to database)
-- `docker-compose.broker.yml` adds a Redis broker
-- `docker-compose.test.yml` launches a test DB, needed to run tests
+A single `docker-compose.yml` file is provided with profiles to manage different environments:
+- Default services: `database` and `database-csv` (PostgreSQL containers for catalog/metadata and CSV conversion)
+- `test` profile: `test-database` (ephemeral test database)
+- `broker` profile: `broker` (Redis broker)
 
-NB: you can launch compose from multiple files like this: `docker compose -f docker-compose.yml -f docker-compose.test.yml up`
+Usage:
+- Development: `docker compose up -d` (or `docker compose --profile broker up -d` if Redis is needed)
+- Tests: `docker compose --profile test up -d` (broker not needed, queue functionality is mocked)
+- Broker only: `docker compose --profile broker up -d`
 
 ### 📝 Logging & Debugging
 
 The log level can be adjusted using the environment variable LOG_LEVEL.
-For example, to set the log level to `DEBUG` when initializing the database, use `LOG_LEVEL="DEBUG" udata-hydra init_db `.
+For example, to set the log level to `DEBUG` when migrating the database, use `LOG_LEVEL="DEBUG" uv run udata-hydra migrate`.
 
 ### 📋 Writing a migration
 
-1. Add a file named `migrations/{YYYYMMDD}_{description}.sql` and write the SQL you need to perform migration.
-2. `udata-hydra migrate` will migrate the database as needed.
+Hydra maintains two migration directories, one per database:
+
+- `udata_hydra/migrations/main/` — catalog, checks, and metadata
+- `udata_hydra/migrations/csv/` — CSV conversion tables
+
+To add a migration:
+
+1. Add a file named `{YYYYMMDD}_{description}.sql` in the appropriate directory above.
+2. Run `uv run udata-hydra migrate` to apply pending migrations (both databases by default; pass `--dbs main` or `--dbs csv` to target one).
 
 ## 🚀 Deployment
 
@@ -540,14 +633,22 @@ pre-commit install
 ```
 Once this is done, code formatting and linting, as well as import sorting, will be automatically checked before each commit.
 
-If you cannot use pre-commit, it is necessary to format, lint, and sort imports with [Ruff](https://docs.astral.sh/ruff/) before committing:
+If you cannot use pre-commit, it is necessary to format, lint, and sort imports with [Ruff](https://astral.sh/ruff/) for linting and formatting, and [ty](https://docs.astral.sh/ty/) for type checking. **Either running these commands manually or installing the pre-commit hook is required before submitting contributions.**
 ```bash
-poetry run ruff check --fix . && poetry run ruff format .
+# Lint (including import sorting) and format code
+uv run ruff check --fix && uv run ruff format
+
+# Type check (ty)
+uv run ty check
 ```
 
-### 🏷️ Releases
+By default `ty check` checks the project root; pass paths to check specific files or directories. See the [ty CLI reference](https://docs.astral.sh/ty/reference/cli/) for options.
 
-The release process uses the [`tag_version.sh`](tag_version.sh) script to create git tags and update [CHANGELOG.md](CHANGELOG.md) and [pyproject.toml](pyproject.toml) automatically.
+### 🏷️ Releases and versioning
+
+The release process uses the [`tag_version.sh`](tag_version.sh) script to create git tags, GitHub releases and update [CHANGELOG.md](CHANGELOG.md) automatically. Package version numbers are automatically derived from git tags using [setuptools_scm](https://github.com/pypa/setuptools_scm), so no manual version updates are needed in `pyproject.toml`.
+
+**Prerequisites**: [GitHub CLI](https://cli.github.com/) must be installed and authenticated, and you must be on the main branch with a clean working directory.
 
 ```bash
 # Create a new release
@@ -560,10 +661,7 @@ The release process uses the [`tag_version.sh`](tag_version.sh) script to create
 ./tag_version.sh 2.5.0 --dry-run
 ```
 
-**Prerequisites**: GitHub CLI (`gh`) must be installed and authenticated, and you must be on the main branch with a clean working directory.
-
 The script automatically:
-- Updates the version in pyproject.toml
 - Extracts commits since the last tag and formats them for CHANGELOG.md
 - Identifies breaking changes (commits with `!:` in the subject)
 - Creates a git tag and pushes it to the remote repository

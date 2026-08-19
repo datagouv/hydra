@@ -9,10 +9,12 @@ from asyncpg import Record
 from dateparser import parse as date_parser
 
 from udata_hydra import config, context
-from udata_hydra.analysis.csv import analyse_csv
-from udata_hydra.analysis.geojson import analyse_geojson
-from udata_hydra.analysis.parquet import analyse_parquet
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
+from udata_hydra.data_formats import (
+    DataFormat,
+    Ogc,
+)
+from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -21,9 +23,6 @@ from udata_hydra.utils import (
     Timer,
     UdataPayload,
     compute_checksum_from_file,
-    detect_geojson_from_headers,
-    detect_parquet_from_headers,
-    detect_tabular_from_headers,
     download_resource,
     queue,
     send,
@@ -76,26 +75,17 @@ async def analyse_resource(
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
     change_status, change_payload = await detect_resource_change_on_early_hints(resource)
 
-    # could it be a CSV, parquet or a GeoJSON? If we get hints, we will analyse the file further depending on change status
-    is_tabular, is_geojson, is_parquet = False, False, False
-    is_tabular, file_format = detect_tabular_from_headers(check)
-    if not is_tabular:
-        # getting the format from the catalog in priority
-        pool = await context.pool()
-        async with pool.acquire() as connection:
-            row: Record = await connection.fetchrow(
-                "SELECT format FROM catalog WHERE resource_id = $1", f"{check['resource_id']}"
-            )
-        is_geojson: bool = row["format"] == "geojson" or await detect_geojson_from_headers(check)
-        if is_geojson:
-            file_format = "geojson"
-        if not is_geojson:
-            is_parquet: bool = row["format"] == "parquet" or await detect_parquet_from_headers(
-                check
-            )
-            if is_parquet:
-                file_format = "parquet"
-    max_size_allowed = None if exception else int(config.MAX_FILESIZE_ALLOWED[file_format])
+    # could it be a CSV, parquet, GeoJSON or OGC service (WFS)?
+    # If we get hints, we will analyse the file further depending on change status
+    data_format: type[DataFormat] | None = await detect_data_format_from_check_or_catalog(check)
+
+    max_size_allowed = (
+        None
+        if exception
+        else data_format.max_filesize_allowed
+        if data_format is not None
+        else config.DEFAULT_MAX_FILESIZE_ALLOWED
+    )
 
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
@@ -105,8 +95,8 @@ async def analyse_resource(
             await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
             tmp_file, _ = await download_resource(url, headers, max_size_allowed)
             timer.mark("download-resource")
-        except IOException:
-            dl_analysis["analysis:error"] = "File too large to download"
+        except IOException as e:
+            dl_analysis["analysis:error"] = str(e)
         else:
             await Resource.update(resource_id, data={"status": "ANALYSING_DOWNLOADED_RESOURCE"})
             # Get file size
@@ -123,7 +113,7 @@ async def analyse_resource(
                 )
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
-            if tmp_file and not (is_tabular or is_geojson or is_parquet):
+            if tmp_file and (data_format is None or not data_format.further_analysis):
                 os.remove(tmp_file.name)
             await Check.update(
                 check["id"],
@@ -155,35 +145,29 @@ async def analyse_resource(
     timer.stop()
 
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
-        if is_tabular and tmp_file:
-            # Change status to TO_ANALYSE_CSV
-            await Resource.update(resource_id, data={"status": "TO_ANALYSE_CSV"})
-            # Analyse CSV and create a table in the CSV database
-            queue.enqueue(
-                analyse_csv,
-                check=check,
-                file_path=tmp_file.name,
-                _priority="high" if worker_priority == "high" else "default",
-                _exception=bool(exception),
+        if data_format is not None:
+            await Resource.update(
+                resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
             )
-        elif is_geojson and tmp_file:
-            await Resource.update(resource_id, data={"status": "TO_ANALYSE_GEOJSON"})
-            queue.enqueue(
-                analyse_geojson,
-                check=check,
-                file_path=tmp_file.name,
-                _priority="high" if worker_priority == "high" else "default",
-                _exception=bool(exception),
-            )
-        elif is_parquet and tmp_file:
-            await Resource.update(resource_id, data={"status": "TO_ANALYSE_PARQUET"})
-            queue.enqueue(
-                analyse_parquet,
-                check=check,
-                file_path=tmp_file.name,
-                _priority="high" if worker_priority == "high" else "default",
-                _exception=bool(exception),
-            )
+            if issubclass(data_format, Ogc):
+                queue.enqueue(
+                    data_format.analyse,
+                    check=dict(check),
+                    _priority="high" if worker_priority == "high" else "default",
+                    _exception=bool(exception),
+                )
+            elif tmp_file:
+                file = data_format(
+                    file_name=os.path.basename(tmp_file.name),
+                    resource_id=resource_id,
+                    dataset_id=dataset_id,
+                )
+                queue.enqueue(
+                    file.analyse,
+                    check=dict(check),
+                    _priority="high" if worker_priority == "high" else "default",
+                    _exception=bool(exception),
+                )
         else:
             await Resource.update(resource_id, data={"status": None})
 
@@ -250,7 +234,7 @@ async def detect_resource_change_from_checksum(
 
 
 async def detect_resource_change_from_last_modified_header(
-    data: dict,
+    data: list,
 ) -> tuple[Change, dict | None]:
     # last modified header check
 
@@ -275,7 +259,7 @@ async def detect_resource_change_from_last_modified_header(
 
 
 async def detect_resource_change_from_content_length_header(
-    data: dict,
+    data: list,
 ) -> tuple[Change, dict | None]:
     # content-length variation between current and last check
     if len(data) <= 1 or not data[0].get("content_length"):

@@ -7,20 +7,21 @@ import uuid
 from datetime import datetime
 
 import asyncpg
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
 import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
 from aioresponses import aioresponses
-from minicli import run
 
 import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra import config
 from udata_hydra.app import app_factory
+from udata_hydra.cli import drop_dbs, load_catalog, migrate
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.logger import stop_sentry
+from udata_hydra.utils import storage_path
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
@@ -29,9 +30,19 @@ RESOURCE_EXCEPTION_TABLE_INDEXES = {"Nom": "index", "N° de certificat": "index"
 RESOURCE_URL = "https://example.com/resource-1"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 NOT_EXISTING_RESOURCE_ID = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
+SIMPLE_CSV_CONTENT = """code_insee,number
+95211,102
+36522,48"""
 pytestmark = pytest.mark.asyncio
 
-nest_asyncio.apply()
+# nest_asyncio2 skips _patch_loop() in Python 3.14 when no event loop is running
+# at import time (get_event_loop() raises RuntimeError, returning None).
+# Passing an explicit temporary loop forces _patch_loop() to run, which patches
+# the loop class so all subsequent event loops (including those created by
+# pytest-asyncio per test) have the nested run_until_complete support.
+_bootstrap_loop = asyncio.new_event_loop()
+nest_asyncio.apply(_bootstrap_loop)
+_bootstrap_loop.close()
 
 log = logging.getLogger("udata-hydra")
 
@@ -99,6 +110,8 @@ def setup():
         SLEEP_BETWEEN_BATCHES=0,
         WEBHOOK_ENABLED=True,
         SENTRY_DSN=None,
+        # Align download_resource with read_or_download_file basename lookup (or "" uses OS temp vs /tmp).
+        TEMPORARY_DOWNLOAD_FOLDER=storage_path("").as_posix(),
     )
     # prevent sentry from sending events in tests (config override is not enough)
     stop_sentry()
@@ -149,20 +162,40 @@ def catalog_content(is_harvested):
         return cfile.read()
 
 
-@pytest.fixture
-def clean_db():
-    run("drop_dbs", dbs=["main"])
-    run("migrate")
+async def _cleanup_cli_connections():
+    """Helper function to clean up CLI connection context between tests"""
+    from udata_hydra.cli import context
+
+    for conn in list(context["conn"].values()):
+        if not conn.is_closed():
+            try:
+                await conn.close()
+            except (RuntimeError, AttributeError):
+                # Connection might be attached to a different/closed event loop
+                # Just mark it as closed in our context
+                pass
+    context["conn"].clear()
+
+
+@pytest_asyncio.fixture
+async def clean_db():
+    await _cleanup_cli_connections()
+    await drop_dbs(dbs=["main"])
+    await migrate(skip_errors=False, dbs=["main", "csv"])
     yield
+    await _cleanup_cli_connections()
 
 
-@pytest.fixture
-def setup_catalog(catalog_content, rmock):
+@pytest_asyncio.fixture
+async def setup_catalog(catalog_content, rmock):
     catalog = "https://example.com/catalog"
     rmock.get(catalog, status=200, body=catalog_content)
-    run("drop_dbs", dbs=["main"])
-    run("migrate")
-    run("load_catalog", url=catalog)
+    await _cleanup_cli_connections()
+    await drop_dbs(dbs=["main"])
+    await migrate(skip_errors=False, dbs=["main", "csv"])
+    await load_catalog(url=catalog, drop_meta=False, drop_all=False, quiet=False)
+    yield
+    await _cleanup_cli_connections()
 
 
 @pytest.fixture
@@ -174,9 +207,10 @@ async def setup_catalog_with_resource_exception(setup_catalog):
     await Resource.insert(
         dataset_id=DATASET_ID,
         resource_id=RESOURCE_EXCEPTION_ID,
+        url="http://example.com/",
         type="main",
         format="csv",
-        url="http://example.com/",
+        title="Exception resource",
     )
     await ResourceException.insert(
         resource_id=RESOURCE_EXCEPTION_ID,
@@ -217,13 +251,14 @@ async def db():
 
 @pytest_asyncio.fixture
 async def insert_fake_resource():
-    async def _insert_fake_resource(database, status: str | None = None):
+    async def _insert_fake_resource(status: str | None = None, format: str = "csv"):
         await Resource.insert(
             dataset_id=DATASET_ID,
             resource_id=RESOURCE_ID,
             url=RESOURCE_URL,
             type="main",
-            format="csv",
+            format=format,
+            title="Fake resource",
             status=status,
             priority=True,
         )
@@ -258,6 +293,7 @@ async def fake_check():
         pmtiles_url=False,
         geojson_url=False,
         url=None,
+        cors_headers=None,
     ) -> dict:
         _url = url or f"https://example.com/resource-{resource}"
         data = {
@@ -285,6 +321,8 @@ async def fake_check():
             "geojson_url": "https://example.org/file.geojson" if pmtiles_url else None,
             "geojson_size": 1024 if geojson_url else None,
         }
+        if cors_headers is not None:
+            data["cors_headers"] = cors_headers
         check: dict = await Check.insert(data=data, returning="*")
         data["id"] = check["id"]
         if check.get("dataset_id"):
@@ -317,6 +355,29 @@ def udata_resource_payload():
             "format": "pdf",
             "mime": "text/plain",
             "schema": None,
+            "filesize": 1024,
+            "checksum_type": "sha1",
+            "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
+            "created_at": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat(),
+        },
+    }
+
+
+@pytest.fixture
+def udata_update_resource_payload():
+    return {
+        "resource_id": RESOURCE_ID,
+        "dataset_id": DATASET_ID,
+        "document": {
+            "id": RESOURCE_ID,
+            "url": RESOURCE_URL,
+            "title": "random title",
+            "description": "random description",
+            "filetype": "file",
+            "type": "documentation",
+            "format": "pdf",
+            "mime": "text/plain",
             "filesize": 1024,
             "checksum_type": "sha1",
             "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",

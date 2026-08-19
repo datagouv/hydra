@@ -3,11 +3,10 @@ NB: we can't use pytest-aiohttp helpers because
 it will interfere with the rest of our async code
 """
 
-from datetime import datetime
-
 import pytest
 
 from tests.conftest import DATASET_ID, NOT_EXISTING_RESOURCE_ID, RESOURCE_ID, RESOURCE_URL
+from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
 
@@ -67,7 +66,22 @@ async def test_create_resource(
     assert text == "Missing document body"
 
 
-async def test_update_resource(client, api_headers, api_headers_wrong_token):
+async def test_create_resource_rejects_malformed_auth_headers(client, udata_resource_payload):
+    """Reject POST /api/resources when the Authorization header is malformed or uses the wrong scheme.
+    Complements the existing missing-token and wrong-token checks in test_create_resource."""
+    for headers in (
+        {"Authorization": "Bearer"},
+        {"Authorization": "Basic wrong-token"},
+    ):
+        resp = await client.post(
+            path="/api/resources/", headers=headers, json=udata_resource_payload
+        )
+        assert resp.status == 403
+
+
+async def test_update_resource(
+    client, api_headers, api_headers_wrong_token, udata_update_resource_payload
+):
     # Test invalid PUT data
     stupid_post_data: dict = {"stupid": "stupid"}
     resp = await client.put(
@@ -75,25 +89,7 @@ async def test_update_resource(client, api_headers, api_headers_wrong_token):
     )
     assert resp.status == 400
 
-    payload = {
-        "resource_id": RESOURCE_ID,
-        "dataset_id": DATASET_ID,
-        "document": {
-            "id": RESOURCE_ID,
-            "url": RESOURCE_URL,
-            "title": "random title",
-            "description": "random description",
-            "filetype": "file",
-            "type": "documentation",
-            "format": "pdf",
-            "mime": "text/plain",
-            "filesize": 1024,
-            "checksum_type": "sha1",
-            "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
-            "created_at": datetime.now().isoformat(),
-            "last_modified": datetime.now().isoformat(),
-        },
-    }
+    payload = udata_update_resource_payload
 
     # Test API call with no token
     resp = await client.put(path=f"/api/resources/{RESOURCE_ID}", headers=None, json=payload)
@@ -119,7 +115,9 @@ async def test_update_resource(client, api_headers, api_headers_wrong_token):
     assert text == "Missing document body"
 
 
-async def test_update_resource_url_since_load_catalog(setup_catalog, db, client, api_headers):
+async def test_update_resource_url_since_load_catalog(
+    setup_catalog, db, client, api_headers, udata_update_resource_payload
+):
     # We modify the url for this resource
     await db.execute(
         "UPDATE catalog SET url = 'https://example.com/resource-0' "
@@ -127,25 +125,7 @@ async def test_update_resource_url_since_load_catalog(setup_catalog, db, client,
     )
 
     # We're sending an update signal on the (dataset_id,resource_id) with the previous url.
-    payload = {
-        "resource_id": RESOURCE_ID,
-        "dataset_id": DATASET_ID,
-        "document": {
-            "id": RESOURCE_ID,
-            "url": RESOURCE_URL,
-            "title": "random title",
-            "description": "random description",
-            "filetype": "file",
-            "type": "documentation",
-            "format": "pdf",
-            "mime": "text/plain",
-            "filesize": 1024,
-            "checksum_type": "sha1",
-            "checksum_value": "b7b1cd8230881b18b6b487d550039949867ec7c5",
-            "created_at": datetime.now().isoformat(),
-            "last_modified": datetime.now().isoformat(),
-        },
-    }
+    payload = udata_update_resource_payload
     # It does not create any duplicated resource.
     # The existing entry get updated accordingly.
 
@@ -183,3 +163,38 @@ async def test_delete_resource(client, api_headers, api_headers_wrong_token):
     # Test API call success
     resp = await client.delete(path=f"/api/resources/{RESOURCE_ID}", headers=api_headers)
     assert resp.status == 204
+
+
+async def test_get_ressources_stats(setup_catalog, client, fake_check):
+    await fake_check(cors_headers={"allow-origin": "data.gouv.fr", "status": 204})
+    expected_resources_statuses_count = {s: 0 for s in Resource.STATUSES if s}
+    expected_resources_statuses_count["null"] = 1
+    expected_data = {
+        "total_count": 1,
+        "deleted_count": 0,
+        "statuses_count": expected_resources_statuses_count,
+    }
+    resp = await client.get("/api/resources/stats")
+    assert resp.status == 200
+    data: dict = await resp.json()
+    assert data == expected_data
+
+
+async def test_get_resources_stats_cors(setup_catalog, client, fake_check):
+    await fake_check(cors_headers={"allow-origin": "data.gouv.fr", "status": 204})
+    expected_cors = {
+        "external_resources_with_cors_data": 1,
+        "external_resources_without_cors_data": 0,
+        "external_resources_cors_coverage_percentage": 100.0,
+        "external_resources_allow_origin_distribution": [
+            {
+                "access_status": "Accessible (Specific Whitelist)",
+                "unique_resources_count": 1,
+                "percentage": 100.0,
+            },
+        ],
+    }
+    resp = await client.get("/api/resources/stats/cors")
+    assert resp.status == 200
+    data: dict = await resp.json()
+    assert data == expected_cors

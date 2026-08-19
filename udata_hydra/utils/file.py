@@ -2,9 +2,9 @@ import gzip
 import hashlib
 import logging
 import mimetypes
-import os
 import re
 import tempfile
+from pathlib import Path
 from typing import IO
 
 import aiohttp
@@ -15,6 +15,12 @@ from udata_hydra.utils.errors import IOException
 from udata_hydra.utils.http import get_http_client
 
 log = logging.getLogger("udata-hydra")
+
+
+def storage_path(file_name: str) -> Path:
+    if file_name.startswith("tests/data/"):
+        return Path(file_name)
+    return Path(config.TEMPORARY_DOWNLOAD_FOLDER or tempfile.gettempdir()) / file_name
 
 
 def compute_checksum_from_file(filename: str) -> str:
@@ -28,10 +34,18 @@ def compute_checksum_from_file(filename: str) -> str:
     return sha1sum.hexdigest()
 
 
-def extract_gzip(file_path: str) -> IO[bytes]:
-    with gzip.open(file_path, "rb") as gz_file:
-        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as temp_file:
-            temp_file.write(gz_file.read())
+def extract_gzip(file_path: str, url: str | None = None) -> IO[bytes]:
+    temp_file = None
+    try:
+        with gzip.open(file_path, "rb") as gz_file:
+            with tempfile.NamedTemporaryFile(
+                dir=storage_path(""), mode="wb", delete=False
+            ) as temp_file:
+                temp_file.write(gz_file.read())
+    except (EOFError, gzip.BadGzipFile) as e:
+        if temp_file is not None:
+            Path(temp_file.name).unlink(missing_ok=True)
+        raise IOException("Corrupted or truncated gzip file", url=url) from e
     return temp_file
 
 
@@ -52,9 +66,7 @@ async def download_resource(
     ):
         raise IOException("File too large to download", url=url)
 
-    tmp_file = tempfile.NamedTemporaryFile(
-        dir=config.TEMPORARY_DOWNLOAD_FOLDER or None, delete=False
-    )
+    tmp_file = tempfile.NamedTemporaryFile(dir=storage_path(""), delete=False)
 
     chunk_size = 1024
     i = 0
@@ -73,11 +85,10 @@ async def download_resource(
         download_error = e
     finally:
         tmp_file.close()
-        if too_large:
-            os.remove(tmp_file.name)
-            raise IOException("File too large to download", url=url)
-        if download_error:
-            os.remove(tmp_file.name)
+        if too_large or download_error:
+            Path(tmp_file.name).unlink(missing_ok=True)
+            if too_large:
+                raise IOException("File too large to download", url=url)
             raise IOException("Error downloading CSV", url=url) from download_error
 
     detected_extension = ""
@@ -87,7 +98,11 @@ async def download_resource(
         "application/gzip",
     ]:
         # It's compressed - extract and determine extension from URL
-        tmp_file = extract_gzip(tmp_file.name)
+        gzip_tmp_file_name = tmp_file.name
+        try:
+            tmp_file = extract_gzip(gzip_tmp_file_name, url=url)
+        finally:
+            Path(gzip_tmp_file_name).unlink(missing_ok=True)
 
         # Extract any extension before .gz using regex
         match = re.search(r"\.([^.]+)\.gz$", url)
@@ -117,5 +132,4 @@ async def download_file(url: str, fd):
 def remove_remainders(resource_id: str, extensions: list[str]) -> None:
     """Delete potential remainders from process that crashed"""
     for ext in extensions:
-        if os.path.exists(f"{resource_id}.{ext}"):
-            os.remove(f"{resource_id}.{ext}")
+        storage_path(f"{resource_id}.{ext}").unlink(missing_ok=True)

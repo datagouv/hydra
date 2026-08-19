@@ -70,7 +70,7 @@ class ExceptionWithSentryDetails(Exception):
         """
         # Only capture if we have a traceback (exception is being raised)
         if getattr(self, "__traceback__", None) is not None:
-            if sentry_sdk.Hub.current.client:
+            if sentry_sdk.Hub.current.client:  # type: ignore[union-attr]
                 with sentry_sdk.new_scope() as scope:
                     scope.set_tags(
                         {
@@ -111,7 +111,7 @@ class IOException(ExceptionWithSentryDetails):
 
 
 async def handle_parse_exception(
-    e: IOException | ParseException, table_name: str | None, check: Record | None
+    e: IOException | ParseException, table_name: str | None, check: Record | dict | None
 ) -> Record | None:
     """Specific IO/ParseException handling. Store error in :check: if in a check context. Also cleanup :table_name: if needed."""
     if table_name is not None and (check and not check.get("parsing_table")):

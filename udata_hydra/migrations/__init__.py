@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Any
 
 from asyncpg.exceptions import SyntaxOrAccessError
 
@@ -9,9 +10,12 @@ log = logging.getLogger("udata-hydra")
 
 
 class Migrator:
+    db: Any
+    skip_errors: bool
+
     # NB: we can't use async __init__, hence the workaround
     @classmethod
-    async def create(cls, db_name, skip_errors=False) -> "Migrator":
+    async def create(cls, db_name: str, skip_errors: bool = False) -> "Migrator":
         self = Migrator(db_name)
         self.skip_errors = skip_errors
         self.db = await context.pool(db=db_name)
@@ -24,11 +28,11 @@ class Migrator:
         await self.db.execute(q)
         return self
 
-    def __init__(self, db_name) -> None:
+    def __init__(self, db_name: str) -> None:
         self.db_name = db_name
         self.table_name = f"migrations_{db_name}"
 
-    async def get(self, name) -> list | None:
+    async def get(self, name: str) -> Any | None:
         q = f"SELECT * FROM {self.table_name} WHERE name = $1 AND status = $2"
         return await self.db.fetchrow(q, name, "DONE")
 

@@ -6,7 +6,7 @@ from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
 from unittest.mock import ANY, patch
 
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
 from aiohttp import ClientSession, RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
@@ -14,7 +14,7 @@ from aioresponses import CallbackResult
 from asyncpg import Record
 from yarl import URL
 
-from tests.conftest import RESOURCE_ID, RESOURCE_URL
+from tests.conftest import RESOURCE_ID, RESOURCE_URL, SIMPLE_CSV_CONTENT
 from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import start_checks
@@ -22,11 +22,6 @@ from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.crawl.preprocess_check_data import get_content_type_from_header
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-
-# TODO: make file content configurable
-SIMPLE_CSV_CONTENT = """code_insee,number
-95211,102
-36522,48"""
 
 pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
@@ -73,7 +68,16 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
     rmock.head(rurl, **params)
     # mock for head fallback
     rmock.get(rurl, **params)
-    rmock.put(udata_url)
+    rmock.options(
+        rurl,
+        status=204,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
+        },
+        repeat=True,
+    )
+    rmock.put(udata_url, repeat=True)
     await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
 
@@ -97,7 +101,8 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
         assert not res["error"]
 
     # test webhook results from mock
-    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
+    payloads = [req.kwargs["json"] for req in rmock.requests[("PUT", URL(udata_url))]]
+    webhook = next(p for p in payloads if "check:id" in p)
     assert webhook.get("check:date")
     datetime.fromisoformat(webhook["check:date"])
     if exception or status == 500:
@@ -115,6 +120,48 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
         assert webhook.get("check:timeout")
     else:
         assert webhook.get("check:timeout") is False
+
+    # CORS headers
+    expect_cors = status and status < 400 and not timeout and not exception
+    if expect_cors:
+        assert webhook.get("check:cors:status") == 204
+        assert webhook.get("check:cors:allow-origin") == "*"
+    else:
+        assert webhook.get("check:cors:status") is None
+
+
+async def test_cors_probe_sends_payload(setup_catalog, rmock, db, analysis_mock, udata_url):
+    rurl = RESOURCE_URL
+    rmock.head(
+        rurl,
+        status=200,
+        headers={"Content-Length": "10", "X-Do": "you"},
+    )
+    rmock.get(
+        rurl,
+        status=200,
+        headers={"Content-Length": "10", "X-Do": "you"},
+    )
+    rmock.options(
+        rurl,
+        status=204,
+        headers={
+            "Access-Control-Allow-Origin": "https://data.gouv.fr",
+            "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization,Content-Type",
+        },
+    )
+    rmock.put(udata_url, repeat=True)
+
+    await start_checks(iterations=1)
+
+    # CORS headers
+    payloads = [req.kwargs["json"] for req in rmock.requests[("PUT", URL(udata_url))]]
+    check_payload = next(p for p in payloads if "check:id" in p)
+    assert check_payload.get("check:cors:status") == 204
+    assert check_payload.get("check:cors:allow-origin") == "https://data.gouv.fr"
+    assert check_payload.get("check:cors:allow-methods") == "GET,HEAD,OPTIONS"
+    assert check_payload.get("check:cors:allow-headers") == "Authorization,Content-Type"
 
 
 async def test_excluded_clause(setup_catalog, mocker, rmock, produce_mock):
@@ -172,6 +219,7 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
 
     # Assert foreign key is now None
     resource = await Resource.get(resource_id=RESOURCE_ID)
+    assert resource is not None
     assert resource["last_check"] is None
 
     # Test crawl is triggered
@@ -182,22 +230,34 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
-async def test_switch_head_to_get(setup_catalog, rmock, produce_mock):
+@pytest.mark.parametrize(
+    "head_status,head_headers",
+    [
+        pytest.param(501, None, id="invalid_status"),
+        pytest.param(200, {}, id="missing_size_headers"),
+        pytest.param(
+            200,
+            {"content-type": "text/html", "content-length": "247"},
+            id="waf_html_headers",
+        ),
+    ],
+)
+async def test_switch_head_to_get(
+    setup_catalog, rmock, produce_mock, analysis_mock, db, head_status, head_headers
+):
     rurl = RESOURCE_URL
-    rmock.head(rurl, status=501)
-    rmock.get(rurl, status=200)
+    head_kwargs = {"status": head_status}
+    if head_headers is not None:
+        head_kwargs["headers"] = head_headers
+    rmock.head(rurl, **head_kwargs)
+    rmock.get(rurl, status=200, headers={"content-length": "10"})
     await start_checks(iterations=1)
     assert ("HEAD", URL(rurl)) in rmock.requests
     assert ("GET", URL(rurl)) in rmock.requests
 
-
-async def test_switch_head_to_get_headers(setup_catalog, rmock, produce_mock):
-    rurl = RESOURCE_URL
-    rmock.head(rurl, status=200, headers={})
-    rmock.get(rurl, status=200)
-    await start_checks(iterations=1)
-    assert ("HEAD", URL(rurl)) in rmock.requests
-    assert ("GET", URL(rurl)) in rmock.requests
+    res = await db.fetchrow("SELECT * FROM checks WHERE url = $1", rurl)
+    assert res["status"] == 200
+    assert not res["error"]
 
 
 async def test_no_switch_head_to_get(setup_catalog, rmock, produce_mock, analysis_mock):
@@ -210,48 +270,40 @@ async def test_no_switch_head_to_get(setup_catalog, rmock, produce_mock, analysi
 
 async def test_analyse_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
-    # disable webhook, tested in following test
+    # webhook covered by test_analyse_resource_udata_webhook
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
     check = await fake_check()
     await analyse_resource(check=check, last_check=None)
     result: Record | None = await Check.get_by_id(check["id"])
-
+    assert result is not None
     assert result["error"] is None
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
     assert result["filesize"] == len(SIMPLE_CSV_CONTENT)
     assert result["mime_type"] == "text/plain"
 
 
-async def test_analyse_resource_send_udata(setup_catalog, mocker, rmock, fake_check, udata_url):
-    mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
-    rmock.put(udata_url, status=200, repeat=True)
-
-    check = await fake_check()
-    await analyse_resource(check=check, last_check=None)
-
-    req = rmock.requests[("PUT", URL(udata_url))]
-    assert len(req) == 1
-    document = req[0].kwargs["json"]
-    assert document["analysis:content-length"] == len(SIMPLE_CSV_CONTENT)
-    assert document["analysis:mime-type"] == "text/plain"
-
-
-async def test_analyse_resource_send_udata_no_change(
-    setup_catalog, mocker, rmock, fake_check, udata_url
+@pytest.mark.parametrize(
+    "same_checksum,expect_put",
+    [(False, True), (True, False)],
+    ids=["checksum_changed", "checksum_unchanged"],
+)
+async def test_analyse_resource_udata_webhook(
+    setup_catalog, mocker, rmock, fake_check, udata_url, same_checksum, expect_put
 ):
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
-
-    # previous check with same checksum
-    last_check = await fake_check(
-        checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
-    )
+    checksum = hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
+    last_check = await fake_check(checksum=checksum) if same_checksum else None
     check = await fake_check()
     await analyse_resource(check=check, last_check=last_check)
-
-    # udata has not been called
-    assert ("PUT", URL(udata_url)) not in rmock.requests
+    put_key = ("PUT", URL(udata_url))
+    if expect_put:
+        doc = rmock.requests[put_key][0].kwargs["json"]
+        assert doc["analysis:content-length"] == len(SIMPLE_CSV_CONTENT)
+        assert doc["analysis:mime-type"] == "text/plain"
+    else:
+        assert put_key not in rmock.requests
 
 
 async def test_analyse_resource_from_crawl(setup_catalog, rmock, db, udata_url):
@@ -269,17 +321,42 @@ async def test_analyse_resource_from_crawl(setup_catalog, rmock, db, udata_url):
     rmock.head(rurl, status=200, headers={"Content-Length": "200"})
     # mock for download
     rmock.get(rurl, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+    rmock.options(
+        rurl,
+        status=204,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
+        },
+    )
     # mock for check and analysis results
     rmock.put(udata_url, status=200, repeat=True)
 
     await start_checks(iterations=1)
 
     assert len(rmock.requests[("PUT", URL(udata_url))]) == 2
+
+    # Verify CORS headers are included in the check payload
+    payloads = [req.kwargs["json"] for req in rmock.requests[("PUT", URL(udata_url))]]
+    check_payload = next(p for p in payloads if "check:id" in p)
+    assert check_payload.get("check:cors:status") == 204
+    assert check_payload.get("check:cors:allow-origin") == "*"
+    assert check_payload.get("check:cors:allow-methods") == "GET,HEAD,OPTIONS"
+
     res = await db.fetch("SELECT * FROM checks")
     assert len(res) == 1
     assert res[0]["url"] == rurl
     assert res[0]["checksum"] is not None
     assert res[0]["status"] is not None
+    # Verify CORS headers are stored in DB
+    assert res[0]["cors_headers"] is not None
+    cors_headers = (
+        json.loads(res[0]["cors_headers"])
+        if isinstance(res[0]["cors_headers"], str)
+        else res[0]["cors_headers"]
+    )
+    assert cors_headers["status"] == 204
+    assert cors_headers["allow-origin"] == "*"
 
 
 async def test_change_analysis_last_modified_header(setup_catalog, rmock, udata_url):
@@ -375,67 +452,108 @@ async def test_no_change_analysis_harvested(
     assert res[0]["detected_last_modified_at"] == last_modfied_at
 
 
-async def test_change_analysis_last_modified_header_twice(
-    setup_catalog, rmock, fake_check, udata_url
+@pytest.mark.parametrize(
+    "head_last_modified,expect_put,expected_modified_at,use_detected_at",
+    [
+        ("Thu, 09 Jan 2020 09:33:37 GMT", False, None, False),
+        ("2020-01-09T09:33:37+04:00", True, "2020-01-09T09:33:37+04:00", True),
+    ],
+    ids=["same_instant_rfc822", "same_instant_different_offset"],
+)
+async def test_change_analysis_last_modified_no_reanalysis(
+    setup_catalog,
+    rmock,
+    fake_check,
+    udata_url,
+    head_last_modified,
+    expect_put,
+    expected_modified_at,
+    use_detected_at,
 ):
-    _date = "Thu, 09 Jan 2020 09:33:37 GMT"
-    await fake_check(
-        headers={"last-modified": _date, "content-type": "application/json"},
-        created_at=datetime.now() - timedelta(days=10),
-    )
+    created_at = datetime.now() - timedelta(days=10)
+    json_headers = {"content-type": "application/json"}
+    if use_detected_at:
+        await fake_check(
+            detected_last_modified_at=datetime.fromisoformat("2020-01-09T09:33:37+01:00"),
+            created_at=created_at,
+            headers=json_headers,
+        )
+    else:
+        await fake_check(
+            headers=json_headers | {"last-modified": head_last_modified},
+            created_at=created_at,
+        )
     rmock.head(
         RESOURCE_URL,
-        headers={"last-modified": _date, "content-type": "application/json"},
+        headers=json_headers | {"last-modified": head_last_modified},
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     await start_checks(iterations=1)
-    # udata has not been called: not first check, outdated check, and last-modified stayed the same
-    assert ("PUT", URL(udata_url)) not in rmock.requests
+    put_key = ("PUT", URL(udata_url))
+    if expect_put:
+        assert put_key in rmock.requests
+        assert (
+            rmock.requests[put_key][0].kwargs["json"].get("analysis:last-modified-at")
+            == expected_modified_at
+        )
+    else:
+        assert put_key not in rmock.requests
 
 
-async def test_change_analysis_last_modified_header_twice_tz(
-    setup_catalog, rmock, fake_check, udata_url
+@pytest.mark.parametrize(
+    "header_name, head_header_value, expected_webhook_value",
+    [
+        pytest.param("content-length", "15", 15, id="content_length_changed"),
+        pytest.param("content-type", "text/csv", "text/csv", id="content_type_changed"),
+    ],
+)
+async def test_check_changed_header(
+    setup_catalog,
+    rmock,
+    fake_check,
+    udata_url,
+    header_name,
+    head_header_value,
+    expected_webhook_value,
 ):
-    _date_1 = "2020-01-09T09:33:37+01:00"
-    _date_2 = "2020-01-09T09:33:37+04:00"
-    await fake_check(
-        detected_last_modified_at=datetime.fromisoformat(_date_1),
-        created_at=datetime.now() - timedelta(days=10),
-        headers={"content-type": "application/json"},
-    )
-    rmock.head(
-        RESOURCE_URL,
-        headers={"last-modified": _date_2, "content-type": "application/json"},
-    )
-    rmock.get(RESOURCE_URL)
-    rmock.put(udata_url, repeat=True)
-    await start_checks(iterations=1)
-    # udata has been called: last-modified has changed (different timezones)
-    assert ("PUT", URL(udata_url)) in rmock.requests
-    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
-    assert webhook.get("analysis:last-modified-at") == _date_2
-
-
-async def test_check_changed_content_length_header(setup_catalog, rmock, fake_check, udata_url):
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
     )
     rmock.head(
         RESOURCE_URL,
-        headers={"content-length": "15", "content-type": "application/json"},
+        headers={
+            header_name: head_header_value,
+            "content-length": "10" if header_name != "content-length" else head_header_value,
+            "content-type": "application/json"
+            if header_name != "content-type"
+            else head_header_value,
+        },
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     await start_checks(iterations=1)
-    # udata has been called in compute_check_has_changed: content-length has changed
     assert ("PUT", URL(udata_url)) in rmock.requests
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
-    assert webhook.get("check:headers:content-length") == 15
+    assert webhook.get(f"check:headers:{header_name}") == expected_webhook_value
 
 
-async def test_no_check_changed_content_length_header(setup_catalog, rmock, fake_check, udata_url):
+@pytest.mark.parametrize(
+    "header_name, head_header_value",
+    [
+        pytest.param("content-length", "10", id="content_length_unchanged"),
+        pytest.param("content-type", "application/json", id="content_type_unchanged"),
+    ],
+)
+async def test_no_check_changed_header(
+    setup_catalog,
+    rmock,
+    fake_check,
+    udata_url,
+    header_name,
+    head_header_value,
+):
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
@@ -443,47 +561,17 @@ async def test_no_check_changed_content_length_header(setup_catalog, rmock, fake
     )
     rmock.head(
         RESOURCE_URL,
-        headers={"content-length": "10", "content-type": "application/json"},
+        headers={
+            header_name: head_header_value,
+            "content-length": "10" if header_name != "content-length" else head_header_value,
+            "content-type": "application/json"
+            if header_name != "content-type"
+            else head_header_value,
+        },
     )
     rmock.get(RESOURCE_URL)
     rmock.put(udata_url, repeat=True)
     await start_checks(iterations=1)
-    # udata has not been called: not first check, outdated check, and content-length stayed the same
-    assert ("PUT", URL(udata_url)) not in rmock.requests
-
-
-async def test_check_changed_content_type_header(setup_catalog, rmock, fake_check, udata_url):
-    await fake_check(
-        created_at=datetime.now() - timedelta(days=10),
-        headers={"content-type": "application/json", "content-length": "10"},
-    )
-    rmock.head(
-        RESOURCE_URL,
-        headers={"content-length": "10", "content-type": "text/csv"},
-    )
-    rmock.get(RESOURCE_URL)
-    rmock.put(udata_url, repeat=True)
-    await start_checks(iterations=1)
-    # udata has been called in compute_check_has_changed: content-type has changed
-    assert ("PUT", URL(udata_url)) in rmock.requests
-    webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
-    assert webhook.get("check:headers:content-type") == "text/csv"
-
-
-async def test_no_check_changed_content_type_header(setup_catalog, rmock, fake_check, udata_url):
-    await fake_check(
-        created_at=datetime.now() - timedelta(days=10),
-        headers={"content-type": "application/json", "content-length": "10"},
-        detected_last_modified_at=datetime.now() - timedelta(days=20),
-    )
-    rmock.head(
-        RESOURCE_URL,
-        headers={"content-length": "10", "content-type": "application/json"},
-    )
-    rmock.get(RESOURCE_URL)
-    rmock.put(udata_url, repeat=True)
-    await start_checks(iterations=1)
-    # udata has not been called: not first check, outdated check, and content-type remained the same
     assert ("PUT", URL(udata_url)) not in rmock.requests
 
 
@@ -651,6 +739,7 @@ async def test_wrong_url_in_catalog(
     setup_catalog, rmock, produce_mock, url_changed, catalog_content
 ):
     r = await Resource.get(RESOURCE_ID)
+    assert r is not None
     not_found_url = r["url"]
     new_url = "https://example.com/has-been-modified-lately"
     rmock.head(
@@ -686,12 +775,12 @@ async def test_wrong_url_in_catalog(
         await check_resource(url=not_found_url, resource=r, session=session)
     if url_changed:
         r = await Resource.get(resource_id=RESOURCE_ID, column_name="url")
-        assert r["url"] == new_url
+        assert r is not None and r["url"] == new_url
         check = await Check.get_by_resource_id(RESOURCE_ID)
-        assert check.get("parsing_finished_at")
+        assert check is not None and check.get("parsing_finished_at")
     else:
         check = await Check.get_by_resource_id(RESOURCE_ID)
-        assert check["status"] == 404
+        assert check is not None and check["status"] == 404
 
 
 @pytest.mark.parametrize(
@@ -779,6 +868,7 @@ async def test_no_change_update_check(fake_check, setup_catalog, produce_mock, r
     )
     # the file has not changed since last check
     r = await Resource.get(resource_id=RESOURCE_ID)
+    assert r is not None
     rmock.head(RESOURCE_URL, repeat=True, headers={"last-modified": last_modified})
     async with ClientSession() as session:
         await check_resource(url=r["url"], resource=r, session=session, force_analysis=False)

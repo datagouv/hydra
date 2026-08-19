@@ -6,11 +6,15 @@ from marshmallow import Schema, fields
 class CheckSchema(Schema):
     check_id = fields.Integer(data_key="id")
     catalog_id = fields.Integer()
-    url = fields.Str()
+    catalog_url = fields.Str()
+    check_url = fields.Str()
     domain = fields.Str()
     created_at = fields.DateTime()
     check_status = fields.Integer(data_key="status")
     headers = fields.Function(lambda obj: json.loads(obj["headers"]) if obj["headers"] else {})
+    cors_headers = fields.Function(
+        lambda obj: json.loads(obj["cors_headers"]) if obj["cors_headers"] else None
+    )
     timeout = fields.Boolean()
     response_time = fields.Float()
     error = fields.Str()

@@ -1,16 +1,213 @@
 # Changelog
 
-## Current (in progress)
+## 2.13.1 (2026-07-08)
 
-- Dynamic version in user agent [#328](https://github.com/datagouv/hydra/pull/328) and [#337](https://github.com/datagouv/hydra/pull/337)
-- Add performance tests for csv to geojson and geojson to pmtiles conversion on geographical big data, and CLI commands to convert geographical files locally [#319](https://github.com/datagouv/hydra/pull/319)
-- Allow crawling of non datagouv URLs with CLI [#312](https://github.com/datagouv/hydra/pull/312)
-- Flag deleted resources in CSV DB instead of deleting them [#340](https://github.com/datagouv/hydra/pull/340)
-- Add a CI workflow for performance benchmarks [#339](https://github.com/datagouv/hydra/pull/339)
-- Store `dataset_id` in `tables_index` table of CSV database [#341](https://github.com/datagouv/hydra/pull/341)
-- Enable to analyse and insert parquet files [#342](https://github.com/datagouv/hydra/pull/342) [#346](https://github.com/datagouv/hydra/pull/346)
-- New `tag_version.sh` script to replace Bump'x [#342](https://github.com/datagouv/hydra/pull/342)
-- Reuse HTTP connexions between sessions [#325](https://github.com/datagouv/hydra/pull/325)
+- chore(CI): use recommended UV_PUBLISH_TOKEN ([#451](https://github.com/datagouv/hydra/pull/451))
+- feat: align check resource CLI with API ([#459](https://github.com/datagouv/hydra/pull/459))
+- feat: upgrade csv-detective to 0.12.0 ([#463](https://github.com/datagouv/hydra/pull/463))
+- fix: check head request fallback ([#460](https://github.com/datagouv/hydra/pull/460))
+- refactor: DB utils split ([#452](https://github.com/datagouv/hydra/pull/452))
+- Revert "refactor: DB utils split ([#452](https://github.com/datagouv/hydra/pull/452))"
+
+
+## 2.13.0 (2026-06-17)
+
+- Don't try to delete a file from a table ([#447](https://github.com/datagouv/hydra/pull/447))
+- Ensure we pass dicts to enqueue ([#446](https://github.com/datagouv/hydra/pull/446))
+- fix: enqueue Ogc subclass analysis ([#444](https://github.com/datagouv/hydra/pull/444))
+- fix: fix linting check in CI and remove unused imports ([#445](https://github.com/datagouv/hydra/pull/445))
+- Remove remainders targets `storage_path` ([#450](https://github.com/datagouv/hydra/pull/450))
+- test: add file.py unit tests ([#449](https://github.com/datagouv/hydra/pull/449))
+- Un-revert data formats and fix file routing ([#443](https://github.com/datagouv/hydra/pull/443))
+- Use the correct kwarg in Geojson + PMTiles export ([#448](https://github.com/datagouv/hydra/pull/448))
+
+
+## 2.12.3 (2026-06-15)
+
+- Revert "Introduce data formats ([#430](https://github.com/datagouv/hydra/pull/430))"
+
+
+## 2.12.2 (2026-06-15)
+
+- fix(cli): make fd var bound (initialize to None) ([#441](https://github.com/datagouv/hydra/pull/441))
+- Introduce data formats ([#430](https://github.com/datagouv/hydra/pull/430))
+
+
+## 2.12.1 (2026-06-12)
+
+- chore: remove ogc layers in payload ([#440](https://github.com/datagouv/hydra/pull/440))
+- docs: refresh README for current API, CLI, and worker behavior ([#439](https://github.com/datagouv/hydra/pull/439))
+- fix(cli): silence botocore logs when using --quiet ([#436](https://github.com/datagouv/hydra/pull/436))
+- fix(deps): constrain urllib3 for GHSA-mf9v-mfxr-j63j ([#420](https://github.com/datagouv/hydra/pull/420))
+- refactor: refactor cli ([#437](https://github.com/datagouv/hydra/pull/437))
+- test: add tests to improve test coverage ([#434](https://github.com/datagouv/hydra/pull/434))
+- test: refactor tests ([#435](https://github.com/datagouv/hydra/pull/435))
+
+
+## 2.12 (2026-06-02)
+
+- feat(status): include python version in health endpoint ([#433](https://github.com/datagouv/hydra/pull/433))
+- perf: use Python 3.14 ([#378](https://github.com/datagouv/hydra/pull/378))
+
+
+## 2.11.1 (2026-06-02)
+
+- Add `header` field to parquet analysis ([#431](https://github.com/datagouv/hydra/pull/431))
+- fix(cli): apply --quiet to all loggers globally ([#432](https://github.com/datagouv/hydra/pull/432))
+
+
+## 2.11.0 (2026-05-27)
+
+- feat(csv): parquet and GeoJSON exports on dedicated RQ queues ([#425](https://github.com/datagouv/hydra/pull/425))
+
+
+## 2.10.3 (2026-05-26)
+
+- Fix S3 uploads ([#428](https://github.com/datagouv/hydra/pull/428))
+- One bucket per env, prefixes made from file extentions ([#429](https://github.com/datagouv/hydra/pull/429))
+
+
+## 2.10.2 (2026-05-26)
+
+- docs: fix minor enqueue docstring error
+- feat(s3): S3 Object Storage via boto3 ([#415](https://github.com/datagouv/hydra/pull/415))
+
+
+## 2.10.1 (2026-05-19)
+
+- feat: db only parquet export ([#424](https://github.com/datagouv/hydra/pull/424))
+- fix(conversion): drop stale CSV_TO_GEOJSON guard in standalone helper
+- test: align test layout with conversion package ([#427](https://github.com/datagouv/hydra/pull/427))
+
+
+## 2.10.0 (2026-05-15)
+
+- chore(csv): remove redundant __all__ from csv analysis ([#426](https://github.com/datagouv/hydra/pull/426))
+- feat(analysis): GeoJSON export from DB only in CSV pipeline ([#423](https://github.com/datagouv/hydra/pull/423))
+- refactor(conversion): separate conversion methods into dedicated files in `/conversion` ([#422](https://github.com/datagouv/hydra/pull/422))
+
+
+## 2.9.0 (2026-05-06)
+
+- feat: generate GeoJSON from PostgreSQL instead of re-reading CSV ([#404](https://github.com/datagouv/hydra/pull/404))
+
+
+## 2.8.1 (2026-05-05)
+
+- clean: remove ununsed import
+- fix: use basename as param in jobs  ([#416](https://github.com/datagouv/hydra/pull/416))
+- refactor: separate stats endpoints into two, rename keys for more clarity ([#387](https://github.com/datagouv/hydra/pull/387))
+
+
+## 2.8.0 (2026-04-14)
+
+-  feat: generate parquet from PostgreSQL table instead of re-reading CSV  ([#402](https://github.com/datagouv/hydra/pull/402))
+- Bump csv-detective to 0.11.2 ([#407](https://github.com/datagouv/hydra/pull/407))
+- chore: use TEMPORARY_DOWNLOAD_FOLDER config and clean up tmp files in extract_gzip ([#400](https://github.com/datagouv/hydra/pull/400))
+- chore(ogc): silence log warning ([#399](https://github.com/datagouv/hydra/pull/399))
+- clean: add integrated type checking ([#391](https://github.com/datagouv/hydra/pull/391))
+- feat: add detailed timer marks for geojson and pmtiles conversion steps ([#403](https://github.com/datagouv/hydra/pull/403))
+- feat(ogc): add support for WMS analysis ([#401](https://github.com/datagouv/hydra/pull/401))
+- Fix publish step in CI on release ([#398](https://github.com/datagouv/hydra/pull/398))
+- Fix tables_index insertion if `nan` or `inf` in profile ([#397](https://github.com/datagouv/hydra/pull/397))
+- Fix URL in checks ([#406](https://github.com/datagouv/hydra/pull/406))
+- fix: handle FileNotFoundError when temporary file is missing in analysis workers ([#395](https://github.com/datagouv/hydra/pull/395))
+- fix: use a default max size for unknown format ([#414](https://github.com/datagouv/hydra/pull/414))
+- Upgrade `csv-detective` to 0.11.0 ([#396](https://github.com/datagouv/hydra/pull/396))
+
+
+## 2.7.0 (2026-03-12)
+
+- Only cast strings from loaded file ([#390](https://github.com/datagouv/hydra/pull/390))
+- feat: add uptime_since to /api/health/ ([#394](https://github.com/datagouv/hydra/pull/394))
+- feat: parse wfs for meta and layers infos ([#385](https://github.com/datagouv/hydra/pull/385))
+
+
+## 2.6.1 (2026-02-09)
+
+- Upgrade `csv-detective` ([#384](https://github.com/datagouv/hydra/pull/384))
+- Upgrade `csv-detective` ([#388](https://github.com/datagouv/hydra/pull/388))
+- Upgrade `csv-detective` to 0.10.4 ([#389](https://github.com/datagouv/hydra/pull/389))
+- Upgrade `csv-detective` to v0.10.3 ([#380](https://github.com/datagouv/hydra/pull/380))
+- chore: use nest-asyncio2 ([#379](https://github.com/datagouv/hydra/pull/379))
+- ci: use latest debian version for docker containers in CI ([#351](https://github.com/datagouv/hydra/pull/351))
+- clean: remove useless import
+- docs: refactor deprecated comment and remove TODO ([#383](https://github.com/datagouv/hydra/pull/383))
+- feat: add `/resources/stats` route and endpoint with CORS stats ([#381](https://github.com/datagouv/hydra/pull/381))
+- fix: fix typo in comment
+
+
+## 2.6.0 (2026-01-30)
+
+- feat: CORS probe ([#359](https://github.com/datagouv/hydra/pull/359))
+
+
+## 2.5.0 (2026-01-20)
+
+- Adapt to the new `csv-detective` output ([#369](https://github.com/datagouv/hydra/pull/369))
+- Better pick latitude/longitude columns when there are multiple options ([#376](https://github.com/datagouv/hydra/pull/376))
+- chore: move pyproject optional-dependencies to dependency-groups ([#368](https://github.com/datagouv/hydra/pull/368))
+- Fix stable resource URL syntax ([#375](https://github.com/datagouv/hydra/pull/375))
+- fix: unlink pmtiles once only ([#373](https://github.com/datagouv/hydra/pull/373))
+- Move file cleanup condition to the config ([#374](https://github.com/datagouv/hydra/pull/374))
+- refactor: refactor docker-compose files to use profiles ([#370](https://github.com/datagouv/hydra/pull/370))
+- Upgrade `csv-detective` ([#377](https://github.com/datagouv/hydra/pull/377))
+
+
+## 2.4.5 (2026-01-12)
+
+- chore(rq): set failure ttl to 10 days ([#372](https://github.com/datagouv/hydra/pull/372))
+- chore: clean remaining pmtiles files ([#371](https://github.com/datagouv/hydra/pull/371))
+- fix: fix tag_version.sh to work with MacOS ([#367](https://github.com/datagouv/hydra/pull/367))
+
+
+## 2.4.4 (2025-11-27)
+
+- Add binary type support ([#364](https://github.com/datagouv/hydra/pull/364))
+- Bring `tables_index` update closer to db insertion ([#366](https://github.com/datagouv/hydra/pull/366))
+- Change how we spot tables to delete ([#358](https://github.com/datagouv/hydra/pull/358))
+- Handle empty geometry cells ([#365](https://github.com/datagouv/hydra/pull/365))
+- Revert "feat: better logs for CLI commands run by crons ([#354](https://github.com/datagouv/hydra/pull/354))" ([#355](https://github.com/datagouv/hydra/pull/355))
+- chore: remove parallel tests executors and add minimum test coverage of 80% ([#356](https://github.com/datagouv/hydra/pull/356))
+- docs: fix README
+- docs: fix README ([#352](https://github.com/datagouv/hydra/pull/352))
+- feat: add parsing_table index on checks ([#357](https://github.com/datagouv/hydra/pull/357))
+- feat: add resource_id index on tables_index ([#353](https://github.com/datagouv/hydra/pull/353))
+- feat: add total resources and deleted resources in crawler status health check ([#362](https://github.com/datagouv/hydra/pull/362))
+- feat: better logs for CLI commands run by crons ([#354](https://github.com/datagouv/hydra/pull/354))
+- feat: optimize cleanup of stuck status resources ([#363](https://github.com/datagouv/hydra/pull/363))
+- fix: resolve async/await compatibility issues with Typer CLI ([#361](https://github.com/datagouv/hydra/pull/361))
+- refactor: replace Minicli dependency with Typer ([#233](https://github.com/datagouv/hydra/pull/233))
+
+
+## 2.4.3 (2025-10-21)
+
+- fix: fix entrypoint ([#350](https://github.com/datagouv/hydra/pull/350))
+
+
+## 2.4.2 (2025-10-20)
+
+- build: add tag_version.sh script ([#342](https://github.com/datagouv/hydra/pull/342))
+- build: use uv instead of Poetry for lock file and in CI ([#241](https://github.com/datagouv/hydra/pull/241))
+- chore: bump version to 2.4.2
+- docs: fix changelog
+- docs: fix error in changelog
+- docs: remove "current" section in changelog to prepare it for automatic update of changelog
+- docs: update changelog for merged PR [#328](https://github.com/datagouv/hydra/pull/328)
+- Enable to analyse and insert parquet files ([#343](https://github.com/datagouv/hydra/pull/343))
+- feat: add performance tests and CLI tools for geographical file conversion benchmarking ([#319](https://github.com/datagouv/hydra/pull/319))
+- feat: allow to crawl non-data.gouv URLs ([#312](https://github.com/datagouv/hydra/pull/312))
+- feat: benchmarks CI workflow ([#339](https://github.com/datagouv/hydra/pull/339))
+- feat: dynamic version in user agent ([#328](https://github.com/datagouv/hydra/pull/328))
+- feat: flag deleted resources in CSV DB instead of deleting them ([#340](https://github.com/datagouv/hydra/pull/340))
+- feat: store dataset_id in CSV tables_index ([#341](https://github.com/datagouv/hydra/pull/341))
+- Fix after parquet ([#346](https://github.com/datagouv/hydra/pull/346))
+- fix: fix docker image
+- fix: fix release in CI ([#349](https://github.com/datagouv/hydra/pull/349))
+- fix: fix user agent string ([#337](https://github.com/datagouv/hydra/pull/337))
+- Revert "chore: bump version to 2.4.2"
+- Update to version 2.4.2.dev for next development cycle
+
 
 ## 2.4.1 (2025-09-03)
 

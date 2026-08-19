@@ -1,31 +1,41 @@
 import hashlib
 
-import nest_asyncio
+import nest_asyncio2 as nest_asyncio
 import pytest
-from minicli import run
 
 from udata_hydra import context
+from udata_hydra.cli import analyse_csv_cli
 from udata_hydra.db.check import Check
 
 pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
 
 
-async def test_csv_analysis_from_check_id(
-    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
+@pytest.mark.parametrize(
+    "entry_mode",
+    [
+        pytest.param("check_id", id="check_id"),
+        pytest.param("url", id="url"),
+    ],
+)
+async def test_csv_analysis_from_catalog(
+    setup_catalog, rmock, catalog_content, fake_check, produce_mock, entry_mode
 ):
-    """Test the analyse-csv CLI command using check_id"""
-    check = await fake_check()
+    """Test the analyse-csv CLI command using check_id or URL for a catalog resource."""
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     rmock.get(url, status=200, body=catalog_content)
-    run("analyse-csv", check_id=str(check["id"]))
+    if entry_mode == "check_id":
+        await analyse_csv_cli(check_id=str(check["id"]))
+    else:
+        await analyse_csv_cli(check_id=None, url=url, debug_insert=False)
 
 
 async def test_csv_analysis_with_debug_insert(setup_catalog, rmock, db, fake_check, produce_mock):
     """Test the analyse-csv CLI command with debug insert mode"""
 
     # Create a check for an existing URL
-    check = await fake_check()
+    check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
 
     # Use simple CSV content instead of catalog_content
@@ -33,7 +43,7 @@ async def test_csv_analysis_with_debug_insert(setup_catalog, rmock, db, fake_che
     rmock.get(url, status=200, body=csv_content)
 
     # Test with debug insert enabled
-    run("analyse-csv", url=url, debug_insert=True)
+    await analyse_csv_cli(check_id=None, url=url, debug_insert=True)
 
     # Verify that the CSV table was created and contains data
     csv_pool = await context.pool("csv")
@@ -53,16 +63,6 @@ async def test_csv_analysis_with_debug_insert(setup_catalog, rmock, db, fake_che
     assert table_data[0]["value"] == 42
 
 
-async def test_csv_analysis_from_url(
-    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
-):
-    """Test the analyse-csv CLI command using URL, with an existing check"""
-    check = await fake_check()
-    url = check["url"]
-    rmock.get(url, status=200, body=catalog_content)
-    run("analyse-csv", url=url)
-
-
 async def test_csv_analysis_from_external_url(setup_catalog, rmock, db, produce_mock):
     """Test the analyse-csv CLI command using an external URL with no existing check"""
 
@@ -73,7 +73,7 @@ async def test_csv_analysis_from_external_url(setup_catalog, rmock, db, produce_
     external_url = "https://external-example.com/test.csv"
     rmock.get(external_url, status=200, body=csv_content)
 
-    run("analyse-csv", url=external_url)
+    await analyse_csv_cli(check_id=None, url=external_url, resource_id=None, debug_insert=False)
 
     # Verify that no permanent data was created in the main database
     resources = await db.fetch("SELECT * FROM catalog WHERE url = $1", external_url)
@@ -103,7 +103,7 @@ async def test_csv_analysis_from_external_invalid_url(setup_catalog, rmock, db, 
     rmock.get(invalid_url, status=404, body="Not Found")
 
     # Test should handle the error gracefully
-    run("analyse-csv", url=invalid_url)
+    await analyse_csv_cli(check_id=None, url=invalid_url, resource_id=None, debug_insert=False)
 
     # Verify that no permanent data was created
     resources = await db.fetch("SELECT * FROM catalog WHERE url = $1", invalid_url)

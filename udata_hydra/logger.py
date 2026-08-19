@@ -1,4 +1,6 @@
 import logging
+from contextlib import contextmanager
+from typing import Iterator
 
 import coloredlogs
 import sentry_sdk
@@ -34,8 +36,35 @@ def setup_logging() -> logging.Logger:
     # silence urllib3 a bit
     logging.getLogger("urllib3").setLevel("INFO")
     logging.getLogger("asyncio").setLevel("INFO")
+    logging.getLogger("owslib").setLevel("INFO")
+    logging.getLogger("botocore").setLevel("INFO")
+    logging.getLogger("boto3").setLevel("INFO")
     context["inited"] = True
     return log
+
+
+@contextmanager
+def quiet_logs(enabled: bool = True) -> Iterator[None]:
+    """Suppress all log output below ERROR for every logger when enabled."""
+    if not enabled:
+        yield
+        return
+    # disable() takes the cutoff: levels at or below it are suppressed (ERROR+ still pass).
+    logging.disable(logging.WARNING)
+    try:
+        yield
+    finally:
+        logging.disable(logging.NOTSET)
+
+
+class OwsLibPyprojFilter(logging.Filter):
+    """Drop the 'pyproj not installed' warning emitted by OWSLib."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "pyproj not installed" not in record.getMessage()
+
+
+logging.getLogger("owslib.feature.wfs100").addFilter(OwsLibPyprojFilter())
 
 
 def stop_sentry() -> None:

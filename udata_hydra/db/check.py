@@ -61,7 +61,8 @@ class Check:
         async with pool.acquire() as connection:
             q = f"""
             SELECT catalog.id as catalog_id, checks.id as check_id,
-                catalog.status as catalog_status, checks.status as check_status, checks.next_check_at as next_check_at, catalog.deleted as deleted, *
+                catalog.status as catalog_status, checks.status as check_status, checks.next_check_at as next_check_at,
+                catalog.deleted as deleted, catalog.url as catalog_url, checks.url as check_url, *
             FROM checks, catalog
             WHERE catalog.{column} = $1
             AND checks.id = catalog.last_check
@@ -75,7 +76,8 @@ class Check:
         async with pool.acquire() as connection:
             q = f"""
             SELECT catalog.id as catalog_id, checks.id as check_id,
-                catalog.status as catalog_status, checks.status as check_status, checks.next_check_at as next_check_at, catalog.deleted as deleted, *
+                catalog.status as catalog_status, checks.status as check_status, checks.next_check_at as next_check_at,
+                catalog.deleted as deleted, catalog.url as catalog_url, checks.url as check_url, *
             FROM checks, catalog
             WHERE catalog.{column} = $1
             AND catalog.{column} = checks.{column}
