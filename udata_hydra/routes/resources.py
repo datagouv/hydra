@@ -52,7 +52,7 @@ async def create_resource(request: web.Request) -> web.Response:
         resource_id=str(payload.resource_id),
         url=document.url,
         type=document.type,
-        format=document.format or "",
+        format=document.format or None,
         priority=True,
         title=document.title,
     )
@@ -100,7 +100,7 @@ async def update_resource(request: web.Request) -> web.Response:
         resource_id=resource_id,
         url=document.url,
         type=document.type,
-        format=document.format or "",
+        format=document.format or None,
         title=document.title,
     )
 
