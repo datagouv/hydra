@@ -1,5 +1,6 @@
 import datetime
 import json
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -62,5 +63,10 @@ class CheckGroupBy(BaseModel):
     # Allow creation from ORM objects (like asyncpg Record) by enabling from_attributes
     model_config = ConfigDict(from_attributes=True)
 
-    value: str
+    value: str | None
     count: int
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def stringify_value(cls, value: Any) -> str | None:
+        return None if value is None else str(value)
