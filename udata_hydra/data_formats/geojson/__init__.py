@@ -52,7 +52,7 @@ class Geojson(DataFormat):
         finally:
             await helpers.notify_udata(resource, check)
             timer.stop()
-            self.path.unlink()
+            self.path.unlink(missing_ok=True)
             await Resource.clear_job_status(resource_id, "geojson")
 
     async def to_pmtiles(self) -> "PMTiles":
