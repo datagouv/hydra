@@ -234,7 +234,7 @@ class Resource:
             await connection.execute(q)
 
     @staticmethod
-    def get_excluded_clause(cls) -> str:
+    def get_excluded_clause() -> str:
         """Return the WHERE clause to get only resources from the checks which:
         - don't have a URL in the excluded URLs patterns
         - are not deleted
