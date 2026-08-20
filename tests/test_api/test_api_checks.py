@@ -5,7 +5,7 @@ it will interfere with the rest of our async code
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from aiohttp import RequestInfo
@@ -29,7 +29,15 @@ pytestmark = pytest.mark.asyncio
     ],
 )
 async def test_get_latest_check(setup_catalog, client, query, expected, fake_check):
-    await fake_check(parsing_table=True, parquet_url=True)
+    await fake_check(
+        parsing_table=True,
+        parquet_url=True,
+        checksum="abc123",
+        filesize=1024,
+        mime_type="text/csv",
+        analysis_error="Too large",
+        detected_last_modified_at=datetime(2025, 4, 4, tzinfo=timezone.utc),
+    )
 
     resp = await client.get(f"/api/checks/latest?{query}")
     assert resp.status == expected
@@ -64,6 +72,11 @@ async def test_get_latest_check(setup_catalog, client, query, expected, fake_che
         "pmtiles_size": None,
         "geojson_url": None,
         "geojson_size": None,
+        "detected_last_modified_at": "2025-04-04T00:00:00Z",
+        "analysis_error": "Too large",
+        "checksum": "abc123",
+        "filesize": 1024,
+        "mime_type": "text/csv",
     }
 
     # Test deleted resource
@@ -127,6 +140,42 @@ async def test_api_get_checks_aggregate(setup_catalog, client, query, value_temp
     for i in range(len(data)):
         assert data[i]["value"] == value_template.format(i)
         assert data[i]["count"] == occurences[i]
+
+
+async def test_api_get_checks_aggregate_on_non_text_column(setup_catalog, client, fake_check):
+    # group_by accepts any column of the checks table, including non-text ones
+    # (status is INT, filesize BIGINT, timeout BOOLEAN): the grouped value is
+    # always serialized as a string.
+    for _ in range(3):
+        await fake_check(created_at=datetime.now(), status=200)
+    await fake_check(created_at=datetime.now(), status=500)
+
+    resp = await client.get("/api/checks/aggregate?group_by=status&created_at=today")
+    assert resp.status == 200
+    data: list = await resp.json()
+    assert data == [
+        {"value": "200", "count": 3},
+        {"value": "500", "count": 1},
+    ]
+
+
+async def test_api_get_checks_aggregate_with_null_group(setup_catalog, client, fake_check):
+    # A check whose headers lack the grouped key produces a NULL group, which is
+    # serialized as null instead of making the whole endpoint fail.
+    created_at = datetime(2024, 9, 5, 10, 0, 0)
+    for _ in range(2):
+        await fake_check(created_at=created_at, headers={"content-type": "application/json"})
+    await fake_check(created_at=created_at, headers={"x-do": "you"})
+
+    resp = await client.get(
+        "/api/checks/aggregate?group_by=headers->>'content-type'&created_at=2024-09-05"
+    )
+    assert resp.status == 200
+    data: list = await resp.json()
+    assert data == [
+        {"value": "application/json", "count": 2},
+        {"value": None, "count": 1},
+    ]
 
 
 async def test_create_check_wrongly(
