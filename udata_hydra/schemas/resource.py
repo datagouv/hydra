@@ -1,7 +1,7 @@
 import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ResourceDocumentSchema(BaseModel):
@@ -12,7 +12,8 @@ class ResourceDocumentSchema(BaseModel):
     url: str
     format: str | None = None
     title: str
-    schema_name: str | None = None
+    # Named schema_ because "schema" shadows an attribute of pydantic's BaseModel
+    schema_: dict | None = Field(default=None, alias="schema")
     description: str | None = None
     filetype: str
     type: str

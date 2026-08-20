@@ -115,6 +115,32 @@ async def test_update_resource(
     assert text == "Missing document body"
 
 
+async def test_resource_schema_round_trips_as_object(
+    client, api_headers, udata_resource_payload, udata_update_resource_payload
+):
+    """udata sends the resource schema as an object under the "schema" key,
+    which must be echoed back under the same key and with the same shape."""
+    schema: dict = {"name": "etalab/schema-irve-statique", "version": "2.3.1"}
+
+    udata_resource_payload["document"]["schema"] = schema
+    resp = await client.post(
+        path="/api/resources/", headers=api_headers, json=udata_resource_payload
+    )
+    assert resp.status == 201
+    data: dict = await resp.json()
+    assert data["schema"] == schema
+
+    udata_update_resource_payload["document"]["schema"] = schema
+    resp = await client.put(
+        path=f"/api/resources/{RESOURCE_ID}",
+        headers=api_headers,
+        json=udata_update_resource_payload,
+    )
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["schema"] == schema
+
+
 async def test_update_resource_url_since_load_catalog(
     setup_catalog, db, client, api_headers, udata_update_resource_payload
 ):

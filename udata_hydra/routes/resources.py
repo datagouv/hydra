@@ -57,7 +57,7 @@ async def create_resource(request: web.Request) -> web.Response:
         title=document.title,
     )
 
-    return web.json_response(document.model_dump(mode="json"), status=201)
+    return web.json_response(document.model_dump(mode="json", by_alias=True), status=201)
 
 
 async def update_resource(request: web.Request) -> web.Response:
@@ -104,7 +104,7 @@ async def update_resource(request: web.Request) -> web.Response:
         title=document.title,
     )
 
-    return web.json_response(document.model_dump(mode="json"), status=200)
+    return web.json_response(document.model_dump(mode="json", by_alias=True), status=200)
 
 
 async def delete_resource(request: web.Request) -> web.Response:
