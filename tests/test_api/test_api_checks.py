@@ -5,7 +5,7 @@ it will interfere with the rest of our async code
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from aiohttp import RequestInfo
@@ -29,7 +29,15 @@ pytestmark = pytest.mark.asyncio
     ],
 )
 async def test_get_latest_check(setup_catalog, client, query, expected, fake_check):
-    await fake_check(parsing_table=True, parquet_url=True)
+    await fake_check(
+        parsing_table=True,
+        parquet_url=True,
+        checksum="abc123",
+        filesize=1024,
+        mime_type="text/csv",
+        analysis_error="Too large",
+        detected_last_modified_at=datetime(2025, 4, 4, tzinfo=timezone.utc),
+    )
 
     resp = await client.get(f"/api/checks/latest?{query}")
     assert resp.status == expected
@@ -64,11 +72,11 @@ async def test_get_latest_check(setup_catalog, client, query, expected, fake_che
         "pmtiles_size": None,
         "geojson_url": None,
         "geojson_size": None,
-        "detected_last_modified_at": None,
-        "analysis_error": None,
-        "checksum": None,
-        "filesize": None,
-        "mime_type": None,
+        "detected_last_modified_at": "2025-04-04T00:00:00Z",
+        "analysis_error": "Too large",
+        "checksum": "abc123",
+        "filesize": 1024,
+        "mime_type": "text/csv",
     }
 
     # Test deleted resource
