@@ -85,6 +85,11 @@ async def test_analyse_parquet(
     with patch("udata_hydra.config.PARQUET_TO_DB", True):
         table = await file.analyse(check=check)
     assert table is not None
+    # Check resource status after analysis
+    resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
+    assert resource["status"] == {}
+
     # checking check result
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table.table_name
