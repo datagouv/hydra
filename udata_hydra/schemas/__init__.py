@@ -4,7 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from .check import CheckGroupBy, CheckSchema
-from .resource import ResourceDocumentSchema, ResourceSchema
+from .resource import CreateResourceRequest, ResourceDocumentSchema, ResourceSchema
 from .resource_exception import ResourceExceptionSchema
 
 
@@ -27,6 +27,7 @@ class CreateCheckRequest(BaseModel):
 __all__ = [
     "CheckGroupBy",
     "CheckSchema",
+    "CreateResourceRequest",
     "ResourceDocumentSchema",
     "ResourceSchema",
     "ResourceExceptionSchema",

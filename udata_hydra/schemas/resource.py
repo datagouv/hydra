@@ -25,8 +25,17 @@ class ResourceDocumentSchema(BaseModel):
 
 
 class ResourceSchema(BaseModel):
+    """Resource as stored in catalog, returned by GET /api/resources/{id}."""
+
     dataset_id: str
     resource_id: UUID
     status: str | None = None
     status_since: datetime.datetime | None = None
-    document: ResourceDocumentSchema | None = None
+
+
+class CreateResourceRequest(BaseModel):
+    """Webhook payload from udata to create or update a resource."""
+
+    dataset_id: str
+    resource_id: UUID
+    document: ResourceDocumentSchema

@@ -7,7 +7,7 @@ from asyncpg import Record
 
 from udata_hydra.db.resource import Resource
 from udata_hydra.routes.status import get_resources_status_counts
-from udata_hydra.schemas import ResourceDocumentSchema, ResourceSchema
+from udata_hydra.schemas import CreateResourceRequest, ResourceSchema
 
 log = logging.getLogger("udata-hydra")
 
@@ -39,13 +39,11 @@ async def create_resource(request: web.Request) -> web.Response:
 
     try:
         request_data: dict = await request.json()
-        payload: ResourceSchema = ResourceSchema.model_validate(request_data)
+        payload: CreateResourceRequest = CreateResourceRequest.model_validate(request_data)
     except Exception as e:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
-    document: ResourceDocumentSchema | None = payload.document
-    if not document:
-        raise web.HTTPBadRequest(text="Missing document body")
+    document = payload.document
 
     await Resource.insert(
         dataset_id=payload.dataset_id,
@@ -69,13 +67,11 @@ async def update_resource(request: web.Request) -> web.Response:
 
     try:
         request_data: dict = await request.json()
-        payload: ResourceSchema = ResourceSchema.model_validate(request_data)
+        payload: CreateResourceRequest = CreateResourceRequest.model_validate(request_data)
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
-    document: ResourceDocumentSchema | None = payload.document
-    if not document:
-        raise web.HTTPBadRequest(text="Missing document body")
+    document = payload.document
 
     # Temporary debug for https://github.com/datagouv/data.gouv.fr/issues/2048
     # (hydra#466). Remove once the check-notify gap is understood.

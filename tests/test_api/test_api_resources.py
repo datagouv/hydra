@@ -28,6 +28,7 @@ async def test_get_resource(setup_catalog, client):
     assert data["resource_id"] == RESOURCE_ID
     assert data["status"] is None
     assert data["status_since"] is None
+    assert "document" not in data
 
 
 async def test_create_resource(
@@ -63,7 +64,7 @@ async def test_create_resource(
     )
     assert resp.status == 400
     text = await resp.text()
-    assert text == "Missing document body"
+    assert "Input should be a valid dictionary or instance of ResourceDocumentSchema" in text
 
 
 async def test_create_resource_rejects_malformed_auth_headers(client, udata_resource_payload):
@@ -112,7 +113,7 @@ async def test_update_resource(
     resp = await client.put(path=f"/api/resources/{RESOURCE_ID}", headers=api_headers, json=payload)
     assert resp.status == 400
     text: str = await resp.text()
-    assert text == "Missing document body"
+    assert "Input should be a valid dictionary or instance of ResourceDocumentSchema" in text
 
 
 async def test_resource_schema_round_trips_as_object(
