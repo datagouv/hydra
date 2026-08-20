@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -40,7 +39,7 @@ class CsvLike(DataFormat):
         )
         if previous_inspection:
             if self.resource_id:
-                await Resource.update(self.resource_id, {"status": "VALIDATING_CSV"})
+                await Resource.set_job_status(self.resource_id, "csv", "VALIDATING_CSV")
             self.inspection = validate_then_detect(  # ty: ignore[invalid-assignment]
                 file_path=self.path.as_posix(),
                 previous_analysis=previous_inspection,
@@ -65,8 +64,7 @@ class CsvLike(DataFormat):
 
         resource_id: str = str(check["resource_id"])
 
-        # Update resource status to ANALYSING_CSVLIKE
-        resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
+        resource: Record | None = await Resource.set_job_status(resource_id, "csv", "ANALYSING_CSV")
 
         # Check if the resource is in the exceptions table
         # If it is, get the table_indexes to use them later
@@ -74,7 +72,7 @@ class CsvLike(DataFormat):
 
         table_indexes: dict | None = None
         if exception and exception.get("table_indexes"):
-            table_indexes = json.loads(exception["table_indexes"])
+            table_indexes = exception["table_indexes"]
 
         timer = Timer("analyse-csv", resource_id)
         assert any(_ is not None for _ in (check["id"], check["url"]))
@@ -155,8 +153,7 @@ class CsvLike(DataFormat):
             timer.stop()
             self.path.unlink()
 
-            # Reset resource status to None
-            await Resource.update(resource_id, {"status": None})
+            await Resource.clear_job_status(resource_id, "csv")
 
     async def to_db(
         self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False

@@ -131,7 +131,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
 
     resource = await Resource.get(check["resource_id"])
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     start = perf_counter()
     file = await download_from_check(check, Csv)
@@ -140,14 +140,14 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
 
     resource = await Resource.get(check["resource_id"])
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count
     profile = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    profile = json.loads(profile["csv_detective"])
+    profile = profile["csv_detective"]
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == expected_count

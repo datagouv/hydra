@@ -1,5 +1,4 @@
 import hashlib
-import json
 import logging
 
 import pytest
@@ -38,7 +37,7 @@ async def test_exception_analysis(
     # Check resource status before analysis
     resource = await Resource.get(RESOURCE_EXCEPTION_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     # Analyse the CSV
     file = await download_from_check(check, Csv)
@@ -47,7 +46,7 @@ async def test_exception_analysis(
     # Check resource status after analysis
     resource = await Resource.get(RESOURCE_EXCEPTION_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert resource["status"] == {}
 
     # Check the table has been created in CSV DB, with the expected number of rows, and get the columns
     row: Record = await db.fetchrow(f'SELECT *, count(*) over () AS count FROM "{table_name}"')
@@ -66,7 +65,7 @@ async def test_exception_analysis(
     profile = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    profile = json.loads(profile["csv_detective"])
+    profile = profile["csv_detective"]
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == expected_count

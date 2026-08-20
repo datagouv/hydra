@@ -58,8 +58,7 @@ async def csv_to_db(
         )
 
     if file.resource_id:
-        # Update resource status to INSERTING_IN_DB
-        await Resource.update(file.resource_id, {"status": "INSERTING_IN_DB"})
+        await Resource.set_job_status(file.resource_id, "csv", "INSERTING_IN_DB")
 
     # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {db_col_name(c): helpers.get_python_type(v) for c, v in inspection["columns"].items()}

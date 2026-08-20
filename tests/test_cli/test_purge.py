@@ -25,7 +25,7 @@ async def _create_parsed_csv_table(db, fake_check, *, with_tables_index: bool = 
         await db.execute(
             "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)",
             md5,
-            "{}",
+            {},
             check.get("resource_id"),
             check.get("url"),
         )
@@ -189,7 +189,7 @@ async def test_purge_selected_csv_tables(setup_catalog, db, fake_check, _kwargs)
         await db.execute(
             "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, url) VALUES($1, $2, $3, $4)",
             md5,
-            "{}",
+            {},
             check.get("resource_id"),
             check.get("url"),
         )

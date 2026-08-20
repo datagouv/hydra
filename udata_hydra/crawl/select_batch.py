@@ -19,7 +19,14 @@ async def select_rows_based_on_query(connection, q: str, *args) -> list[Record]:
     )
     # Update resource status to CRAWLING_URL
     update_select_catalog_query = f"""
-        UPDATE catalog SET status = 'CRAWLING_URL' WHERE resource_id in (select resource_id from {temporary_table});
+        UPDATE catalog
+        SET status = jsonb_set(
+            status,
+            '{{crawler}}',
+            jsonb_build_object('state', 'CRAWLING_URL', 'since', NOW()),
+            true
+        )
+        WHERE resource_id IN (SELECT resource_id FROM {temporary_table});
     """
     async with connection.transaction():
         await connection.execute("BEGIN;")

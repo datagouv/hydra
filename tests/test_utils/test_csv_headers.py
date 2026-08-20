@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from tests.conftest import RESOURCE_ID
@@ -32,5 +30,5 @@ from udata_hydra.data_formats.detect import detect_data_format_from_check_or_cat
     ),
 )
 async def test_detect_tabular_from_headers(headers, url, expected):
-    check = {"headers": json.dumps(headers), "url": url, "resource_id": RESOURCE_ID}
+    check = {"headers": headers, "url": url, "resource_id": RESOURCE_ID}
     assert await detect_data_format_from_check_or_catalog(check) == expected

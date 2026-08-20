@@ -1,5 +1,3 @@
-import json
-
 from asyncpg import Record
 
 from udata_hydra import context
@@ -63,7 +61,7 @@ class ResourceException:
                 VALUES ($1, $2, $3)
                 RETURNING *;
             """
-            return await connection.fetchrow(q, resource_id, json.dumps(table_indexes), comment)
+            return await connection.fetchrow(q, resource_id, table_indexes, comment)
 
     @classmethod
     async def update(
@@ -98,7 +96,7 @@ class ResourceException:
                 WHERE resource_id = $1
                 RETURNING *;
             """
-            return await connection.fetchrow(q, resource_id, json.dumps(table_indexes), comment)
+            return await connection.fetchrow(q, resource_id, table_indexes, comment)
 
     @classmethod
     async def delete(cls, resource_id: str) -> None:

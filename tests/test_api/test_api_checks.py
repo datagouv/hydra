@@ -4,7 +4,6 @@ it will interfere with the rest of our async code
 """
 
 import hashlib
-import json
 from datetime import datetime
 
 import pytest
@@ -218,7 +217,7 @@ async def test_create_check(
     assert res["url"] == rurl
     assert res["status"] == resource_status
     if not resource_exception:
-        assert json.loads(res["headers"]) == {
+        assert res["headers"] == {
             "x-do": "you",
             # added by aioresponses :shrug:
             "content-type": "application/json",

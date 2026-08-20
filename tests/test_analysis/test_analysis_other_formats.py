@@ -1,5 +1,4 @@
 import hashlib
-import json
 
 import pytest
 
@@ -32,7 +31,7 @@ async def test_formats_analysis(setup_catalog, rmock, db, fake_check, produce_mo
     profile = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    profile: dict = json.loads(profile["csv_detective"])
+    profile: dict = profile["csv_detective"]
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == expected_count

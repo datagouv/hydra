@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from tests.conftest import (
@@ -65,7 +63,7 @@ async def test_create_resource_exception(
     assert resp.status == 201
     data: dict = await resp.json()
     assert data["resource_id"] == RESOURCE_ID
-    assert json.loads(data["table_indexes"]) == RESOURCE_EXCEPTION_TABLE_INDEXES
+    assert data["table_indexes"] == RESOURCE_EXCEPTION_TABLE_INDEXES
     assert data["comment"] == "This is a test comment."
 
     # Test posting the same resource exception
@@ -83,7 +81,7 @@ async def test_create_resource_exception(
     assert resp.status == 201
     data: dict = await resp.json()
     assert data["resource_id"] == RESOURCE_ID
-    assert data["table_indexes"] == "{}"
+    assert data["table_indexes"] == {}
 
 
 async def test_update_resource_exception(
@@ -132,7 +130,7 @@ async def test_update_resource_exception(
     assert resp.status == 200
     data: dict = await resp.json()
     assert data["resource_id"] == RESOURCE_EXCEPTION_ID
-    assert json.loads(data["table_indexes"]) == RESOURCE_EXCEPTION_TABLE_INDEXES
+    assert data["table_indexes"] == RESOURCE_EXCEPTION_TABLE_INDEXES
     assert data["comment"] == "Updated test comment."
 
 

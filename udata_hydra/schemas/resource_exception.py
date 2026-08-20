@@ -6,7 +6,7 @@ from udata_hydra import config
 class ResourceExceptionSchema(Schema):
     id = fields.Str(required=True)
     resource_id = fields.Str(required=True)
-    table_indexes = fields.Str(allow_none=True)
+    table_indexes = fields.Function(lambda obj: obj.get("table_indexes") or {})
     comment = fields.Str(allow_none=True)
 
     @staticmethod

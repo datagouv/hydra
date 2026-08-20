@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime, timezone
 
@@ -90,7 +89,8 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
     # Update resource following check:
     # Reset resource status so that it's not forbidden to be checked again.
     # Reset priority so that it's not prioritised anymore.
-    await Resource.update(check_data["resource_id"], data={"status": None, "priority": False})
+    await Resource.clear_job_status(check_data["resource_id"], "crawler")
+    await Resource.update(check_data["resource_id"], data={"priority": False})
 
     return new_check, last_check
 
@@ -110,12 +110,8 @@ async def has_check_changed(check_data: dict, last_check_data: dict | None) -> b
     timeout_has_changed = last_check_data and check_data.get("timeout") != last_check_data.get(
         "timeout"
     )
-    current_headers = check_data.get("headers", {})
-    last_check_headers = (
-        json.loads(last_check_data.get("headers"))
-        if last_check_data and last_check_data.get("headers")
-        else {}
-    )
+    current_headers = check_data.get("headers") or {}
+    last_check_headers = (last_check_data.get("headers") or {}) if last_check_data else {}
     content_has_changed = last_check_data and (
         current_headers.get("content-length") != last_check_headers.get("content-length")
         or current_headers.get("content-type") != last_check_headers.get("content-type")
@@ -124,10 +120,8 @@ async def has_check_changed(check_data: dict, last_check_data: dict | None) -> b
     # Check if CORS headers have changed
     current_cors_headers = check_data.get("cors_headers")
     last_check_cors_headers = None
-    if last_check_data:
-        cors_headers_value = last_check_data.get("cors_headers")
-        if cors_headers_value:
-            last_check_cors_headers = json.loads(cors_headers_value)
+    if last_check_data and last_check_data.get("cors_headers"):
+        last_check_cors_headers = last_check_data["cors_headers"]
     cors_has_changed = last_check_data and current_cors_headers != last_check_cors_headers
 
     # TODO: Instead of computing criterions here, store payload and compare with previous one.

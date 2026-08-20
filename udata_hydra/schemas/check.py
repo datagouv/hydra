@@ -1,5 +1,3 @@
-import json
-
 from marshmallow import Schema, fields
 
 
@@ -11,10 +9,8 @@ class CheckSchema(Schema):
     domain = fields.Str()
     created_at = fields.DateTime()
     check_status = fields.Integer(data_key="status")
-    headers = fields.Function(lambda obj: json.loads(obj["headers"]) if obj["headers"] else {})
-    cors_headers = fields.Function(
-        lambda obj: json.loads(obj["cors_headers"]) if obj["cors_headers"] else None
-    )
+    headers = fields.Function(lambda obj: obj.get("headers") or {})
+    cors_headers = fields.Function(lambda obj: obj.get("cors_headers"))
     timeout = fields.Boolean()
     response_time = fields.Float()
     error = fields.Str()

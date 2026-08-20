@@ -1,5 +1,3 @@
-import json
-
 from asyncpg import Record
 
 from udata_hydra import context
@@ -13,15 +11,6 @@ RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin"
 def db_col_name(col: str) -> str:
     """Map a CSV column name to its actual PostgreSQL column name."""
     return f"{col}__hydra_renamed" if col.lower() in RESERVED_COLS else col
-
-
-def convert_dict_values_to_json(data: dict) -> dict:
-    """
-    Convert values in dict that are dict to json for DB serialization
-    TODO: this is suboptimal from asyncpg, dig into this
-    https://magicstack.github.io/asyncpg/current/usage.html#example-automatic-json-conversion
-    """
-    return {k: json.dumps(v) if type(v) is dict else v for k, v in data.items()}
 
 
 def compute_insert_query(table_name: str, data: dict, returning: str = "id") -> str:
@@ -49,7 +38,6 @@ def compute_update_query(table_name: str, data: dict, returning: str = "*") -> s
 
 
 async def update_table_record(table_name: str, record_id: int, data: dict) -> Record | None:
-    data = convert_dict_values_to_json(data)
     q = compute_update_query(table_name, data)
     pool = await context.pool()
     return await pool.fetchrow(q, *data.values(), record_id)

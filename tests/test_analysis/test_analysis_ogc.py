@@ -1,4 +1,3 @@
-import json
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -131,7 +130,7 @@ class TestOgcAnalysis:
 
         # Verify metadata was stored in the database
         res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
-        assert json.loads(res["ogc_metadata"]) == expected_metadata
+        assert res["ogc_metadata"] == expected_metadata
         assert res["parsing_started_at"] is not None
         assert res["parsing_finished_at"] is not None
 
@@ -436,7 +435,7 @@ class TestOgcAnalysis:
 
         # Verify metadata was stored in the database
         res = await db.fetchrow(f"SELECT * FROM checks WHERE resource_id='{RESOURCE_ID}'")
-        assert json.loads(res["ogc_metadata"]) == expected_metadata
+        assert res["ogc_metadata"] == expected_metadata
         assert res["parsing_started_at"] is not None
         assert res["parsing_finished_at"] is not None
 

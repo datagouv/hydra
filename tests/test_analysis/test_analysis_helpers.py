@@ -1,4 +1,3 @@
-import json
 import os
 import tempfile
 from datetime import datetime, timezone
@@ -105,6 +104,11 @@ async def test_notify_udata_raises_without_check_or_resource(missing):
             {"geojson_url": "https://example.com/file.geojson", "geojson_size": 77},
             ["analysis:parsing:geojson_url", "analysis:parsing:geojson_size"],
         ),
+        (
+            "OGC_ANALYSIS_ENABLED",
+            {"ogc_metadata": {"service": "WMS", "version": "1.3.0"}},
+            ["analysis:parsing:ogc_metadata"],
+        ),
     ),
 )
 async def test_notify_udata_includes_optional_payload_fields(
@@ -129,23 +133,3 @@ async def test_notify_udata_includes_optional_payload_fields(
     document = enqueue.call_args.kwargs["document"].payload
     for key in expected_document_keys:
         assert key in document
-
-
-@pytest.mark.asyncio
-async def test_notify_udata_parses_string_ogc_metadata(mocker):
-    enqueue = mocker.patch("udata_hydra.analysis.helpers.queue.enqueue")
-    mocker.patch("udata_hydra.config.OGC_ANALYSIS_ENABLED", True)
-
-    ogc_metadata = {"service": "WMS", "version": "1.3.0"}
-    check = {
-        "resource_id": "resource-id",
-        "parsing_started_at": datetime(2024, 1, 1, tzinfo=timezone.utc),
-        "parsing_finished_at": datetime(2024, 1, 2, tzinfo=timezone.utc),
-        "ogc_metadata": json.dumps(ogc_metadata),
-    }
-    resource = {"dataset_id": "dataset-id"}
-
-    await helpers.notify_udata(resource, check)
-
-    document = enqueue.call_args.kwargs["document"].payload
-    assert document["analysis:parsing:ogc_metadata"] == ogc_metadata
