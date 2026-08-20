@@ -3,11 +3,10 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from udata_hydra import config
-from udata_hydra.analysis import helpers
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import ParseException, Timer, handle_parse_exception
+from udata_hydra.utils import Timer
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats.pmtiles import PMTiles
@@ -33,7 +32,8 @@ class Geojson(DataFormat):
         resource_id: str = str(check["resource_id"])
         url = check["url"]
 
-        resource = await Resource.set_job_status(resource_id, "geojson", "ANALYSING_GEOJSON")
+        # Update resource status to geojson.ANALYSING_GEOJSON
+        await Resource.set_job_status(resource_id, "geojson", "ANALYSING_GEOJSON")
 
         timer = Timer("analyse-geojson", resource_id)
         assert any(_ is not None for _ in (check["id"], url))
@@ -47,10 +47,7 @@ class Geojson(DataFormat):
                     "parsing_finished_at": datetime.now(timezone.utc),
                 },
             )
-        except ParseException as e:
-            check = await handle_parse_exception(e, None, check)  # type: ignore[assignment]
         finally:
-            await helpers.notify_udata(resource, check)
             timer.stop()
             self.path.unlink(missing_ok=True)
             await Resource.clear_job_status(resource_id, "geojson")
