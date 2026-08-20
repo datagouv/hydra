@@ -18,7 +18,6 @@ from udata_hydra.data_formats import (
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.db.check import Check
-from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
@@ -76,7 +75,7 @@ async def analyse_resource(
     resource_id = check["resource_id"]
     dataset_id = check["dataset_id"]
     url = check["url"]
-    headers = parse_json_value(check.get("headers"), {})
+    headers = check.get("headers") or {}
 
     timer = Timer("analyse-resource", resource_id)
 

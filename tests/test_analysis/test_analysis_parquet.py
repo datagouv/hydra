@@ -9,7 +9,6 @@ import pytest
 from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis import helpers
 from udata_hydra.data_formats import Parquet
-from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import ParseException
 
@@ -110,7 +109,7 @@ async def test_analyse_parquet(
     res = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    inspection = parse_json_value(res["csv_detective"])
+    inspection = res["csv_detective"]
     assert inspection["total_lines"] == len(df)
     assert inspection["header"] == list(df.columns)
 

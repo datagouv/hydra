@@ -12,7 +12,6 @@ from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.table import Table
 from udata_hydra.db.check import Check
-from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
@@ -78,7 +77,7 @@ class Parquet(DataFormat):
         exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
         table_indexes: dict | None = None
         if exception and exception.get("table_indexes"):
-            table_indexes = parse_json_value(exception["table_indexes"])
+            table_indexes = exception["table_indexes"]
 
         timer = Timer("analyse-parquet", resource_id)
         assert any(_ is not None for _ in (check["id"], check["url"]))

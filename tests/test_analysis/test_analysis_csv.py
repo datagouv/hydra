@@ -14,7 +14,6 @@ from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
 from udata_hydra.db.check import Check
-from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -51,7 +50,7 @@ async def test_analyse_csv_on_catalog(
     assert row["id"] == RESOURCE_ID
     assert row["url"] == RESOURCE_URL
     res = await db.fetchrow("SELECT * from tables_index")
-    inspection = parse_json_value(res["csv_detective"])
+    inspection = res["csv_detective"]
     assert all(k in inspection["columns"] for k in ["id", "url"])
 
 
@@ -415,7 +414,7 @@ async def test_validation(
     assert all(row["url"] == check["url"] for row in res)
     assert all(row["dataset_id"] == check["dataset_id"] for row in res)
     assert all(row["deleted_at"] is None for row in res)  # Should be NULL for new records
-    latest_analysis = parse_json_value(res[0]["csv_detective"])
+    latest_analysis = res[0]["csv_detective"]
     # check that latest analysis is in line with expectation
     for key in current_analysis.keys():
         if current_analysis[key] is not None:
@@ -698,13 +697,9 @@ async def test_file_with_nan(
     rows = await db.fetch(f'SELECT * FROM "{table_name}"')
     assert dict(rows[0])["c"] == float("inf")
     assert dict(rows[1])["b"] is None
-    profile = parse_json_value(
-        list(
-            await db.fetch(
-                "SELECT * FROM tables_index WHERE resource_id = $1", check["resource_id"]
-            )
-        )[0]["csv_detective"]
-    )["profile"]
+    profile = list(
+        await db.fetch("SELECT * FROM tables_index WHERE resource_id = $1", check["resource_id"])
+    )[0]["csv_detective"]["profile"]
     for col in ["a", "b"]:
         # NaN doesn't prevent the operations
         assert all(profile[col][method] is not None for method in ["min", "max", "mean", "std"])

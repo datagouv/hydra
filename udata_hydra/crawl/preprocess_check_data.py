@@ -6,7 +6,6 @@ from asyncpg import Record
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_status
 from udata_hydra.db.check import Check
-from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import UdataPayload, queue, send
 from udata_hydra.utils.http import CORS_HEADER_FIELDS
@@ -111,10 +110,8 @@ async def has_check_changed(check_data: dict, last_check_data: dict | None) -> b
     timeout_has_changed = last_check_data and check_data.get("timeout") != last_check_data.get(
         "timeout"
     )
-    current_headers = check_data.get("headers", {})
-    last_check_headers = (
-        parse_json_value(last_check_data.get("headers"), {}) if last_check_data else {}
-    )
+    current_headers = check_data.get("headers") or {}
+    last_check_headers = (last_check_data.get("headers") or {}) if last_check_data else {}
     content_has_changed = last_check_data and (
         current_headers.get("content-length") != last_check_headers.get("content-length")
         or current_headers.get("content-type") != last_check_headers.get("content-type")
@@ -123,10 +120,8 @@ async def has_check_changed(check_data: dict, last_check_data: dict | None) -> b
     # Check if CORS headers have changed
     current_cors_headers = check_data.get("cors_headers")
     last_check_cors_headers = None
-    if last_check_data:
-        cors_headers_value = last_check_data.get("cors_headers")
-        if cors_headers_value:
-            last_check_cors_headers = parse_json_value(cors_headers_value)
+    if last_check_data and last_check_data.get("cors_headers"):
+        last_check_cors_headers = last_check_data["cors_headers"]
     cors_has_changed = last_check_data and current_cors_headers != last_check_cors_headers
 
     # TODO: Instead of computing criterions here, store payload and compare with previous one.

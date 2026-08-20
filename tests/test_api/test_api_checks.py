@@ -12,7 +12,6 @@ from aiohttp.client_exceptions import ClientError, ClientResponseError
 from yarl import URL
 
 from tests.conftest import DATASET_ID, RESOURCE_ID, RESOURCE_URL
-from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -218,7 +217,7 @@ async def test_create_check(
     assert res["url"] == rurl
     assert res["status"] == resource_status
     if not resource_exception:
-        assert parse_json_value(res["headers"], {}) == {
+        assert res["headers"] == {
             "x-do": "you",
             # added by aioresponses :shrug:
             "content-type": "application/json",

@@ -20,7 +20,6 @@ import pytest
 
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv, Geojson
-from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -148,7 +147,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
     profile = await db.fetchrow(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
     )
-    profile = parse_json_value(profile["csv_detective"])
+    profile = profile["csv_detective"]
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == expected_count

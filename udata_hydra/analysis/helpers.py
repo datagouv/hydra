@@ -5,7 +5,6 @@ from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.data_formats.data_format import DataFormat
-from udata_hydra.db.codec import parse_json_value
 from udata_hydra.utils import (
     IOException,
     UdataPayload,
@@ -44,7 +43,7 @@ async def read_or_download_file(
     else:
         tmp_file, _ = await download_resource(
             url=check["url"],
-            headers=parse_json_value(check.get("headers"), {}),
+            headers=check.get("headers") or {},
             max_size_allowed=None
             if exception
             else (
@@ -98,8 +97,6 @@ async def notify_udata(resource: Record | None, check: Record | dict | None) -> 
         payload["document"]["analysis:parsing:geojson_url"] = check.get("geojson_url")
         payload["document"]["analysis:parsing:geojson_size"] = check.get("geojson_size")
     if config.OGC_ANALYSIS_ENABLED and check.get("ogc_metadata"):
-        ogc_metadata = check.get("ogc_metadata")
-        ogc_metadata = parse_json_value(ogc_metadata)
-        payload["document"]["analysis:parsing:ogc_metadata"] = ogc_metadata
+        payload["document"]["analysis:parsing:ogc_metadata"] = check["ogc_metadata"]
     payload["document"] = UdataPayload(payload["document"])
     queue.enqueue(send, _priority="high", **payload)

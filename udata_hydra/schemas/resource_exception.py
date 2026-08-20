@@ -1,13 +1,12 @@
 from marshmallow import Schema, fields
 
 from udata_hydra import config
-from udata_hydra.db.codec import parse_json_value
 
 
 class ResourceExceptionSchema(Schema):
     id = fields.Str(required=True)
     resource_id = fields.Str(required=True)
-    table_indexes = fields.Function(lambda obj: parse_json_value(obj.get("table_indexes"), {}))
+    table_indexes = fields.Function(lambda obj: obj.get("table_indexes") or {})
     comment = fields.Str(allow_none=True)
 
     @staticmethod

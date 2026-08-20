@@ -12,7 +12,6 @@ from udata_hydra.analysis.tables_index import get_previous_inspection
 from udata_hydra.data_formats.csv_like.to_geojson import _detect_geo_columns
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
-from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import (
@@ -73,7 +72,7 @@ class CsvLike(DataFormat):
 
         table_indexes: dict | None = None
         if exception and exception.get("table_indexes"):
-            table_indexes = parse_json_value(exception["table_indexes"])
+            table_indexes = exception["table_indexes"]
 
         timer = Timer("analyse-csv", resource_id)
         assert any(_ is not None for _ in (check["id"], check["url"]))

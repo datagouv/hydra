@@ -1,7 +1,5 @@
 from marshmallow import Schema, fields
 
-from udata_hydra.db.codec import parse_json_value
-
 
 class CheckSchema(Schema):
     check_id = fields.Integer(data_key="id")
@@ -11,8 +9,8 @@ class CheckSchema(Schema):
     domain = fields.Str()
     created_at = fields.DateTime()
     check_status = fields.Integer(data_key="status")
-    headers = fields.Function(lambda obj: parse_json_value(obj.get("headers"), {}))
-    cors_headers = fields.Function(lambda obj: parse_json_value(obj.get("cors_headers")))
+    headers = fields.Function(lambda obj: obj.get("headers") or {})
+    cors_headers = fields.Function(lambda obj: obj.get("cors_headers"))
     timeout = fields.Boolean()
     response_time = fields.Float()
     error = fields.Str()

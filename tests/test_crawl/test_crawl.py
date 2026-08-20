@@ -20,7 +20,6 @@ from udata_hydra.crawl import start_checks
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.crawl.preprocess_check_data import get_content_type_from_header
 from udata_hydra.db.check import Check
-from udata_hydra.db.codec import parse_json_value
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -86,7 +85,7 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
     assert res["url"] == rurl
     assert res["status"] == status
     if not exception:
-        assert parse_json_value(res["headers"], {}) == {
+        assert res["headers"] == {
             "x-do": "you",
             # added by aioresponses :shrug:
             "content-type": "application/json",
@@ -350,7 +349,7 @@ async def test_analyse_resource_from_crawl(setup_catalog, rmock, db, udata_url):
     assert res[0]["status"] is not None
     # Verify CORS headers are stored in DB
     assert res[0]["cors_headers"] is not None
-    cors_headers = parse_json_value(res[0]["cors_headers"])
+    cors_headers = res[0]["cors_headers"]
     assert cors_headers["status"] == 204
     assert cors_headers["allow-origin"] == "*"
 
