@@ -1,13 +1,11 @@
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 from udata_hydra import config
 
 
 class ResourceExceptionSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int  # In DB, this is SERIAL PRIMARY KEY (which is an integer), but it was a str in the schema before
     resource_id: UUID
     table_indexes: str | None = None

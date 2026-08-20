@@ -7,8 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class CheckSchema(BaseModel):
-    # Allow creation from ORM objects (like asyncpg Record) by enabling from_attributes
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    # Allow population from field names (id, status) or aliases (check_id, check_status) by enabling populate_by_name
+    model_config = ConfigDict(populate_by_name=True)
 
     id: int = Field(alias="check_id")
     catalog_id: int | None = None
@@ -60,9 +60,6 @@ class CheckSchema(BaseModel):
 
 
 class CheckGroupBy(BaseModel):
-    # Allow creation from ORM objects (like asyncpg Record) by enabling from_attributes
-    model_config = ConfigDict(from_attributes=True)
-
     value: str | None
     count: int
 
