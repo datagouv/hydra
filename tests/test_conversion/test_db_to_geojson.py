@@ -37,7 +37,7 @@ async def _geojson_from_columns(
         pass
 
     check = await fake_check()
-    with NamedTemporaryFile(delete=False) as fp:
+    with NamedTemporaryFile(dir=storage_path(""), delete=False) as fp:
         fp.write(_build_csv_content(columns, sep).encode("utf-8"))
         fp.seek(0)
         file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
