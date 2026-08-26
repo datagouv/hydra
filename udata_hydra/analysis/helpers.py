@@ -1,6 +1,6 @@
 import json
 import os
-from typing import IO
+from typing import IO, TypeVar
 
 from asyncpg import Record
 
@@ -14,6 +14,9 @@ from udata_hydra.utils import (
     send,
     storage_path,
 )
+
+# the concrete format asked for is the one returned, so callers keep its specific methods
+DataFormatT = TypeVar("DataFormatT", bound=DataFormat)
 
 
 def get_python_type(column: dict) -> str:
@@ -56,7 +59,7 @@ async def read_or_download_file(
         return tmp_file
 
 
-async def download_from_check(check: dict, data_format: type[DataFormat]) -> DataFormat:
+async def download_from_check(check: dict, data_format: type[DataFormatT]) -> DataFormatT:
     tmp_file = await read_or_download_file(
         check=check,
         filename=None,

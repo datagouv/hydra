@@ -1,4 +1,6 @@
 import json
+import re
+from typing import Iterable
 
 from asyncpg import Record
 
@@ -9,10 +11,59 @@ from udata_hydra import context
 # geojson modules.
 RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin", "xmax")
 
+RENAMED_SUFFIX = "__hydra_renamed"
 
-def db_col_name(col: str) -> str:
-    """Map a CSV column name to its actual PostgreSQL column name."""
-    return f"{col}__hydra_renamed" if col.lower() in RESERVED_COLS else col
+# Postgres' limit for identifiers (columns, indexes). It is fixed at compile time and
+# 63 everywhere but on a custom build, so it is not configurable.
+PG_MAX_IDENTIFIER_BYTES = 63
+
+# the suffixes hydra appends to build a PostgreSQL name: a source column already ending
+# with one of them is renamed as well, which is what makes collisions impossible below
+_GENERATED_SUFFIX = re.compile(rf"({RENAMED_SUFFIX}|__col\d+)$")
+
+
+def truncate_utf8(value: str, max_bytes: int) -> str:
+    """Cut a string to `max_bytes` UTF-8 bytes, on a character boundary."""
+    # errors="ignore" drops the incomplete multi-byte sequence left by the cut
+    return value.encode("utf-8")[:max_bytes].decode("utf-8", errors="ignore")
+
+
+def build_db_columns_mapping(columns: Iterable[str]) -> dict[str, str]:
+    """Map every source column name to its actual PostgreSQL column name.
+
+    The order of `columns` is significant: it gives each column the positional index used
+    to disambiguate truncated names, so it must be the order of the columns in the table.
+
+    A source name is kept as-is only if it fits in Postgres' identifier limit and doesn't
+    already look like a name hydra generates; otherwise it is truncated and suffixed with
+    `__col{position}`. Kept names therefore never end with a generated suffix, and
+    generated ones differ by their position: two columns can never end up with the same
+    PostgreSQL name.
+    """
+    sources: list[str] = list(columns)
+    names: list[str] = []
+    for position, col in enumerate(sources):
+        # rename reserved columns first: the limit applies to the renamed name, which is longer
+        base = f"{col}{RENAMED_SUFFIX}" if col.lower() in RESERVED_COLS else col
+        fits = len(base.encode("utf-8")) <= PG_MAX_IDENTIFIER_BYTES
+        if fits and not _GENERATED_SUFFIX.search(col):
+            names.append(base)
+            continue
+        suffix = f"__col{position}"
+        names.append(truncate_utf8(base, PG_MAX_IDENTIFIER_BYTES - len(suffix)) + suffix)
+    return dict(zip(sources, names))
+
+
+def db_col_name(col: str, mapping: dict[str, str]) -> str:
+    """Resolve a source column name through a published (partial) mapping.
+
+    An inspection stored before `columns_mapping` existed has no mapping at all, yet its
+    reserved columns were already renamed: falling back to the source name would make
+    `SELECT "xmin"` return the system column instead of failing.
+    """
+    if col in mapping:
+        return mapping[col]
+    return f"{col}{RENAMED_SUFFIX}" if col.lower() in RESERVED_COLS else col
 
 
 def convert_dict_values_to_json(data: dict) -> dict:

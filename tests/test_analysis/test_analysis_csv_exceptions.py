@@ -5,10 +5,12 @@ import logging
 import pytest
 from asyncpg import Record
 
-from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_EXCEPTION_TABLE_INDEXES
+from tests.conftest import DATASET_ID, RESOURCE_EXCEPTION_ID, RESOURCE_EXCEPTION_TABLE_INDEXES
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv
+from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils.db import get_columns_with_indexes
 
 pytestmark = pytest.mark.asyncio
@@ -70,3 +72,48 @@ async def test_exception_analysis(
     for attr in ("header", "columns", "formats", "profile"):
         assert profile[attr]
     assert profile["total_lines"] == expected_count
+    # every column name of that file fits in Postgres, so nothing was renamed
+    assert profile["columns_mapping"] == {}
+
+
+async def test_index_on_a_column_the_file_does_not_have(
+    setup_catalog, rmock, db, fake_check, produce_mock
+):
+    """table_indexes is filled by hand and the file it points at can change: an index asked
+    on a column that is not there must land in parsing_error, not escape the analysis job."""
+    resource_id = "9f9ca6f7-5ee0-4d0f-a0da-3ba51ae4b9be"
+    await Resource.insert(
+        dataset_id=DATASET_ID,
+        resource_id=resource_id,
+        url="http://example.com/missing-index-column",
+        type="main",
+        format="csv",
+        title="Resource indexed on a column it doesn't have",
+    )
+    await ResourceException.insert(
+        resource_id=resource_id,
+        table_indexes={"colonne_absente": "index"},
+        comment="This is a test comment.",
+    )
+    check = await fake_check(resource_id=resource_id, headers={"content-type": "application/csv"})
+    rmock.get(
+        check["url"],
+        status=200,
+        headers={"content-type": "application/csv"},
+        body=b"a,b\n1,2",
+    )
+
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
+
+    updated_check = await Check.get_by_id(check["id"])
+    assert updated_check is not None
+    assert updated_check["parsing_error"].startswith("create_table_query:")
+    assert "colonne_absente" in updated_check["parsing_error"]
+    # the half-created table has been cleaned up
+    tables = await db.fetch(
+        "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'public';"
+    )
+    assert hashlib.md5(check["url"].encode("utf-8")).hexdigest() not in [
+        r["table_name"] for r in tables
+    ]
