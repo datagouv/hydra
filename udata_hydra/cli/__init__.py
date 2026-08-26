@@ -9,7 +9,7 @@ from udata_hydra.cli.catalog import (
 )
 from udata_hydra.cli.common import _find_check, _make_async_wrapper, cli, connection, context, log
 from udata_hydra.cli.crawl import probe_cors_cli
-from udata_hydra.cli.db import drop_dbs, migrate
+from udata_hydra.cli.db import drop_dbs, dump_tables_index, migrate
 from udata_hydra.cli.purge import purge_checks, purge_csv_tables, purge_selected_csv_tables
 from udata_hydra.crawl.check_resources import probe_cors
 
@@ -19,6 +19,7 @@ __all__ = [
     "connection",
     "context",
     "drop_dbs",
+    "dump_tables_index",
     "_find_check",
     "insert_resource_into_catalog",
     "insert_url_into_catalog",
