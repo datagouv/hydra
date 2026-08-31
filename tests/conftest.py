@@ -61,6 +61,29 @@ def dummy(return_value=None):
     return fn
 
 
+def job_states(snapshots: list[dict], job: str) -> list[str]:
+    """States recorded for one job in ResourceJobStatus snapshots."""
+    return [snap[job]["state"] for snap in snapshots if job in snap]
+
+
+@pytest.fixture
+def job_status_snapshots(mocker) -> list[dict]:
+    """Snapshot ResourceJobStatus.for_resource() after each set/update."""
+    snapshots: list[dict] = []
+
+    def wrap(method):
+        async def capturing(resource_id: str, *args, **kwargs):
+            result = await method(resource_id, *args, **kwargs)
+            snapshots.append(await ResourceJobStatus.for_resource(resource_id))
+            return result
+
+        return capturing
+
+    mocker.patch.object(ResourceJobStatus, "set", wrap(ResourceJobStatus.set))
+    mocker.patch.object(ResourceJobStatus, "update", wrap(ResourceJobStatus.update))
+    return snapshots
+
+
 @pytest.fixture
 def is_harvested(request):
     return "catalog_harvested" in [m.name for m in request.node.iter_markers()]

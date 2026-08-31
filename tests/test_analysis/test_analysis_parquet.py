@@ -7,8 +7,10 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
+from tests.conftest import job_states
 from udata_hydra.analysis import helpers
 from udata_hydra.data_formats import Parquet
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import ParseException
 
 pytestmark = pytest.mark.asyncio
@@ -28,6 +30,7 @@ async def test_analyse_parquet(
     fake_check,
     produce_mock,
     check_kwargs,
+    job_status_snapshots,
 ):
     check = await fake_check(**check_kwargs)
     url = check["url"]
@@ -85,6 +88,8 @@ async def test_analyse_parquet(
     with patch("udata_hydra.config.PARQUET_TO_DB", True):
         table = await file.analyse(check=check)
     assert table is not None
+    assert job_states(job_status_snapshots, "parquet") == ["ANALYSING_PARQUET", "INSERTING_IN_DB"]
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}
     # checking check result
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table.table_name
