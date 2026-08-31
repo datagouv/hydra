@@ -159,7 +159,7 @@ async def analyse_resource(
     timer.stop()
 
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
-        if data_format is not None:
+        if data_format is not None and (issubclass(data_format, Ogc) or tmp_file):
             log.info(
                 f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
             )

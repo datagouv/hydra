@@ -23,6 +23,7 @@ from udata_hydra.crawl.preprocess_check_data import get_content_type_from_header
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_job_status import ResourceJobStatus
+from udata_hydra.utils import IOException
 
 pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
@@ -342,6 +343,22 @@ async def test_analyse_resource_hands_off_crawler_to_csv(
     assert "crawler" not in status
     assert status["csv"]["state"] == "TO_ANALYSE_CSV"
     assert job_states(job_status_snapshots, "csv") == ["TO_ANALYSE_CSV"]
+
+
+async def test_analyse_resource_clears_crawler_when_download_fails(
+    setup_catalog, mocker, fake_check
+):
+    async def fail_download(*args, **kwargs):
+        raise IOException(message="File too large to download")
+
+    mocker.patch("udata_hydra.analysis.resource.download_resource", fail_download)
+    mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
+    mocker.patch("udata_hydra.analysis.resource.queue.enqueue")
+
+    check = await fake_check(headers={"content-type": "text/csv"})
+    await analyse_resource(check=check, last_check=None)
+
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
 @pytest.mark.parametrize(
