@@ -11,13 +11,17 @@ from dateparser import parse as date_parser
 from udata_hydra import config, context
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.data_formats import (
+    CsvLike,
     DataFormat,
+    Geojson,
     Ogc,
+    Parquet,
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import (
     IOException,
     Timer,
@@ -36,6 +40,18 @@ class Change(Enum):
 
 
 log = logging.getLogger("udata-hydra")
+
+
+def _analysis_job_and_state(data_format: type[DataFormat]) -> tuple[str, str]:
+    if issubclass(data_format, Ogc):
+        return "ogc", "TO_ANALYSE_OGC"
+    if issubclass(data_format, CsvLike):
+        return "csv", "TO_ANALYSE_CSV"
+    if issubclass(data_format, Geojson):
+        return "geojson", "TO_ANALYSE_GEOJSON"
+    if issubclass(data_format, Parquet):
+        return "parquet", "TO_ANALYSE_PARQUET"
+    raise ValueError(f"Unknown data format: {data_format!r}")
 
 
 async def analyse_resource(
@@ -67,10 +83,8 @@ async def analyse_resource(
 
     log.debug(f"Analysis for resource {resource_id} in dataset {dataset_id}")
 
-    # Update resource status to ANALYSING_RESOURCE
-    resource: Record | None = await Resource.update(
-        resource_id, data={"status": "ANALYSING_RESOURCE_HEAD"}
-    )
+    await ResourceJobStatus.set(resource_id, "crawler", "ANALYSING_RESOURCE_HEAD")
+    resource: Record | None = await Resource.get(resource_id)
 
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
     change_status, change_payload = await detect_resource_change_on_early_hints(resource)
@@ -92,13 +106,13 @@ async def analyse_resource(
     tmp_file = None
     if change_status != Change.HAS_NOT_CHANGED or force_analysis:
         try:
-            await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
+            await ResourceJobStatus.set(resource_id, "crawler", "DOWNLOADING_RESOURCE")
             tmp_file, _ = await download_resource(url, headers, max_size_allowed)
             timer.mark("download-resource")
         except IOException as e:
             dl_analysis["analysis:error"] = str(e)
         else:
-            await Resource.update(resource_id, data={"status": "ANALYSING_DOWNLOADED_RESOURCE"})
+            await ResourceJobStatus.set(resource_id, "crawler", "ANALYSING_DOWNLOADED_RESOURCE")
             # Get file size
             dl_analysis["analysis:content-length"] = os.path.getsize(tmp_file.name)
             # Get checksum
@@ -145,13 +159,12 @@ async def analyse_resource(
     timer.stop()
 
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
-        if data_format is not None:
+        if data_format is not None and (issubclass(data_format, Ogc) or tmp_file):
             log.info(
                 f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
             )
-            await Resource.update(
-                resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
-            )
+            job, state = _analysis_job_and_state(data_format)
+            await ResourceJobStatus.update(resource_id, "crawler", job, state)
             if issubclass(data_format, Ogc):
                 queue.enqueue(
                     data_format.analyse,
@@ -172,7 +185,7 @@ async def analyse_resource(
                     _exception=bool(exception),
                 )
         else:
-            await Resource.update(resource_id, data={"status": None})
+            await ResourceJobStatus.clear(resource_id, "crawler")
 
         # Send analysis result to udata
         queue.enqueue(
@@ -189,7 +202,7 @@ async def analyse_resource(
             f"(change_status={change_status.name}, last_parsing_table="
             f"{last_check.get('parsing_table') if last_check else None})"
         )
-        await Resource.update(resource_id, data={"status": None})
+        await ResourceJobStatus.clear(resource_id, "crawler")
 
 
 async def update_check_with_modification_and_next_dates(

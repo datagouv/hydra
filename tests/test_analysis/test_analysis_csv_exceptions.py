@@ -8,7 +8,7 @@ from asyncpg import Record
 from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_EXCEPTION_TABLE_INDEXES
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv
-from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils.db import get_columns_with_indexes
 
 pytestmark = pytest.mark.asyncio
@@ -36,18 +36,14 @@ async def test_exception_analysis(
     rmock.get(url, status=200, body=data)
 
     # Check resource status before analysis
-    resource = await Resource.get(RESOURCE_EXCEPTION_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_EXCEPTION_ID) == {}
 
     # Analyse the CSV
     file = await download_from_check(check, Csv)
     await file.analyse(check=check)
 
     # Check resource status after analysis
-    resource = await Resource.get(RESOURCE_EXCEPTION_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_EXCEPTION_ID) == {}
 
     # Check the table has been created in CSV DB, with the expected number of rows, and get the columns
     row: Record = await db.fetchrow(f'SELECT *, count(*) over () AS count FROM "{table_name}"')

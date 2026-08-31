@@ -3,10 +3,12 @@ NB: we can't use pytest-aiohttp helpers because
 it will interfere with the rest of our async code
 """
 
+from datetime import datetime
+
 import pytest
 
 from tests.conftest import DATASET_ID, NOT_EXISTING_RESOURCE_ID, RESOURCE_ID, RESOURCE_URL
-from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -26,8 +28,16 @@ async def test_get_resource(setup_catalog, client):
     data: dict = await resp.json()
     assert data["dataset_id"] == DATASET_ID
     assert data["resource_id"] == RESOURCE_ID
-    assert data["status"] is None
-    assert data["status_since"] is None
+    assert data["status"] == {}
+
+
+async def test_get_resource_with_active_job(setup_catalog, client):
+    await ResourceJobStatus.set(RESOURCE_ID, "crawler", "CRAWLING_URL")
+    resp = await client.get(f"/api/resources/{RESOURCE_ID}")
+    assert resp.status == 200
+    data: dict = await resp.json()
+    assert data["status"]["crawler"]["state"] == "CRAWLING_URL"
+    datetime.fromisoformat(data["status"]["crawler"]["since"])
 
 
 async def test_create_resource(
@@ -167,17 +177,33 @@ async def test_delete_resource(client, api_headers, api_headers_wrong_token):
 
 async def test_get_ressources_stats(setup_catalog, client, fake_check):
     await fake_check(cors_headers={"allow-origin": "data.gouv.fr", "status": 204})
-    expected_resources_statuses_count = {s: 0 for s in Resource.STATUSES if s}
-    expected_resources_statuses_count["null"] = 1
     expected_data = {
         "total_count": 1,
         "deleted_count": 0,
-        "statuses_count": expected_resources_statuses_count,
+        "statuses_count": {
+            "idle": 1,
+            "busy": 0,
+            "jobs": {job: {} for job in ResourceJobStatus.JOB_STATUSES},
+        },
     }
     resp = await client.get("/api/resources/stats")
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == expected_data
+
+
+async def test_get_ressources_stats_busy_counts_distinct_resources(setup_catalog, client):
+    """One resource with two jobs is busy=1; job row counts still sum to 2."""
+    await ResourceJobStatus.set(RESOURCE_ID, "csv", "ANALYSING_CSV")
+    await ResourceJobStatus.set(RESOURCE_ID, "parquet", "CONVERTING_TO_PARQUET")
+    resp = await client.get("/api/resources/stats")
+    assert resp.status == 200
+    data: dict = await resp.json()
+    assert data["total_count"] == 1
+    assert data["statuses_count"]["idle"] == 0
+    assert data["statuses_count"]["busy"] == 1
+    assert data["statuses_count"]["jobs"]["csv"]["ANALYSING_CSV"] == 1
+    assert data["statuses_count"]["jobs"]["parquet"]["CONVERTING_TO_PARQUET"] == 1
 
 
 async def test_get_resources_stats_cors(setup_catalog, client, fake_check):

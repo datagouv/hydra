@@ -12,8 +12,8 @@ from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.table import Table
 from udata_hydra.db.check import Check
-from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import (
     ParseException,
     Timer,
@@ -69,7 +69,7 @@ class Parquet(DataFormat):
 
         resource_id: str = str(check["resource_id"])
 
-        await Resource.update(resource_id, {"status": "ANALYSING_PARQUET"})
+        await ResourceJobStatus.set(resource_id, "parquet", "ANALYSING_PARQUET")
 
         # Check if the resource is in the exceptions table
         # If it is, get the table_indexes to use them later
@@ -81,33 +81,39 @@ class Parquet(DataFormat):
         timer = Timer("analyse-parquet", resource_id)
         assert any(_ is not None for _ in (check["id"], check["url"]))
 
-        check = await Check.update(check["id"], {"parsing_started_at": datetime.now(timezone.utc)})  # type: ignore[assignment]
-
-        # open the file and read the metadata
         try:
-            self.inspect()
-        except Exception as e:
-            raise ParseException(
-                message=str(e),
-                step="parquet_analysis",
-                resource_id=resource_id,
-                url=check["url"],
-                check_id=check["id"],
-            ) from e
-        timer.mark("parquet-analysis")
+            check = await Check.update(
+                check["id"], {"parsing_started_at": datetime.now(timezone.utc)}
+            )  # type: ignore[assignment]
 
-        # Convert to PMTiles
-        table = await self.to_db(
-            check=check, table_indexes=table_indexes, debug_insert=debug_insert
-        )
-        timer.mark("parquet-to-db")
-        check = await Check.update(  # type: ignore[assignment]
-            check_id=check["id"],
-            data={
-                "parsing_finished_at": datetime.now(timezone.utc),
-            },
-        )
-        return table
+            # open the file and read the metadata
+            try:
+                self.inspect()
+            except Exception as e:
+                raise ParseException(
+                    message=str(e),
+                    step="parquet_analysis",
+                    resource_id=resource_id,
+                    url=check["url"],
+                    check_id=check["id"],
+                ) from e
+            timer.mark("parquet-analysis")
+
+            table = await self.to_db(
+                check=check, table_indexes=table_indexes, debug_insert=debug_insert
+            )
+            timer.mark("parquet-to-db")
+            check = await Check.update(  # type: ignore[assignment]
+                check_id=check["id"],
+                data={
+                    "parsing_finished_at": datetime.now(timezone.utc),
+                },
+            )
+            return table
+        finally:
+            timer.stop()
+            await ResourceJobStatus.clear(resource_id, "parquet")
+            self.path.unlink(missing_ok=True)
 
     async def to_db(
         self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False

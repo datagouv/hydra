@@ -1,40 +1,11 @@
-from datetime import datetime, timedelta, timezone
-
 from asyncpg import Record
 
 from udata_hydra import config, context
+from udata_hydra.db.resource_job_status import CRAWLABLE_CLAUSE, ResourceJobStatus
 
 
 class Resource:
     """Represents a resource in the "catalog" DB table"""
-
-    STATUSES = {
-        None: "no status, waiting",
-        "BACKOFF": "backoff period for this domain, will be checked later",
-        "CRAWLING_URL": "resource URL currently being crawled",
-        "TO_ANALYSE_RESOURCE": "resource to be processed for change, type and size analysis",
-        "ANALYSING_RESOURCE_HEAD": "currently checking for change, type and size from headers",
-        "DOWNLOADING_RESOURCE": "currently being downloaded",
-        "ANALYSING_DOWNLOADED_RESOURCE": "currently checking for change, type and size from downloaded file",
-        "TO_ANALYSE_CSV": "CSV resource content to be analysed by CSV detective",
-        "TO_ANALYSE_CSVGZ": "CSV.GZ resource content to be analysed by CSV detective",
-        "TO_ANALYSE_XLS": "XLS resource content to be analysed by CSV detective",
-        "TO_ANALYSE_XLSX": "XLSX resource content to be analysed by CSV detective",
-        "ANALYSING_CSV": "CSV-like resource content currently being analysed by CSV detective",
-        "VALIDATING_CSV": "CSV-like resource content being validated using the previous analysis",
-        "INSERTING_IN_DB": "currently being inserted in DB",
-        "CONVERTING_TO_PARQUET": "currently being converted to Parquet",
-        "TO_ANALYSE_GEOJSON": "geojson resource content to be analysed",
-        "ANALYSING_GEOJSON": "geojson resource content currently being analysed",
-        "CONVERTING_TO_PMTILES": "currently being converted to PMTiles",
-        "CONVERTING_TO_GEOJSON": "csv is currently being converted to geojson",
-        "TO_ANALYSE_PARQUET": "parquet resource content to be analysed",
-        "ANALYSING_PARQUET": "retrieving parquet column metadata",
-        "TO_ANALYSE_WFS": "WFS service to be analysed",
-        "ANALYSING_WFS": "retrieving WFS service metadata",
-        "TO_ANALYSE_WMS": "WMS service to be analysed",
-        "ANALYSING_WMS": "retrieving WMS service metadata",
-    }
 
     @classmethod
     async def get(cls, resource_id: str, column_name: str = "*") -> Record | None:
@@ -52,37 +23,30 @@ class Resource:
         type: str,
         format: str,
         title: str,
-        status: str | None = None,
         priority: bool = True,
     ) -> Record | None:
-        if status and status not in cls.STATUSES.keys():
-            raise ValueError(f"Invalid status: {status}")
-
         pool = await context.pool()
         async with pool.acquire() as connection:
             # Insert new resource in catalog table and mark as high priority for crawling
             q = """
-                    INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, status, priority, title)
-                    VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8)
+                    INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, priority, title)
+                    VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7)
                     ON CONFLICT (resource_id) DO UPDATE SET
                         dataset_id = $1,
                         url = $3,
                         type = $4,
                         format = $5,
                         deleted = FALSE,
-                        status = $6,
-                        priority = $7,
-                        title = $8
+                        priority = $6,
+                        title = $7
                     RETURNING *;"""
             return await connection.fetchrow(
-                q, dataset_id, resource_id, url, type, format, status, priority, title
+                q, dataset_id, resource_id, url, type, format, priority, title
             )
 
     @classmethod
     async def update(cls, resource_id: str, data: dict) -> Record | None:
         """Update a resource in DB with new data and return the updated resource in DB"""
-        if "status" in data:
-            data["status_since"] = datetime.now(timezone.utc)
         columns = data.keys()
         # $1, $2...
         placeholders = [f"${x + 1}" for x in range(len(data.values()))]
@@ -105,37 +69,32 @@ class Resource:
         type: str,
         format: str,
         title: str,
-        status: str | None = None,
         priority: bool = True,  # Make resource high priority by default for crawling
     ) -> Record | None:
-        if status and status not in cls.STATUSES.keys():
-            raise ValueError(f"Invalid status: {status}")
-
         pool = await context.pool()
         async with pool.acquire() as connection:
             # Check if resource is in catalog then insert or update into table
             if await Resource.get(resource_id):
                 q = """
                         UPDATE catalog
-                        SET dataset_id = $1, url = $3, type = $4, format=$5, status = $6, priority = $7, title = $8
+                        SET dataset_id = $1, url = $3, type = $4, format=$5, priority = $6, title = $7
                         WHERE resource_id = $2
                         RETURNING *;"""
             else:
                 q = """
-                        INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, status, priority, title)
-                        VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8)
+                        INSERT INTO catalog (dataset_id, resource_id, url, type, format, deleted, priority, title)
+                        VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7)
                         ON CONFLICT (resource_id) DO UPDATE SET
                             dataset_id = $1,
                             url = $3,
                             type = $4,
                             format = $5,
                             deleted = FALSE,
-                            status = $6,
-                            priority = $7,
-                            title = $8
+                            priority = $6,
+                            title = $7
                         RETURNING *;"""
             return await connection.fetchrow(
-                q, dataset_id, resource_id, url, type, format, status, priority, title
+                q, dataset_id, resource_id, url, type, format, priority, title
             )
 
     @classmethod
@@ -150,43 +109,29 @@ class Resource:
                 q = f"""DELETE FROM catalog WHERE resource_id = '{resource_id}';"""
                 await connection.execute(q)
             else:
-                # Mark resource as deleted in catalog table
-                q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
-            await connection.execute(q)
+                # Clear in-progress jobs so a deleted resource is not counted as active.
+                async with connection.transaction():
+                    await ResourceJobStatus.clear_all(resource_id, connection)
+                    q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
+                    await connection.execute(q)
 
     @staticmethod
     def get_excluded_clause() -> str:
         """Return the WHERE clause to get only resources from the checks which:
         - don't have a URL in the excluded URLs patterns
         - are not deleted
-        - are not currently being crawled or analysed (i.e. resources with no status, or status 'BACKOFF')
+        - are not currently being crawled or analysed (i.e. idle, or only crawler=BACKOFF)
         """
         return " AND ".join(
             [f"catalog.url NOT LIKE '{p}'" for p in config.EXCLUDED_PATTERNS]
             + [
                 "catalog.deleted = False",
-                "(catalog.status IS NULL OR catalog.status = 'BACKOFF')",
+                CRAWLABLE_CLAUSE,
             ]
         )
 
     @staticmethod
     async def clean_up_statuses() -> int:
-        """Some resources end up being stuck in a not null status forever, we want to get them back on track.
-        This returns the number of such stuck resources that were cleaned up."""
-        threshold = datetime.now(timezone.utc) - timedelta(seconds=config.STUCK_THRESHOLD_SECONDS)
-
-        pool = await context.pool()
-        async with pool.acquire() as connection:
-            # Update all stuck resources in a single query
-            q = """
-                UPDATE catalog
-                SET status = NULL, status_since = $1
-                WHERE resource_id IN (
-                    SELECT ca.resource_id
-                    FROM checks c
-                    JOIN catalog ca ON c.id = ca.last_check
-                    WHERE ca.status IS NOT NULL AND c.created_at < $2
-                )
-            """
-            result = await connection.execute(q, datetime.now(timezone.utc), threshold)
-            return result  # Returns the number of affected rows
+        """Delete stuck per-job status rows based on their since timestamp.
+        Returns the number of status rows that were cleaned up."""
+        return await ResourceJobStatus.clean_stuck()
