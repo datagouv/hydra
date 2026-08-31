@@ -2,15 +2,12 @@ import json
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from udata_hydra.schemas.types import IsoDateTime
 
 
 class CheckSchema(BaseModel):
-    # Allow population from field names (id, status) or aliases (check_id, check_status) by enabling populate_by_name
-    model_config = ConfigDict(populate_by_name=True)
-
     id: int = Field(alias="check_id")
     catalog_id: int | None = None
     catalog_url: str | None = None
