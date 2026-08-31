@@ -9,17 +9,16 @@ from udata_hydra.db.resource_job_status import CRAWLABLE_CLAUSE, ResourceJobStat
 from udata_hydra.worker import QUEUES
 
 
-async def get_resources_status_counts(request: web.Request) -> dict:
-    idle_row = await request.app["pool"].fetchrow(
-        """
-        SELECT COUNT(*) AS count
-        FROM catalog
-        WHERE NOT EXISTS (
-            SELECT 1 FROM resource_job_status s
-            WHERE s.resource_id = catalog.resource_id
-        )
-        """
+async def get_resources_status_counts(request: web.Request, total_count: int) -> dict:
+    """Resource-level idle/busy plus per-job row counts.
+
+    ``idle + busy == total_count``. ``jobs`` counts status rows, so the sum of
+    job counts can exceed ``busy`` when one resource has several jobs.
+    """
+    busy_row = await request.app["pool"].fetchrow(
+        "SELECT COUNT(DISTINCT resource_id) AS count FROM resource_job_status"
     )
+    busy: int = busy_row["count"]
     jobs: dict[str, dict[str, int]] = {job: {} for job in ResourceJobStatus.JOB_STATUSES}
 
     rows = await request.app["pool"].fetch(
@@ -32,7 +31,7 @@ async def get_resources_status_counts(request: web.Request) -> dict:
     for row in rows:
         jobs[row["job"]][row["state"]] = row["count"]
 
-    return {"idle": idle_row["count"], "jobs": jobs}
+    return {"idle": total_count - busy, "busy": busy, "jobs": jobs}
 
 
 async def get_crawler_status(request: web.Request) -> web.Response:

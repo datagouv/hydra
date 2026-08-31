@@ -180,6 +180,7 @@ async def test_get_ressources_stats(setup_catalog, client, fake_check):
         "deleted_count": 0,
         "statuses_count": {
             "idle": 1,
+            "busy": 0,
             "jobs": {job: {} for job in ResourceJobStatus.JOB_STATUSES},
         },
     }
@@ -187,6 +188,20 @@ async def test_get_ressources_stats(setup_catalog, client, fake_check):
     assert resp.status == 200
     data: dict = await resp.json()
     assert data == expected_data
+
+
+async def test_get_ressources_stats_busy_counts_distinct_resources(setup_catalog, client):
+    """One resource with two jobs is busy=1; job row counts still sum to 2."""
+    await ResourceJobStatus.set(RESOURCE_ID, "csv", "ANALYSING_CSV")
+    await ResourceJobStatus.set(RESOURCE_ID, "parquet", "CONVERTING_TO_PARQUET")
+    resp = await client.get("/api/resources/stats")
+    assert resp.status == 200
+    data: dict = await resp.json()
+    assert data["total_count"] == 1
+    assert data["statuses_count"]["idle"] == 0
+    assert data["statuses_count"]["busy"] == 1
+    assert data["statuses_count"]["jobs"]["csv"]["ANALYSING_CSV"] == 1
+    assert data["statuses_count"]["jobs"]["parquet"]["CONVERTING_TO_PARQUET"] == 1
 
 
 async def test_get_resources_stats_cors(setup_catalog, client, fake_check):

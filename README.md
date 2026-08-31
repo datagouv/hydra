@@ -386,6 +386,8 @@ $ curl -s "http://localhost:8000/api/checks/aggregate?group_by=domain&created_at
 
 #### Get resources stats
 
+`idle` + `busy` = `total_count` (resource counts). `jobs` counts status rows and may sum to more than `busy` when one resource has several jobs.
+
 ```bash
 $ curl -s "http://localhost:8000/api/resources/stats" | json_pp
 {
@@ -393,10 +395,11 @@ $ curl -s "http://localhost:8000/api/resources/stats" | json_pp
    "deleted_count" : 3,
    "statuses_count" : {
       "idle" : 85,
+      "busy" : 15,
       "jobs" : {
          "crawler" : { "BACKOFF" : 2, "CRAWLING_URL" : 1 },
-         "csv" : {},
-         "parquet" : {},
+         "csv" : { "ANALYSING_CSV" : 12 },
+         "parquet" : { "CONVERTING_TO_PARQUET" : 1 },
          "geojson" : {},
          "pmtiles" : {},
          "ogc" : {}

@@ -142,7 +142,9 @@ async def get_resources_stats(request: web.Request) -> web.Response:
         {
             "total_count": stats_resources["total_resources"],
             "deleted_count": stats_resources["deleted_resources"],
-            "statuses_count": await get_resources_status_counts(request),
+            "statuses_count": await get_resources_status_counts(
+                request, stats_resources["total_resources"]
+            ),
         }
     )
 
