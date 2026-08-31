@@ -48,8 +48,8 @@ class Geojson(DataFormat):
             )
         finally:
             timer.stop()
-            self.path.unlink(missing_ok=True)
             await ResourceJobStatus.clear(resource_id, "geojson")
+            self.path.unlink(missing_ok=True)
 
     async def to_pmtiles(self) -> "PMTiles":
         from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
