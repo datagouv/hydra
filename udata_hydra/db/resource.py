@@ -7,8 +7,6 @@ from udata_hydra.db.resource_job_status import CRAWLABLE_CLAUSE, ResourceJobStat
 class Resource:
     """Represents a resource in the "catalog" DB table"""
 
-    JOB_STATUSES = ResourceJobStatus.JOB_STATUSES
-
     @classmethod
     async def get(cls, resource_id: str, column_name: str = "*") -> Record | None:
         pool = await context.pool()
