@@ -121,6 +121,7 @@ class CsvLike(DataFormat):
                 if config.DB_TO_PARQUET:
                     from udata_hydra.analysis.exports import export_parquet
 
+                    await ResourceJobStatus.set(resource_id, "parquet", "CONVERTING_TO_PARQUET")
                     queue.enqueue(
                         export_parquet,
                         table=table,
@@ -136,6 +137,7 @@ class CsvLike(DataFormat):
                 ):
                     from udata_hydra.analysis.exports import export_geojson_pmtiles
 
+                    await ResourceJobStatus.set(resource_id, "geojson", "CONVERTING_TO_GEOJSON")
                     queue.enqueue(
                         export_geojson_pmtiles,
                         source=table,
