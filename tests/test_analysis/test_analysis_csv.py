@@ -9,7 +9,7 @@ from asyncpg.exceptions import UndefinedTableError
 from csv_detective import validate_then_detect
 from yarl import URL
 
-from tests.conftest import RESOURCE_ID, RESOURCE_URL
+from tests.conftest import RESOURCE_ID, RESOURCE_URL, job_states
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.crawl.check_resources import check_resource
@@ -22,18 +22,8 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_analyse_csv_on_catalog(
-    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock, mocker
+    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock, job_status_snapshots
 ):
-    snapshots: list[dict] = []
-    real_set = ResourceJobStatus.set
-
-    async def capturing_set(resource_id: str, job: str, state: str):
-        result = await real_set(resource_id, job, state)
-        snapshots.append(await ResourceJobStatus.for_resource(resource_id))
-        return result
-
-    mocker.patch.object(ResourceJobStatus, "set", capturing_set)
-
     check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
@@ -46,8 +36,7 @@ async def test_analyse_csv_on_catalog(
     file = await download_from_check(check, Csv)
     await file.analyse(check=check)
 
-    csv_states = [snap["csv"]["state"] for snap in snapshots if "csv" in snap]
-    assert csv_states == ["ANALYSING_CSV", "INSERTING_IN_DB"]
+    assert job_states(job_status_snapshots, "csv") == ["ANALYSING_CSV", "INSERTING_IN_DB"]
     assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
@@ -354,6 +343,7 @@ async def test_validation(
     udata_url,
     _params,
     produce_mock,
+    job_status_snapshots,
 ):
     previous_scan_kwargs, current_scan_kwargs, is_valid = _params
     previous_analysis = create_analysis(previous_scan_kwargs)
@@ -405,6 +395,13 @@ async def test_validation(
         file = await download_from_check(check, Csv)
         await file.analyse(check=check)
         mock_func.assert_called_once()
+
+    assert job_states(job_status_snapshots, "csv") == [
+        "ANALYSING_CSV",
+        "VALIDATING_CSV",
+        "INSERTING_IN_DB",
+    ]
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     # now we check what is inside csv_detective in tables_index
     res = await db.fetch(
@@ -608,10 +605,11 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     assert updated_check["parsing_error"] is not None
 
 
-async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, fake_check, mocker):
+async def test_export_geojson_pmtiles_notifies_udata_on_success(
+    setup_catalog, fake_check, mocker, job_status_snapshots
+):
     """When GeoJSON/PMTiles export succeeds, notify udata and clear the resource status."""
     check = await fake_check()
-    await ResourceJobStatus.set(RESOURCE_ID, "pmtiles", "CONVERTING_TO_PMTILES")
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -639,20 +637,15 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
     )
 
     assert notify_udata.await_count == 2
+    assert job_states(job_status_snapshots, "geojson") == ["CONVERTING_TO_GEOJSON"]
+    assert job_states(job_status_snapshots, "pmtiles") == ["CONVERTING_TO_PMTILES"]
     assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
-async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_check, mocker):
+async def test_export_parquet_notifies_udata_on_success(
+    setup_catalog, fake_check, mocker, job_status_snapshots
+):
     """When parquet export succeeds, notify udata and clear the resource status."""
-    snapshots: list[dict] = []
-    real_set = ResourceJobStatus.set
-
-    async def capturing_set(resource_id: str, job: str, state: str):
-        result = await real_set(resource_id, job, state)
-        snapshots.append(await ResourceJobStatus.for_resource(resource_id))
-        return result
-
-    mocker.patch.object(ResourceJobStatus, "set", capturing_set)
     check = await fake_check()
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
@@ -675,9 +668,7 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
     )
 
     notify_udata.assert_awaited_once()
-    assert any(
-        snap.get("parquet", {}).get("state") == "CONVERTING_TO_PARQUET" for snap in snapshots
-    )
+    assert job_states(job_status_snapshots, "parquet") == ["CONVERTING_TO_PARQUET"]
     assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 

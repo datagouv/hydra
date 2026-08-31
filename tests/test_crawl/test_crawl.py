@@ -14,7 +14,7 @@ from aioresponses import CallbackResult
 from asyncpg import Record
 from yarl import URL
 
-from tests.conftest import RESOURCE_ID, RESOURCE_URL, SIMPLE_CSV_CONTENT
+from tests.conftest import RESOURCE_ID, RESOURCE_URL, SIMPLE_CSV_CONTENT, job_states
 from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import start_checks
@@ -321,7 +321,9 @@ async def test_analyse_resource(setup_catalog, mocker, fake_check):
     assert result["mime_type"] == "text/plain"
 
 
-async def test_analyse_resource_hands_off_crawler_to_csv(setup_catalog, mocker, fake_check):
+async def test_analyse_resource_hands_off_crawler_to_csv(
+    setup_catalog, mocker, fake_check, job_status_snapshots
+):
     """After resource analysis, crawler is cleared and csv is waiting as TO_ANALYSE_CSV."""
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
@@ -331,9 +333,15 @@ async def test_analyse_resource_hands_off_crawler_to_csv(setup_catalog, mocker, 
     check = await fake_check(headers={"content-type": "text/csv"})
     await analyse_resource(check=check, last_check=None)
 
+    assert job_states(job_status_snapshots, "crawler") == [
+        "ANALYSING_RESOURCE_HEAD",
+        "DOWNLOADING_RESOURCE",
+        "ANALYSING_DOWNLOADED_RESOURCE",
+    ]
     status = await ResourceJobStatus.for_resource(RESOURCE_ID)
     assert "crawler" not in status
     assert status["csv"]["state"] == "TO_ANALYSE_CSV"
+    assert job_states(job_status_snapshots, "csv") == ["TO_ANALYSE_CSV"]
 
 
 @pytest.mark.parametrize(
