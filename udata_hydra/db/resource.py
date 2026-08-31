@@ -50,7 +50,7 @@ class Resource:
         resource_id: str,
         url: str,
         type: str,
-        format: str,
+        format: str | None,
         title: str,
         status: str | None = None,
         priority: bool = True,
@@ -103,7 +103,7 @@ class Resource:
         resource_id: str,
         url: str,
         type: str,
-        format: str,
+        format: str | None,
         title: str,
         status: str | None = None,
         priority: bool = True,  # Make resource high priority by default for crawling
