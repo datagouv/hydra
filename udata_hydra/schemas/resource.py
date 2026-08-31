@@ -22,7 +22,7 @@ class ResourceDocumentSchema(Schema):
 
 class JobStatusSchema(Schema):
     state = fields.Str(required=True)
-    since = fields.Str(required=True)
+    since = fields.DateTime(required=True)
 
 
 class ResourceSchema(Schema):

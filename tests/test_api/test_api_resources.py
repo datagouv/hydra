@@ -3,6 +3,8 @@ NB: we can't use pytest-aiohttp helpers because
 it will interfere with the rest of our async code
 """
 
+from datetime import datetime
+
 import pytest
 
 from tests.conftest import DATASET_ID, NOT_EXISTING_RESOURCE_ID, RESOURCE_ID, RESOURCE_URL
@@ -35,7 +37,7 @@ async def test_get_resource_with_active_job(setup_catalog, client):
     assert resp.status == 200
     data: dict = await resp.json()
     assert data["status"]["crawler"]["state"] == "CRAWLING_URL"
-    assert "since" in data["status"]["crawler"]
+    datetime.fromisoformat(data["status"]["crawler"]["since"])
 
 
 async def test_create_resource(

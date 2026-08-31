@@ -130,7 +130,7 @@ class ResourceJobStatus:
                 return await connection.fetchrow(q, resource_id, to_job, state, now)
 
     @classmethod
-    async def for_resource(cls, resource_id: str) -> dict[str, dict[str, str]]:
+    async def for_resource(cls, resource_id: str) -> dict[str, dict[str, str | datetime]]:
         """Return {job: {state, since}} for a resource, or {} if idle."""
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -145,7 +145,7 @@ class ResourceJobStatus:
         return {
             row["job"]: {
                 "state": row["state"],
-                "since": row["since"].isoformat(),
+                "since": row["since"],
             }
             for row in rows
         }
