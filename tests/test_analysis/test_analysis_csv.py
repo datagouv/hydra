@@ -518,6 +518,11 @@ async def test_analyse_csv_parquet_export_enqueue(
         assert kw["_priority"] == "low"
         assert kw["check"]["id"] == check["id"]
         assert "table" in kw
+        status = await ResourceJobStatus.for_resource(RESOURCE_ID)
+        assert "csv" not in status
+        assert status["parquet"]["state"] == "CONVERTING_TO_PARQUET"
+    else:
+        assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
 async def test_crash_after_db_insertion(
