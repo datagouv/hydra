@@ -156,9 +156,8 @@ class CsvLike(DataFormat):
         finally:
             await helpers.notify_udata(resource, check)
             timer.stop()
-            self.path.unlink()
-
             await ResourceJobStatus.clear(resource_id, "csv")
+            self.path.unlink(missing_ok=True)
 
     async def to_db(
         self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False

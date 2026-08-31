@@ -112,8 +112,8 @@ class Parquet(DataFormat):
             return table
         finally:
             timer.stop()
-            self.path.unlink(missing_ok=True)
             await ResourceJobStatus.clear(resource_id, "parquet")
+            self.path.unlink(missing_ok=True)
 
     async def to_db(
         self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False
