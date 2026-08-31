@@ -26,7 +26,7 @@ class ResourceDocumentSchema(BaseModel):
 
 class JobStatusSchema(BaseModel):
     state: str
-    since: str
+    since: datetime
 
 
 class ResourceSchema(BaseModel):
