@@ -73,13 +73,10 @@ async def create_check(request: web.Request) -> web.Response:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
     # Get URL from resource_id
-    try:
-        resource: Record | None = await Resource.get(str(payload.resource_id))
-        if not resource:
-            raise web.HTTPNotFound(text=f"Couldn't find URL for resource {payload.resource_id}")
-        url: str = resource["url"]
-    except Exception:
+    resource: Record | None = await Resource.get(str(payload.resource_id))
+    if not resource:
         raise web.HTTPNotFound(text=f"Couldn't find URL for resource {payload.resource_id}")
+    url: str = resource["url"]
 
     context.monitor().set_status(f'Crawling url "{url}"...')
 
