@@ -110,9 +110,10 @@ class Resource:
                 await connection.execute(q)
             else:
                 # Clear in-progress jobs so a deleted resource is not counted as active.
-                await ResourceJobStatus.clear_all(resource_id)
-                q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
-                await connection.execute(q)
+                async with connection.transaction():
+                    await ResourceJobStatus.clear_all(resource_id, connection)
+                    q = f"""UPDATE catalog SET deleted = TRUE WHERE resource_id = '{resource_id}';"""
+                    await connection.execute(q)
 
     @staticmethod
     def get_excluded_clause() -> str:

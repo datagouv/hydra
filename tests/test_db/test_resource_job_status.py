@@ -1,6 +1,7 @@
 import pytest
 
 from tests.conftest import RESOURCE_ID
+from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_job_status import ResourceJobStatus
 
 pytestmark = pytest.mark.asyncio
@@ -42,3 +43,9 @@ async def test_transition_geojson_to_pmtiles(setup_catalog):
     status = await ResourceJobStatus.for_resource(RESOURCE_ID)
     assert "geojson" not in status
     assert status["pmtiles"]["state"] == "CONVERTING_TO_PMTILES"
+
+
+async def test_soft_delete_clears_job_status(setup_catalog):
+    await ResourceJobStatus.set(RESOURCE_ID, "csv", "ANALYSING_CSV")
+    await Resource.delete(RESOURCE_ID)
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}

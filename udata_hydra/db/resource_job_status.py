@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from asyncpg import Record
+from asyncpg import Connection, Record
 
 from udata_hydra import config, context
 
@@ -151,14 +151,15 @@ class ResourceJobStatus:
         }
 
     @classmethod
-    async def clear_all(cls, resource_id: str) -> None:
+    async def clear_all(cls, resource_id: str, connection: Connection | None = None) -> None:
         """Remove every job status row for a resource (soft-delete / idle)."""
+        q = "DELETE FROM resource_job_status WHERE resource_id = $1;"
+        if connection is not None:
+            await connection.execute(q, resource_id)
+            return
         pool = await context.pool()
         async with pool.acquire() as connection:
-            await connection.execute(
-                "DELETE FROM resource_job_status WHERE resource_id = $1;",
-                resource_id,
-            )
+            await connection.execute(q, resource_id)
 
     @classmethod
     async def clean_stuck(cls) -> int:
