@@ -36,6 +36,7 @@ async def test_analyse_csv_on_catalog(
     file = await download_from_check(check, Csv)
     await file.analyse(check=check)
 
+    # Check resource status after analysis
     assert job_states(job_status_snapshots, "csv") == ["ANALYSING_CSV", "INSERTING_IN_DB"]
     assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
