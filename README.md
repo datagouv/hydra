@@ -233,7 +233,7 @@ The API serves the following endpoints:
 
 *Related to resources:*
 - `GET` on `/api/resources/{resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
-- `GET` on `/api/resources/stats` to get aggregate statistics about resources (counts and breakdown by catalog `status`)
+- `GET` on `/api/resources/stats` to get aggregate statistics about resources (counts and breakdown by per-job `status`)
 - `GET` on `/api/resources/stats/cors` to get CORS coverage statistics for external resources (URLs not on data.gouv.fr)
 - `POST` on `/api/resources` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
 - `PUT` on `/api/resources/{resource_id}` to update a resource in the DB "catalog" table
@@ -392,10 +392,15 @@ $ curl -s "http://localhost:8000/api/resources/stats" | json_pp
    "total_count" : 100,
    "deleted_count" : 3,
    "statuses_count" : {
-      "null" : 85,
-      "BACKOFF" : 2,
-      "CRAWLING_URL" : 1,
-      ...
+      "idle" : 85,
+      "jobs" : {
+         "crawler" : { "BACKOFF" : 2, "CRAWLING_URL" : 1 },
+         "csv" : {},
+         "parquet" : {},
+         "geojson" : {},
+         "pmtiles" : {},
+         "ogc" : {}
+      }
    }
 }
 ```

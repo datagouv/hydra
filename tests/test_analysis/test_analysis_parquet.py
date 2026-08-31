@@ -148,7 +148,9 @@ async def test_parquet_to_db_copy_failure_raises_parse_exception(fake_check, moc
         "udata_hydra.data_formats.parquet.to_db.context.pool",
         new=mocker.AsyncMock(return_value=mock_pool),
     )
-    mocker.patch("udata_hydra.data_formats.parquet.to_db.Resource.update", new=mocker.AsyncMock())
+    mocker.patch(
+        "udata_hydra.data_formats.parquet.to_db.ResourceJobStatus.set", new=mocker.AsyncMock()
+    )
     inspection = {
         "columns": {"name": {"python_type": "string", "format": set()}},
         "total_lines": 1,
@@ -174,7 +176,9 @@ async def test_parquet_to_db_create_table_failure_raises_parse_exception(fake_ch
         "udata_hydra.data_formats.parquet.to_db.context.pool",
         new=mocker.AsyncMock(return_value=mock_pool),
     )
-    mocker.patch("udata_hydra.data_formats.parquet.to_db.Resource.update", new=mocker.AsyncMock())
+    mocker.patch(
+        "udata_hydra.data_formats.parquet.to_db.ResourceJobStatus.set", new=mocker.AsyncMock()
+    )
     inspection = {
         "columns": {"name": {"python_type": "string", "format": set()}},
         "total_lines": 1,
