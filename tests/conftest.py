@@ -20,6 +20,7 @@ from udata_hydra.cli import drop_dbs, load_catalog, migrate
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.logger import stop_sentry
 from udata_hydra.utils import storage_path
 
@@ -237,9 +238,12 @@ async def insert_fake_resource():
             type="main",
             format=format,
             title="Fake resource",
-            status=status,
             priority=True,
         )
+        if status:
+            await ResourceJobStatus.set(
+                RESOURCE_ID, ResourceJobStatus.job_for_state(status), status
+            )
 
     return _insert_fake_resource
 

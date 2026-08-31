@@ -8,7 +8,7 @@ from asyncpg.exceptions import UndefinedTableError
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.data_formats import Gz, Xls, Xlsx
-from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -62,9 +62,7 @@ async def test_gz_skips_json_payload(setup_catalog, rmock, db, fake_check, produ
     with pytest.raises(UndefinedTableError):
         await db.fetch(f'SELECT * FROM "{table_name}"')
 
-    resource = await Resource.get(check["resource_id"])
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}
 
 
 async def test_analyse_resource_skips_json_gz(setup_catalog, rmock, db, fake_check, produce_mock):
@@ -84,9 +82,7 @@ async def test_analyse_resource_skips_json_gz(setup_catalog, rmock, db, fake_che
     with pytest.raises(UndefinedTableError):
         await db.fetch(f'SELECT * FROM "{table_name}"')
 
-    resource = await Resource.get(check["resource_id"])
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}
 
 
 CORRUPTED_GZ_BODY = gzip.compress(b"col1,col2\n1,2")[:10]
@@ -108,6 +104,4 @@ async def test_analyse_resource_corrupted_gzip_sets_analysis_error(
     assert res["mime_type"] is None
     assert res["parsing_error"] is None
 
-    resource = await Resource.get(check["resource_id"])
-    assert resource is not None
-    assert resource["status"] != "TO_ANALYSE_GZ"
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}

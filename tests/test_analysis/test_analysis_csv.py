@@ -16,33 +16,39 @@ from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 
 pytestmark = pytest.mark.asyncio
 
 
 async def test_analyse_csv_on_catalog(
-    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
+    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock, mocker
 ):
+    snapshots: list[dict] = []
+    real_set = ResourceJobStatus.set
+
+    async def capturing_set(resource_id: str, job: str, state: str):
+        result = await real_set(resource_id, job, state)
+        snapshots.append(await ResourceJobStatus.for_resource(resource_id))
+        return result
+
+    mocker.patch.object(ResourceJobStatus, "set", capturing_set)
+
     check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
     table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
     rmock.get(url, status=200, body=catalog_content)
 
     # Check resource status before analysis
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
-    assert resource["status_since"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     # Analyse the CSV
     file = await download_from_check(check, Csv)
     await file.analyse(check=check)
 
-    # Check resource status after analysis
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
-    assert isinstance(resource["status_since"], datetime)
+    csv_states = [snap["csv"]["state"] for snap in snapshots if "csv" in snap]
+    assert csv_states == ["ANALYSING_CSV", "INSERTING_IN_DB"]
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table_name
@@ -69,9 +75,7 @@ async def test_error_reporting_csv_detective(
     await file.analyse(check=check)
 
     # Check resource status after analysis attempt
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -92,9 +96,7 @@ async def test_error_reporting_parsing(
     await file.analyse(check=check)
 
     # Check resource status after analysis attempt
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -120,9 +122,7 @@ async def test_analyse_csv_send_udata_webhook(
     await file.analyse(check=check)
 
     # Check resource status after analysis
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("analysis:parsing:started_at")
@@ -593,7 +593,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     """When GeoJSON/PMTiles export fails, record the error and reset the resource status.
     Also removes leftover geojson/pmtiles files so a retry does not leave stale artifacts."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_GEOJSON"})
+    await ResourceJobStatus.set(RESOURCE_ID, "geojson", "CONVERTING_TO_GEOJSON")
     remove_remainders = mocker.patch("udata_hydra.analysis.exports.remove_remainders")
     mocker.patch("udata_hydra.analysis.exports.helpers.notify_udata")
     mocker.patch(
@@ -609,7 +609,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     remove_remainders.assert_called_once_with(RESOURCE_ID, ["geojson"])
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
     updated_check = await Check.get_by_id(check["id"])
     assert updated_check is not None
     assert updated_check["parsing_error"] is not None
@@ -618,7 +618,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
 async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, fake_check, mocker):
     """When GeoJSON/PMTiles export succeeds, notify udata and clear the resource status."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PMTILES"})
+    await ResourceJobStatus.set(RESOURCE_ID, "pmtiles", "CONVERTING_TO_PMTILES")
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -646,9 +646,7 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
     )
 
     assert notify_udata.await_count == 2
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
 @pytest.mark.parametrize("recrawled", [False, True])
@@ -656,11 +654,19 @@ async def test_export_parquet_notifies_udata_on_success(
     setup_catalog, fake_check, mocker, recrawled
 ):
     """When parquet export succeeds, notify udata and clear the resource status."""
+    snapshots: list[dict] = []
+    real_set = ResourceJobStatus.set
+
+    async def capturing_set(resource_id: str, job: str, state: str):
+        result = await real_set(resource_id, job, state)
+        snapshots.append(await ResourceJobStatus.for_resource(resource_id))
+        return result
+
+    mocker.patch.object(ResourceJobStatus, "set", capturing_set)
     check = await fake_check()
     if recrawled:
         # the export job ran after a new crawl: its check is not the last one anymore
         await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PARQUET"})
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -685,9 +691,10 @@ async def test_export_parquet_notifies_udata_on_success(
 
     notify_udata.assert_awaited_once()
     assert notify_udata.await_args.args[1]["parquet_url"] == "https://example.org/file.parquet"
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert any(
+        snap.get("parquet", {}).get("state") == "CONVERTING_TO_PARQUET" for snap in snapshots
+    )
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
 async def test_export_parquet_stores_error_on_recrawled_check(
@@ -743,7 +750,8 @@ async def test_export_parquet_notify_depending_on_later_check(
     check = await fake_check()
     later_check = await fake_check()
     await Check.update(later_check["id"], later_check_data)
-    await Resource.update(RESOURCE_ID, {"status": status})
+    later_job = ResourceJobStatus.job_for_state(status)
+    await ResourceJobStatus.set(RESOURCE_ID, later_job, status)
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -761,14 +769,14 @@ async def test_export_parquet_notify_depending_on_later_check(
         check=check,
     )
 
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
     if should_notify:
         notify_udata.assert_awaited_once()
-        assert resource["status"] is None
     else:
         notify_udata.assert_not_awaited()
-        assert resource["status"] == status
+    # the export only clears its own job status, the later check's one is left untouched
+    statuses = await ResourceJobStatus.for_resource(RESOURCE_ID)
+    assert "parquet" not in statuses
+    assert statuses[later_job]["state"] == status
 
 
 async def test_file_with_nan(
