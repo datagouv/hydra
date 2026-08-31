@@ -1,9 +1,10 @@
-import datetime
 import json
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from udata_hydra.schemas.types import IsoDateTime
 
 
 class CheckSchema(BaseModel):
@@ -15,7 +16,7 @@ class CheckSchema(BaseModel):
     catalog_url: str | None = None
     check_url: str | None = None
     domain: str | None = None
-    created_at: datetime.datetime | None
+    created_at: IsoDateTime | None
     status: int | None = Field(alias="check_status")
     headers: dict
     cors_headers: dict | None = None
@@ -25,18 +26,18 @@ class CheckSchema(BaseModel):
     dataset_id: str | None = None
     resource_id: UUID | None = None
     deleted: bool | None = None
-    parsing_started_at: datetime.datetime | None = None
-    parsing_finished_at: datetime.datetime | None = None
+    parsing_started_at: IsoDateTime | None = None
+    parsing_finished_at: IsoDateTime | None = None
     parsing_error: str | None = None
     parsing_table: str | None = None
-    next_check_at: datetime.datetime | None = None
+    next_check_at: IsoDateTime | None = None
     parquet_url: str | None = None
     parquet_size: int | None = None
     pmtiles_url: str | None = None
     pmtiles_size: int | None = None
     geojson_url: str | None = None
     geojson_size: int | None = None
-    detected_last_modified_at: datetime.datetime | None = None
+    detected_last_modified_at: IsoDateTime | None = None
     analysis_error: str | None = None
     checksum: str | None = None
     filesize: int | None = None

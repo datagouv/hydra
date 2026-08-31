@@ -72,7 +72,7 @@ async def test_get_latest_check(setup_catalog, client, query, expected, fake_che
         "pmtiles_size": None,
         "geojson_url": None,
         "geojson_size": None,
-        "detected_last_modified_at": "2025-04-04T00:00:00Z",
+        "detected_last_modified_at": "2025-04-04T00:00:00+00:00",
         "analysis_error": "Too large",
         "checksum": "abc123",
         "filesize": 1024,

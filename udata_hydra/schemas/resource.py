@@ -1,7 +1,8 @@
-import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+from udata_hydra.schemas.types import IsoDateTime
 
 
 class ResourceDocumentSchema(BaseModel):
@@ -18,8 +19,8 @@ class ResourceDocumentSchema(BaseModel):
     filesize: int | None = None
     checksum_type: str | None = None
     checksum_value: str | None = None
-    created_at: datetime.datetime
-    last_modified: datetime.datetime
+    created_at: IsoDateTime
+    last_modified: IsoDateTime
     extras: dict | None = None
     harvest: dict | None = None
 
@@ -30,7 +31,7 @@ class ResourceSchema(BaseModel):
     dataset_id: str
     resource_id: UUID
     status: str | None = None
-    status_since: datetime.datetime | None = None
+    status_since: IsoDateTime | None = None
 
 
 class CreateResourceRequest(BaseModel):
