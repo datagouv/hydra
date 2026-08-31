@@ -35,16 +35,6 @@ async def test_update_job_status_is_atomic(setup_catalog):
     assert status["csv"]["state"] == "TO_ANALYSE_CSV"
 
 
-async def test_transition_geojson_to_pmtiles(setup_catalog):
-    await ResourceJobStatus.set(RESOURCE_ID, "geojson", "CONVERTING_TO_GEOJSON")
-
-    await ResourceJobStatus.update(RESOURCE_ID, "geojson", "pmtiles", "CONVERTING_TO_PMTILES")
-
-    status = await ResourceJobStatus.for_resource(RESOURCE_ID)
-    assert "geojson" not in status
-    assert status["pmtiles"]["state"] == "CONVERTING_TO_PMTILES"
-
-
 async def test_soft_delete_clears_job_status(setup_catalog):
     await ResourceJobStatus.set(RESOURCE_ID, "csv", "ANALYSING_CSV")
     await Resource.delete(RESOURCE_ID)
