@@ -18,6 +18,7 @@ class Resource:
         "ANALYSING_DOWNLOADED_RESOURCE": "currently checking for change, type and size from downloaded file",
         "TO_ANALYSE_CSV": "CSV resource content to be analysed by CSV detective",
         "TO_ANALYSE_CSVGZ": "CSV.GZ resource content to be analysed by CSV detective",
+        "TO_ANALYSE_GZ": "gzip resource to be unwrapped before analysing the payload",
         "TO_ANALYSE_XLS": "XLS resource content to be analysed by CSV detective",
         "TO_ANALYSE_XLSX": "XLSX resource content to be analysed by CSV detective",
         "ANALYSING_CSV": "CSV-like resource content currently being analysed by CSV detective",
