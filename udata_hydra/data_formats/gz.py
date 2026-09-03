@@ -17,8 +17,7 @@ class Gz(DataFormat):
 
     standard_mime_type = "application/gzip"
     valid_mime_types = {standard_mime_type, "application/x-gzip"}
-    # historical gzip download cap (named csvgz when only csv.gz was analysed)
-    max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["csvgz"])
+    max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["gz"])
     check_url = ".gz"
     further_analysis = True
 
