@@ -16,7 +16,7 @@ class Gz(DataFormat):
     """Gzip wrapper: unwrap the payload and analyse it as its own format."""
 
     standard_mime_type = "application/gzip"
-    valid_mime_types = {standard_mime_type, "application/x-gzip"}
+    valid_mime_types = {standard_mime_type, "application/x-gzip", "application/octet-stream"}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["gz"])
     check_url = ".gz"
     further_analysis = True

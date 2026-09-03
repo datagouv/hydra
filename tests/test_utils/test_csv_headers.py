@@ -25,6 +25,11 @@ from udata_hydra.data_formats.detect import (
             Gz,
         ),
         (
+            {"content-type": "application/octet-stream"},
+            "https://example.com/data.csv.gz",
+            Gz,
+        ),
+        (
             {"content-type": "application/vnd.ms-excel"},
             "https://example.com/data.xls",
             Xls,
