@@ -190,21 +190,6 @@ class Csv(CsvLike):
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["csv"])
 
 
-class Csvgz(CsvLike):
-    standard_mime_type = "application/gzip"
-    valid_mime_types = {
-        standard_mime_type,
-        "application/octet-stream",
-        "application/x-gzip",
-    }
-    max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["csvgz"])
-    check_url = "csv.gz"
-
-    @classmethod
-    def detect_from_catalog_format(cls, format: str | None) -> bool:
-        return format == "csv.gz"
-
-
 class Xls(CsvLike):
     standard_mime_type = "application/vnd.ms-excel"
     valid_mime_types = {standard_mime_type}

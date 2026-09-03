@@ -93,27 +93,10 @@ async def download_resource(
                 raise IOException("File too large to download", url=url)
             raise IOException("Error downloading CSV", url=url) from download_error
 
-    detected_extension = ""
-
-    if magic.from_file(tmp_file.name, mime=True) in [
-        "application/x-gzip",
-        "application/gzip",
-    ]:
-        # It's compressed - extract and determine extension from URL
-        gzip_tmp_file_name = tmp_file.name
-        try:
-            tmp_file = extract_gzip(gzip_tmp_file_name, url=url)
-        finally:
-            Path(gzip_tmp_file_name).unlink(missing_ok=True)
-
-        # Extract any extension before .gz using regex
-        match = re.search(r"\.([^.]+)\.gz$", url)
-        if match:
-            detected_extension = f".{match.group(1)}"
-        else:
-            detected_extension = ""
+    match = re.search(r"\.([^.]+)\.gz$", url)
+    if match:
+        detected_extension = f".{match.group(1)}"
     else:
-        # Not compressed - use magic to detect type
         mime_type = magic.from_file(tmp_file.name, mime=True)
         detected_extension = mimetypes.guess_extension(mime_type) or ""
 
