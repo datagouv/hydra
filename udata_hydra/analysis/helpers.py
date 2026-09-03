@@ -1,10 +1,11 @@
 import json
-import os
+from pathlib import Path
 from typing import IO
 
 from asyncpg import Record
 
 from udata_hydra import config
+from udata_hydra.data_formats import Gz
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.utils import (
     IOException,
@@ -62,11 +63,14 @@ async def download_from_check(check: dict, data_format: type[DataFormat]) -> Dat
         filename=None,
         data_format=data_format,
     )
-    return data_format(
-        file_name=os.path.basename(tmp_file.name),
+    file = data_format(
+        file_name=Path(tmp_file.name).name,
         resource_id=check.get("resource_id"),
         dataset_id=check.get("dataset_id"),
     )
+    if isinstance(file, Gz):
+        file.unwrap()
+    return file
 
 
 async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:

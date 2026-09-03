@@ -1,13 +1,12 @@
 import logging
 import os
-from pathlib import Path
 
 import magic
 
 from udata_hydra import config
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import extract_gzip
+from udata_hydra.utils import IOException, extract_gzip
 
 log = logging.getLogger("udata-hydra")
 
@@ -26,12 +25,16 @@ class Gz(DataFormat):
         return format is not None and (format.endswith(".gz") or format in {"gz", "gzip"})
 
     def unwrap(self) -> None:
-        """Gunzip in place when the file is still compressed (download_resource may already have)."""
+        """Gunzip in place; call before checksum or analysis on the payload."""
         mime_type = magic.from_file(str(self.path), mime=True)
         if mime_type not in self.valid_mime_types:
             return
-        extracted = extract_gzip(str(self.path))
-        Path(self.path).unlink(missing_ok=True)
+        try:
+            extracted = extract_gzip(str(self.path))
+        except IOException:
+            self.path.unlink(missing_ok=True)
+            raise
+        self.path.unlink(missing_ok=True)
         self.file_name = os.path.basename(extracted.name)
 
     async def analyse(self, check: dict, debug_insert: bool = False) -> None:
@@ -40,7 +43,6 @@ class Gz(DataFormat):
             detect_format_from_payload,
         )
 
-        self.unwrap()
         payload_mime = magic.from_file(str(self.path), mime=True)
         inner_cls = detect_format_from_payload(
             check,

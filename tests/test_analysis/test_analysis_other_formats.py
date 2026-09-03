@@ -87,3 +87,27 @@ async def test_analyse_resource_skips_json_gz(setup_catalog, rmock, db, fake_che
     resource = await Resource.get(check["resource_id"])
     assert resource is not None
     assert resource["status"] is None
+
+
+CORRUPTED_GZ_BODY = gzip.compress(b"col1,col2\n1,2")[:10]
+
+
+async def test_analyse_resource_corrupted_gzip_sets_analysis_error(
+    setup_catalog, rmock, db, fake_check, produce_mock
+):
+    check: dict = await fake_check(
+        headers={"content-type": "application/gzip"},
+        url="https://example.com/data.csv.gz",
+    )
+    rmock.get(check["url"], status=200, body=CORRUPTED_GZ_BODY)
+    await analyse_resource(check=check, last_check=None)
+
+    res = await db.fetchrow("SELECT * FROM checks WHERE id = $1", check["id"])
+    assert res["analysis_error"] == "Corrupted or truncated gzip file"
+    assert res["checksum"] is None
+    assert res["mime_type"] is None
+    assert res["parsing_error"] is None
+
+    resource = await Resource.get(check["resource_id"])
+    assert resource is not None
+    assert resource["status"] != "TO_ANALYSE_GZ"
