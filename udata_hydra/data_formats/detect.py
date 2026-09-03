@@ -26,7 +26,7 @@ def detect_format_from_payload(
     mime = (payload_mime or "").split(";")[0].strip()
     inner_check = {
         **check,
-        "url": _strip_gz_suffix(check.get("url") or "") or "",
+        "url": _strip_gz_suffix(check.get("url")) or "",
         "headers": json.dumps({"content-type": mime}),
     }
     inner_format = _strip_gz_suffix(resource_format)
