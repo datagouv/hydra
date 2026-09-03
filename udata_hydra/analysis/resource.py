@@ -111,6 +111,9 @@ async def analyse_resource(
                 ) = await detect_resource_change_from_checksum(
                     new_checksum=dl_analysis["analysis:checksum"], last_check=last_check
                 )
+            # Sniffed after download (gzip is decompressed in download_resource).
+            # Stores the inner payload MIME, not the original Content-Type header;
+            # the catalog keeps the resource's declared type.
             dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
         finally:
             if tmp_file and (data_format is None or not data_format.further_analysis):

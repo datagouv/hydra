@@ -78,7 +78,7 @@ async def test_analyse_resource_skips_json_gz(setup_catalog, rmock, db, fake_che
     res = await db.fetchrow("SELECT * FROM checks WHERE id = $1", check["id"])
     assert res["parsing_error"] is None
     assert res["parsing_table"] is None
-    assert res["mime_type"] == "application/json"
+    assert res["mime_type"] == "application/json"  # inner payload, not application/gzip
 
     table_name: str = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
     with pytest.raises(UndefinedTableError):
