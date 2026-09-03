@@ -40,7 +40,6 @@ class Gz(DataFormat):
             catalog_format_for,
             detect_format_from_payload,
         )
-        from udata_hydra.data_formats.geojson import Geojson
 
         self.unwrap()
         payload_mime = magic.from_file(str(self.path), mime=True)
@@ -65,7 +64,4 @@ class Gz(DataFormat):
             resource_id=self.resource_id,
             dataset_id=self.dataset_id,
         )
-        if inner_cls is Geojson:
-            await inner.analyse(check)
-        else:
-            await inner.analyse(check, debug_insert=debug_insert)
+        await inner.analyse(check, debug_insert=debug_insert)
