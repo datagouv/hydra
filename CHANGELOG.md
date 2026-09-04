@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.13.2 (2026-09-04)
+
+- chore: add logs to trace check-notify gap on resource update ([#466](https://github.com/datagouv/hydra/pull/466))
+- chore: better corrupted gzip resilience ([#467](https://github.com/datagouv/hydra/pull/467))
+- chore: update .gitignore
+- docs: add comment about [#466](https://github.com/datagouv/hydra/pull/466)
+- feat: perf benchmarks ([#464](https://github.com/datagouv/hydra/pull/464))
+- fix: add dummy migration of resources_exceptions ([#457](https://github.com/datagouv/hydra/pull/457))
+- fix(crawl): fallback to GET when HEAD times out ([#461](https://github.com/datagouv/hydra/pull/461))
+- fix(gz): remove Csvgz dataformat, create Gz dataformat which routes to right format after decompression ([#476](https://github.com/datagouv/hydra/pull/476))
+
+
 ## 2.13.1 (2026-07-08)
 
 - chore(CI): use recommended UV_PUBLISH_TOKEN ([#451](https://github.com/datagouv/hydra/pull/451))
