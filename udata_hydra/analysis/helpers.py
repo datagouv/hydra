@@ -5,7 +5,7 @@ from typing import IO
 from asyncpg import Record
 
 from udata_hydra import config
-from udata_hydra.data_formats import Gz
+from udata_hydra.data_formats.gz import Gz
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.utils import (
     IOException,
