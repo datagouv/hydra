@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.13.4 (2026-09-04)
+
+- fix: circular import ([#478](https://github.com/datagouv/hydra/pull/478))
+
+
 ## 2.13.3 (2026-09-04)
 
 - feat: upgrade csv-detective 0.12.1 ([#477](https://github.com/datagouv/hydra/pull/477))
