@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.13.3 (2026-09-04)
+
+- feat: upgrade csv-detective 0.12.1 ([#477](https://github.com/datagouv/hydra/pull/477))
+
+
 ## 2.13.2 (2026-09-04)
 
 - chore: add logs to trace check-notify gap on resource update ([#466](https://github.com/datagouv/hydra/pull/466))
