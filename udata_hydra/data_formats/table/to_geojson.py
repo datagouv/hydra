@@ -2,11 +2,11 @@ import logging
 from typing import TYPE_CHECKING
 
 from udata_hydra import context
-from udata_hydra.data_formats.table import Table
 from udata_hydra.data_formats.csv_like.to_geojson import (
     DEFAULT_GEOJSON_FILENAME,
     _detect_geo_columns,
 )
+from udata_hydra.data_formats.table import Table
 from udata_hydra.db import db_col_name
 from udata_hydra.utils import storage_path
 
