@@ -105,6 +105,11 @@ async def test_notify_udata_raises_without_check_or_resource(missing):
             {"geojson_url": "https://example.com/file.geojson", "geojson_size": 77},
             ["analysis:parsing:geojson_url", "analysis:parsing:geojson_size"],
         ),
+        (
+            "CODE_COMMUNE_ANALYSIS_ENABLED",
+            {"code_commune_values": {"code_commune": ["13055", "75056"]}},
+            ["analysis:parsing:code_commune_values"],
+        ),
     ),
 )
 async def test_notify_udata_includes_optional_payload_fields(
@@ -149,3 +154,23 @@ async def test_notify_udata_parses_string_ogc_metadata(mocker):
 
     document = enqueue.call_args.kwargs["document"].payload
     assert document["analysis:parsing:ogc_metadata"] == ogc_metadata
+
+
+@pytest.mark.asyncio
+async def test_notify_udata_parses_string_code_commune_values(mocker):
+    enqueue = mocker.patch("udata_hydra.analysis.helpers.queue.enqueue")
+    mocker.patch("udata_hydra.config.CODE_COMMUNE_ANALYSIS_ENABLED", True)
+
+    code_commune_values = {"code_commune": ["13055", "75056"]}
+    check = {
+        "resource_id": "resource-id",
+        "parsing_started_at": datetime(2024, 1, 1, tzinfo=timezone.utc),
+        "parsing_finished_at": datetime(2024, 1, 2, tzinfo=timezone.utc),
+        "code_commune_values": json.dumps(code_commune_values),
+    }
+    resource = {"dataset_id": "dataset-id"}
+
+    await helpers.notify_udata(resource, check)
+
+    document = enqueue.call_args.kwargs["document"].payload
+    assert document["analysis:parsing:code_commune_values"] == code_commune_values
