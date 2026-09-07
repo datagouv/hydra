@@ -25,9 +25,24 @@ from udata_hydra.data_formats.detect import (
             Gz,
         ),
         (
+            {"content-type": "application/gzip"},
+            "https://example.com/data",
+            Gz,
+        ),
+        (
             {"content-type": "application/octet-stream"},
             "https://example.com/data.csv.gz",
             Gz,
+        ),
+        (
+            {"content-type": "application/octet-stream"},
+            "https://example.com/data.fgb",
+            None,
+        ),
+        (
+            {"content-type": "application/json"},
+            "https://example.com/data.json.gz",
+            None,
         ),
         (
             {"content-type": "application/vnd.ms-excel"},
