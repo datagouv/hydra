@@ -17,9 +17,6 @@ class Gz(DataFormat):
 
     standard_mime_type = "application/gzip"
     valid_mime_types = {standard_mime_type, "application/x-gzip"}
-    # octet-stream is accepted only with ".gz" in the URL by `detect_from_check()`;
-    # in `valid_mime_types` it would match shapefile, FlatGeobuf, etc. without that AND.
-    gzip_like_mime_types = {*valid_mime_types, "application/octet-stream"}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["gz"])
     check_url = ".gz"
     further_analysis = True
@@ -30,11 +27,15 @@ class Gz(DataFormat):
 
     @classmethod
     def detect_from_check(cls, check: dict, **kwargs) -> bool:
-        """HTTP gzip hint: gzip-like Content-Type AND ".gz" in the URL."""
+        """True gzip Content-Type, or octet-stream only if the URL contains ".gz"."""
         headers: dict = json.loads(check.get("headers") or "{}")
         content_type = headers.get("content-type", "").lower()
-        gzip_like = any(content_type.startswith(ct) for ct in cls.gzip_like_mime_types)
-        return gzip_like and cls.check_url in check.get("url", "")
+        if any(content_type.startswith(ct) for ct in cls.valid_mime_types):
+            return True
+        # octet-stream alone matches shapefile, FlatGeobuf, etc.
+        return content_type.startswith("application/octet-stream") and cls.check_url in check.get(
+            "url", ""
+        )
 
     def unwrap(self) -> None:
         """Gunzip in place; call before checksum or analysis on the payload."""

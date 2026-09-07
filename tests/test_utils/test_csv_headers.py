@@ -27,7 +27,7 @@ from udata_hydra.data_formats.detect import (
         (
             {"content-type": "application/gzip"},
             "https://example.com/data",
-            None,
+            Gz,
         ),
         (
             {"content-type": "application/octet-stream"},
