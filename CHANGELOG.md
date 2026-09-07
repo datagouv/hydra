@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.13.5 (2026-09-07)
+
+- fix: fix gz octet stream detection ([#479](https://github.com/datagouv/hydra/pull/479))
+
+
 ## 2.13.4 (2026-09-04)
 
 - fix: circular import ([#478](https://github.com/datagouv/hydra/pull/478))
