@@ -8,6 +8,7 @@ import pytest
 
 from udata_hydra.data_formats import Csv
 from udata_hydra.data_formats.csv_like.to_geojson import DEFAULT_GEOJSON_FILENAME
+from udata_hydra.utils import storage_path
 
 
 def _build_csv_content(columns: dict, sep: str = ";") -> str:
@@ -31,7 +32,7 @@ async def _geojson_from_csv_columns(
     except FileNotFoundError:
         pass
 
-    with NamedTemporaryFile(delete=False, suffix=".csv") as fp:
+    with NamedTemporaryFile(dir=storage_path(""), delete=False, suffix=".csv") as fp:
         fp.write(_build_csv_content(columns, sep).encode("utf-8"))
         fp.seek(0)
         csv_file = Csv(file_name=os.path.basename(fp.name))
@@ -176,7 +177,7 @@ async def test_csv_to_geojson_returns_none_without_geo_columns():
     except FileNotFoundError:
         pass
 
-    with NamedTemporaryFile(delete=False, suffix=".csv") as fp:
+    with NamedTemporaryFile(dir=storage_path(""), delete=False, suffix=".csv") as fp:
         fp.write(b"nombre;score\n1;0.5\n2;1.0\n")
         fp.seek(0)
         csv_file = Csv(file_name=os.path.basename(fp.name))

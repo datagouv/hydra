@@ -167,3 +167,49 @@ def purge_selected_csv_tables(
     return _make_async_wrapper(_purge_selected_csv_tables)(
         retention_days=retention_days, retention_tables=retention_tables, quiet=quiet
     )
+
+
+async def _purge_shadow_tables(
+    quiet: bool = False,
+) -> None:
+    """Drop all leftover shadow tables"""
+    with quiet_logs(enabled=quiet):
+        conn = await connection(db_name="csv")
+        res: list[Record] = await conn.fetch(
+            f"""SELECT tablename FROM pg_catalog.pg_tables
+            WHERE schemaname = '{config.DATABASE_SCHEMA}'
+            AND tablename ~ '^[0-9a-f]{{32}}_s[0-9a-f]{{4}}$'"""
+        )
+
+        if not res:
+            log.info("No shadow tables to purge.")
+            return
+
+        success_count = 0
+        error_count = 0
+        for row in res:
+            try:
+                await conn.execute(f'DROP TABLE IF EXISTS "{row["tablename"]}"')
+                success_count += 1
+            except Exception as e:
+                error_count += 1
+                log.error(f'Failed to drop shadow table "{row["tablename"]}": {e}')
+                continue
+
+        if success_count:
+            log.info(f"Dropped {success_count} shadow table(s).")
+        if error_count:
+            log.warning(f"Failed to drop {error_count} shadow table(s).")
+
+
+@cli.command()
+def purge_shadow_tables(
+    quiet: bool = typer.Option(False, help="Ignore logs except for errors"),
+) -> Coroutine[Any, Any, None]:
+    """Drop leftover shadow tables. You should stop workers first to prevent deleting an in-use shadow table."""
+    typer.echo(
+        "WARNING: Make sure no workers are currently importing data, "
+        "otherwise an in-use shadow table could be dropped."
+    )
+    typer.confirm("Continue?", abort=True)
+    return _make_async_wrapper(_purge_shadow_tables)(quiet=quiet)
