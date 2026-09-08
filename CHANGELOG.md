@@ -1,5 +1,42 @@
 # Changelog
 
+## 2.13.5 (2026-09-07)
+
+- fix: fix gz octet stream detection ([#479](https://github.com/datagouv/hydra/pull/479))
+
+
+## 2.13.4 (2026-09-04)
+
+- fix: circular import ([#478](https://github.com/datagouv/hydra/pull/478))
+
+
+## 2.13.3 (2026-09-04)
+
+- feat: upgrade csv-detective 0.12.1 ([#477](https://github.com/datagouv/hydra/pull/477))
+
+
+## 2.13.2 (2026-09-04)
+
+- chore: add logs to trace check-notify gap on resource update ([#466](https://github.com/datagouv/hydra/pull/466))
+- chore: better corrupted gzip resilience ([#467](https://github.com/datagouv/hydra/pull/467))
+- chore: update .gitignore
+- docs: add comment about [#466](https://github.com/datagouv/hydra/pull/466)
+- feat: perf benchmarks ([#464](https://github.com/datagouv/hydra/pull/464))
+- fix: add dummy migration of resources_exceptions ([#457](https://github.com/datagouv/hydra/pull/457))
+- fix(crawl): fallback to GET when HEAD times out ([#461](https://github.com/datagouv/hydra/pull/461))
+- fix(gz): remove Csvgz dataformat, create Gz dataformat which routes to right format after decompression ([#476](https://github.com/datagouv/hydra/pull/476))
+
+
+## 2.13.1 (2026-07-08)
+
+- chore(CI): use recommended UV_PUBLISH_TOKEN ([#451](https://github.com/datagouv/hydra/pull/451))
+- feat: align check resource CLI with API ([#459](https://github.com/datagouv/hydra/pull/459))
+- feat: upgrade csv-detective to 0.12.0 ([#463](https://github.com/datagouv/hydra/pull/463))
+- fix: check head request fallback ([#460](https://github.com/datagouv/hydra/pull/460))
+- refactor: DB utils split ([#452](https://github.com/datagouv/hydra/pull/452))
+- Revert "refactor: DB utils split ([#452](https://github.com/datagouv/hydra/pull/452))"
+
+
 ## 2.13.0 (2026-06-17)
 
 - Don't try to delete a file from a table ([#447](https://github.com/datagouv/hydra/pull/447))
