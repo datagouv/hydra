@@ -36,3 +36,9 @@ class Table(DataFormat):
 
         if config.DB_TO_GEOJSON:
             return await db_to_geojson(table=self)
+
+    async def get_code_commune_values(self) -> dict[str, list[str]] | None:
+        from udata_hydra.data_formats.table.code_commune import extract_code_commune_values
+
+        if config.CODE_COMMUNE_ANALYSIS_ENABLED:
+            return await extract_code_commune_values(table=self)
