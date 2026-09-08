@@ -93,7 +93,10 @@ async def analyse_resource(
     dl_analysis = {}
     tmp_file = None
     analysis_file_name = None
-    if change_status != Change.HAS_NOT_CHANGED or force_analysis:
+    # OGC is a service endpoint: OWSLib does GetCapabilities, no file download.
+    if (change_status != Change.HAS_NOT_CHANGED or force_analysis) and not (
+        data_format is not None and issubclass(data_format, Ogc)
+    ):
         try:
             await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
             tmp_file, _ = await download_resource(url, headers, max_size_allowed)
