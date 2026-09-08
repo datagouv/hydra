@@ -91,7 +91,7 @@ async def download_resource(
             Path(tmp_file.name).unlink(missing_ok=True)
             if too_large:
                 raise IOException("File too large to download", url=url)
-            raise IOException("Error downloading CSV", url=url) from download_error
+            raise IOException("Error downloading resource", url=url) from download_error
 
     match = re.search(r"\.([^.]+)\.gz$", url)
     if match:
