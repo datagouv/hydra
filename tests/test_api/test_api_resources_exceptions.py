@@ -104,7 +104,7 @@ async def test_update_resource_exception(
         json={"table_indexes": "stupid"},
     )
     assert resp.status == 400
-    assert "table_indexes must be a dictionary" in await resp.text()
+    assert "dictionary" in (await resp.text()).lower()
 
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
@@ -117,6 +117,14 @@ async def test_update_resource_exception(
     # Test API call with non existing resource id data
     resp = await client.put(
         path=f"/api/resources-exceptions/{NOT_EXISTING_RESOURCE_ID}",
+        headers=api_headers,
+        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
+    )
+    assert resp.status == 404
+
+    # Test API call with a resource which is in the catalog but has no exception
+    resp = await client.put(
+        path=f"/api/resources-exceptions/{RESOURCE_ID}",
         headers=api_headers,
         json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
     )

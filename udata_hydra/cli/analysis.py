@@ -14,6 +14,7 @@ from udata_hydra.cli.common import _find_check, _make_async_wrapper, cli, connec
 from udata_hydra.data_formats import (
     CsvLike,
     Geojson,
+    Gz,
     Ogc,
     Parquet,
 )
@@ -71,7 +72,7 @@ async def _analyse_csv_cli(
 
     try:
         data_format = await detect_data_format_from_check_or_catalog(check)
-        if data_format is None or not issubclass(data_format, CsvLike):
+        if data_format is None or not (data_format is Gz or issubclass(data_format, CsvLike)):
             log.error("File does not look like csv-like, aborting")
             return
         try:
@@ -79,7 +80,7 @@ async def _analyse_csv_cli(
         except Exception as e:
             log.warning(f"Failed download resource from  {url}: {e}")
             return
-        await file.analyse(check=check, debug_insert=debug_insert)  # ty: ignore[unknown-argument]
+        await file.analyse(check=check, debug_insert=debug_insert)
         log.info("CSV analysis completed")
     finally:
         if url and tmp_resource_id:
@@ -135,10 +136,10 @@ async def _analyse_geojson_cli(
     if not check:
         return
     data_format = await detect_data_format_from_check_or_catalog(check)
-    if data_format != Geojson:
+    if data_format not in (Geojson, Gz):
         log.error("File does not look like geojson, aborting")
         return
-    file = await helpers.download_from_check(check, Geojson)
+    file = await helpers.download_from_check(check, data_format)
     await file.analyse(check=check)
 
 
