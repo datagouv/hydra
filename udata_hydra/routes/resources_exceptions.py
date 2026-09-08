@@ -84,18 +84,17 @@ async def update_resource_exception(request: web.Request) -> web.Response:
         payload: UpdateResourceExceptionRequest = UpdateResourceExceptionRequest.model_validate(
             request_data
         )
-        if payload.table_indexes:
-            valid, error = ResourceExceptionSchema.are_table_indexes_valid(payload.table_indexes)
-            if not valid:
-                raise web.HTTPBadRequest(text=error)
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
-    resource_exception: Record | None = await ResourceException.update(
-        resource_id=resource_id,
-        table_indexes=payload.table_indexes,
-        comment=payload.comment,
-    )
+    try:
+        resource_exception: Record | None = await ResourceException.update(
+            resource_id=resource_id,
+            table_indexes=payload.table_indexes,
+            comment=payload.comment,
+        )
+    except ValueError as err:
+        raise web.HTTPBadRequest(text=f"Resource exception could not be updated: {str(err)}")
 
     if not resource_exception:
         raise web.HTTPNotFound(text="Resource exception not found")
