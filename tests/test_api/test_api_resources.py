@@ -28,6 +28,7 @@ async def test_get_resource(setup_catalog, client):
     assert data["resource_id"] == RESOURCE_ID
     assert data["status"] is None
     assert data["status_since"] is None
+    assert "document" not in data
 
 
 async def test_create_resource(
@@ -63,7 +64,7 @@ async def test_create_resource(
     )
     assert resp.status == 400
     text = await resp.text()
-    assert text == "Missing document body"
+    assert "Input should be a valid dictionary or instance of ResourceDocumentSchema" in text
 
 
 async def test_create_resource_rejects_malformed_auth_headers(client, udata_resource_payload):
@@ -112,7 +113,33 @@ async def test_update_resource(
     resp = await client.put(path=f"/api/resources/{RESOURCE_ID}", headers=api_headers, json=payload)
     assert resp.status == 400
     text: str = await resp.text()
-    assert text == "Missing document body"
+    assert "Input should be a valid dictionary or instance of ResourceDocumentSchema" in text
+
+
+async def test_resource_schema_round_trips_as_object(
+    client, api_headers, udata_resource_payload, udata_update_resource_payload
+):
+    """udata sends the resource schema as an object under the "schema" key,
+    which must be echoed back under the same key and with the same shape."""
+    schema: dict = {"name": "etalab/schema-irve-statique", "version": "2.3.1"}
+
+    udata_resource_payload["document"]["schema"] = schema
+    resp = await client.post(
+        path="/api/resources/", headers=api_headers, json=udata_resource_payload
+    )
+    assert resp.status == 201
+    data: dict = await resp.json()
+    assert data["schema"] == schema
+
+    udata_update_resource_payload["document"]["schema"] = schema
+    resp = await client.put(
+        path=f"/api/resources/{RESOURCE_ID}",
+        headers=api_headers,
+        json=udata_update_resource_payload,
+    )
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["schema"] == schema
 
 
 async def test_update_resource_url_since_load_catalog(

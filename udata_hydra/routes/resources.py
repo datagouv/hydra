@@ -7,7 +7,7 @@ from asyncpg import Record
 
 from udata_hydra.db.resource import Resource
 from udata_hydra.routes.status import get_resources_status_counts
-from udata_hydra.schemas import ResourceDocumentSchema, ResourceSchema
+from udata_hydra.schemas import CreateResourceRequest, ResourceSchema
 
 log = logging.getLogger("udata-hydra")
 
@@ -27,7 +27,7 @@ async def get_resource(request: web.Request) -> web.Response:
     if not resource:
         raise web.HTTPNotFound()
 
-    return web.json_response(ResourceSchema().dump(dict(resource)))
+    return web.json_response(ResourceSchema.model_validate(dict(resource)).model_dump(mode="json"))
 
 
 async def create_resource(request: web.Request) -> web.Response:
@@ -36,30 +36,26 @@ async def create_resource(request: web.Request) -> web.Response:
     Respond with a 200 status code and a JSON body with a message key set to "created"
     If error, respond with a 400 status code
     """
+
     try:
-        payload = await request.json()
-        valid_payload: dict = ResourceSchema().load(payload)
-    except Exception as err:
-        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
+        request_data: dict = await request.json()
+        payload: CreateResourceRequest = CreateResourceRequest.model_validate(request_data)
+    except Exception as e:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
-    document: dict | None = valid_payload["document"]
-    if not document:
-        raise web.HTTPBadRequest(text="Missing document body")
-
-    dataset_id = valid_payload["dataset_id"]
-    resource_id = valid_payload["resource_id"]
+    document = payload.document
 
     await Resource.insert(
-        dataset_id=dataset_id,
-        resource_id=resource_id,
-        url=document["url"],
-        type=document["type"],
-        format=document["format"],
+        dataset_id=payload.dataset_id,
+        resource_id=str(payload.resource_id),
+        url=document.url,
+        type=document.type,
+        format=document.format or None,
         priority=True,
-        title=document["title"],
+        title=document.title,
     )
 
-    return web.json_response(ResourceDocumentSchema().dump(dict(document)), status=201)
+    return web.json_response(document.model_dump(mode="json", by_alias=True), status=201)
 
 
 async def update_resource(request: web.Request) -> web.Response:
@@ -70,20 +66,17 @@ async def update_resource(request: web.Request) -> web.Response:
     """
 
     try:
-        payload = await request.json()
-        valid_payload: dict = ResourceSchema().load(payload)
+        request_data: dict = await request.json()
+        payload: CreateResourceRequest = CreateResourceRequest.model_validate(request_data)
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
-    document: dict | None = valid_payload["document"]
-    if not document:
-        raise web.HTTPBadRequest(text="Missing document body")
+    document = payload.document
 
     # Temporary debug for https://github.com/datagouv/data.gouv.fr/issues/2048
     # (hydra#466). Remove once the check-notify gap is understood.
-    dataset_id: str = valid_payload["dataset_id"]
-    resource_id: str = valid_payload["resource_id"]
-    new_url: str = document["url"]
+    resource_id: str = str(payload.resource_id)
+    new_url: str = document.url
 
     existing: Record | None = await Resource.get(resource_id)
     if existing:
@@ -99,15 +92,15 @@ async def update_resource(request: web.Request) -> web.Response:
         )
 
     await Resource.update_or_insert(
-        dataset_id=dataset_id,
+        dataset_id=payload.dataset_id,
         resource_id=resource_id,
-        url=document["url"],
-        type=document["type"],
-        format=document["format"],
-        title=document["title"],
+        url=document.url,
+        type=document.type,
+        format=document.format or None,
+        title=document.title,
     )
 
-    return web.json_response(ResourceDocumentSchema().dump(document), status=200)
+    return web.json_response(document.model_dump(mode="json", by_alias=True), status=200)
 
 
 async def delete_resource(request: web.Request) -> web.Response:

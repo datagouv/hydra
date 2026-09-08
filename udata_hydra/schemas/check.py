@@ -1,42 +1,67 @@
 import json
+from typing import Any
+from uuid import UUID
 
-from marshmallow import Schema, fields
+from pydantic import BaseModel, Field, field_validator
 
-
-class CheckSchema(Schema):
-    check_id = fields.Integer(data_key="id")
-    catalog_id = fields.Integer()
-    catalog_url = fields.Str()
-    check_url = fields.Str()
-    domain = fields.Str()
-    created_at = fields.DateTime()
-    check_status = fields.Integer(data_key="status")
-    headers = fields.Function(lambda obj: json.loads(obj["headers"]) if obj["headers"] else {})
-    cors_headers = fields.Function(
-        lambda obj: json.loads(obj["cors_headers"]) if obj["cors_headers"] else None
-    )
-    timeout = fields.Boolean()
-    response_time = fields.Float()
-    error = fields.Str()
-    dataset_id = fields.Str()
-    resource_id = fields.UUID()
-    next_check_at = fields.DateTime()
-    deleted = fields.Boolean()
-    parsing_started_at = fields.DateTime()
-    parsing_finished_at = fields.DateTime()
-    parsing_error = fields.Str()
-    parsing_table = fields.Str()
-    parquet_url = fields.Str()
-    parquet_size = fields.Integer()
-    pmtiles_url = fields.Str()
-    pmtiles_size = fields.Integer()
-    geojson_url = fields.Str()
-    geojson_size = fields.Integer()
-
-    def create(self, data):
-        return self.load(data)
+from udata_hydra.schemas.types import IsoDateTime
 
 
-class CheckGroupBy(Schema):
-    value = fields.Str()
-    count = fields.Integer()
+class CheckSchema(BaseModel):
+    id: int = Field(alias="check_id")
+    catalog_id: int | None = None
+    catalog_url: str | None = None
+    check_url: str | None = None
+    domain: str | None = None
+    created_at: IsoDateTime | None
+    status: int | None = Field(alias="check_status")
+    headers: dict
+    cors_headers: dict | None = None
+    timeout: bool | None = None
+    response_time: float | None
+    error: str | None = None
+    dataset_id: str | None = None
+    resource_id: UUID | None = None
+    deleted: bool | None = None
+    parsing_started_at: IsoDateTime | None = None
+    parsing_finished_at: IsoDateTime | None = None
+    parsing_error: str | None = None
+    parsing_table: str | None = None
+    next_check_at: IsoDateTime | None = None
+    parquet_url: str | None = None
+    parquet_size: int | None = None
+    pmtiles_url: str | None = None
+    pmtiles_size: int | None = None
+    geojson_url: str | None = None
+    geojson_size: int | None = None
+    detected_last_modified_at: IsoDateTime | None = None
+    analysis_error: str | None = None
+    checksum: str | None = None
+    filesize: int | None = None
+    mime_type: str | None = None
+
+    @field_validator("headers", mode="before")
+    @classmethod
+    def transform_headers(cls, value: str | dict | None) -> dict:
+        if isinstance(value, dict):
+            return value
+        return json.loads(value) if value else {}
+
+    @field_validator("cors_headers", mode="before")
+    @classmethod
+    def transform_cors_headers(cls, value: str | dict | None) -> dict | None:
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            return value
+        return json.loads(value) if value else None
+
+
+class CheckGroupBy(BaseModel):
+    value: str | None
+    count: int
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def stringify_value(cls, value: Any) -> str | None:
+        return None if value is None else str(value)
