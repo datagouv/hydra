@@ -1,32 +1,46 @@
-from marshmallow import Schema, fields
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+from udata_hydra.schemas.types import IsoDateTime
 
 
-class ResourceDocumentSchema(Schema):
-    id = fields.Str(required=True)
-    url = fields.Str(required=True)
-    format = fields.Str(allow_none=True)
-    title = fields.Str(required=True)
-    schema = fields.Dict(allow_none=True)
-    description = fields.Str(allow_none=True)
-    filetype = fields.Str(required=True)
-    type = fields.Str(required=True)
-    mime = fields.Str(allow_none=True)
-    filesize = fields.Int(allow_none=True)
-    checksum_type = fields.Str(allow_none=True)
-    checksum_value = fields.Str(allow_none=True)
-    created_at = fields.DateTime(required=True)
-    last_modified = fields.DateTime(required=True)
-    extras = fields.Dict()
-    harvest = fields.Dict()
+class ResourceDocumentSchema(BaseModel):
+    id: str
+    url: str
+    format: str | None = None
+    title: str
+    # Named schema_ because "schema" shadows an attribute of pydantic's BaseModel
+    schema_: dict | None = Field(default=None, alias="schema")
+    description: str | None = None
+    filetype: str
+    type: str
+    mime: str | None = None
+    filesize: int | None = None
+    checksum_type: str | None = None
+    checksum_value: str | None = None
+    created_at: IsoDateTime
+    last_modified: IsoDateTime
+    extras: dict | None = None
+    harvest: dict | None = None
 
 
-class JobStatusSchema(Schema):
-    state = fields.Str(required=True)
-    since = fields.DateTime(required=True)
+class JobStatusSchema(BaseModel):
+    state: str
+    since: IsoDateTime
 
 
-class ResourceSchema(Schema):
-    dataset_id = fields.Str(required=True)
-    resource_id = fields.Str(required=True)
-    status = fields.Dict(keys=fields.Str(), values=fields.Nested(JobStatusSchema()), required=False)
-    document = fields.Nested(ResourceDocumentSchema(), allow_none=True)
+class ResourceSchema(BaseModel):
+    """Resource as stored in catalog, returned by GET /api/resources/{id}."""
+
+    dataset_id: str
+    resource_id: UUID
+    status: dict[str, JobStatusSchema] = Field(default_factory=dict)
+
+
+class CreateResourceRequest(BaseModel):
+    """Webhook payload from udata to create or update a resource."""
+
+    dataset_id: str
+    resource_id: UUID
+    document: ResourceDocumentSchema

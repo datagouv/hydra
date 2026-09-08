@@ -402,7 +402,8 @@ $ curl -s "http://localhost:8000/api/resources/stats" | json_pp
          "parquet" : { "CONVERTING_TO_PARQUET" : 1 },
          "geojson" : {},
          "pmtiles" : {},
-         "ogc" : {}
+         "ogc" : {},
+         "gz" : {}
       }
    }
 }
@@ -586,6 +587,13 @@ Regarding analysis, there is a phase called "change detection". It will try to g
 - harvest modified date in catalog
 - content-length and last-modified headers
 - checksum comparison over time
+
+Hydra tracks three separate type signals for a resource. They can differ (e.g. for a `.gz` file) and that is expected:
+- `check:headers:content-type` — what the server returned at crawl time
+- `catalog.format` — format declared on data.gouv.fr (e.g. `csv.gz`)
+- `analysis:mime-type` — content sniffed after download (gzip is decompressed first)
+
+Format detection uses HTTP headers and catalog format, not `analysis:mime-type`. The latter describes the actual payload and aligns with checksum and filesize.
 
 The payload should look something like:
 

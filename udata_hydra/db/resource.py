@@ -21,7 +21,7 @@ class Resource:
         resource_id: str,
         url: str,
         type: str,
-        format: str,
+        format: str | None,
         title: str,
         priority: bool = True,
     ) -> Record | None:
@@ -67,7 +67,7 @@ class Resource:
         resource_id: str,
         url: str,
         type: str,
-        format: str,
+        format: str | None,
         title: str,
         priority: bool = True,  # Make resource high priority by default for crawling
     ) -> Record | None:

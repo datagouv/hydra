@@ -38,6 +38,9 @@ JOB_STATUSES: dict[str, set[str]] = {
         "TO_ANALYSE_OGC",  # OGC service to be analysed
         "ANALYSING_OGC",  # retrieving OGC service metadata
     },
+    "gz": {
+        "TO_ANALYSE_GZ",  # gzip resource to be unwrapped before analysing the payload
+    },
 }
 
 # Resource is crawlable when it has no status row, or only crawler=BACKOFF.

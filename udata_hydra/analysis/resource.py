@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 
 import magic
 from asyncpg import Record
@@ -14,6 +15,7 @@ from udata_hydra.data_formats import (
     CsvLike,
     DataFormat,
     Geojson,
+    Gz,
     Ogc,
     Parquet,
 )
@@ -45,6 +47,8 @@ log = logging.getLogger("udata-hydra")
 def _analysis_job_and_state(data_format: type[DataFormat]) -> tuple[str, str]:
     if issubclass(data_format, Ogc):
         return "ogc", "TO_ANALYSE_OGC"
+    if issubclass(data_format, Gz):
+        return "gz", "TO_ANALYSE_GZ"
     if issubclass(data_format, CsvLike):
         return "csv", "TO_ANALYSE_CSV"
     if issubclass(data_format, Geojson):
@@ -104,19 +108,31 @@ async def analyse_resource(
     # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
     tmp_file = None
+    analysis_file_name = None
     if change_status != Change.HAS_NOT_CHANGED or force_analysis:
         try:
             await ResourceJobStatus.set(resource_id, "crawler", "DOWNLOADING_RESOURCE")
             tmp_file, _ = await download_resource(url, headers, max_size_allowed)
             timer.mark("download-resource")
+            analysis_path = Path(tmp_file.name)
+            analysis_file_name = analysis_path.name
+            if data_format is Gz:
+                gz_file = Gz(
+                    file_name=analysis_file_name,
+                    resource_id=str(resource_id),
+                    dataset_id=dataset_id,
+                )
+                gz_file.unwrap()
+                analysis_file_name = gz_file.file_name
+                analysis_path = gz_file.path
         except IOException as e:
             dl_analysis["analysis:error"] = str(e)
         else:
             await ResourceJobStatus.set(resource_id, "crawler", "ANALYSING_DOWNLOADED_RESOURCE")
             # Get file size
-            dl_analysis["analysis:content-length"] = os.path.getsize(tmp_file.name)
+            dl_analysis["analysis:content-length"] = analysis_path.stat().st_size
             # Get checksum
-            dl_analysis["analysis:checksum"] = compute_checksum_from_file(tmp_file.name)
+            dl_analysis["analysis:checksum"] = compute_checksum_from_file(str(analysis_path))
             # Check if checksum has been modified if we don't have other hints
             if change_status == Change.NO_GUESS:
                 (
@@ -125,7 +141,8 @@ async def analyse_resource(
                 ) = await detect_resource_change_from_checksum(
                     new_checksum=dl_analysis["analysis:checksum"], last_check=last_check
                 )
-            dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
+            # Inner payload MIME after Gz.unwrap when applicable; catalog keeps the declared type.
+            dl_analysis["analysis:mime-type"] = magic.from_file(str(analysis_path), mime=True)
         finally:
             if tmp_file and (data_format is None or not data_format.further_analysis):
                 os.remove(tmp_file.name)
@@ -159,7 +176,11 @@ async def analyse_resource(
     timer.stop()
 
     if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
-        if data_format is not None and (issubclass(data_format, Ogc) or tmp_file):
+        if (
+            data_format is not None
+            and not dl_analysis.get("analysis:error")
+            and (issubclass(data_format, Ogc) or tmp_file)
+        ):
             log.info(
                 f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
             )
@@ -172,9 +193,9 @@ async def analyse_resource(
                     _priority="high" if worker_priority == "high" else "default",
                     _exception=bool(exception),
                 )
-            elif tmp_file:
+            elif tmp_file and analysis_file_name:
                 file = data_format(
-                    file_name=os.path.basename(tmp_file.name),
+                    file_name=analysis_file_name,
                     resource_id=resource_id,
                     dataset_id=dataset_id,
                 )
