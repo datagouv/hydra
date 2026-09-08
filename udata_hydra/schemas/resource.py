@@ -25,13 +25,17 @@ class ResourceDocumentSchema(BaseModel):
     harvest: dict | None = None
 
 
+class JobStatusSchema(BaseModel):
+    state: str
+    since: IsoDateTime
+
+
 class ResourceSchema(BaseModel):
     """Resource as stored in catalog, returned by GET /api/resources/{id}."""
 
     dataset_id: str
     resource_id: UUID
-    status: str | None = None
-    status_since: IsoDateTime | None = None
+    status: dict[str, JobStatusSchema] = Field(default_factory=dict)
 
 
 class CreateResourceRequest(BaseModel):

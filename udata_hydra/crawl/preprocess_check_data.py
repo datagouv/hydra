@@ -8,6 +8,7 @@ from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_status
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import UdataPayload, queue, send
 from udata_hydra.utils.http import CORS_HEADER_FIELDS
 
@@ -88,9 +89,10 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
         )
 
     # Update resource following check:
-    # Reset resource status so that it's not forbidden to be checked again.
+    # Clear crawler status so that it's not forbidden to be checked again.
     # Reset priority so that it's not prioritised anymore.
-    await Resource.update(check_data["resource_id"], data={"status": None, "priority": False})
+    await ResourceJobStatus.clear(check_data["resource_id"], "crawler")
+    await Resource.update(check_data["resource_id"], data={"priority": False})
 
     return new_check, last_check
 

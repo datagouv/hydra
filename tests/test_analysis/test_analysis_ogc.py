@@ -7,7 +7,7 @@ from owslib.crs import Crs
 from owslib.util import ServiceException
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
-from tests.conftest import RESOURCE_ID
+from tests.conftest import RESOURCE_ID, job_states
 from udata_hydra.data_formats import (
     Csv,
     Ogc,
@@ -15,6 +15,7 @@ from udata_hydra.data_formats import (
     Wms,
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -89,7 +90,7 @@ class TestOgcAnalysis:
             data_format = await detect_data_format_from_check_or_catalog(check)
             assert data_format is None
 
-    async def test_analyse_wfs_success(self, setup_catalog, db, fake_check):
+    async def test_analyse_wfs_success(self, setup_catalog, db, fake_check, job_status_snapshots):
         check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")
 
         mock_crs_4326 = MagicMock(spec=Crs)
@@ -137,6 +138,8 @@ class TestOgcAnalysis:
 
         # Verify notify_udata was called
         mock_notify.assert_called_once()
+        assert job_states(job_status_snapshots, "ogc") == ["ANALYSING_OGC"]
+        assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     async def test_analyse_wfs_connection_error(self, setup_catalog, db, fake_check):
         check = await fake_check(url="https://example.com/geoserver/wfs?SERVICE=WFS")

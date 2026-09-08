@@ -6,7 +6,7 @@ import magic
 
 from udata_hydra import config
 from udata_hydra.data_formats.data_format import DataFormat
-from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import IOException, extract_gzip
 
 log = logging.getLogger("udata-hydra")
@@ -68,11 +68,16 @@ class Gz(DataFormat):
                 f"skipping (resource_id={self.resource_id})"
             )
             if self.resource_id:
-                await Resource.update(self.resource_id, {"status": None})
+                await ResourceJobStatus.clear(self.resource_id, "gz")
             self.path.unlink(missing_ok=True)
             return
 
         log.debug(f"Unwrapped gzip, analysing as {inner_cls.__name__}")
+        if self.resource_id:
+            from udata_hydra.analysis.resource import _analysis_job_and_state
+
+            job, state = _analysis_job_and_state(inner_cls)
+            await ResourceJobStatus.update(self.resource_id, "gz", job, state)
         inner = inner_cls(
             file_name=self.file_name,
             resource_id=self.resource_id,

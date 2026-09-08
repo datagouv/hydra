@@ -5,25 +5,33 @@ from aiohttp import web
 
 from udata_hydra import config, context
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import CRAWLABLE_CLAUSE, ResourceJobStatus
 from udata_hydra.worker import QUEUES
 
 
-async def get_resources_status_counts(request: web.Request) -> dict[str | None, int]:
-    status_counts: dict = {status: 0 for status in Resource.STATUSES}
-    status_counts[None] = 0
+async def get_resources_status_counts(request: web.Request, total_count: int) -> dict:
+    """Resource-level idle/busy plus per-job row counts.
 
-    q = """
-        SELECT COALESCE(status, 'NULL') AS status, COUNT(*) AS count
-        FROM catalog
-        GROUP BY COALESCE(status, 'NULL');
+    ``idle + busy == total_count``. ``jobs`` counts status rows, so the sum of
+    job counts can exceed ``busy`` when one resource has several jobs.
     """
-    rows = await request.app["pool"].fetch(q)
+    busy_row = await request.app["pool"].fetchrow(
+        "SELECT COUNT(DISTINCT resource_id) AS count FROM resource_job_status"
+    )
+    busy: int = busy_row["count"]
+    jobs: dict[str, dict[str, int]] = {job: {} for job in ResourceJobStatus.JOB_STATUSES}
 
+    rows = await request.app["pool"].fetch(
+        """
+        SELECT job, state, COUNT(*) AS count
+        FROM resource_job_status
+        GROUP BY job, state
+        """
+    )
     for row in rows:
-        status = row["status"] if row["status"] != "NULL" else None
-        status_counts[status] = row["count"]
+        jobs[row["job"]][row["state"]] = row["count"]
 
-    return status_counts
+    return {"idle": total_count - busy, "busy": busy, "jobs": jobs}
 
 
 async def get_crawler_status(request: web.Request) -> web.Response:
@@ -41,14 +49,12 @@ async def get_crawler_status(request: web.Request) -> web.Response:
     """
     stats_combined: dict = await request.app["pool"].fetchrow(q, now)
 
-    # Count resources in progress (have a status that is not NULL and not 'BACKOFF')
-    # Build excluded patterns clause similar to get_excluded_clause() but without status filter
+    # Count resources in progress (not idle and not only crawler=BACKOFF)
     excluded_patterns_clause = " AND ".join(
         [f"catalog.url NOT LIKE '{p}'" for p in (config.EXCLUDED_PATTERNS or [])]
         + [
             "catalog.deleted = False",
-            "catalog.status IS NOT NULL",
-            "catalog.status != 'BACKOFF'",
+            f"NOT ({CRAWLABLE_CLAUSE})",
         ]
     )
     q_in_progress = f"""
