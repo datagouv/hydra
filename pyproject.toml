@@ -94,10 +94,10 @@ local_scheme = "no-local-version"
 [tool.uv]
 constraint-dependencies = ["urllib3>=2.7.0"]
 
-# `cast()` only takes the inferred date format from that branch on. Pin it back to a released
-# version once datagouv/csv-detective#245 is merged and published.
+# `cast()` only takes the inferred date format from datagouv/csv-detective#245 on, which is merged
+# but not released yet. Pin it back to a released version once it ships.
 [tool.uv.sources]
-csv-detective = { git = "https://github.com/datagouv/csv-detective", branch = "improve_date_parsing" }
+csv-detective = { git = "https://github.com/datagouv/csv-detective", branch = "main" }
 
 [tool.uv.build-backend]
 module-name = "udata_hydra"

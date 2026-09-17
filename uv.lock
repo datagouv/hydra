@@ -467,8 +467,8 @@ wheels = [
 
 [[package]]
 name = "csv-detective"
-version = "0.12.1.dev20"
-source = { git = "https://github.com/datagouv/csv-detective?branch=improve_date_parsing#79e3685f342aaa0ecfa7d2f9fdbd559c2e48124e" }
+version = "0.12.2.dev1"
+source = { git = "https://github.com/datagouv/csv-detective?branch=main#bc64053af7819c4d7f86687c6772e3a2711cba73" }
 dependencies = [
     { name = "charset-normalizer" },
     { name = "dateparser" },
@@ -2215,7 +2215,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "boto3", specifier = ">=1.35.0" },
     { name = "coloredlogs", specifier = ">=15.0.1" },
-    { name = "csv-detective", git = "https://github.com/datagouv/csv-detective?branch=improve_date_parsing" },
+    { name = "csv-detective", git = "https://github.com/datagouv/csv-detective?branch=main" },
     { name = "dateparser", specifier = ">=1.1.7" },
     { name = "humanfriendly", specifier = ">=10.0" },
     { name = "json-stream", specifier = ">=2.3.3" },
