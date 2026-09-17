@@ -90,6 +90,9 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db, fake_
         (["03/04/2022", "25/04/2022"], [date(2022, 4, 3), date(2022, 4, 25)]),
         # ...and the same value is read the other way around in a month-first column
         (["03/04/2022", "04/25/2022"], [date(2022, 3, 4), date(2022, 4, 25)]),
+        # the same disambiguation happens in a year-first column, where the ambiguous
+        # value would otherwise be read as year-month-day
+        (["2022/03/05", "2022/25/04"], [date(2022, 5, 3), date(2022, 4, 25)]),
     ),
 )
 async def test_csv_to_db_ambiguous_date_column(db, values_expected, clean_db, fake_check):
