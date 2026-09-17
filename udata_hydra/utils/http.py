@@ -100,7 +100,7 @@ async def send(dataset_id: str, resource_id: str, document: UdataPayload) -> Non
         async with session.put(uri, json=document.payload, headers=headers) as resp:
             # we're raising since we should be in a worker thread
             if resp.status == 404:
-                pass
+                log.warning(f"[resource_id={resource_id}] udata extras PUT returned 404")
             elif resp.status == 410:
                 raise IOException(
                     "Resource has been deleted on udata", resource_id=resource_id, url=uri

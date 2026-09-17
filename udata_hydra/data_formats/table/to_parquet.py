@@ -5,7 +5,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
-from udata_hydra.data_formats import Table
+from udata_hydra.data_formats.table import Table
 from udata_hydra.db import db_col_name
 from udata_hydra.utils import storage_path
 
