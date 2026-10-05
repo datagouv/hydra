@@ -30,7 +30,7 @@ def convert_dict_values_to_json(data: dict) -> dict:
 
 
 def compute_insert_query(table_name: str, data: dict, returning: str = "id") -> str:
-    columns = ",".join([f'"{k}"' for k in data.keys()])
+    columns = ",".join([quote_ident(k) for k in data.keys()])
     # $1, $2...
     placeholders = ",".join([f"${x + 1}" for x in range(len(data.values()))])
     return f"""
