@@ -69,11 +69,14 @@ def test_is_safe_to_expose_postgres_error():
     "demo-hydra"', 'syntax error at or near "1.0"'). These carry either
     attacker-influenced text or database internals."""
     assert (
-        _is_safe_to_expose(asyncpg.InvalidTextRepresentationError("invalid input syntax"))
-        is False
+        _is_safe_to_expose(asyncpg.InvalidTextRepresentationError("invalid input syntax")) is False
     )
-    assert _is_safe_to_expose(asyncpg.UndefinedFunctionError("function x() does not exist")) is False
-    assert _is_safe_to_expose(asyncpg.UndefinedColumnError('column "title" does not exist')) is False
+    assert (
+        _is_safe_to_expose(asyncpg.UndefinedFunctionError("function x() does not exist")) is False
+    )
+    assert (
+        _is_safe_to_expose(asyncpg.UndefinedColumnError('column "title" does not exist')) is False
+    )
     # Connection errors also inherit from PostgresError.
     assert _is_safe_to_expose(asyncpg.PostgresConnectionError("connection refused")) is False
     # A generic subclass is covered too.
