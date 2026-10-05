@@ -9,6 +9,7 @@ import pytest
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.data_formats import CsvLike, Parquet
 from udata_hydra.data_formats.table.to_parquet import DEFAULT_PARQUET_FILENAME
+from udata_hydra.db import quote_ident
 from udata_hydra.utils.casting import iter_tabular_rows
 
 pytestmark = pytest.mark.asyncio
@@ -106,3 +107,28 @@ async def test_export_db_to_parquet(fake_check, mocker, parquet_config, clean_db
         parquet = await run_export()
         assert isinstance(parquet, Parquet)
         parquet.path.unlink()
+
+
+async def test_quote_ident_escapes_double_quotes():
+    """quote_ident must double embedded double quotes so a hostile column name
+    cannot break out of the identifier position in a generated SELECT."""
+    assert quote_ident('foo"bar') == '"foo""bar"'
+    assert quote_ident('odd"name()') == '"odd""name()"'
+    assert quote_ident("plain") == '"plain"'
+
+
+async def test_db_to_parquet_escapes_quoted_column_name(clean_db, fake_check, mocker, tmp_path):
+    """A column name containing a double quote must be exported safely, i.e. the
+    quoting must hold so the name is treated as a literal identifier, not SQL."""
+    csv = tmp_path / "hostile.csv"
+    csv.write_text('"a""odd""name()",val\n1,row1\n2,row2\n')
+    mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
+    mocker.patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1)
+    check = await fake_check()
+    file = CsvLike(file_name=str(csv))
+    await file.inspect()
+    table = await file.to_db(check=check)
+    parquet = await table.to_parquet()
+    assert parquet is not None
+    assert parquet.path.exists()
+    parquet.path.unlink()

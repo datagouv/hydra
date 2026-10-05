@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 
+import asyncpg
 import sentry_sdk
 from asyncpg import Record
 
@@ -8,6 +9,16 @@ from udata_hydra import context
 from udata_hydra.db.check import Check
 
 log = logging.getLogger("udata-hydra")
+
+
+def _is_safe_to_expose(cause: BaseException | None) -> bool:
+    """Whether the exception message is safe to expose in the `analysis:parsing:error
+    field. In particular, raw database/driver errors (asyncpg.PostgresError) are not
+    safe to be exposed.
+    """
+    if cause is None:
+        return True
+    return not isinstance(cause, asyncpg.PostgresError)
 
 
 class ExceptionWithSentryDetails(Exception):
@@ -122,14 +133,24 @@ async def handle_parse_exception(
     if check:
         # e.__cause__ let us access the "inherited" error of the Exception (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
-        err = f"{e.step}:{str(e.__cause__)}"
+        # We check if the cause is safe to be exposed and stored in `analysis:parsing:error`.
+        # The details are logged server-side in any case.
+        cause = e.__cause__
+        detail = f"{e.step}:{cause}" if cause is not None else str(e)
+        log.error(
+            "Parsing error for check %s at step %s: %s",
+            check.get("id"),
+            e.step,
+            detail,
+            exc_info=e,
+        )
+        err = f"{e.step}:{cause}" if _is_safe_to_expose(cause) else f"{e.step}:error"
         if e.sentry_event_id:
             err = f"{e.step}:sentry:{e.sentry_event_id}"
         check = await Check.update(
             check["id"],
             {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
         )
-        log.error("Parsing error", exc_info=e)
         return check
     else:
         raise e
