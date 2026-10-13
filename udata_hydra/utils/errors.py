@@ -165,13 +165,14 @@ async def handle_parse_exception(
         err = detail if _is_safe_to_expose(cause) else f"{e.step}:error"
         if e.sentry_event_id:
             err = f"{e.step}:sentry:{e.sentry_event_id}"
+        check_id = check["id"]
         check = await Check.update(
-            check["id"],
+            check_id,
             {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
         )
         log.error(
             "Parsing error for check %s at step %s: %s",
-            check.get("id"),
+            check_id,
             e.step,
             detail,
             exc_info=e,

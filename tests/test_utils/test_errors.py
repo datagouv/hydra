@@ -220,6 +220,7 @@ async def test_handle_parse_exception_redaction(clean_db, fake_check, cause, exp
     check = await fake_check()
     e = _parse_exception(cause)
     updated = await handle_parse_exception(e, table_name=None, check=check)
+    assert updated is not None
     assert updated["parsing_error"] == expected
     assert updated["parsing_finished_at"] is not None
 
@@ -232,6 +233,7 @@ async def test_handle_parse_exception_csv_detective_value_error_exposed(clean_db
     )
     e = _parse_exception(cause, step="csv_detective")
     updated = await handle_parse_exception(e, table_name=None, check=check)
+    assert updated is not None
     assert updated["parsing_error"] == (
         "csv_detective:Number of columns is not even across the first 10 rows "
         "(detected separator: ;)."
@@ -245,6 +247,7 @@ async def test_handle_parse_exception_postgres_syntax_error_redacted(clean_db, f
         asyncpg.PostgresSyntaxError('syntax error at or near "1.0"'), step="parquet_export"
     )
     updated = await handle_parse_exception(e, table_name=None, check=check)
+    assert updated is not None
     assert updated["parsing_error"] == "parquet_export:error"
 
 
@@ -261,6 +264,7 @@ async def test_handle_parse_exception_overflow_error_redacted(clean_db, fake_che
         OverflowError("Python int too large to convert to C long"), step="csv_detective"
     )
     updated = await handle_parse_exception(e, table_name=None, check=check)
+    assert updated is not None
     assert updated["parsing_error"] == "csv_detective:error"
 
 
@@ -281,6 +285,7 @@ async def test_handle_parse_exception_ogc_value_error_still_exposed(clean_db, fa
     )
     e = _parse_exception(cause, step="ogc_service_connection")
     updated = await handle_parse_exception(e, table_name=None, check=check)
+    assert updated is not None
     assert updated["parsing_error"] == (
         "ogc_service_connection:https://ogc.example/wfs/f63cfb9a?service=WFS&request=GetCapabilities "
         "responded with Content-Type 'text/html;charset=UTF-8': 'msLoadMap(): Unable to access file. "
