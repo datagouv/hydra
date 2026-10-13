@@ -101,7 +101,6 @@ async def csv_to_db(
         bar = ProgressBar(total=inspection["total_lines"])
         for r in bar.iter(iter_tabular_rows(file.path, inspection, cast_json=False)):
             data = {k: v for k, v in zip(inspection["columns"], r)}
-            # NB: possible sql injection here, but should not be used in prod
             q = compute_insert_query(table_name=table_name, data=data, returning="__id")
             await db.execute(q, *data.values())
 

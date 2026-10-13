@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timezone
 
-import asyncpg
 import sentry_sdk
 from asyncpg import Record
 
@@ -11,14 +10,37 @@ from udata_hydra.db.check import Check
 log = logging.getLogger("udata-hydra")
 
 
+# Allowlist of well-known data/value parsing errors that may be republished in
+# `analysis:parsing:error`. Everything else is redacted: it may echo DB text or
+# leak infrastructure details. Deliberate exceptions: OverflowError stays redacted
+# (ambiguous origin), while ValueError is exposed even though owslib OGC errors
+# (embedding endpoint URLs) also raise it — a known, accepted leak.
+_SAFE_EXPOSE_TYPES = (
+    ValueError,  # also covers UnicodeError (UnicodeDecodeError/UnicodeEncodeError)
+    TypeError,
+    KeyError,
+    IndexError,
+)
+
+
 def _is_safe_to_expose(cause: BaseException | None) -> bool:
-    """Whether the exception message is safe to expose in the `analysis:parsing:error
-    field. In particular, raw database/driver errors (asyncpg.PostgresError) are not
-    safe to be exposed.
+    """Whether `cause` may be republished in `analysis:parsing:error`.
+
+    Allowlist: only well-known data/value parsing errors are exposed verbatim.
+    Everything else is redacted to `error`, as it may echo attacker-controlled DB
+    text or leak infrastructure details (host, port, endpoint, bucket).
     """
     if cause is None:
-        return True
-    return not isinstance(cause, asyncpg.PostgresError)
+        # No type-checkable cause: our free-form message (which may embed server
+        # paths) is never republished; it is still logged server-side.
+        return False
+    if isinstance(cause, OSError):
+        # Some infra errors (ssl, requests, aiohttp connectors) inherit ValueError.
+        return False
+    if type(cause).__module__.startswith("asyncpg"):
+        # Client-side asyncpg errors inherit ValueError but embed connection settings.
+        return False
+    return isinstance(cause, _SAFE_EXPOSE_TYPES)
 
 
 class ExceptionWithSentryDetails(Exception):
@@ -95,7 +117,10 @@ class ExceptionWithSentryDetails(Exception):
                     )
 
                     event_id = sentry_sdk.capture_exception(self)
-                    self.sentry_event_id = event_id  # Store the event ID, so it can be used by handle_parse_exception to be stored in check
+                    # handle_parse_exception only persists this id for cause-less errors: there it
+                    # calls str(e) before Check.update, triggering this capture. For cause-bearing
+                    # errors str(e) runs later (in log.error), so the id is not stored.
+                    self.sentry_event_id = event_id
 
                     # # If we want also to display the chained exception performance stack trace we could check for chained exceptions (__cause__ or __context__)
                     # # But we would have both original and chained exception appear in Sentry
@@ -137,19 +162,19 @@ async def handle_parse_exception(
         # The details are logged server-side in any case.
         cause = e.__cause__
         detail = f"{e.step}:{cause}" if cause is not None else str(e)
+        err = detail if _is_safe_to_expose(cause) else f"{e.step}:error"
+        if e.sentry_event_id:
+            err = f"{e.step}:sentry:{e.sentry_event_id}"
+        check = await Check.update(
+            check["id"],
+            {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
+        )
         log.error(
             "Parsing error for check %s at step %s: %s",
             check.get("id"),
             e.step,
             detail,
             exc_info=e,
-        )
-        err = f"{e.step}:{cause}" if _is_safe_to_expose(cause) else f"{e.step}:error"
-        if e.sentry_event_id:
-            err = f"{e.step}:sentry:{e.sentry_event_id}"
-        check = await Check.update(
-            check["id"],
-            {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
         )
         return check
     else:
