@@ -15,6 +15,7 @@ from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import (
     IOException,
     ParseException,
@@ -40,7 +41,7 @@ class CsvLike(DataFormat):
         )
         if previous_inspection:
             if self.resource_id:
-                await Resource.update(self.resource_id, {"status": "VALIDATING_CSV"})
+                await ResourceJobStatus.set(self.resource_id, "csv", "VALIDATING_CSV")
             self.inspection = validate_then_detect(  # ty: ignore[invalid-assignment]
                 file_path=self.path.as_posix(),
                 previous_analysis=previous_inspection,
@@ -65,8 +66,8 @@ class CsvLike(DataFormat):
 
         resource_id: str = str(check["resource_id"])
 
-        # Update resource status to ANALYSING_CSVLIKE
-        resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
+        await ResourceJobStatus.set(resource_id, "csv", "ANALYSING_CSV")
+        resource: Record | None = await Resource.get(resource_id)
 
         # Check if the resource is in the exceptions table
         # If it is, get the table_indexes to use them later
@@ -123,6 +124,7 @@ class CsvLike(DataFormat):
                 ):
                     from udata_hydra.analysis.exports import export_parquet
 
+                    await ResourceJobStatus.set(resource_id, "parquet", "CONVERTING_TO_PARQUET")
                     queue.enqueue(
                         export_parquet,
                         table=table,
@@ -138,6 +140,7 @@ class CsvLike(DataFormat):
                 ):
                     from udata_hydra.analysis.exports import export_geojson_pmtiles
 
+                    await ResourceJobStatus.set(resource_id, "geojson", "CONVERTING_TO_GEOJSON")
                     queue.enqueue(
                         export_geojson_pmtiles,
                         source=table,
@@ -153,10 +156,8 @@ class CsvLike(DataFormat):
         finally:
             await helpers.notify_udata(resource, check)
             timer.stop()
-            self.path.unlink()
-
-            # Reset resource status to None
-            await Resource.update(resource_id, {"status": None})
+            await ResourceJobStatus.clear(resource_id, "csv")
+            self.path.unlink(missing_ok=True)
 
     async def to_db(
         self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False

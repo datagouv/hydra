@@ -6,6 +6,7 @@ from aiohttp import web
 from asyncpg import Record
 
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.routes.status import get_resources_status_counts
 from udata_hydra.schemas import CreateResourceRequest, ResourceSchema
 
@@ -27,7 +28,9 @@ async def get_resource(request: web.Request) -> web.Response:
     if not resource:
         raise web.HTTPNotFound()
 
-    return web.json_response(ResourceSchema.model_validate(dict(resource)).model_dump(mode="json"))
+    payload = dict(resource)
+    payload["status"] = await ResourceJobStatus.for_resource(resource_id)
+    return web.json_response(ResourceSchema.model_validate(payload).model_dump(mode="json"))
 
 
 async def create_resource(request: web.Request) -> web.Response:
@@ -132,7 +135,9 @@ async def get_resources_stats(request: web.Request) -> web.Response:
         {
             "total_count": stats_resources["total_resources"],
             "deleted_count": stats_resources["deleted_resources"],
-            "statuses_count": await get_resources_status_counts(request),
+            "statuses_count": await get_resources_status_counts(
+                request, stats_resources["total_resources"]
+            ),
         }
     )
 

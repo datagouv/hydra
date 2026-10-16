@@ -17,9 +17,13 @@ async def select_rows_based_on_query(connection, q: str, *args) -> list[Record]:
     create_temp_select_table_query = (
         f"""CREATE TEMPORARY TABLE {temporary_table} AS {q} FOR UPDATE;"""
     )
-    # Update resource status to CRAWLING_URL
+    # Claim crawler status so selected resources are not picked again
     update_select_catalog_query = f"""
-        UPDATE catalog SET status = 'CRAWLING_URL' WHERE resource_id in (select resource_id from {temporary_table});
+        INSERT INTO resource_job_status (resource_id, job, state, since)
+        SELECT resource_id, 'crawler', 'CRAWLING_URL', NOW()
+        FROM {temporary_table}
+        ON CONFLICT (resource_id, job) DO UPDATE
+        SET state = 'CRAWLING_URL', since = NOW();
     """
     async with connection.transaction():
         await connection.execute("BEGIN;")

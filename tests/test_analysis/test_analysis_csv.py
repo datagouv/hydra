@@ -9,19 +9,20 @@ from asyncpg.exceptions import UndefinedTableError
 from csv_detective import validate_then_detect
 from yarl import URL
 
-from tests.conftest import RESOURCE_ID, RESOURCE_URL
+from tests.conftest import RESOURCE_ID, RESOURCE_URL, job_states
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 
 pytestmark = pytest.mark.asyncio
 
 
 async def test_analyse_csv_on_catalog(
-    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
+    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock, job_status_snapshots
 ):
     check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
@@ -29,20 +30,15 @@ async def test_analyse_csv_on_catalog(
     rmock.get(url, status=200, body=catalog_content)
 
     # Check resource status before analysis
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
-    assert resource["status_since"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     # Analyse the CSV
     file = await download_from_check(check, Csv)
     await file.analyse(check=check)
 
     # Check resource status after analysis
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
-    assert isinstance(resource["status_since"], datetime)
+    assert job_states(job_status_snapshots, "csv") == ["ANALYSING_CSV", "INSERTING_IN_DB"]
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table_name
@@ -69,9 +65,7 @@ async def test_error_reporting_csv_detective(
     await file.analyse(check=check)
 
     # Check resource status after analysis attempt
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -92,9 +86,7 @@ async def test_error_reporting_parsing(
     await file.analyse(check=check)
 
     # Check resource status after analysis attempt
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] is None
@@ -120,9 +112,7 @@ async def test_analyse_csv_send_udata_webhook(
     await file.analyse(check=check)
 
     # Check resource status after analysis
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("analysis:parsing:started_at")
@@ -354,6 +344,7 @@ async def test_validation(
     udata_url,
     _params,
     produce_mock,
+    job_status_snapshots,
 ):
     previous_scan_kwargs, current_scan_kwargs, is_valid = _params
     previous_analysis = create_analysis(previous_scan_kwargs)
@@ -405,6 +396,13 @@ async def test_validation(
         file = await download_from_check(check, Csv)
         await file.analyse(check=check)
         mock_func.assert_called_once()
+
+    assert job_states(job_status_snapshots, "csv") == [
+        "ANALYSING_CSV",
+        "VALIDATING_CSV",
+        "INSERTING_IN_DB",
+    ]
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     # now we check what is inside csv_detective in tables_index
     res = await db.fetch(
@@ -521,6 +519,11 @@ async def test_analyse_csv_parquet_export_enqueue(
         assert kw["_priority"] == "low"
         assert kw["check"]["id"] == check["id"]
         assert "table" in kw
+        status = await ResourceJobStatus.for_resource(RESOURCE_ID)
+        assert "csv" not in status
+        assert status["parquet"]["state"] == "CONVERTING_TO_PARQUET"
+    else:
+        assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
 async def test_crash_after_db_insertion(
@@ -586,7 +589,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     """When GeoJSON/PMTiles export fails, record the error and reset the resource status.
     Also removes leftover geojson/pmtiles files so a retry does not leave stale artifacts."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_GEOJSON"})
+    await ResourceJobStatus.set(RESOURCE_ID, "geojson", "CONVERTING_TO_GEOJSON")
     remove_remainders = mocker.patch("udata_hydra.analysis.exports.remove_remainders")
     mocker.patch("udata_hydra.analysis.exports.helpers.notify_udata")
     mocker.patch(
@@ -602,16 +605,17 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     remove_remainders.assert_called_once_with(RESOURCE_ID, ["geojson"])
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
     updated_check = await Check.get_by_id(check["id"])
     assert updated_check is not None
     assert updated_check["parsing_error"] is not None
 
 
-async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, fake_check, mocker):
+async def test_export_geojson_pmtiles_notifies_udata_on_success(
+    setup_catalog, fake_check, mocker, job_status_snapshots
+):
     """When GeoJSON/PMTiles export succeeds, notify udata and clear the resource status."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PMTILES"})
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -639,15 +643,16 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
     )
 
     assert notify_udata.await_count == 2
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert job_states(job_status_snapshots, "geojson") == ["CONVERTING_TO_GEOJSON"]
+    assert job_states(job_status_snapshots, "pmtiles") == ["CONVERTING_TO_PMTILES"]
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
-async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_check, mocker):
+async def test_export_parquet_notifies_udata_on_success(
+    setup_catalog, fake_check, mocker, job_status_snapshots
+):
     """When parquet export succeeds, notify udata and clear the resource status."""
     check = await fake_check()
-    await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PARQUET"})
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -669,9 +674,8 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
     )
 
     notify_udata.assert_awaited_once()
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert job_states(job_status_snapshots, "parquet") == ["CONVERTING_TO_PARQUET"]
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
 async def test_file_with_nan(

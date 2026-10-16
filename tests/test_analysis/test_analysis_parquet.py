@@ -7,8 +7,10 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
+from tests.conftest import job_states
 from udata_hydra.analysis import helpers
 from udata_hydra.data_formats import Parquet
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import ParseException
 
 pytestmark = pytest.mark.asyncio
@@ -28,6 +30,7 @@ async def test_analyse_parquet(
     fake_check,
     produce_mock,
     check_kwargs,
+    job_status_snapshots,
 ):
     check = await fake_check(**check_kwargs)
     url = check["url"]
@@ -85,6 +88,8 @@ async def test_analyse_parquet(
     with patch("udata_hydra.config.PARQUET_TO_DB", True):
         table = await file.analyse(check=check)
     assert table is not None
+    assert job_states(job_status_snapshots, "parquet") == ["ANALYSING_PARQUET", "INSERTING_IN_DB"]
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}
     # checking check result
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table.table_name
@@ -148,7 +153,9 @@ async def test_parquet_to_db_copy_failure_raises_parse_exception(fake_check, moc
         "udata_hydra.data_formats.parquet.to_db.context.pool",
         new=mocker.AsyncMock(return_value=mock_pool),
     )
-    mocker.patch("udata_hydra.data_formats.parquet.to_db.Resource.update", new=mocker.AsyncMock())
+    mocker.patch(
+        "udata_hydra.data_formats.parquet.to_db.ResourceJobStatus.set", new=mocker.AsyncMock()
+    )
     inspection = {
         "columns": {"name": {"python_type": "string", "format": set()}},
         "total_lines": 1,
@@ -174,7 +181,9 @@ async def test_parquet_to_db_create_table_failure_raises_parse_exception(fake_ch
         "udata_hydra.data_formats.parquet.to_db.context.pool",
         new=mocker.AsyncMock(return_value=mock_pool),
     )
-    mocker.patch("udata_hydra.data_formats.parquet.to_db.Resource.update", new=mocker.AsyncMock())
+    mocker.patch(
+        "udata_hydra.data_formats.parquet.to_db.ResourceJobStatus.set", new=mocker.AsyncMock()
+    )
     inspection = {
         "columns": {"name": {"python_type": "string", "format": set()}},
         "total_lines": 1,
