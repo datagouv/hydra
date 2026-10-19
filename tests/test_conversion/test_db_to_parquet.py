@@ -52,7 +52,6 @@ async def test_reference_table_from_csv(file_and_count):
 
 async def test_db_to_parquet(clean_db, fake_check, mocker):
     mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
-    mocker.patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1)
     check = await fake_check()
     file = CsvLike(file_name="tests/data/catalog.csv")
     inspection = await file.inspect()
@@ -76,28 +75,18 @@ async def test_db_to_parquet(clean_db, fake_check, mocker):
     parquet.path.unlink()
 
 
-@pytest.mark.parametrize(
-    "parquet_config",
-    (
-        (False, 1, False),  # DB_TO_PARQUET off → no export
-        (True, 10, False),  # MIN_LINES_FOR_PARQUET = 10 (> total_lines) → skip
-        (True, 1, True),  # DB_TO_PARQUET on, MIN_LINES = 1 → convert
-        (True, 3, False),  # MIN_LINES_FOR_PARQUET = 3 (> fixture row count) → skip
-    ),
-)
-async def test_export_db_to_parquet(fake_check, mocker, parquet_config, clean_db):
+@pytest.mark.parametrize("db_to_parquet_flag", (False, True))
+async def test_export_db_to_parquet(fake_check, mocker, db_to_parquet_flag, clean_db):
     csv_file = CsvLike(file_name="tests/data/catalog.csv")
     check = await fake_check()
-    db_to_parquet_flag, min_lines_for_parquet_config, expected_conversion = parquet_config
     mocker.patch("udata_hydra.config.DB_TO_PARQUET", db_to_parquet_flag)
-    mocker.patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", min_lines_for_parquet_config)
 
     async def run_export() -> Parquet | None:
         await csv_file.inspect()
         table = await csv_file.to_db(check=check)
         return await table.to_parquet()
 
-    if not expected_conversion:
+    if not db_to_parquet_flag:
         with patch("udata_hydra.data_formats.table.to_parquet.db_to_parquet") as conversion:
             assert await run_export() is None
             conversion.assert_not_called()
