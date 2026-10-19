@@ -74,8 +74,13 @@ async def analyse_resource(
         resource_id, data={"status": "ANALYSING_RESOURCE_HEAD"}
     )
 
+    # the parsing table is named after the URL: a URL never analysed has no table yet
+    needs_parsing: bool = not last_check or last_check["url"] != url
+
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
-    change_status, change_payload = await detect_resource_change_on_early_hints(resource)
+    change_status, change_payload = await detect_resource_change_on_early_hints(
+        resource, check_id=check["id"]
+    )
 
     # could it be a CSV, parquet, GeoJSON or OGC service (WFS)?
     # If we get hints, we will analyse the file further depending on change status
@@ -93,7 +98,7 @@ async def analyse_resource(
     dl_analysis = {}
     tmp_file = None
     analysis_file_name = None
-    if change_status != Change.HAS_NOT_CHANGED or force_analysis:
+    if change_status != Change.HAS_NOT_CHANGED or needs_parsing or force_analysis:
         try:
             await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
             tmp_file, _ = await download_resource(url, headers, max_size_allowed)
@@ -159,7 +164,7 @@ async def analyse_resource(
 
     timer.stop()
 
-    if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
+    if change_status == Change.HAS_CHANGED or needs_parsing or force_analysis:
         if data_format is not None and not dl_analysis.get("analysis:error"):
             log.info(
                 f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
@@ -307,11 +312,12 @@ async def detect_resource_change_from_content_length_header(
 
 async def detect_resource_change_on_early_hints(
     resource: Record | None,
+    check_id: int,
 ) -> tuple[Change, dict | None]:
     """
     Try to guess if a resource has been modified from harvest and headers in check data:
     - last-modified header value if it can be found and parsed
-    - content-length if it is found and changed over time (vs last checks)
+    - content-length if it is found and changed over time (vs the check preceding check_id)
 
     Returns a tuple with a Change status and an optional payload:
     {
@@ -322,7 +328,8 @@ async def detect_resource_change_on_early_hints(
     data = None
 
     if resource:
-        # Fetch current and last check headers
+        # Fetch the analysed check and its predecessor: newer checks may already exist
+        # if this analysis was delayed in the queue
         q = """
         SELECT
             created_at,
@@ -330,13 +337,13 @@ async def detect_resource_change_on_early_hints(
             headers->>'content-length' as content_length,
             detected_last_modified_at
         FROM checks
-        WHERE resource_id = $1
+        WHERE resource_id = $1 AND id <= $2
         ORDER BY created_at DESC
         LIMIT 2
         """
         pool = await context.pool()
         async with pool.acquire() as connection:
-            data = await connection.fetch(q, str(resource["resource_id"]))
+            data = await connection.fetch(q, str(resource["resource_id"]), check_id)
 
     # not enough checks to make a comparison
     if not data:

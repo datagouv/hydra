@@ -452,6 +452,7 @@ async def test_no_change_analysis_harvested(
         tzinfo=timezone.utc
     )
     await fake_check(
+        url="https://example.com/harvested",
         headers={"content-type": "application/json"},
         created_at=datetime.now() - timedelta(days=10),
         detected_last_modified_at=last_modfied_at,
@@ -463,6 +464,98 @@ async def test_no_change_analysis_harvested(
     assert ("PUT", URL(udata_url)) not in rmock.requests
     res = await db.fetch("SELECT * FROM checks ORDER BY created_at DESC LIMIT 1")
     assert res[0]["detected_last_modified_at"] == last_modfied_at
+
+
+CSV_HEADERS = {"content-type": "text/csv"}
+
+
+async def get_parsing_table(db, check_id: int) -> str | None:
+    res = await db.fetchrow("SELECT parsing_table FROM checks WHERE id = $1", check_id)
+    return res["parsing_table"]
+
+
+async def test_analyse_first_check_parses_when_next_check_already_exists(
+    setup_catalog, rmock, fake_check, db, produce_mock
+):
+    # a second check was inserted before the first one got analysed, with the same early hints
+    headers = CSV_HEADERS | {"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"}
+    first_check = await fake_check(headers=headers)
+    await fake_check(headers=headers)
+    rmock.get(RESOURCE_URL, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+
+    await analyse_resource(check=first_check, last_check=None)
+
+    assert (
+        await get_parsing_table(db, first_check["id"])
+        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
+    )
+
+
+async def test_analyse_check_compares_with_its_own_predecessor(
+    setup_catalog, rmock, fake_check, db, produce_mock
+):
+    previous_check = await fake_check(
+        headers=CSV_HEADERS | {"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"},
+        detected_last_modified_at=datetime(2020, 1, 9, 9, 33, 37, tzinfo=timezone.utc),
+        parsing_table=True,
+    )
+    # the file changed, and a newer check was inserted before this one got analysed
+    new_headers = CSV_HEADERS | {"last-modified": "Fri, 10 Jan 2025 09:33:37 GMT"}
+    check = await fake_check(headers=new_headers)
+    await fake_check(headers=new_headers)
+    rmock.get(RESOURCE_URL, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+
+    await analyse_resource(check=check, last_check=previous_check)
+
+    assert (
+        await get_parsing_table(db, check["id"])
+        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
+    )
+
+
+@pytest.mark.catalog_harvested
+async def test_analyse_new_url_parses_when_harvest_date_unchanged(
+    setup_catalog, rmock, fake_check, db, produce_mock
+):
+    new_url = "https://example.com/harvested"
+    harvest_modified_at = datetime.fromisoformat("2022-12-06T05:00:32.647000").replace(
+        tzinfo=timezone.utc
+    )
+    last_check = await fake_check(
+        url="https://example.com/harvested-old",
+        headers=CSV_HEADERS,
+        detected_last_modified_at=harvest_modified_at,
+        parsing_table=True,
+    )
+    check = await fake_check(url=new_url, headers=CSV_HEADERS)
+    rmock.get(new_url, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+
+    await analyse_resource(check=check, last_check=last_check)
+
+    assert (
+        await get_parsing_table(db, check["id"]) == hashlib.md5(new_url.encode("utf-8")).hexdigest()
+    )
+
+
+async def test_analyse_new_url_parses_when_file_is_identical(
+    setup_catalog, rmock, fake_check, db, produce_mock
+):
+    last_check = await fake_check(
+        url="https://example.com/resource-1-old",
+        headers=CSV_HEADERS,
+        checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest(),
+        detected_last_modified_at=datetime(2020, 1, 9, tzinfo=timezone.utc),
+        parsing_table=True,
+    )
+    check = await fake_check(headers=CSV_HEADERS)
+    rmock.get(RESOURCE_URL, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+
+    await analyse_resource(check=check, last_check=last_check)
+
+    assert (
+        await get_parsing_table(db, check["id"])
+        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
+    )
 
 
 @pytest.mark.parametrize(
