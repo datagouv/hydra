@@ -14,7 +14,7 @@ from udata_hydra.utils.http import CORS_HEADER_FIELDS
 log = logging.getLogger("udata-hydra")
 
 
-async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict, dict | None]:
+async def preprocess_check_data(dataset_id: str, check_data: dict) -> dict:
     """Preprocess a check data.
 
     Insert a new check in the DB with the provided check data before analysis, and update the resource status and priority.
@@ -25,7 +25,6 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
 
     Returns:
         The updated check data as it has just been inserted in the DB.
-        The previous check data, or None if it's the first check.
     """
 
     check_data["resource_id"] = str(check_data["resource_id"])
@@ -82,7 +81,7 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
     # Reset priority so that it's not prioritised anymore.
     await Resource.update(check_data["resource_id"], data={"status": None, "priority": False})
 
-    return new_check, last_check
+    return new_check
 
 
 async def has_check_changed(check_data: dict, last_check_data: dict | None) -> bool:

@@ -42,7 +42,6 @@ log = logging.getLogger("udata-hydra")
 
 async def analyse_resource(
     check: dict,
-    last_check: dict | None,
     force_analysis: bool = False,
     worker_priority: str = "default",
 ) -> None:
@@ -54,7 +53,8 @@ async def analyse_resource(
     - checksum (optional)
     - launch csv_analysis if looks like a CSV response
 
-    Will call udata if first check or changes found, and update check with optional infos
+    Will call udata if first analysis, new URL, changes found or forced analysis,
+    and update check with optional infos
     """
 
     # Check if the resource is in the exceptions table
@@ -74,12 +74,19 @@ async def analyse_resource(
         resource_id, data={"status": "ANALYSING_RESOURCE_HEAD"}
     )
 
+    # compare with the last analysed check, not catalog.last_check: checks that failed in between
+    # (timeout, HTTP error) were never downloaded and tell nothing about the file
+    last_check_record: Record | None = await Check.get_previous_analysed(
+        str(resource_id), check["id"]
+    )
+    last_check: dict | None = dict(last_check_record) if last_check_record else None
+
     # the parsing table is named after the URL: a URL never analysed has no table yet
-    needs_parsing: bool = not last_check or last_check["url"] != url
+    must_analyse: bool = force_analysis or not last_check or last_check["url"] != url
 
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
     change_status, change_payload = await detect_resource_change_on_early_hints(
-        resource, check_id=check["id"]
+        resource, check_id=check["id"], last_check_id=last_check["id"] if last_check else None
     )
 
     # could it be a CSV, parquet, GeoJSON or OGC service (WFS)?
@@ -94,11 +101,10 @@ async def analyse_resource(
         else config.DEFAULT_MAX_FILESIZE_ALLOWED
     )
 
-    # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
     tmp_file = None
     analysis_file_name = None
-    if change_status != Change.HAS_NOT_CHANGED or needs_parsing or force_analysis:
+    if change_status != Change.HAS_NOT_CHANGED or must_analyse:
         try:
             await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
             tmp_file, _ = await download_resource(url, headers, max_size_allowed)
@@ -164,7 +170,7 @@ async def analyse_resource(
 
     timer.stop()
 
-    if change_status == Change.HAS_CHANGED or needs_parsing or force_analysis:
+    if change_status == Change.HAS_CHANGED or must_analyse:
         if data_format is not None and not dl_analysis.get("analysis:error"):
             log.info(
                 f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
@@ -313,11 +319,12 @@ async def detect_resource_change_from_content_length_header(
 async def detect_resource_change_on_early_hints(
     resource: Record | None,
     check_id: int,
+    last_check_id: int | None,
 ) -> tuple[Change, dict | None]:
     """
     Try to guess if a resource has been modified from harvest and headers in check data:
     - last-modified header value if it can be found and parsed
-    - content-length if it is found and changed over time (vs the check preceding check_id)
+    - content-length if it is found and changed over time (vs the last analysed check)
 
     Returns a tuple with a Change status and an optional payload:
     {
@@ -328,8 +335,6 @@ async def detect_resource_change_on_early_hints(
     data = None
 
     if resource:
-        # Fetch the analysed check and its predecessor: newer checks may already exist
-        # if this analysis was delayed in the queue
         q = """
         SELECT
             created_at,
@@ -337,13 +342,14 @@ async def detect_resource_change_on_early_hints(
             headers->>'content-length' as content_length,
             detected_last_modified_at
         FROM checks
-        WHERE resource_id = $1 AND id <= $2
+        WHERE id = ANY($1::int[])
         ORDER BY created_at DESC
-        LIMIT 2
         """
         pool = await context.pool()
         async with pool.acquire() as connection:
-            data = await connection.fetch(q, str(resource["resource_id"]), check_id)
+            data = await connection.fetch(
+                q, [check_id] + ([last_check_id] if last_check_id else [])
+            )
 
     # not enough checks to make a comparison
     if not data:
