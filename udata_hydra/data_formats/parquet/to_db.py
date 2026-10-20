@@ -123,15 +123,17 @@ async def parquet_to_db(
         pqf = pq.ParquetFile(file.path)
         for r in bar.iter(_iter_parquet_rows(pqf)):
             data = {k: v for k, v in zip(pqf.schema.names, r)}
-            print(data)
             q = compute_insert_query(table_name=table_name, data=data, returning="__id")
             await db.execute(q, *data.values())
 
     check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
-    await insert_tables_index_entry(table_name, file.inspection, check, file.dataset_id)
+    created_at = await insert_tables_index_entry(
+        table_name, file.inspection, check, file.dataset_id
+    )
     return Table(
         table_name=table_name,
         inspection=file.inspection,
         resource_id=file.resource_id,
         dataset_id=file.dataset_id,
+        created_at=created_at,
     )

@@ -592,7 +592,7 @@ async def test_export_geojson_pmtiles_clears_status_on_failure(setup_catalog, fa
     )
 
     await export_geojson_pmtiles(
-        source=Table(table_name="test", resource_id=RESOURCE_ID),
+        source=Table(table_name="test", resource_id=RESOURCE_ID, created_at=datetime.now()),
         check=check,
     )
 
@@ -631,7 +631,7 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
     mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=MagicMock())
 
     await export_geojson_pmtiles(
-        source=Table(table_name="test", resource_id=RESOURCE_ID),
+        source=Table(table_name="test", resource_id=RESOURCE_ID, created_at=datetime.now()),
         check=check,
     )
 
@@ -661,7 +661,7 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
     mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=MagicMock())
 
     await export_parquet(
-        table=Table(table_name="test", resource_id=RESOURCE_ID),
+        table=Table(table_name="test", resource_id=RESOURCE_ID, created_at=datetime.now()),
         check=check,
     )
 

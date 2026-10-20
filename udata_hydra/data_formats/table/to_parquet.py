@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from udata_hydra.analysis.tables_index import serialize_inspection
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.data_formats.table import Table
 from udata_hydra.db import db_col_name, quote_ident
@@ -35,7 +36,12 @@ async def db_to_parquet(table: Table) -> "Parquet":
         [
             pa.field(c, PYTHON_TYPE_TO_PA[table.inspection["columns"][c]["python_type"]])
             for c in original_cols
-        ]
+        ],
+        # the file must be self-sufficient for readers that don't have access to `tables_index`
+        metadata={
+            "csv_detective": serialize_inspection(table.inspection),
+            "created_at": table.created_at.isoformat(),
+        },
     )
 
     parquet_name = (

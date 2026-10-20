@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from udata_hydra import config
@@ -11,6 +12,11 @@ log = logging.getLogger("udata-hydra")
 
 
 class Table(DataFormat):
+    def __init__(self, *, created_at: datetime, **kwargs) -> None:
+        super().__init__(**kwargs)
+        # ingestion date of the `tables_index` entry describing this table
+        self.created_at = created_at
+
     @classmethod
     def detect_from_check(cls, check: dict, **kwargs):
         raise NotImplementedError
