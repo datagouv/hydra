@@ -2214,7 +2214,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = ">=3.10.3" },
+    { name = "aiohttp", specifier = ">=3.10.3,<3.14" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "boto3", specifier = ">=1.35.0" },
     { name = "coloredlogs", specifier = ">=15.0.1" },
@@ -2239,7 +2239,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "aiohttp-devtools", specifier = ">=1.0.post0" },
-    { name = "aioresponses", specifier = ">=0.7.3" },
+    { name = "aioresponses", specifier = ">=0.7.3,<0.7.9" },
     { name = "gunicorn", specifier = ">=20.1.0" },
     { name = "mypy", specifier = ">=1.11.0" },
     { name = "nest-asyncio2", specifier = ">=1.7.1" },

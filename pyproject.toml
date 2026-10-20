@@ -9,7 +9,7 @@ description = "Async crawler and parsing service for data.gouv.fr"
 authors = [{ name = "Opendata Team", email = "opendatateam@data.gouv.fr" }]
 dependencies = [
     "boto3>=1.35.0",
-    "aiohttp>=3.10.3",
+    "aiohttp>=3.10.3,<3.14",  # aioresponses cannot mock ClientResponse on 3.14+ yet
     "asyncpg>=0.29.0",
     "coloredlogs>=15.0.1",
     "csv-detective==0.13.0",
@@ -36,7 +36,7 @@ readme = "README.md"
 [dependency-groups]
 dev = [
     "aiohttp-devtools>=1.0.post0",
-    "aioresponses>=0.7.3",
+    "aioresponses>=0.7.3,<0.7.9",  # 0.7.9 breaks on aiohttp 3.14 (stream_writer); no fixed release yet
     "gunicorn>=20.1.0",
     "mypy>=1.11.0",
     "nest-asyncio2>=1.7.1",
