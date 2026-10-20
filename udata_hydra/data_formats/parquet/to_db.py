@@ -127,13 +127,10 @@ async def parquet_to_db(
             await db.execute(q, *data.values())
 
     check = await Check.update(check["id"], {"parsing_table": table_name})  # type: ignore[assignment]
-    created_at = await insert_tables_index_entry(
-        table_name, file.inspection, check, file.dataset_id
-    )
+    await insert_tables_index_entry(table_name, file.inspection, check, file.dataset_id)
     return Table(
         table_name=table_name,
         inspection=file.inspection,
         resource_id=file.resource_id,
         dataset_id=file.dataset_id,
-        created_at=created_at,
     )

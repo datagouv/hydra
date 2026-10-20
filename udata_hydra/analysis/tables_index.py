@@ -1,6 +1,5 @@
 import json
 import logging
-from datetime import datetime
 
 from asyncpg import Record
 from asyncpg.exceptions import UndefinedTableError
@@ -37,22 +36,17 @@ async def get_previous_inspection(resource_id: str) -> dict | None:
     return inspection
 
 
-def serialize_inspection(inspection: dict) -> str:
-    return json.dumps(sanitize_for_json(inspection), default=str)
-
-
 async def insert_tables_index_entry(
     table_name: str, inspection: dict, check: Record | dict, dataset_id: str | None
-) -> datetime:
-    """Insert metadata for a parsed table into `DATABASE_URL_CSV.tables_index`,
-    returning the ingestion date set by the database."""
+) -> None:
+    """Insert metadata for a parsed table into `DATABASE_URL_CSV.tables_index`."""
     db = await context.pool("csv")
-    q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5) RETURNING created_at"
+    q = "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)"
     try:
-        return await db.fetchval(
+        await db.execute(
             q,
             table_name,
-            serialize_inspection(inspection),
+            json.dumps(sanitize_for_json(inspection), default=str),
             check.get("resource_id"),
             dataset_id,
             check.get("url"),

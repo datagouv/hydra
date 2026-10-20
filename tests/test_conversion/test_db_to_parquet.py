@@ -1,5 +1,6 @@
+import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
@@ -78,27 +79,35 @@ async def test_db_to_parquet(clean_db, fake_check, mocker):
     parquet.path.unlink()
 
 
-async def test_db_to_parquet_embeds_tables_index_entry(clean_db, fake_check, db, mocker):
-    """The parquet carries the same csv-detective inspection and ingestion date as `tables_index`,
-    so that a reader of the file alone (api-tabular on DuckDB) can serve the same profile."""
+async def test_db_to_parquet_embeds_latest_tables_index_entry(clean_db, fake_check, db, mocker):
+    """The parquet carries the csv-detective inspection and ingestion date of the latest
+    `tables_index` entry of its table, so that a reader of the file alone (api-tabular on DuckDB)
+    can serve the same profile. A previous ingestion of the same url leaves a stale entry."""
     mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
     check = await fake_check()
+    await db.execute(
+        "INSERT INTO tables_index(parsing_table, csv_detective, created_at) VALUES($1, $2, $3)",
+        hashlib.md5(check["url"].encode("utf-8")).hexdigest(),
+        json.dumps({"stale": True}),
+        datetime(2020, 1, 1, tzinfo=timezone.utc),
+    )
     file = CsvLike(file_name="tests/data/catalog.csv")
     await file.inspect()
     table = await file.to_db(check=check)
 
     parquet = await table.to_parquet()
+    assert parquet is not None
 
     metadata = pq.read_schema(parquet.path).metadata
-    entry = await db.fetchrow(
-        "SELECT csv_detective, created_at FROM tables_index WHERE parsing_table = $1",
+    latest = await db.fetchrow(
+        "SELECT csv_detective, created_at FROM tables_index "
+        "WHERE parsing_table = $1 ORDER BY created_at DESC LIMIT 1",
         table.table_name,
     )
     embedded = json.loads(metadata[b"csv_detective"])
-    assert embedded == json.loads(entry["csv_detective"])
+    assert embedded == json.loads(latest["csv_detective"])
     assert embedded["profile"].keys() == file.inspection["columns"].keys()
-    created_at = datetime.fromisoformat(metadata[b"created_at"].decode())
-    assert created_at == entry["created_at"]
+    assert datetime.fromisoformat(metadata[b"created_at"].decode()) == latest["created_at"]
     parquet.path.unlink()
 
 
