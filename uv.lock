@@ -2248,7 +2248,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-mock", specifier = ">=3.7.0" },
     { name = "ruff", specifier = ">=0.9.3,<0.16.0" },
-    { name = "ty", specifier = ">=0.0.17" },
+    { name = "ty", specifier = ">=0.0.17,<0.0.20" },
 ]
 
 [[package]]
