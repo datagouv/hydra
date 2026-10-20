@@ -31,11 +31,23 @@ async def db_to_parquet(table: Table) -> "Parquet":
     db_cols = [db_col_name(c) for c in original_cols]
     cols_sql = ", ".join(quote_ident(c) for c in db_cols)
 
+    # a table name is the hash of the resource url, so each re-ingestion adds an entry:
+    # the latest one describes the current table content
+    index_entry = await pool.fetchrow(
+        "SELECT csv_detective, created_at FROM tables_index "
+        "WHERE parsing_table = $1 ORDER BY created_at DESC LIMIT 1",
+        table.table_name,
+    )
     schema = pa.schema(
         [
             pa.field(c, PYTHON_TYPE_TO_PA[table.inspection["columns"][c]["python_type"]])
             for c in original_cols
-        ]
+        ],
+        # the file must be self-sufficient for readers that don't have access to `tables_index`
+        metadata={
+            "csv_detective": index_entry["csv_detective"],
+            "created_at": index_entry["created_at"].isoformat(),
+        },
     )
 
     parquet_name = (
