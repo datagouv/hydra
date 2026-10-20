@@ -1,6 +1,5 @@
-import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
@@ -85,25 +84,22 @@ async def test_db_to_parquet_embeds_latest_tables_index_entry(clean_db, fake_che
     can serve the same profile. A previous ingestion of the same url leaves a stale entry."""
     mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
     check = await fake_check()
-    await db.execute(
-        "INSERT INTO tables_index(parsing_table, csv_detective, created_at) VALUES($1, $2, $3)",
-        hashlib.md5(check["url"].encode("utf-8")).hexdigest(),
-        json.dumps({"stale": True}),
-        datetime(2020, 1, 1, tzinfo=timezone.utc),
-    )
     file = CsvLike(file_name="tests/data/catalog.csv")
     await file.inspect()
+    await file.to_db(check=check)
     table = await file.to_db(check=check)
 
     parquet = await table.to_parquet()
     assert parquet is not None
 
     metadata = pq.read_schema(parquet.path).metadata
-    latest = await db.fetchrow(
+    entries = await db.fetch(
         "SELECT csv_detective, created_at FROM tables_index "
-        "WHERE parsing_table = $1 ORDER BY created_at DESC LIMIT 1",
+        "WHERE parsing_table = $1 ORDER BY created_at DESC",
         table.table_name,
     )
+    assert len(entries) == 2
+    latest = entries[0]
     embedded = json.loads(metadata[b"csv_detective"])
     assert embedded == json.loads(latest["csv_detective"])
     assert embedded["profile"].keys() == file.inspection["columns"].keys()
