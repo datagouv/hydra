@@ -8,7 +8,7 @@ import pytest
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.data_formats import Geojson
-from udata_hydra.utils import IOException
+from udata_hydra.utils import FileTooLargeException, IOException
 from udata_hydra.utils.file import download_resource, extract_gzip, remove_remainders, storage_path
 
 
@@ -59,7 +59,7 @@ def test_extract_gzip_raises_ioerror_on_invalid_file(mocker, tmp_path):
 
 
 async def test_download_resource_rejects_oversized_content_length():
-    with pytest.raises(IOException, match="File too large to download"):
+    with pytest.raises(FileTooLargeException, match="File too large to download"):
         await download_resource(
             url="http://example.com/file.csv",
             headers={"content-length": "1000"},
@@ -71,7 +71,7 @@ async def test_download_resource_rejects_oversized_while_streaming(rmock):
     url = "http://example.com/file.csv"
     rmock.get(url, status=200, body=b"x" * 2048)
 
-    with pytest.raises(IOException, match="File too large to download"):
+    with pytest.raises(FileTooLargeException, match="File too large to download"):
         await download_resource(url=url, max_size_allowed=500)
 
 

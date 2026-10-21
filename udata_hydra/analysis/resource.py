@@ -110,11 +110,8 @@ async def analyse_resource(
                 analysis_file_name = gz_file.file_name
                 analysis_path = gz_file.path
         except IOException as e:
-            # File too large is expected; str(e) would capture it to Sentry.
-            if e.message == "File too large to download":
-                dl_analysis["analysis:error"] = e.message
-            else:
-                dl_analysis["analysis:error"] = str(e)
+            # FileTooLargeException.__str__ skips Sentry; other IO errors are reported.
+            dl_analysis["analysis:error"] = str(e)
         else:
             await Resource.update(resource_id, data={"status": "ANALYSING_DOWNLOADED_RESOURCE"})
             # Get file size

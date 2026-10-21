@@ -110,6 +110,13 @@ class IOException(ExceptionWithSentryDetails):
     pass
 
 
+class FileTooLargeException(IOException):
+    """Expected size limit. ``str()`` does not report it to Sentry."""
+
+    def __str__(self) -> str:
+        return self.message or ""
+
+
 async def handle_parse_exception(
     e: IOException | ParseException, table_name: str | None, check: Record | dict | None
 ) -> Record | None:
