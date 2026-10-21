@@ -345,8 +345,16 @@ def analyse_ogc_cli(
     )
 
 
-# Latest check of parsed, non-deleted resources that never got a parquet file.
-# Native parquet sources and resources currently being processed are excluded.
+# Resources we can turn into a parquet file without downloading them again.
+# `catalog` is the list of data.gouv.fr resources. Each row's `last_check` points
+# at its latest crawl result in `checks`.
+# A row is kept when:
+# - the resource is still published, and no crawl or analysis is in progress (`status`)
+# - the source file is a table we loaded into Postgres (`parsing_table`), not a parquet file
+# - that load succeeded (`parsing_error` is empty)
+# - no parquet export has been stored yet (`parquet_url` is empty)
+# Ordering by check id lets `--limit` resume later: a finished export gets a
+# `parquet_url` and drops out of this query, so the next run continues after it.
 _BACKFILL_CANDIDATES_SQL = """
     SELECT checks.id, checks.url, checks.resource_id, checks.parsing_table, catalog.dataset_id
     FROM catalog
@@ -430,11 +438,14 @@ def backfill_parquet_cli(
         None,
         "--limit",
         min=1,
-        help="Maximum number of parquet exports to enqueue. With --dry-run, limits how many candidates are counted",
+        help=(
+            "Stop after this many exports. With --dry-run, limits how many candidates are counted. "
+            "Already exported resources are skipped on the next run"
+        ),
     ),
 ):
     """Enqueue parquet exports for parsed resources that do not have a parquet file yet.
 
-    Run once, on a single host, after deploy. Jobs go to the shared low-priority queue.
+    Run on a single host. Jobs go to the shared low-priority queue.
     """
     return _make_async_wrapper(_backfill_parquet)(dry_run=dry_run, limit=limit)
