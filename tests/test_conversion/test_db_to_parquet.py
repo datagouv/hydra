@@ -143,6 +143,7 @@ async def test_db_to_parquet_escapes_quoted_column_name(clean_db, fake_check, mo
     csv = tmp_path / "hostile.csv"
     csv.write_text('"a""odd""name()",val\n1,row1\n2,row2\n')
     mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
+    mocker.patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1)
     check = await fake_check()
     file = CsvLike(file_name=str(csv))
     await file.inspect()
