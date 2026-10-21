@@ -198,6 +198,7 @@ async def test_forced_analysis(
             "content-type": "application/csv",
             "content-length": "100",
         },
+        checksum=hashlib.sha1(b"previous content").hexdigest(),
         detected_last_modified_at=datetime(2025, 4, 4, 0, 0, 0),
     )
     url = check["url"]

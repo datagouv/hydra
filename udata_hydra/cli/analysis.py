@@ -31,7 +31,7 @@ async def _analyse_resource_cli(resource_id: str):
     if not check:
         log.error("Could not find a check linked to the specified resource ID")
         return
-    await analyse_resource(check=dict(check), last_check=None, force_analysis=True)
+    await analyse_resource(check=dict(check), force_analysis=True)
 
 
 @cli.command(name="analyse-resource")
