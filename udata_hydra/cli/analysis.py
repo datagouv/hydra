@@ -6,9 +6,11 @@ from pathlib import Path
 import typer
 from asyncpg import Record
 
-from udata_hydra import config
+from udata_hydra import config, context
 from udata_hydra.analysis import helpers
+from udata_hydra.analysis.exports import export_parquet
 from udata_hydra.analysis.resource import analyse_resource
+from udata_hydra.analysis.tables_index import get_previous_inspection
 from udata_hydra.cli.catalog import _insert_url_into_catalog
 from udata_hydra.cli.common import _find_check, _make_async_wrapper, cli, connection, log
 from udata_hydra.data_formats import (
@@ -17,12 +19,14 @@ from udata_hydra.data_formats import (
     Gz,
     Ogc,
     Parquet,
+    Table,
 )
 from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.utils import queue
 
 
 async def _analyse_resource_cli(resource_id: str):
@@ -339,3 +343,137 @@ def analyse_ogc_cli(
     return _make_async_wrapper(_analyse_ogc_cli)(
         format=format, check_id=check_id, url=url, resource_id=resource_id
     )
+
+
+_BACKFILL_CANDIDATES_SQL = """
+    SELECT
+        checks.id AS id,
+        checks.url AS url,
+        checks.resource_id AS resource_id,
+        checks.parsing_table AS parsing_table,
+        checks.parsing_started_at AS parsing_started_at,
+        checks.parsing_finished_at AS parsing_finished_at,
+        checks.parsing_error AS parsing_error,
+        catalog.dataset_id AS dataset_id
+    FROM catalog
+    JOIN checks ON checks.id = catalog.last_check
+    WHERE catalog.deleted = FALSE
+      AND checks.parsing_table IS NOT NULL
+      AND checks.parquet_url IS NULL
+      AND checks.parsing_error IS NULL
+      AND lower(catalog.format) IS DISTINCT FROM 'parquet'
+      AND catalog.status IS NULL
+    ORDER BY checks.id
+"""
+
+
+def _total_lines(inspection: dict) -> int | None:
+    value = inspection.get("total_lines")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return int(value)
+
+
+async def _backfill_parquet(dry_run: bool = False, limit: int | None = None) -> dict:
+    """Enqueue parquet exports for resources already parsed into Postgres but missing a parquet file.
+
+    Reads the latest check of each non-deleted catalog resource. Skips native parquet
+    sources, resources currently being processed, and checks that already failed parsing.
+    Column order comes from the live table: ``csv_detective`` is JSONB and does not
+    preserve key order. Empty or missing tables are logged and skipped.
+    """
+    pool = await context.pool()
+    rows = await pool.fetch(_BACKFILL_CANDIDATES_SQL)
+
+    examined = 0
+    skipped = 0
+    enqueued = 0
+    min_lines: int | None = None
+    max_lines: int | None = None
+    action = "would_enqueue" if dry_run else "enqueued"
+
+    for row in rows:
+        examined += 1
+        resource_id = str(row["resource_id"])
+        parsing_table = row["parsing_table"]
+        try:
+            inspection = await get_previous_inspection(resource_id)
+        except Exception:
+            log.exception(
+                f"Skipping parquet backfill for resource {resource_id} "
+                f"(parsing_table={parsing_table})"
+            )
+            skipped += 1
+            continue
+        if inspection is None:
+            log.warning(
+                f"Skipping parquet backfill for resource {resource_id} "
+                f"(parsing_table={parsing_table}): table is empty or missing"
+            )
+            skipped += 1
+            continue
+
+        line_count = _total_lines(inspection)
+        if line_count is not None:
+            min_lines = line_count if min_lines is None else min(min_lines, line_count)
+            max_lines = line_count if max_lines is None else max(max_lines, line_count)
+
+        if not dry_run:
+            queue.enqueue(
+                export_parquet,
+                table=Table(
+                    table_name=parsing_table,
+                    inspection=inspection,
+                    resource_id=resource_id,
+                    dataset_id=row["dataset_id"],
+                ),
+                check={
+                    "id": row["id"],
+                    "url": row["url"],
+                    "resource_id": resource_id,
+                    "parsing_table": parsing_table,
+                    "parsing_started_at": row["parsing_started_at"],
+                    "parsing_finished_at": row["parsing_finished_at"],
+                    "parsing_error": row["parsing_error"],
+                },
+                _priority="low",
+            )
+        enqueued += 1
+        if limit is not None and enqueued >= limit:
+            log.info(f"Stopped parquet backfill after --limit {limit}")
+            break
+
+    dry_run_label = " (dry-run)" if dry_run else ""
+    log.info(
+        f"Parquet backfill{dry_run_label}: examined={examined} skipped={skipped} "
+        f"{action}={enqueued} total_lines min={min_lines} max={max_lines}"
+    )
+    return {
+        "dry_run": dry_run,
+        "examined": examined,
+        "skipped": skipped,
+        "enqueued": enqueued,
+        "min_lines": min_lines,
+        "max_lines": max_lines,
+    }
+
+
+@cli.command(name="backfill-parquet")
+def backfill_parquet_cli(
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Count candidates and total_lines without enqueueing jobs",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        min=1,
+        help="Maximum number of parquet exports to enqueue. With --dry-run, limits how many candidates are counted",
+    ),
+):
+    """Enqueue parquet exports for parsed resources that do not have a parquet file yet.
+
+    Run once, on a single host, after deploy. Jobs go to the shared low-priority queue.
+    """
+    return _make_async_wrapper(_backfill_parquet)(dry_run=dry_run, limit=limit)
