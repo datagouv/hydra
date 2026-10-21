@@ -6,9 +6,11 @@ from pathlib import Path
 import typer
 from asyncpg import Record
 
-from udata_hydra import config
+from udata_hydra import config, context
 from udata_hydra.analysis import helpers
+from udata_hydra.analysis.exports import export_parquet
 from udata_hydra.analysis.resource import analyse_resource
+from udata_hydra.analysis.tables_index import get_previous_inspection
 from udata_hydra.cli.catalog import _insert_url_into_catalog
 from udata_hydra.cli.common import _find_check, _make_async_wrapper, cli, connection, log
 from udata_hydra.data_formats import (
@@ -17,12 +19,14 @@ from udata_hydra.data_formats import (
     Gz,
     Ogc,
     Parquet,
+    Table,
 )
 from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.utils import queue
 
 
 async def _analyse_resource_cli(resource_id: str):
@@ -339,3 +343,109 @@ def analyse_ogc_cli(
     return _make_async_wrapper(_analyse_ogc_cli)(
         format=format, check_id=check_id, url=url, resource_id=resource_id
     )
+
+
+# Resources we can turn into a parquet file without downloading them again.
+# `catalog` is the list of data.gouv.fr resources. Each row's `last_check` points
+# at its latest crawl result in `checks`.
+# A row is kept when:
+# - the resource is still published, and no crawl or analysis is in progress (`status`)
+# - the source file is a table we loaded into Postgres (`parsing_table`), not a parquet file
+# - that load succeeded (`parsing_error` is empty)
+# - no parquet export has been stored yet (`parquet_url` is empty)
+# Ordering by check id lets `--limit` resume later: a finished export gets a
+# `parquet_url` and drops out of this query, so the next run continues after it.
+_BACKFILL_CANDIDATES_SQL = """
+    SELECT checks.id, checks.url, checks.resource_id, checks.parsing_table, catalog.dataset_id
+    FROM catalog
+    JOIN checks ON checks.id = catalog.last_check
+    WHERE catalog.deleted = FALSE
+      AND catalog.status IS NULL
+      AND lower(catalog.format) IS DISTINCT FROM 'parquet'
+      AND checks.parsing_table IS NOT NULL
+      AND checks.parquet_url IS NULL
+      AND checks.parsing_error IS NULL
+    ORDER BY checks.id
+"""
+
+
+async def _backfill_parquet(dry_run: bool = False, limit: int | None = None) -> dict:
+    """Enqueue parquet exports for parsed resources that have no parquet file yet."""
+    rows = await (await context.pool()).fetch(_BACKFILL_CANDIDATES_SQL)
+    skipped = 0
+    enqueued = 0
+    line_counts: list[int] = []
+
+    for row in rows:
+        resource_id = str(row["resource_id"])
+        parsing_table = row["parsing_table"]
+        try:
+            # JSONB reorders csv_detective keys; the live table has the real column order.
+            inspection = await get_previous_inspection(resource_id)
+        except Exception:
+            log.exception(f"Skipping parquet backfill for resource {resource_id}")
+            skipped += 1
+            continue
+        if inspection is None:
+            log.warning(
+                f"Skipping parquet backfill for resource {resource_id}: table is empty or missing"
+            )
+            skipped += 1
+            continue
+
+        total_lines = inspection.get("total_lines")
+        if type(total_lines) is int:
+            line_counts.append(total_lines)
+        if not dry_run:
+            queue.enqueue(
+                export_parquet,
+                table=Table(
+                    table_name=parsing_table,
+                    inspection=inspection,
+                    resource_id=resource_id,
+                    dataset_id=row["dataset_id"],
+                ),
+                check={
+                    "id": row["id"],
+                    "url": row["url"],
+                    "resource_id": resource_id,
+                    "parsing_table": parsing_table,
+                },
+                _priority="low",
+            )
+        enqueued += 1
+        if limit is not None and enqueued >= limit:
+            break
+
+    summary = {
+        "skipped": skipped,
+        "enqueued": enqueued,
+        "min_lines": min(line_counts) if line_counts else None,
+        "max_lines": max(line_counts) if line_counts else None,
+    }
+    log.info(f"Parquet backfill dry_run={dry_run} {summary}")
+    return summary
+
+
+@cli.command(name="backfill-parquet")
+def backfill_parquet_cli(
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Count candidates and total_lines without enqueueing jobs",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        min=1,
+        help=(
+            "Stop after this many exports. With --dry-run, limits how many candidates are counted. "
+            "Already exported resources are skipped on the next run"
+        ),
+    ),
+):
+    """Enqueue parquet exports for parsed resources that do not have a parquet file yet.
+
+    Run on a single host. Jobs go to the shared low-priority queue.
+    """
+    return _make_async_wrapper(_backfill_parquet)(dry_run=dry_run, limit=limit)
