@@ -7,7 +7,7 @@ from udata_hydra.data_formats.csv_like.to_geojson import (
     _detect_geo_columns,
 )
 from udata_hydra.data_formats.table import Table
-from udata_hydra.db import db_col_name
+from udata_hydra.db import db_col_name, quote_ident
 from udata_hydra.utils import storage_path
 
 if TYPE_CHECKING:
@@ -16,14 +16,9 @@ if TYPE_CHECKING:
 log = logging.getLogger("udata-hydra")
 
 
-def _quote_ident(name: str) -> str:
-    """Escape a PostgreSQL identifier to prevent SQL injection."""
-    return '"' + name.replace('"', '""') + '"'
-
-
 def _clean_pair_sql(col: str) -> str:
     """SQL version — used when reading from PostgreSQL."""
-    return f"replace(replace(replace({_quote_ident(col)}, ' ', ''), '[', ''), ']', '')"
+    return f"replace(replace(replace({quote_ident(col)}, ' ', ''), '[', ''), ']', '')"
 
 
 def _build_feature_sql(
@@ -46,7 +41,7 @@ def _build_feature_sql(
         params.append(col)
         # $N::text parameters are JSON *keys* (column names), not values.
         # Values come from the quoted column identifiers and keep their native PG types.
-        properties_fragments.append(f"${idx + 1}::text, {_quote_ident(db_col_name(col))}")
+        properties_fragments.append(f"${idx + 1}::text, {quote_ident(db_col_name(col))}")
 
     # PostgreSQL's json_build_object accepts max 100 arguments (50 key-value pairs).
     # Split into chunks and merge with || when needed.
@@ -63,7 +58,7 @@ def _build_feature_sql(
 
     if "geojson" in geo:
         col = db_col_name(geo["geojson"])
-        geometry_sql = f"({_quote_ident(col)})::json"
+        geometry_sql = f"({quote_ident(col)})::json"
         where = ""
     elif "latlon" in geo or "lonlat" in geo:
         pair_key = "latlon" if "latlon" in geo else "lonlat"
@@ -78,15 +73,15 @@ def _build_feature_sql(
                     (split_part({_clean_pair_sql(col)}, ',', {lat_idx}))::float
                 )
             )"""
-        where = f"WHERE {_quote_ident(col)} IS NOT NULL"
+        where = f"WHERE {quote_ident(col)} IS NOT NULL"
     else:
         lon_col = db_col_name(geo["longitude"])
         lat_col = db_col_name(geo["latitude"])
         geometry_sql = f"""json_build_object(
                 'type', 'Point',
-                'coordinates', json_build_array({_quote_ident(lon_col)}, {_quote_ident(lat_col)})
+                'coordinates', json_build_array({quote_ident(lon_col)}, {quote_ident(lat_col)})
             )"""
-        where = f"WHERE {_quote_ident(lat_col)} IS NOT NULL AND {_quote_ident(lon_col)} IS NOT NULL"
+        where = f"WHERE {quote_ident(lat_col)} IS NOT NULL AND {quote_ident(lon_col)} IS NOT NULL"
 
     query = f"""
         SELECT json_build_object(
@@ -94,7 +89,7 @@ def _build_feature_sql(
             'geometry', {geometry_sql},
             'properties', {properties_sql}
         )::text AS feature_json
-        FROM {_quote_ident(table_name)}
+        FROM {quote_ident(table_name)}
         {where}
     """
     return query, params

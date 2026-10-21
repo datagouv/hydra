@@ -164,7 +164,6 @@ async def test_analyse_csv_enqueues_export_jobs_on_low_queue(
     rmock.get(url, status=200, body=catalog_content)
     with (
         patch("udata_hydra.config.DB_TO_PARQUET", True),
-        patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
         patch("udata_hydra.config.DB_TO_GEOJSON", False),
     ):
         file = await download_from_check(check, Csv)
@@ -199,6 +198,7 @@ async def test_forced_analysis(
             "content-type": "application/csv",
             "content-length": "100",
         },
+        checksum=hashlib.sha1(b"previous content").hexdigest(),
         detected_last_modified_at=datetime(2025, 4, 4, 0, 0, 0),
     )
     url = check["url"]
@@ -338,7 +338,12 @@ def create_analysis(scan: dict) -> dict:
                 "rows": [["1", "2022-11-03"], ["5", "2025-11-02"]],
                 "columns": {
                     "a": {"score": 1.0, "format": "int", "python_type": "int"},
-                    "b": {"score": 1.0, "format": "date", "python_type": "date"},
+                    "b": {
+                        "score": 1.0,
+                        "format": "date",
+                        "python_type": "date",
+                        "date_format": "%Y-%m-%d",
+                    },
                 },
                 "formats": {"int": ["a"], "date": ["b"]},
             },
@@ -504,7 +509,6 @@ async def test_analyse_csv_parquet_export_enqueue(
 
     with (
         patch("udata_hydra.config.DB_TO_PARQUET", db_to_parquet_enabled),
-        patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
         patch("udata_hydra.config.DB_TO_GEOJSON", False),
     ):
         file = await download_from_check(check, Csv)
@@ -555,7 +559,6 @@ async def test_crash_after_db_insertion(
     )
     with (
         patch("udata_hydra.config.DB_TO_PARQUET", True),
-        patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1),
         patch("udata_hydra.data_formats.csv_like.queue.enqueue", side_effect=capture_enqueue),
     ):
         file = await download_from_check(check, Csv)

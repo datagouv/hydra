@@ -123,8 +123,6 @@ async def parquet_to_db(
         pqf = pq.ParquetFile(file.path)
         for r in bar.iter(_iter_parquet_rows(pqf)):
             data = {k: v for k, v in zip(pqf.schema.names, r)}
-            print(data)
-            # NB: possible sql injection here, but should not be used in prod
             q = compute_insert_query(table_name=table_name, data=data, returning="__id")
             await db.execute(q, *data.values())
 
