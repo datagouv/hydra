@@ -1,10 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 
 from pydantic import PlainSerializer
 
-# JSON mode serializes UTC datetimes as "...Z"; isoformat() keeps "+00:00" like the analysis payloads.
+
+def format_datetime_for_json(value: datetime) -> str:
+    if value.tzinfo is None:
+        return value.isoformat()
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 IsoDateTime = Annotated[
     datetime,
-    PlainSerializer(lambda value: value.isoformat(), return_type=str, when_used="json"),
+    PlainSerializer(format_datetime_for_json, return_type=str, when_used="json"),
 ]
