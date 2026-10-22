@@ -7,9 +7,7 @@ from pydantic import PlainSerializer
 def format_datetime_for_json(value: datetime) -> str:
     if value.tzinfo is None:
         return value.isoformat()
-    utc = value.astimezone(timezone.utc)
-    s = utc.isoformat()
-    return s[:-6] + "Z" if s.endswith("+00:00") else s
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 IsoDateTime = Annotated[
