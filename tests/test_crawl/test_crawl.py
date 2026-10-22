@@ -384,7 +384,7 @@ async def test_change_analysis_last_modified_header(setup_catalog, rmock, udata_
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
-    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37+00:00"
+    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37Z"
     assert data["analysis:last-modified-detection"] == "last-modified-header"
 
 
@@ -446,7 +446,7 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, fake_chec
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
-    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000+00:00"
+    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000Z"
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
     res = await db.fetch("SELECT * FROM checks ORDER BY created_at DESC LIMIT 1")
     assert res[0]["detected_last_modified_at"].isoformat() == "2022-12-06T05:00:32.647000+00:00"
@@ -634,14 +634,14 @@ async def test_analyse_new_url_notifies_udata(setup_catalog, rmock, fake_check, 
     analysis_payload = next(p for p in payloads if "analysis:check_id" in p)
     assert analysis_payload["analysis:check_id"] == check["id"]
     assert analysis_payload["analysis:last-modified-detection"] == "harvest-resource-metadata"
-    assert analysis_payload["analysis:last-modified-at"] == harvest_modified_at.isoformat()
+    assert analysis_payload["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000Z"
 
 
 @pytest.mark.parametrize(
     "head_last_modified,expect_put,expected_modified_at,use_detected_at",
     [
         ("Thu, 09 Jan 2020 09:33:37 GMT", False, None, False),
-        ("2020-01-09T09:33:37+04:00", True, "2020-01-09T09:33:37+04:00", True),
+        ("2020-01-09T09:33:37+04:00", True, "2020-01-09T05:33:37Z", True),
     ],
     ids=["same_instant_rfc822", "same_instant_different_offset"],
 )
