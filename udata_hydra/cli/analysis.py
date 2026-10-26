@@ -408,7 +408,8 @@ async def _backfill_parquet(
     csv_pool = await context.pool("csv")
     skipped: dict[str, int] = {}
     enqueued = 0
-    line_counts: list[int] = []
+    # rows to export, according to csv-detective: a rough measure of the batch size
+    total_lines = 0
 
     def skip(reason: str, resource_id: str) -> None:
         log.debug(f"Skipping parquet backfill for resource {resource_id}: {reason}")
@@ -492,9 +493,8 @@ async def _backfill_parquet(
                 await Resource.update(resource_id, {"status": None})
                 raise
 
-        total_lines = inspection.get("total_lines")
-        if type(total_lines) is int:
-            line_counts.append(total_lines)
+        if type(inspection.get("total_lines")) is int:
+            total_lines += inspection["total_lines"]
         enqueued += 1
         if limit is not None and enqueued >= limit:
             break
@@ -503,8 +503,7 @@ async def _backfill_parquet(
         "candidates": len(candidates),
         "enqueued": enqueued,
         "skipped": skipped,
-        "min_lines": min(line_counts) if line_counts else None,
-        "max_lines": max(line_counts) if line_counts else None,
+        "total_lines": total_lines,
     }
     log.info(f"Parquet backfill dry_run={dry_run} {summary}")
     return summary
@@ -521,7 +520,7 @@ def backfill_parquet_cli(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Count candidates and total_lines without locking resources nor enqueueing jobs",
+        help="Count candidates and their total lines without locking resources nor enqueueing jobs",
     ),
     limit: int | None = typer.Option(
         None,

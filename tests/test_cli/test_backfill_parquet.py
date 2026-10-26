@@ -110,6 +110,7 @@ async def test_backfill_parquet_enqueues_from_udata_extras(
 
     summary = await _backfill(catalog_file=catalog, dry_run=True)
     assert summary["enqueued"] == 1
+    assert summary["total_lines"] == 4
     mock_enqueue.assert_not_called()
     assert await _status(db, resource_id) is None
 
