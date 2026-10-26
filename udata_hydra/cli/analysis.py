@@ -391,8 +391,11 @@ async def _backfill_parquet(
     catalog_file: str | None = None,
     dry_run: bool = False,
     limit: int | None = None,
-) -> dict:
+) -> dict | None:
     """Enqueue parquet exports for resources that udata shows as parsed but without parquet."""
+    if not config.DB_TO_PARQUET and not dry_run:
+        log.warning("DB_TO_PARQUET is off, no parquet export enqueued. --dry-run still works.")
+        return None
     if catalog_file:
         candidates = _read_backfill_candidates(catalog_file)
     else:

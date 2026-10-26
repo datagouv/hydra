@@ -16,6 +16,11 @@ nest_asyncio.apply()
 BACKFILL_STATUS = "TO_BACKFILL_PARQUET"
 
 
+@pytest.fixture(autouse=True)
+def db_to_parquet(mocker):
+    mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
+
+
 async def _backfill(**kwargs) -> dict:
     """Call the command with every option, typer defaults are not usable outside the CLI"""
     options = {"catalog_url": None, "catalog_file": None, "dry_run": False, "limit": None}
