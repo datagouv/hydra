@@ -33,6 +33,7 @@ from udata_hydra.data_formats.detect import (
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.utils import download_file, queue, storage_path
 
 
@@ -499,6 +500,7 @@ async def _backfill_parquet(
             if locked is None:
                 skip("busy", resource_id)
                 continue
+            exception = await ResourceException.get_by_resource_id(resource_id)
             try:
                 queue.enqueue(
                     export_parquet,
@@ -510,6 +512,8 @@ async def _backfill_parquet(
                     ),
                     check=dict(check),
                     _priority="low",
+                    # set per job: the queue keeps the default timeout of its first use
+                    job_timeout=config.RQ_DEFAULT_TIMEOUT * (5 if exception else 1),
                 )
             except Exception:
                 await Resource.update(resource_id, {"status": None})

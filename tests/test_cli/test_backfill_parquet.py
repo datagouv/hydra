@@ -6,9 +6,11 @@ import nest_asyncio2 as nest_asyncio
 import pytest
 
 from tests.conftest import DATASET_ID
+from udata_hydra import config
 from udata_hydra.analysis.exports import export_parquet
 from udata_hydra.cli.analysis import backfill_parquet_cli
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_exception import ResourceException
 
 pytestmark = pytest.mark.asyncio
 nest_asyncio.apply()
@@ -125,12 +127,30 @@ async def test_backfill_parquet_enqueues_from_udata_extras(
     mock_enqueue.assert_called_once()
     assert mock_enqueue.call_args.args[0] is export_parquet
     assert mock_enqueue.call_args.kwargs["_priority"] == "low"
+    assert mock_enqueue.call_args.kwargs["job_timeout"] == config.RQ_DEFAULT_TIMEOUT
     assert mock_enqueue.call_args.kwargs["check"]["id"] == check["id"]
     table = mock_enqueue.call_args.kwargs["table"]
     assert table.table_name == check["parsing_table"]
     assert table.dataset_id == DATASET_ID
     assert list(table.inspection["columns"]) == ["b", "a"]
     assert await _status(db, resource_id) == BACKFILL_STATUS
+
+
+async def test_backfill_parquet_gives_resource_exceptions_a_longer_timeout(
+    clean_db, db, fake_check, mocker, tmp_path
+):
+    mock_enqueue = mocker.patch("udata_hydra.utils.queue.enqueue")
+    check = await _seed_parsed_resource(db, fake_check, "https://example.com/large.csv")
+    resource_id = check["resource_id"]
+    await ResourceException.insert(resource_id=resource_id)
+    catalog = _write_catalog(
+        tmp_path / "catalog.csv",
+        [{"resource_id": resource_id, "extras": _extras(check["parsing_table"])}],
+    )
+
+    await _backfill(catalog_file=catalog)
+
+    assert mock_enqueue.call_args.kwargs["job_timeout"] == config.RQ_DEFAULT_TIMEOUT * 5
 
 
 async def test_backfill_parquet_enqueues_resource_in_backoff(
