@@ -128,6 +128,26 @@ async def test_backfill_parquet_enqueues_from_udata_extras(
     assert await _status(db, resource_id) == BACKFILL_STATUS
 
 
+async def test_backfill_parquet_enqueues_resource_in_backoff(
+    clean_db, db, fake_check, mocker, tmp_path
+):
+    """BACKOFF only means the crawler waits for the domain, the export reads our own DB"""
+    mock_enqueue = mocker.patch("udata_hydra.utils.queue.enqueue")
+    check = await _seed_parsed_resource(db, fake_check, "https://example.com/backoff.csv")
+    resource_id = check["resource_id"]
+    await db.execute("UPDATE catalog SET status = 'BACKOFF' WHERE resource_id = $1", resource_id)
+    catalog = _write_catalog(
+        tmp_path / "catalog.csv",
+        [{"resource_id": resource_id, "extras": _extras(check["parsing_table"])}],
+    )
+
+    summary = await _backfill(catalog_file=catalog)
+
+    assert summary["enqueued"] == 1
+    mock_enqueue.assert_called_once()
+    assert await _status(db, resource_id) == BACKFILL_STATUS
+
+
 @pytest.mark.parametrize(
     "row",
     [

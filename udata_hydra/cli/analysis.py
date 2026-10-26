@@ -423,7 +423,8 @@ async def _backfill_parquet(
         if resource is None:
             skip("not_in_catalog", resource_id)
             continue
-        if resource["status"] is not None:
+        # BACKOFF only means the crawler waits for the domain to cool down, like get_excluded_clause
+        if resource["status"] not in (None, "BACKOFF"):
             skip("busy", resource_id)
             continue
 
@@ -468,7 +469,8 @@ async def _backfill_parquet(
             # the export job resets the status when it finishes
             locked = await pool.fetchval(
                 "UPDATE catalog SET status = $1, status_since = $2 "
-                "WHERE resource_id = $3 AND status IS NULL AND deleted = FALSE "
+                "WHERE resource_id = $3 AND (status IS NULL OR status = 'BACKOFF') "
+                "AND deleted = FALSE "
                 "RETURNING resource_id",
                 _BACKFILL_STATUS,
                 datetime.now(timezone.utc),
