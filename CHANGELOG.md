@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.14.0 (2026-10-21)
+
+- chore: escape quote identifiers in SQL queries and expose only safe errors in analysis:parsing:error ([#485](https://github.com/datagouv/hydra/pull/485))
+- chore(deps): upgrade dependencies to latest versions ([#490](https://github.com/datagouv/hydra/pull/490))
+- ci: publish to PyPI without triggering a deploy ([#486](https://github.com/datagouv/hydra/pull/486))
+- feat: embed csv-detective inspection and ingestion date in exported parquet metadata ([#489](https://github.com/datagouv/hydra/pull/489))
+- feat: remove MIN_LINES_FOR_PARQUET to export parquet for every resource ([#487](https://github.com/datagouv/hydra/pull/487))
+- feat: use csv-detective 0.13.0 ([#491](https://github.com/datagouv/hydra/pull/491))
+- fix: dont send error to sentry when file too big ([#483](https://github.com/datagouv/hydra/pull/483))
+- fix: fix error message ([#480](https://github.com/datagouv/hydra/pull/480))
+- fix: parse resources whose URL has no table yet and compare checks with their own predecessor ([#488](https://github.com/datagouv/hydra/pull/488))
+- fix(api): index validation errors on resource exception update ([#473](https://github.com/datagouv/hydra/pull/473))
+- refactor: replace Marshmallow with Pydantic ([#465](https://github.com/datagouv/hydra/pull/465))
+- test: add crawl helpers unit tests ([#462](https://github.com/datagouv/hydra/pull/462))
+- tests: remove useless test ([#493](https://github.com/datagouv/hydra/pull/493))
+
+
 ## 2.13.5 (2026-09-07)
 
 - fix: fix gz octet stream detection ([#479](https://github.com/datagouv/hydra/pull/479))

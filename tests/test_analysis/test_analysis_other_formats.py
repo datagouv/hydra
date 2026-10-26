@@ -71,7 +71,7 @@ async def test_analyse_resource_skips_json_gz(setup_catalog, rmock, db, fake_che
         url="https://example.com/finess.json.gz",
     )
     rmock.get(check["url"], status=200, body=JSON_GZ_BODY)
-    await analyse_resource(check=check, last_check=None)
+    await analyse_resource(check=check)
 
     res = await db.fetchrow("SELECT * FROM checks WHERE id = $1", check["id"])
     assert res["parsing_error"] is None
@@ -96,7 +96,7 @@ async def test_analyse_resource_corrupted_gzip_sets_analysis_error(
         url="https://example.com/data.csv.gz",
     )
     rmock.get(check["url"], status=200, body=CORRUPTED_GZ_BODY)
-    await analyse_resource(check=check, last_check=None)
+    await analyse_resource(check=check)
 
     res = await db.fetchrow("SELECT * FROM checks WHERE id = $1", check["id"])
     assert res["analysis_error"] == "Corrupted or truncated gzip file"

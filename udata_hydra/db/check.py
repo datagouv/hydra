@@ -42,6 +42,21 @@ class Check:
             return await connection.fetchrow(q, resource_id)
 
     @classmethod
+    async def get_previous_analysed(cls, resource_id: str, check_id: int) -> Record | None:
+        """Get the latest check before check_id whose file has been downloaded, either by its
+        own analysis or inherited from an unchanged previous one (failed checks have no checksum)
+        """
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = """
+                SELECT * FROM checks
+                WHERE resource_id = $1 AND id < $2 AND checksum IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            return await connection.fetchrow(q, resource_id, check_id)
+
+    @classmethod
     async def get_by_url(cls, url: str) -> list[Record]:
         pool = await context.pool()
         async with pool.acquire() as connection:

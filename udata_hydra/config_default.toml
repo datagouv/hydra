@@ -97,7 +97,6 @@ S3_URL_PATTERN = "https://{endpoint}/{bucket}/{key}"
 
 # -- Parquet conversion settings -- #
 DB_TO_PARQUET = false
-MIN_LINES_FOR_PARQUET = 200
 
 # -- Geojson conversion settings -- #
 DB_TO_GEOJSON = false

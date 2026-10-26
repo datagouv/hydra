@@ -139,7 +139,7 @@ async def check_resource(
                         pass
 
             # Preprocess the check data. If it has changed, it will be sent to udata
-            new_check, last_check = await preprocess_check_data(
+            new_check = await preprocess_check_data(
                 dataset_id=resource["dataset_id"],
                 check_data={
                     "resource_id": str(resource["resource_id"]),
@@ -161,7 +161,6 @@ async def check_resource(
             queue.enqueue(
                 analyse_resource,
                 check=new_check,
-                last_check=last_check,
                 force_analysis=force_analysis,
                 worker_priority=worker_priority,
                 _priority=worker_priority,

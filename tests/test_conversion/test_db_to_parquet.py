@@ -1,3 +1,5 @@
+import json
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
@@ -9,6 +11,7 @@ import pytest
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.data_formats import CsvLike, Parquet
 from udata_hydra.data_formats.table.to_parquet import DEFAULT_PARQUET_FILENAME
+from udata_hydra.db import quote_ident
 from udata_hydra.utils.casting import iter_tabular_rows
 
 pytestmark = pytest.mark.asyncio
@@ -52,7 +55,6 @@ async def test_reference_table_from_csv(file_and_count):
 
 async def test_db_to_parquet(clean_db, fake_check, mocker):
     mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
-    mocker.patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", 1)
     check = await fake_check()
     file = CsvLike(file_name="tests/data/catalog.csv")
     inspection = await file.inspect()
@@ -76,28 +78,47 @@ async def test_db_to_parquet(clean_db, fake_check, mocker):
     parquet.path.unlink()
 
 
-@pytest.mark.parametrize(
-    "parquet_config",
-    (
-        (False, 1, False),  # DB_TO_PARQUET off → no export
-        (True, 10, False),  # MIN_LINES_FOR_PARQUET = 10 (> total_lines) → skip
-        (True, 1, True),  # DB_TO_PARQUET on, MIN_LINES = 1 → convert
-        (True, 3, False),  # MIN_LINES_FOR_PARQUET = 3 (> fixture row count) → skip
-    ),
-)
-async def test_export_db_to_parquet(fake_check, mocker, parquet_config, clean_db):
+async def test_db_to_parquet_embeds_latest_tables_index_entry(clean_db, fake_check, db, mocker):
+    """The parquet carries the csv-detective inspection and ingestion date of the latest
+    `tables_index` entry of its table, so that a reader of the file alone (api-tabular on DuckDB)
+    can serve the same profile. A previous ingestion of the same url leaves a stale entry."""
+    mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
+    check = await fake_check()
+    file = CsvLike(file_name="tests/data/catalog.csv")
+    await file.inspect()
+    await file.to_db(check=check)
+    table = await file.to_db(check=check)
+
+    parquet = await table.to_parquet()
+    assert parquet is not None
+
+    metadata = pq.read_schema(parquet.path).metadata
+    entries = await db.fetch(
+        "SELECT csv_detective, created_at FROM tables_index "
+        "WHERE parsing_table = $1 ORDER BY created_at DESC",
+        table.table_name,
+    )
+    assert len(entries) == 2
+    latest = entries[0]
+    embedded = json.loads(metadata[b"csv_detective"])
+    assert embedded == json.loads(latest["csv_detective"])
+    assert embedded["profile"].keys() == file.inspection["columns"].keys()
+    assert datetime.fromisoformat(metadata[b"created_at"].decode()) == latest["created_at"]
+    parquet.path.unlink()
+
+
+@pytest.mark.parametrize("db_to_parquet_flag", (False, True))
+async def test_export_db_to_parquet(fake_check, mocker, db_to_parquet_flag, clean_db):
     csv_file = CsvLike(file_name="tests/data/catalog.csv")
     check = await fake_check()
-    db_to_parquet_flag, min_lines_for_parquet_config, expected_conversion = parquet_config
     mocker.patch("udata_hydra.config.DB_TO_PARQUET", db_to_parquet_flag)
-    mocker.patch("udata_hydra.config.MIN_LINES_FOR_PARQUET", min_lines_for_parquet_config)
 
     async def run_export() -> Parquet | None:
         await csv_file.inspect()
         table = await csv_file.to_db(check=check)
         return await table.to_parquet()
 
-    if not expected_conversion:
+    if not db_to_parquet_flag:
         with patch("udata_hydra.data_formats.table.to_parquet.db_to_parquet") as conversion:
             assert await run_export() is None
             conversion.assert_not_called()
@@ -106,3 +127,27 @@ async def test_export_db_to_parquet(fake_check, mocker, parquet_config, clean_db
         parquet = await run_export()
         assert isinstance(parquet, Parquet)
         parquet.path.unlink()
+
+
+async def test_quote_ident_escapes_double_quotes():
+    """quote_ident must double embedded double quotes so a hostile column name
+    cannot break out of the identifier position in a generated SELECT."""
+    assert quote_ident('foo"bar') == '"foo""bar"'
+    assert quote_ident('odd"name()') == '"odd""name()"'
+    assert quote_ident("plain") == '"plain"'
+
+
+async def test_db_to_parquet_escapes_quoted_column_name(clean_db, fake_check, mocker, tmp_path):
+    """A column name containing a double quote must be exported safely, i.e. the
+    quoting must hold so the name is treated as a literal identifier, not SQL."""
+    csv = tmp_path / "hostile.csv"
+    csv.write_text('"a""odd""name()",val\n1,row1\n2,row2\n')
+    mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
+    check = await fake_check()
+    file = CsvLike(file_name=str(csv))
+    await file.inspect()
+    table = await file.to_db(check=check)
+    parquet = await table.to_parquet()
+    assert parquet is not None
+    assert parquet.path.exists()
+    parquet.path.unlink()

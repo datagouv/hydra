@@ -118,10 +118,7 @@ class CsvLike(DataFormat):
             )
 
             if config.CSV_TO_DB:
-                if (
-                    config.DB_TO_PARQUET
-                    and int(table.inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET  # type: ignore[arg-type]
-                ):
+                if config.DB_TO_PARQUET:
                     from udata_hydra.analysis.exports import export_parquet
 
                     await ResourceJobStatus.set(resource_id, "parquet", "CONVERTING_TO_PARQUET")

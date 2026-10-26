@@ -10,13 +10,47 @@ from udata_hydra.db.check import Check
 log = logging.getLogger("udata-hydra")
 
 
+# Allowlist of well-known data/value parsing errors that may be republished in
+# `analysis:parsing:error`. Everything else is redacted: it may echo DB text or
+# leak infrastructure details. Deliberate exceptions: OverflowError stays redacted
+# (ambiguous origin), while ValueError is exposed even though owslib OGC errors
+# (embedding endpoint URLs) also raise it — a known, accepted leak.
+_SAFE_EXPOSE_TYPES = (
+    ValueError,  # also covers UnicodeError (UnicodeDecodeError/UnicodeEncodeError)
+    TypeError,
+    KeyError,
+    IndexError,
+)
+
+
+def _is_safe_to_expose(cause: BaseException | None) -> bool:
+    """Whether `cause` may be republished in `analysis:parsing:error`.
+
+    Allowlist: only well-known data/value parsing errors are exposed verbatim.
+    Everything else is redacted to `error`, as it may echo attacker-controlled DB
+    text or leak infrastructure details (host, port, endpoint, bucket).
+    """
+    if cause is None:
+        # No type-checkable cause: our free-form message (which may embed server
+        # paths) is never republished; it is still logged server-side.
+        return False
+    if isinstance(cause, OSError):
+        # Some infra errors (ssl, requests, aiohttp connectors) inherit ValueError.
+        return False
+    if type(cause).__module__.startswith("asyncpg"):
+        # Client-side asyncpg errors inherit ValueError but embed connection settings.
+        return False
+    return isinstance(cause, _SAFE_EXPOSE_TYPES)
+
+
 class ExceptionWithSentryDetails(Exception):
     """
     Custom exception that automatically captures to Sentry with enriched tags when
     raised.
 
     This implementation captures the exception in the __str__ method, ensuring the
-    full stack trace is available.
+    full stack trace is available. Set report_to_sentry to False on a subclass to
+    store the message with str() without reporting.
 
     The exception automatically attaches resource ID, URL, check ID, and other
     context to Sentry events. Tags and exception capture happen in the same scope,
@@ -42,6 +76,8 @@ class ExceptionWithSentryDetails(Exception):
             table_name="processed_data"
         )
     """
+
+    report_to_sentry = True
 
     def __init__(
         self,
@@ -69,8 +105,8 @@ class ExceptionWithSentryDetails(Exception):
         This happens when it's raised and caught, ensuring full stack trace.
         """
         # Only capture if we have a traceback (exception is being raised)
-        if getattr(self, "__traceback__", None) is not None:
-            if sentry_sdk.Hub.current.client:  # type: ignore[union-attr]
+        if self.report_to_sentry and getattr(self, "__traceback__", None) is not None:
+            if sentry_sdk.Hub.current.client:
                 with sentry_sdk.new_scope() as scope:
                     scope.set_tags(
                         {
@@ -84,7 +120,10 @@ class ExceptionWithSentryDetails(Exception):
                     )
 
                     event_id = sentry_sdk.capture_exception(self)
-                    self.sentry_event_id = event_id  # Store the event ID, so it can be used by handle_parse_exception to be stored in check
+                    # handle_parse_exception only persists this id for cause-less errors: there it
+                    # calls str(e) before Check.update, triggering this capture. For cause-bearing
+                    # errors str(e) runs later (in log.error), so the id is not stored.
+                    self.sentry_event_id = event_id
 
                     # # If we want also to display the chained exception performance stack trace we could check for chained exceptions (__cause__ or __context__)
                     # # But we would have both original and chained exception appear in Sentry
@@ -110,6 +149,12 @@ class IOException(ExceptionWithSentryDetails):
     pass
 
 
+class FileTooLargeException(IOException):
+    """Expected size limit. Not reported to Sentry."""
+
+    report_to_sentry = False
+
+
 async def handle_parse_exception(
     e: IOException | ParseException, table_name: str | None, check: Record | dict | None
 ) -> Record | None:
@@ -122,14 +167,25 @@ async def handle_parse_exception(
     if check:
         # e.__cause__ let us access the "inherited" error of the Exception (raise e from cause)
         # it's called explicit exception chaining and it's very cool, look it up (PEP 3134)!
-        err = f"{e.step}:{str(e.__cause__)}"
+        # We check if the cause is safe to be exposed and stored in `analysis:parsing:error`.
+        # The details are logged server-side in any case.
+        cause = e.__cause__
+        detail = f"{e.step}:{cause}" if cause is not None else str(e)
+        err = detail if _is_safe_to_expose(cause) else f"{e.step}:error"
         if e.sentry_event_id:
             err = f"{e.step}:sentry:{e.sentry_event_id}"
+        check_id = check["id"]
         check = await Check.update(
-            check["id"],
+            check_id,
             {"parsing_error": err, "parsing_finished_at": datetime.now(timezone.utc)},
         )
-        log.error("Parsing error", exc_info=e)
+        log.error(
+            "Parsing error for check %s at step %s: %s",
+            check_id,
+            e.step,
+            detail,
+            exc_info=e,
+        )
         return check
     else:
         raise e
