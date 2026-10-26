@@ -49,7 +49,8 @@ class ExceptionWithSentryDetails(Exception):
     raised.
 
     This implementation captures the exception in the __str__ method, ensuring the
-    full stack trace is available.
+    full stack trace is available. Set report_to_sentry to False on a subclass to
+    store the message with str() without reporting.
 
     The exception automatically attaches resource ID, URL, check ID, and other
     context to Sentry events. Tags and exception capture happen in the same scope,
@@ -75,6 +76,8 @@ class ExceptionWithSentryDetails(Exception):
             table_name="processed_data"
         )
     """
+
+    report_to_sentry = True
 
     def __init__(
         self,
@@ -102,7 +105,7 @@ class ExceptionWithSentryDetails(Exception):
         This happens when it's raised and caught, ensuring full stack trace.
         """
         # Only capture if we have a traceback (exception is being raised)
-        if getattr(self, "__traceback__", None) is not None:
+        if self.report_to_sentry and getattr(self, "__traceback__", None) is not None:
             if sentry_sdk.Hub.current.client:
                 with sentry_sdk.new_scope() as scope:
                     scope.set_tags(
@@ -144,6 +147,12 @@ class IOException(ExceptionWithSentryDetails):
     """Exception raised when an error occurs during IO operations."""
 
     pass
+
+
+class FileTooLargeException(IOException):
+    """Expected size limit. Not reported to Sentry."""
+
+    report_to_sentry = False
 
 
 async def handle_parse_exception(
