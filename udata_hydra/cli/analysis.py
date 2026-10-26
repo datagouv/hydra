@@ -1,10 +1,10 @@
 import csv
 import hashlib
 import json
-import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import typer
 from asyncpg import Record
@@ -14,7 +14,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.analysis.exports import export_parquet
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.analysis.tables_index import get_previous_inspection
-from udata_hydra.cli.catalog import _download_catalog, _insert_url_into_catalog
+from udata_hydra.cli.catalog import _insert_url_into_catalog
 from udata_hydra.cli.common import _find_check, _make_async_wrapper, cli, connection, log
 from udata_hydra.data_formats import (
     CsvLike,
@@ -29,7 +29,7 @@ from udata_hydra.data_formats.detect import detect_data_format_from_check_or_cat
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import queue
+from udata_hydra.utils import download_file, queue, storage_path
 
 
 async def _analyse_resource_cli(resource_id: str):
@@ -393,12 +393,15 @@ async def _backfill_parquet(
     limit: int | None = None,
 ) -> dict:
     """Enqueue parquet exports for resources that udata shows as parsed but without parquet."""
-    catalog_path = catalog_file or await _download_catalog(catalog_url or config.CATALOG_URL)
-    try:
-        candidates = _read_backfill_candidates(catalog_path)
-    finally:
-        if not catalog_file:
-            os.unlink(catalog_path)
+    if catalog_file:
+        candidates = _read_backfill_candidates(catalog_file)
+    else:
+        url = catalog_url or config.CATALOG_URL
+        log.info(f"Downloading resources catalog from {url}...")
+        with NamedTemporaryFile(dir=storage_path("")) as fd:
+            await download_file(url, fd)
+            fd.flush()
+            candidates = _read_backfill_candidates(fd.name)
     log.info(f"{len(candidates)} resources without parquet export in udata extras")
 
     pool = await context.pool()

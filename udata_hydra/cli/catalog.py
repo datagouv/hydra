@@ -17,19 +17,6 @@ from udata_hydra.logger import quiet_logs
 from udata_hydra.utils import download_file, storage_path
 
 
-async def _download_catalog(url: str) -> str:
-    """Download the resources catalog CSV to a temporary file and return its path.
-    The caller is responsible for deleting the file."""
-    log.info(f"Downloading resources catalog from {url}...")
-    with NamedTemporaryFile(dir=storage_path(""), delete=False) as fd:
-        try:
-            await download_file(url, fd)
-        except Exception:
-            os.unlink(fd.name)
-            raise
-    return fd.name
-
-
 async def _load_catalog(
     url: str | None = None,
     drop_meta: bool = False,
@@ -55,14 +42,16 @@ async def _load_catalog(
                 for row in bar.iter(rows):
                     yield row
 
-        catalog_path = None
+        fd = None
         try:
-            catalog_path = await _download_catalog(url)
+            log.info(f"Downloading resources catalog from {url}...")
+            with NamedTemporaryFile(dir=storage_path(""), delete=False) as fd:
+                await download_file(url, fd)
             log.info("Upserting resources catalog in database...")
             # consider everything deleted, deleted will be updated when loading new catalog
             conn = await connection()
             await conn.execute("UPDATE catalog SET deleted = TRUE")
-            with open(catalog_path) as fd:
+            with open(fd.name) as fd:
                 reader = csv.DictReader(fd, delimiter=";")
                 rows = list(reader)
                 for row in iter_with_progressbar_or_quiet(rows, quiet):
@@ -104,8 +93,9 @@ async def _load_catalog(
         except Exception as e:
             raise e
         finally:
-            if catalog_path:
-                os.unlink(catalog_path)
+            if fd:
+                fd.close()
+                os.unlink(fd.name)
 
 
 @cli.command()
