@@ -58,7 +58,7 @@ def _extras(parsing_table: str | None, parquet_url: str | None = None, error: st
     }
 
 
-async def _seed_parsed_resource(db, fake_check, url: str) -> dict:
+async def _seed_parsed_resource(db, fake_check, url: str, format: str = "csv", **check) -> dict:
     """A resource in catalog, its parsing check, its tables_index entry and its table"""
     resource_id = str(uuid.uuid4())
     await Resource.insert(
@@ -66,10 +66,10 @@ async def _seed_parsed_resource(db, fake_check, url: str) -> dict:
         resource_id=resource_id,
         url=url,
         type="main",
-        format="csv",
+        format=format,
         title="Backfill resource",
     )
-    check = await fake_check(resource_id=resource_id, url=url, parsing_table=True)
+    check = await fake_check(resource_id=resource_id, url=url, parsing_table=True, **check)
     parsing_table = check["parsing_table"]
     await db.execute(
         "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) "
@@ -161,7 +161,6 @@ async def test_backfill_parquet_enqueues_resource_in_backoff(
         {"extras": _extras(None)},
         {"extras": {}},
         {"extras": _extras("table"), "archived": "True"},
-        {"extras": _extras("table"), "format": "parquet"},
     ],
 )
 async def test_backfill_parquet_filters_on_catalog(clean_db, mocker, tmp_path, row):
@@ -210,6 +209,38 @@ async def test_backfill_parquet_skips_on_local_state(
     assert summary["enqueued"] == 0
     assert summary["skipped"] == {case: 1}
     mock_enqueue.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "url,format,check,exported",
+    [
+        # a parquet source without catalog format, detected from its URL
+        ("https://example.com/data.parquet", "", {}, False),
+        # a gzipped CSV is analysed from its unzipped payload
+        (
+            "https://example.com/archive.gz",
+            "csv.gz",
+            {"headers": {"content-type": "application/gzip"}, "mime_type": "text/csv"},
+            True,
+        ),
+    ],
+)
+async def test_backfill_parquet_only_exports_csv_like_sources(
+    clean_db, db, fake_check, mocker, tmp_path, url, format, check, exported
+):
+    mock_enqueue = mocker.patch("udata_hydra.utils.queue.enqueue")
+    check = await _seed_parsed_resource(db, fake_check, url, format=format, **check)
+    resource_id = check["resource_id"]
+    catalog = _write_catalog(
+        tmp_path / "catalog.csv",
+        [{"resource_id": resource_id, "extras": _extras(check["parsing_table"])}],
+    )
+
+    summary = await _backfill(catalog_file=catalog)
+
+    assert summary["enqueued"] == int(exported)
+    assert summary["skipped"] == ({} if exported else {"not_csv_like": 1})
+    assert mock_enqueue.call_count == int(exported)
 
 
 async def test_backfill_parquet_limit_follows_resource_id_order(

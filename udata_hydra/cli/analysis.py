@@ -25,7 +25,11 @@ from udata_hydra.data_formats import (
     Table,
 )
 from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
-from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
+from udata_hydra.data_formats.detect import (
+    catalog_format_for,
+    detect_data_format_from_check_or_catalog,
+    detect_format_from_payload,
+)
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
@@ -367,8 +371,6 @@ def _read_backfill_candidates(catalog_path: str) -> list[tuple[str, str]]:
         for row in csv.DictReader(fd, delimiter=";"):
             if row.get("dataset.archived") != "False":
                 continue
-            if (row.get("format") or "").lower() == "parquet":
-                continue
             try:
                 resource_id = str(uuid.UUID(row["id"]))
                 extras = json.loads(row.get("extras") or "{}")
@@ -384,6 +386,18 @@ def _read_backfill_candidates(catalog_path: str) -> list[tuple[str, str]]:
             ):
                 candidates.append((resource_id, parsing_table))
     return sorted(candidates)
+
+
+async def _is_csv_like_source(check: dict) -> bool:
+    """Whether the table was loaded from a CSV-like file, detected like the analysis does:
+    parquet sources also get a table, and must not be exported to parquet again."""
+    data_format = await detect_data_format_from_check_or_catalog(check)
+    if data_format is Gz:
+        # like Gz.analyse, from the unzipped payload, whose MIME type the check keeps
+        data_format = detect_format_from_payload(
+            check, check.get("mime_type"), await catalog_format_for(check["resource_id"])
+        )
+    return data_format is not None and issubclass(data_format, CsvLike)
 
 
 async def _backfill_parquet(
@@ -451,6 +465,9 @@ async def _backfill_parquet(
         )
         if check is None:
             skip("no_matching_check", resource_id)
+            continue
+        if not await _is_csv_like_source(dict(check)):
+            skip("not_csv_like", resource_id)
             continue
         # exported since the catalog snapshot was generated
         if check["parquet_url"]:
