@@ -14,7 +14,7 @@ def test_gz_unwrap_extracts_payload(mocker, tmp_path):
     gz_path.write_bytes(gzip.compress(b"col\nval"))
 
     file = Gz(file_name=gz_path.name, resource_id=RESOURCE_ID)
-    file.unwrap()
+    file.unwrap(max_size_allowed=None)
 
     try:
         assert not gz_path.exists()
@@ -34,6 +34,6 @@ def test_gz_unwrap_corrupted_gzip_raises_ioerror(mocker, tmp_path):
 
     file = Gz(file_name=gz_path.name, resource_id=RESOURCE_ID)
     with pytest.raises(IOException, match="Corrupted or truncated gzip file"):
-        file.unwrap()
+        file.unwrap(max_size_allowed=None)
 
     assert not list(tmp_path.iterdir())

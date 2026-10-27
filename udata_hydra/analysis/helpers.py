@@ -69,7 +69,7 @@ async def download_from_check(check: dict, data_format: type[DataFormat]) -> Dat
         dataset_id=check.get("dataset_id"),
     )
     if isinstance(file, Gz):
-        file.unwrap()
+        file.unwrap(max_size_allowed=Gz.max_decompressed_filesize_allowed)
     return file
 
 

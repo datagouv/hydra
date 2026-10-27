@@ -3,7 +3,6 @@ import hashlib
 import logging
 import mimetypes
 import re
-import shutil
 import tempfile
 from pathlib import Path
 from typing import IO
@@ -34,17 +33,30 @@ def compute_checksum_from_file(filename: str) -> str:
     return sha1sum.hexdigest()
 
 
-def extract_gzip(file_path: str, url: str | None = None) -> IO[bytes]:
+def extract_gzip(
+    file_path: str, url: str | None = None, max_size_allowed: int | None = None
+) -> IO[bytes]:
+    """
+    Gunzip in chunks to a temporary file.
+    Raises FileTooLargeException if the payload exceeds max_size_allowed, IOException on other errors.
+    """
     temp_file = None
     try:
         with gzip.open(file_path, "rb") as gz_file:
             with tempfile.NamedTemporaryFile(
                 dir=storage_path(""), mode="wb", delete=False
             ) as temp_file:
-                shutil.copyfileobj(gz_file, temp_file, length=2**20)
-    except (EOFError, OSError) as e:
+                size = 0
+                while chunk := gz_file.read(2**20):
+                    size += len(chunk)
+                    if max_size_allowed is not None and size > max_size_allowed:
+                        raise FileTooLargeException("Decompressed file too large", url=url)
+                    temp_file.write(chunk)
+    except (EOFError, OSError, FileTooLargeException) as e:
         if temp_file is not None:
             Path(temp_file.name).unlink(missing_ok=True)
+        if isinstance(e, FileTooLargeException):
+            raise
         if isinstance(e, (EOFError, gzip.BadGzipFile)):
             raise IOException("Corrupted or truncated gzip file", url=url) from e
         raise IOException("Could not extract gzip file", url=url) from e
