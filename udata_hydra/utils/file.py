@@ -4,6 +4,7 @@ import logging
 import mimetypes
 import re
 import tempfile
+import zlib
 from pathlib import Path
 from typing import IO
 
@@ -52,12 +53,12 @@ def extract_gzip(
                     if max_size_allowed is not None and size > max_size_allowed:
                         raise FileTooLargeException("Decompressed file too large", url=url)
                     temp_file.write(chunk)
-    except (EOFError, OSError, FileTooLargeException) as e:
+    except (EOFError, OSError, zlib.error, FileTooLargeException) as e:
         if temp_file is not None:
             Path(temp_file.name).unlink(missing_ok=True)
         if isinstance(e, FileTooLargeException):
             raise
-        if isinstance(e, (EOFError, gzip.BadGzipFile)):
+        if isinstance(e, (EOFError, gzip.BadGzipFile, zlib.error)):
             raise IOException("Corrupted or truncated gzip file", url=url) from e
         raise IOException("Could not extract gzip file", url=url) from e
     return temp_file
