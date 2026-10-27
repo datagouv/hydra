@@ -114,7 +114,9 @@ async def analyse_resource(
                     resource_id=str(resource_id),
                     dataset_id=dataset_id,
                 )
-                gz_file.unwrap()
+                gz_file.unwrap(
+                    max_size_allowed=None if exception else Gz.max_decompressed_filesize_allowed
+                )
                 analysis_file_name = gz_file.file_name
                 analysis_path = gz_file.path
         except IOException as e:
