@@ -16,13 +16,6 @@ def format_datetime_for_json(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-UDATA_DATETIME_KEYS = (
-    "check:date",
-    "analysis:last-modified-at",
-    "analysis:parsing:started_at",
-    "analysis:parsing:finished_at",
-)
-
 log = logging.getLogger("udata-hydra")
 
 CORS_HEADER_PREFIX = "access-control-"
@@ -72,23 +65,7 @@ class UdataPayload:
             for field in self.HYDRA_UDATA_METADATA[cat]:
                 if f"{cat}:{field}" not in payload:
                     payload[f"{cat}:{field}"] = None
-        for key in UDATA_DATETIME_KEYS:
-            if key not in payload or payload[key] is None:
-                continue
-            payload[key] = _normalize_udata_datetime(payload[key])
         self.payload = payload
-
-
-def _normalize_udata_datetime(value: datetime | str) -> str:
-    if isinstance(value, datetime):
-        return format_datetime_for_json(value)
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return value
-    if parsed.tzinfo is None:
-        return value
-    return format_datetime_for_json(parsed)
 
 
 def is_valid_uri(uri: str) -> bool:
