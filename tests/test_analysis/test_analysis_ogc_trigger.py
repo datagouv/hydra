@@ -125,21 +125,6 @@ async def test_too_large_on_download(setup_catalog, rmock, fake_check, produce_m
     await _assert_status_reset(check)
 
 
-async def test_too_large_known_from_previous_check(
-    setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
-):
-    """No download when the headers say nothing changed: rely on the last known filesize"""
-    headers = {"content-length": "0"}
-    await previous_check(
-        headers=headers,
-        filesize=Wfs.max_filesize_allowed + 1,
-        detected_last_modified_at=datetime.now(timezone.utc) - timedelta(days=60),
-    )
-    check = await _analyse_new_check(fake_check, rmock, headers=headers)
-    ogc_analyse.assert_not_called()
-    await _assert_status_reset(check)
-
-
 async def test_unchanged_from_headers_and_never_analysed(
     setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
 ):

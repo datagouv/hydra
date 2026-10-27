@@ -176,20 +176,9 @@ async def analyse_resource(
     # OGC services are analysed on their own schedule: the GetCapabilities document can stay
     # the same for years or change on every check, whatever happens to the service
     if ogc_format is not None:
-        downloaded: bool = change_status != Change.HAS_NOT_CHANGED or must_analyse
-        if downloaded or not last_check:
-            analysis_error = dl_analysis.get("analysis:error")
-            filesize = dl_analysis.get("analysis:content-length")
-        else:
-            analysis_error = last_check["analysis_error"]
-            filesize = last_check["filesize"]
-        if await is_ogc_analysis_due(
-            check,
-            headers=headers,
-            must_analyse=must_analyse,
-            analysis_error=analysis_error,
-            filesize=filesize,
-            max_size_allowed=max_size_allowed,
+        # a failed download (e.g. too large) rules out the analysis, which fetches the document again
+        if not dl_analysis.get("analysis:error") and await is_ogc_analysis_due(
+            check, must_analyse=must_analyse
         ):
             log.info(
                 f"[resource_id={resource_id}] analyse_resource: enqueued {ogc_format.__name__} analysis"
@@ -249,32 +238,11 @@ async def analyse_resource(
             await Resource.update(resource_id, data={"status": None})
 
 
-async def is_ogc_analysis_due(
-    check: dict,
-    headers: dict,
-    must_analyse: bool,
-    analysis_error: str | None,
-    filesize: int | None,
-    max_size_allowed: int | None,
-) -> bool:
-    """Decide whether an OGC service should be analysed, independently of the change detection.
-
-    The analysis is skipped if the GetCapabilities document is known to be too large or could not
-    be downloaded, since the OGC analysis fetches it again without any size limit.
-    Otherwise it runs when forced or on a new URL, when it never ran for this URL,
-    or when the last attempt (successful or not) is older than OGC_ANALYSIS_MAX_AGE_DAYS.
+async def is_ogc_analysis_due(check: dict, must_analyse: bool) -> bool:
+    """Decide whether an OGC service should be analysed, independently of the change detection:
+    when must_analyse, when it never ran, or when the last attempt (successful or not)
+    is older than OGC_ANALYSIS_MAX_AGE_DAYS.
     """
-    if analysis_error:
-        return False
-
-    if max_size_allowed is not None:
-        try:
-            header_length: int | None = int(headers.get("content-length") or 0) or None
-        except ValueError:
-            header_length = None
-        if any(size and size > max_size_allowed for size in (filesize, header_length)):
-            return False
-
     if must_analyse:
         return True
 
