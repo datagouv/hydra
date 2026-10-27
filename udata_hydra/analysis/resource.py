@@ -240,7 +240,7 @@ async def analyse_resource(
 
 async def is_ogc_analysis_due(check: dict, must_analyse: bool) -> bool:
     """Decide whether an OGC service should be analysed, independently of the change detection:
-    when must_analyse, when it never ran, or when the check of the last attempt (successful or not)
+    when must_analyse, when it never succeeded, or when the check of the last successful analysis
     is older than OGC_ANALYSIS_MAX_AGE_DAYS.
     """
     if must_analyse:

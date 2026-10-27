@@ -29,7 +29,7 @@ def ogc_analyse(mocker):
 
 @pytest.fixture
 def previous_check(fake_check):
-    """A check already analysed (it has a checksum), optionally with an OGC analysis attempt"""
+    """A check already analysed (it has a checksum), optionally with a successful OGC analysis"""
 
     async def _previous_check(ogc_analysis_age: timedelta | None = None, **kwargs) -> dict:
         created_at = datetime.now(timezone.utc) - (ogc_analysis_age or timedelta(days=60))
@@ -41,7 +41,7 @@ def previous_check(fake_check):
         } | kwargs
         check = await fake_check(**kwargs)
         if ogc_analysis_age is not None:
-            await Check.update(check["id"], {"parsing_started_at": created_at})
+            await Check.update(check["id"], {"ogc_metadata": {"format": "wfs"}})
         return check
 
     return _previous_check
@@ -87,6 +87,21 @@ async def test_unchanged_and_analysis_too_old(
     setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
 ):
     await previous_check(ogc_analysis_age=timedelta(days=config.OGC_ANALYSIS_MAX_AGE_DAYS + 1))
+    await _analyse_new_check(fake_check, rmock)
+    ogc_analyse.assert_called_once()
+
+
+async def test_recent_failed_analysis_is_retried(
+    setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
+):
+    previous = await previous_check(created_at=datetime.now(timezone.utc) - timedelta(days=1))
+    await Check.update(
+        previous["id"],
+        {
+            "parsing_started_at": previous["created_at"],
+            "parsing_error": "ogc_service_connection:error",
+        },
+    )
     await _analyse_new_check(fake_check, rmock)
     ogc_analyse.assert_called_once()
 

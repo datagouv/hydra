@@ -58,13 +58,12 @@ class Check:
 
     @classmethod
     async def get_previous_ogc_analysed(cls, resource_id: str, check_id: int) -> Record | None:
-        """Get the latest check before check_id on which an OGC analysis was started,
-        whether it succeeded or not"""
+        """Get the latest check before check_id on which an OGC analysis succeeded"""
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
                 SELECT * FROM checks
-                WHERE resource_id = $1 AND id < $2 AND parsing_started_at IS NOT NULL
+                WHERE resource_id = $1 AND id < $2 AND ogc_metadata IS NOT NULL
                 ORDER BY created_at DESC
                 LIMIT 1
             """
