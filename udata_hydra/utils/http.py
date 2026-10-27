@@ -13,6 +13,8 @@ from udata_hydra.utils import IOException
 def format_datetime_for_json(value: datetime) -> str:
     if value.tzinfo is None:
         return value.isoformat()
+    # Convert to UTC rather than just formatting the offset: udata's `to_naive_datetime`
+    # drops the offset without converting, so a `+04:00` date would be stored 4h off.
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
