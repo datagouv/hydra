@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 
@@ -168,22 +168,54 @@ async def analyse_resource(
 
     timer.stop()
 
-    if change_status == Change.HAS_CHANGED or must_analyse:
-        if data_format is not None and not dl_analysis.get("analysis:error"):
+    has_changed: bool = change_status == Change.HAS_CHANGED or must_analyse
+    ogc_format: type[Ogc] | None = (
+        data_format if data_format is not None and issubclass(data_format, Ogc) else None
+    )
+
+    # OGC services are analysed on their own schedule: the GetCapabilities document can stay
+    # the same for years or change on every check, whatever happens to the service
+    if ogc_format is not None:
+        downloaded: bool = change_status != Change.HAS_NOT_CHANGED or must_analyse
+        if downloaded or not last_check:
+            analysis_error = dl_analysis.get("analysis:error")
+            filesize = dl_analysis.get("analysis:content-length")
+        else:
+            analysis_error = last_check["analysis_error"]
+            filesize = last_check["filesize"]
+        if await is_ogc_analysis_due(
+            check,
+            headers=headers,
+            must_analyse=must_analyse,
+            analysis_error=analysis_error,
+            filesize=filesize,
+            max_size_allowed=max_size_allowed,
+        ):
+            log.info(
+                f"[resource_id={resource_id}] analyse_resource: enqueued {ogc_format.__name__} analysis"
+            )
+            await Resource.update(
+                resource_id, data={"status": f"TO_ANALYSE_{ogc_format.__name__.upper()}"}
+            )
+            queue.enqueue(
+                ogc_format.analyse,
+                check=dict(check),
+                _priority="high" if worker_priority == "high" else "default",
+                _exception=bool(exception),
+            )
+        else:
+            await Resource.update(resource_id, data={"status": None})
+
+    if has_changed:
+        # OGC formats have already been handled above
+        if data_format is not None and not ogc_format and not dl_analysis.get("analysis:error"):
             log.info(
                 f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
             )
             await Resource.update(
                 resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
             )
-            if issubclass(data_format, Ogc):
-                queue.enqueue(
-                    data_format.analyse,
-                    check=dict(check),
-                    _priority="high" if worker_priority == "high" else "default",
-                    _exception=bool(exception),
-                )
-            elif tmp_file and analysis_file_name:
+            if tmp_file and analysis_file_name:
                 file = data_format(
                     file_name=analysis_file_name,
                     resource_id=resource_id,
@@ -195,7 +227,7 @@ async def analyse_resource(
                     _priority="high" if worker_priority == "high" else "default",
                     _exception=bool(exception),
                 )
-        else:
+        elif not ogc_format:
             await Resource.update(resource_id, data={"status": None})
 
         # Send analysis result to udata
@@ -213,7 +245,47 @@ async def analyse_resource(
             f"(change_status={change_status.name}, last_parsing_table="
             f"{last_check.get('parsing_table') if last_check else None})"
         )
-        await Resource.update(resource_id, data={"status": None})
+        if not ogc_format:
+            await Resource.update(resource_id, data={"status": None})
+
+
+async def is_ogc_analysis_due(
+    check: dict,
+    headers: dict,
+    must_analyse: bool,
+    analysis_error: str | None,
+    filesize: int | None,
+    max_size_allowed: int | None,
+) -> bool:
+    """Decide whether an OGC service should be analysed, independently of the change detection.
+
+    The analysis is skipped if the GetCapabilities document is known to be too large or could not
+    be downloaded, since the OGC analysis fetches it again without any size limit.
+    Otherwise it runs when forced or on a new URL, when it never ran for this URL,
+    or when the last attempt (successful or not) is older than OGC_ANALYSIS_MAX_AGE_DAYS.
+    """
+    if analysis_error:
+        return False
+
+    if max_size_allowed is not None:
+        try:
+            header_length: int | None = int(headers.get("content-length") or 0) or None
+        except ValueError:
+            header_length = None
+        if any(size and size > max_size_allowed for size in (filesize, header_length)):
+            return False
+
+    if must_analyse:
+        return True
+
+    last_ogc_analysis: Record | None = await Check.get_latest_ogc_analysis(
+        str(check["resource_id"]), check["url"], check["id"]
+    )
+    if not last_ogc_analysis:
+        return True
+
+    max_age = timedelta(days=config.OGC_ANALYSIS_MAX_AGE_DAYS)
+    return last_ogc_analysis["parsing_started_at"] < datetime.now(timezone.utc) - max_age
 
 
 async def update_check_with_modification_and_next_dates(
