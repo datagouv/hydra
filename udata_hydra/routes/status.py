@@ -5,7 +5,7 @@ from aiohttp import web
 
 from udata_hydra import config, context
 from udata_hydra.db.resource import Resource
-from udata_hydra.schemas.types import format_datetime_for_json
+from udata_hydra.utils.http import format_datetime_for_json
 from udata_hydra.worker import QUEUES
 
 

@@ -1,14 +1,20 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import aiohttp
 from aiohttp import web
 
 from udata_hydra import config
-from udata_hydra.schemas.types import format_datetime_for_json
 from udata_hydra.utils import IOException
+
+
+def format_datetime_for_json(value: datetime) -> str:
+    if value.tzinfo is None:
+        return value.isoformat()
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
 
 UDATA_DATETIME_KEYS = (
     "check:date",
