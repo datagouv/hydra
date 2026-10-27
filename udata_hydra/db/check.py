@@ -57,20 +57,18 @@ class Check:
             return await connection.fetchrow(q, resource_id, check_id)
 
     @classmethod
-    async def get_latest_ogc_analysis(
-        cls, resource_id: str, url: str, check_id: int
-    ) -> Record | None:
-        """Get the latest check before check_id on which an OGC analysis was started for this URL,
+    async def get_previous_ogc_analysed(cls, resource_id: str, check_id: int) -> Record | None:
+        """Get the latest check before check_id on which an OGC analysis was started,
         whether it succeeded or not"""
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = """
-                SELECT id, parsing_started_at, ogc_metadata FROM checks
-                WHERE resource_id = $1 AND url = $2 AND id < $3 AND parsing_started_at IS NOT NULL
-                ORDER BY parsing_started_at DESC
+                SELECT * FROM checks
+                WHERE resource_id = $1 AND id < $2 AND parsing_started_at IS NOT NULL
+                ORDER BY created_at DESC
                 LIMIT 1
             """
-            return await connection.fetchrow(q, resource_id, url, check_id)
+            return await connection.fetchrow(q, resource_id, check_id)
 
     @classmethod
     async def get_by_url(cls, url: str) -> list[Record]:

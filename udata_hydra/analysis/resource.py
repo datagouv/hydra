@@ -240,20 +240,20 @@ async def analyse_resource(
 
 async def is_ogc_analysis_due(check: dict, must_analyse: bool) -> bool:
     """Decide whether an OGC service should be analysed, independently of the change detection:
-    when must_analyse, when it never ran, or when the last attempt (successful or not)
+    when must_analyse, when it never ran, or when the check of the last attempt (successful or not)
     is older than OGC_ANALYSIS_MAX_AGE_DAYS.
     """
     if must_analyse:
         return True
 
-    last_ogc_analysis: Record | None = await Check.get_latest_ogc_analysis(
-        str(check["resource_id"]), check["url"], check["id"]
+    last_ogc_analysis: Record | None = await Check.get_previous_ogc_analysed(
+        str(check["resource_id"]), check["id"]
     )
     if not last_ogc_analysis:
         return True
 
     max_age = timedelta(days=config.OGC_ANALYSIS_MAX_AGE_DAYS)
-    return last_ogc_analysis["parsing_started_at"] < datetime.now(timezone.utc) - max_age
+    return last_ogc_analysis["created_at"] < datetime.now(timezone.utc) - max_age
 
 
 async def update_check_with_modification_and_next_dates(
