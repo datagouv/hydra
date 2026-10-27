@@ -42,10 +42,12 @@ def extract_gzip(file_path: str, url: str | None = None) -> IO[bytes]:
                 dir=storage_path(""), mode="wb", delete=False
             ) as temp_file:
                 shutil.copyfileobj(gz_file, temp_file, length=2**20)
-    except (EOFError, gzip.BadGzipFile) as e:
+    except (EOFError, OSError) as e:
         if temp_file is not None:
             Path(temp_file.name).unlink(missing_ok=True)
-        raise IOException("Corrupted or truncated gzip file", url=url) from e
+        if isinstance(e, (EOFError, gzip.BadGzipFile)):
+            raise IOException("Corrupted or truncated gzip file", url=url) from e
+        raise IOException("Could not extract gzip file", url=url) from e
     return temp_file
 
 
