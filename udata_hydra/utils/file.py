@@ -3,6 +3,7 @@ import hashlib
 import logging
 import mimetypes
 import re
+import shutil
 import tempfile
 from pathlib import Path
 from typing import IO
@@ -40,7 +41,7 @@ def extract_gzip(file_path: str, url: str | None = None) -> IO[bytes]:
             with tempfile.NamedTemporaryFile(
                 dir=storage_path(""), mode="wb", delete=False
             ) as temp_file:
-                temp_file.write(gz_file.read())
+                shutil.copyfileobj(gz_file, temp_file, length=2**20)
     except (EOFError, gzip.BadGzipFile) as e:
         if temp_file is not None:
             Path(temp_file.name).unlink(missing_ok=True)
