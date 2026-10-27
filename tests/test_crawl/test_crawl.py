@@ -113,6 +113,7 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
     webhook = next(p for p in payloads if "check:id" in p)
     assert webhook.get("check:date")
     datetime.fromisoformat(webhook["check:date"])
+    assert webhook["check:date"].endswith("Z")
     if exception is TimeoutError:
         assert webhook.get("check:available")
         assert webhook.get("check:headers:content-type") == "application/json"
