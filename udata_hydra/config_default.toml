@@ -68,6 +68,9 @@ MAX_FILESIZE_ALLOWED.wfs = 1048576     # 1 MB
 
 DEFAULT_MAX_FILESIZE_ALLOWED = 52428800
 
+# max size of a gzip payload once decompressed (1 GB), against gzip bombs
+MAX_DECOMPRESSED_FILESIZE_ALLOWED = 1073741824
+
 # -- CSV analysis settings -- #
 SQL_INDEXES_TYPES_SUPPORTED = ["index"]
 
