@@ -32,18 +32,16 @@ def previous_check(fake_check):
     """A check already analysed (it has a checksum), optionally with an OGC analysis attempt"""
 
     async def _previous_check(ogc_analysis_age: timedelta | None = None, **kwargs) -> dict:
+        created_at = datetime.now(timezone.utc) - (ogc_analysis_age or timedelta(days=60))
         kwargs = {
             "url": WFS_URL,
             "checksum": CAPABILITIES_CHECKSUM,
             "filesize": len(CAPABILITIES),
-            "created_at": datetime.now(timezone.utc) - timedelta(days=60),
+            "created_at": created_at,
         } | kwargs
         check = await fake_check(**kwargs)
         if ogc_analysis_age is not None:
-            await Check.update(
-                check["id"],
-                {"parsing_started_at": datetime.now(timezone.utc) - ogc_analysis_age},
-            )
+            await Check.update(check["id"], {"parsing_started_at": created_at})
         return check
 
     return _previous_check
