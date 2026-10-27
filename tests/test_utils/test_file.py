@@ -1,6 +1,7 @@
 import gzip
 import os
 import tempfile
+import tracemalloc
 from pathlib import Path
 from unittest.mock import patch
 
@@ -36,6 +37,27 @@ def test_extract_gzip_writes_to_storage_path(mocker, tmp_path):
         assert Path(extracted.name).parent == storage_path("")
         with open(extracted.name, "rb") as f:
             assert f.read() == b"col\nval"
+    finally:
+        os.remove(extracted.name)
+
+
+def test_extract_gzip_does_not_load_payload_in_memory(mocker, tmp_path):
+    mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", str(tmp_path))
+    size = 20 * 2**20
+    gz_path = tmp_path / "big.csv.gz"
+    gz_path.write_bytes(gzip.compress(b"\0" * size))
+
+    tracemalloc.start()
+    try:
+        extracted = extract_gzip(str(gz_path))
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    try:
+        # Reading the whole payload at once would peak above its size
+        assert peak < 10 * 2**20
+        assert Path(extracted.name).stat().st_size == size
     finally:
         os.remove(extracted.name)
 
