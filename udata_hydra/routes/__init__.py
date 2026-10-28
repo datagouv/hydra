@@ -8,7 +8,7 @@ from udata_hydra.routes.checks import (
     get_checks_aggregate,
     get_latest_check,
 )
-from udata_hydra.routes.max_sizes import get_all_format_size_thresholds
+from udata_hydra.routes.config import get_exposed_config
 from udata_hydra.routes.resources import (
     create_resource,
     delete_resource,
@@ -77,7 +77,7 @@ routes_params = [
         delete_resource_exception,
         None,
     ),
-    (web.get, "/api/max-sizes", get_all_format_size_thresholds, None),
+    (web.get, "/api/config", get_exposed_config, None),
 ]
 
 # Generate the routes
