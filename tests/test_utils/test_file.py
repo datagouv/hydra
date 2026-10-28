@@ -1,6 +1,7 @@
 import gzip
 import os
 import tempfile
+import tracemalloc
 from pathlib import Path
 from unittest.mock import patch
 
@@ -8,7 +9,7 @@ import pytest
 
 from tests.conftest import RESOURCE_ID
 from udata_hydra.data_formats import Geojson
-from udata_hydra.utils import IOException
+from udata_hydra.utils import FileTooLargeException, IOException
 from udata_hydra.utils.file import download_resource, extract_gzip, remove_remainders, storage_path
 
 
@@ -40,6 +41,38 @@ def test_extract_gzip_writes_to_storage_path(mocker, tmp_path):
         os.remove(extracted.name)
 
 
+def test_extract_gzip_does_not_load_payload_in_memory(mocker, tmp_path):
+    mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", str(tmp_path))
+    size = 20 * 2**20
+    gz_path = tmp_path / "big.csv.gz"
+    gz_path.write_bytes(gzip.compress(b"\0" * size))
+
+    tracemalloc.start()
+    try:
+        extracted = extract_gzip(str(gz_path))
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    try:
+        # Reading the whole payload at once would peak above its size
+        assert peak < 10 * 2**20
+        assert Path(extracted.name).stat().st_size == size
+    finally:
+        os.remove(extracted.name)
+
+
+def test_extract_gzip_raises_too_large_above_max_size(mocker, tmp_path):
+    mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", str(tmp_path))
+    gz_path = tmp_path / "bomb.csv.gz"
+    gz_path.write_bytes(gzip.compress(b"\0" * (2 * 2**20)))
+
+    with pytest.raises(FileTooLargeException, match="Decompressed file too large"):
+        extract_gzip(str(gz_path), max_size_allowed=2**20)
+
+    assert list(tmp_path.iterdir()) == [gz_path]
+
+
 def test_extract_gzip_raises_ioerror_on_truncated_file(mocker, tmp_path):
     mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", str(tmp_path))
     gz_path = tmp_path / "truncated.csv.gz"
@@ -47,6 +80,21 @@ def test_extract_gzip_raises_ioerror_on_truncated_file(mocker, tmp_path):
 
     with pytest.raises(IOException, match="Corrupted or truncated gzip file"):
         extract_gzip(str(gz_path))
+
+
+def test_extract_gzip_removes_partial_file_on_os_error(mocker, tmp_path):
+    mocker.patch("udata_hydra.config.TEMPORARY_DOWNLOAD_FOLDER", str(tmp_path))
+    gz_path = tmp_path / "data.csv.gz"
+    gz_path.write_bytes(gzip.compress(b"col\nval"))
+    mocker.patch(
+        "udata_hydra.utils.file.gzip.GzipFile.read",
+        side_effect=[b"col\n", OSError(5, "Input/output error")],
+    )
+
+    with pytest.raises(IOException, match="Could not extract gzip file"):
+        extract_gzip(str(gz_path))
+
+    assert list(tmp_path.iterdir()) == [gz_path]
 
 
 def test_extract_gzip_raises_ioerror_on_invalid_file(mocker, tmp_path):
@@ -59,7 +107,7 @@ def test_extract_gzip_raises_ioerror_on_invalid_file(mocker, tmp_path):
 
 
 async def test_download_resource_rejects_oversized_content_length():
-    with pytest.raises(IOException, match="File too large to download"):
+    with pytest.raises(FileTooLargeException, match="File too large to download"):
         await download_resource(
             url="http://example.com/file.csv",
             headers={"content-length": "1000"},
@@ -71,7 +119,7 @@ async def test_download_resource_rejects_oversized_while_streaming(rmock):
     url = "http://example.com/file.csv"
     rmock.get(url, status=200, body=b"x" * 2048)
 
-    with pytest.raises(IOException, match="File too large to download"):
+    with pytest.raises(FileTooLargeException, match="File too large to download"):
         await download_resource(url=url, max_size_allowed=500)
 
 

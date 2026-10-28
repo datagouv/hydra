@@ -6,7 +6,7 @@ import pyarrow.parquet as pq
 
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.data_formats.table import Table
-from udata_hydra.db import db_col_name
+from udata_hydra.db import db_col_name, quote_ident
 from udata_hydra.utils import storage_path
 
 if TYPE_CHECKING:
@@ -29,13 +29,25 @@ async def db_to_parquet(table: Table) -> "Parquet":
 
     original_cols = list(table.inspection["columns"].keys())
     db_cols = [db_col_name(c) for c in original_cols]
-    cols_sql = ", ".join(f'"{c}"' for c in db_cols)
+    cols_sql = ", ".join(quote_ident(c) for c in db_cols)
 
+    # a table name is the hash of the resource url, so each re-ingestion adds an entry:
+    # the latest one describes the current table content
+    index_entry = await pool.fetchrow(
+        "SELECT csv_detective, created_at FROM tables_index "
+        "WHERE parsing_table = $1 ORDER BY created_at DESC LIMIT 1",
+        table.table_name,
+    )
     schema = pa.schema(
         [
             pa.field(c, PYTHON_TYPE_TO_PA[table.inspection["columns"][c]["python_type"]])
             for c in original_cols
-        ]
+        ],
+        # the file must be self-sufficient for readers that don't have access to `tables_index`
+        metadata={
+            "csv_detective": index_entry["csv_detective"],
+            "created_at": index_entry["created_at"].isoformat(),
+        },
     )
 
     parquet_name = (
@@ -48,7 +60,7 @@ async def db_to_parquet(table: Table) -> "Parquet":
     try:
         async with pool.acquire() as conn:
             async with conn.transaction():
-                stmt = await conn.prepare(f'SELECT {cols_sql} FROM "{table.table_name}"')
+                stmt = await conn.prepare(f"SELECT {cols_sql} FROM {quote_ident(table.table_name)}")
                 cursor = await stmt.cursor()
                 while batch := await cursor.fetch(BATCH_SIZE):
                     pq_table = pa.table(

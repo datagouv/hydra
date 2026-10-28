@@ -26,6 +26,9 @@ pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
 nest_asyncio.apply()
 
+# checksum of a previously analysed check, different from the one of SIMPLE_CSV_CONTENT
+PREVIOUS_CHECKSUM = hashlib.sha1(b"previous content").hexdigest()
+
 
 async def mock_download_resource(url, headers, max_size_allowed):
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -287,7 +290,7 @@ async def test_analyse_resource(setup_catalog, mocker, fake_check):
     mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
 
     check = await fake_check()
-    await analyse_resource(check=check, last_check=None)
+    await analyse_resource(check=check)
     result: Record | None = await Check.get_by_id(check["id"])
     assert result is not None
     assert result["error"] is None
@@ -307,9 +310,10 @@ async def test_analyse_resource_udata_webhook(
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
     rmock.put(udata_url, status=200, repeat=True)
     checksum = hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
-    last_check = await fake_check(checksum=checksum) if same_checksum else None
+    if same_checksum:
+        await fake_check(checksum=checksum)
     check = await fake_check()
-    await analyse_resource(check=check, last_check=last_check)
+    await analyse_resource(check=check)
     put_key = ("PUT", URL(udata_url))
     if expect_put:
         doc = rmock.requests[put_key][0].kwargs["json"]
@@ -388,7 +392,7 @@ async def test_change_analysis_content_length_header(
     setup_catalog, rmock, fake_check, db, udata_url
 ):
     # different content-length than mock response
-    await fake_check(headers={"content-length": "1"})
+    await fake_check(headers={"content-length": "1"}, checksum=PREVIOUS_CHECKSUM)
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", RESOURCE_ID)
     rmock.head(RESOURCE_URL, headers={"content-length": "2"})
@@ -428,7 +432,11 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
 
 @pytest.mark.catalog_harvested
 async def test_change_analysis_harvested(setup_catalog, mocker, rmock, fake_check, db, udata_url):
-    await fake_check(detected_last_modified_at=datetime.now() - timedelta(days=10))
+    await fake_check(
+        url="https://example.com/harvested",
+        checksum=PREVIOUS_CHECKSUM,
+        detected_last_modified_at=datetime.now() - timedelta(days=10),
+    )
     # force check execution at next run
     await db.execute("UPDATE catalog SET priority = TRUE WHERE resource_id = $1", RESOURCE_ID)
     mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
@@ -452,7 +460,9 @@ async def test_no_change_analysis_harvested(
         tzinfo=timezone.utc
     )
     await fake_check(
+        url="https://example.com/harvested",
         headers={"content-type": "application/json"},
+        checksum=PREVIOUS_CHECKSUM,
         created_at=datetime.now() - timedelta(days=10),
         detected_last_modified_at=last_modfied_at,
     )  # same date as harvest.modified_at in catalog
@@ -463,6 +473,168 @@ async def test_no_change_analysis_harvested(
     assert ("PUT", URL(udata_url)) not in rmock.requests
     res = await db.fetch("SELECT * FROM checks ORDER BY created_at DESC LIMIT 1")
     assert res[0]["detected_last_modified_at"] == last_modfied_at
+
+
+CSV_HEADERS = {"content-type": "text/csv"}
+
+
+async def get_parsing_table(db, check_id: int) -> str | None:
+    res = await db.fetchrow("SELECT parsing_table FROM checks WHERE id = $1", check_id)
+    return res["parsing_table"]
+
+
+async def test_analyse_first_check_parses_when_next_check_already_exists(
+    setup_catalog, rmock, fake_check, db, produce_mock
+):
+    # a second check was inserted before the first one got analysed, with the same early hints
+    headers = CSV_HEADERS | {"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"}
+    first_check = await fake_check(headers=headers)
+    await fake_check(headers=headers)
+    rmock.get(RESOURCE_URL, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+
+    await analyse_resource(check=first_check)
+
+    assert (
+        await get_parsing_table(db, first_check["id"])
+        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
+    )
+
+
+async def test_analyse_check_compares_with_its_own_predecessor(
+    setup_catalog, rmock, fake_check, db, produce_mock
+):
+    await fake_check(
+        headers=CSV_HEADERS | {"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"},
+        checksum=PREVIOUS_CHECKSUM,
+        detected_last_modified_at=datetime(2020, 1, 9, 9, 33, 37, tzinfo=timezone.utc),
+        parsing_table=True,
+    )
+    # the file changed, and a newer check was inserted before this one got analysed
+    new_headers = CSV_HEADERS | {"last-modified": "Fri, 10 Jan 2025 09:33:37 GMT"}
+    check = await fake_check(headers=new_headers)
+    await fake_check(headers=new_headers)
+    rmock.get(RESOURCE_URL, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+
+    await analyse_resource(check=check)
+
+    assert (
+        await get_parsing_table(db, check["id"])
+        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
+    )
+
+
+@pytest.mark.catalog_harvested
+async def test_analyse_new_url_parses_when_harvest_date_unchanged(
+    setup_catalog, rmock, fake_check, db, produce_mock
+):
+    new_url = "https://example.com/harvested"
+    harvest_modified_at = datetime.fromisoformat("2022-12-06T05:00:32.647000").replace(
+        tzinfo=timezone.utc
+    )
+    await fake_check(
+        url="https://example.com/harvested-old",
+        headers=CSV_HEADERS,
+        checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest(),
+        detected_last_modified_at=harvest_modified_at,
+        parsing_table=True,
+    )
+    check = await fake_check(url=new_url, headers=CSV_HEADERS)
+    rmock.get(new_url, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+
+    await analyse_resource(check=check)
+
+    assert (
+        await get_parsing_table(db, check["id"]) == hashlib.md5(new_url.encode("utf-8")).hexdigest()
+    )
+
+
+async def test_analyse_new_url_parses_when_file_is_identical(
+    setup_catalog, rmock, fake_check, db, produce_mock
+):
+    await fake_check(
+        url="https://example.com/resource-1-old",
+        headers=CSV_HEADERS,
+        checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest(),
+        detected_last_modified_at=datetime(2020, 1, 9, tzinfo=timezone.utc),
+        parsing_table=True,
+    )
+    check = await fake_check(headers=CSV_HEADERS)
+    rmock.get(RESOURCE_URL, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+
+    await analyse_resource(check=check)
+
+    assert (
+        await get_parsing_table(db, check["id"])
+        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
+    )
+
+
+async def test_analyse_new_url_parses_when_first_check_on_it_failed(
+    setup_catalog, rmock, fake_check, db, produce_mock
+):
+    await fake_check(
+        url="https://example.com/resource-1-old",
+        headers=CSV_HEADERS,
+        checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest(),
+        parsing_table=True,
+    )
+    # the first check on the new URL timed out, so it was never analysed
+    await fake_check(timeout=True, status=None, headers={})
+    check = await fake_check(headers=CSV_HEADERS)
+    rmock.get(RESOURCE_URL, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+
+    await analyse_resource(check=check)
+
+    assert (
+        await get_parsing_table(db, check["id"])
+        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
+    )
+
+
+async def test_analyse_detects_content_change_across_failed_check(
+    setup_catalog, rmock, fake_check, db, produce_mock
+):
+    await fake_check(
+        headers=CSV_HEADERS,
+        checksum=PREVIOUS_CHECKSUM,
+        detected_last_modified_at=datetime(2020, 1, 9, tzinfo=timezone.utc),
+        parsing_table=True,
+    )
+    await fake_check(timeout=True, status=None, headers={})
+    check = await fake_check(headers=CSV_HEADERS)
+    rmock.get(RESOURCE_URL, status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+
+    await analyse_resource(check=check)
+
+    assert (
+        await get_parsing_table(db, check["id"])
+        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
+    )
+
+
+@pytest.mark.catalog_harvested
+async def test_analyse_new_url_notifies_udata(setup_catalog, rmock, fake_check, udata_url):
+    harvest_modified_at = datetime.fromisoformat("2022-12-06T05:00:32.647000").replace(
+        tzinfo=timezone.utc
+    )
+    await fake_check(
+        url="https://example.com/harvested-old",
+        headers=CSV_HEADERS,
+        checksum=hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest(),
+        detected_last_modified_at=harvest_modified_at,
+        parsing_table=True,
+    )
+    check = await fake_check(url="https://example.com/harvested", headers=CSV_HEADERS)
+    rmock.get(check["url"], status=200, body=SIMPLE_CSV_CONTENT.encode("utf-8"))
+    rmock.put(udata_url, repeat=True)
+
+    await analyse_resource(check=check)
+
+    payloads = [req.kwargs["json"] for req in rmock.requests[("PUT", URL(udata_url))]]
+    analysis_payload = next(p for p in payloads if "analysis:check_id" in p)
+    assert analysis_payload["analysis:check_id"] == check["id"]
+    assert analysis_payload["analysis:last-modified-detection"] == "harvest-resource-metadata"
+    assert analysis_payload["analysis:last-modified-at"] == harvest_modified_at.isoformat()
 
 
 @pytest.mark.parametrize(
@@ -490,11 +662,13 @@ async def test_change_analysis_last_modified_no_reanalysis(
             detected_last_modified_at=datetime.fromisoformat("2020-01-09T09:33:37+01:00"),
             created_at=created_at,
             headers=json_headers,
+            checksum=PREVIOUS_CHECKSUM,
         )
     else:
         await fake_check(
             headers=json_headers | {"last-modified": head_last_modified},
             created_at=created_at,
+            checksum=PREVIOUS_CHECKSUM,
         )
     rmock.head(
         RESOURCE_URL,
@@ -570,6 +744,7 @@ async def test_no_check_changed_header(
     await fake_check(
         created_at=datetime.now() - timedelta(days=10),
         headers={"content-type": "application/json", "content-length": "10"},
+        checksum=PREVIOUS_CHECKSUM,
         detected_last_modified_at=datetime.now() - timedelta(days=20),
     )
     rmock.head(
@@ -670,7 +845,9 @@ async def test_check_triggers_csv_analysis(rmock, db, produce_mock, setup_catalo
 async def test_recheck_download_only_once(rmock, fake_check, db, produce_mock, setup_catalog):
     """On recheck of a (CSV) file, if it hasn't change, downloads only once"""
     await fake_check(
-        resource_id=RESOURCE_ID, headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"}
+        resource_id=RESOURCE_ID,
+        headers={"last-modified": "Thu, 09 Jan 2020 09:33:37 GMT"},
+        checksum=PREVIOUS_CHECKSUM,
     )
     rurl = RESOURCE_URL
     # mock for check, with same last-modified header
@@ -816,7 +993,6 @@ async def test_reset_statuses(fake_check, db, setup_catalog, check_duration):
             "udata_hydra.analysis.resource.analyse_resource",
             {
                 "check": ANY,
-                "last_check": ANY,
                 "force_analysis": False,
                 "worker_priority": "default",
             },
