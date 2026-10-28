@@ -168,9 +168,10 @@ async def analyse_resource(
 
     timer.stop()
 
-    has_changed: bool = change_status == Change.HAS_CHANGED or must_analyse
+    # the resource has changed, or must be analysed anyway (forced, first check, new URL)
+    should_notify: bool = change_status == Change.HAS_CHANGED or must_analyse
 
-    if has_changed:
+    if should_notify:
         # Send analysis result to udata
         queue.enqueue(
             send,
@@ -213,7 +214,7 @@ async def analyse_resource(
             await Resource.update(resource_id, data={"status": None})
         return
 
-    if has_changed and data_format is not None and not dl_analysis.get("analysis:error"):
+    if should_notify and data_format is not None and not dl_analysis.get("analysis:error"):
         log.info(
             f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
         )
@@ -238,14 +239,14 @@ async def analyse_resource(
 
 async def is_ogc_analysis_due(check: dict, must_analyse: bool) -> bool:
     """Decide whether an OGC service should be analysed, independently of the change detection:
-    when must_analyse, when it never succeeded, or when the check of the last successful analysis
+    when must_analyse, when it never succeeded on this URL, or when the check of the last successful analysis
     is older than OGC_ANALYSIS_MAX_AGE_DAYS.
     """
     if must_analyse:
         return True
 
     last_ogc_analysis: Record | None = await Check.get_previous_ogc_analysed(
-        str(check["resource_id"]), check["id"]
+        str(check["resource_id"]), check["url"], check["id"]
     )
     if not last_ogc_analysis:
         return True
