@@ -711,6 +711,37 @@ async def test_export_parquet_stores_error_on_recrawled_check(
     notify_udata.assert_awaited_once()
 
 
+async def test_export_parquet_skips_notify_when_later_check_parsed(
+    setup_catalog, fake_check, mocker
+):
+    """A later check has parsed the resource: don't overwrite its analysis nor its status."""
+    check = await fake_check()
+    later_check = await fake_check()
+    await Check.update(later_check["id"], {"parsing_started_at": datetime.now()})
+    await Resource.update(RESOURCE_ID, {"status": "ANALYSING_CSV"})
+    notify_udata = mocker.patch(
+        "udata_hydra.analysis.exports.helpers.notify_udata",
+        new=mocker.AsyncMock(),
+    )
+    mocker.patch(
+        "udata_hydra.analysis.exports.Table.to_parquet",
+        new=mocker.AsyncMock(
+            return_value=Parquet(file_name="tests/data/valid.geojson", resource_id=RESOURCE_ID)
+        ),
+    )
+    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=MagicMock())
+
+    await export_parquet(
+        table=Table(table_name="test", resource_id=RESOURCE_ID),
+        check=check,
+    )
+
+    notify_udata.assert_not_awaited()
+    resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
+    assert resource["status"] == "ANALYSING_CSV"
+
+
 async def test_file_with_nan(
     setup_catalog,
     rmock,

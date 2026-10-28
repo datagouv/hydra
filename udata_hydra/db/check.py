@@ -57,6 +57,19 @@ class Check:
             return await connection.fetchrow(q, resource_id, check_id)
 
     @classmethod
+    async def has_later_parsing(cls, resource_id: str, check_id: int) -> bool:
+        """Whether a check after check_id has started parsing the resource"""
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = """
+                SELECT EXISTS (
+                    SELECT 1 FROM checks
+                    WHERE resource_id = $1 AND id > $2 AND parsing_started_at IS NOT NULL
+                )
+            """
+            return await connection.fetchval(q, resource_id, check_id)
+
+    @classmethod
     async def get_by_url(cls, url: str) -> list[Record]:
         pool = await context.pool()
         async with pool.acquire() as connection:

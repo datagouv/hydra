@@ -64,7 +64,10 @@ async def _run_export_job(
                 pe, getattr(data_object, "table_name", None), check
             )
     finally:
-        if data_object.resource_id is not None:
+        # a later check has (re)parsed the resource: its analysis and status take precedence
+        if data_object.resource_id is not None and not await Check.has_later_parsing(
+            data_object.resource_id, check["id"]
+        ):
             resource = await Resource.get(data_object.resource_id)
             if resource is not None and check_out is not None:
                 await helpers.notify_udata(resource, check_out)
