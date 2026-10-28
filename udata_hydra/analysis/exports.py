@@ -34,7 +34,7 @@ async def _run_export_job(
         upload_url = context.s3_client().send_file(
             output, delete_source=delete_output and config.REMOVE_GENERATED_FILES
         )
-        #  the updated check may not be the last one anymore, e.g. recrawled since its parsing
+        # the updated check may not be the last one anymore, e.g. recrawled since its parsing
         check_out = await Check.update(
             check["id"],
             {
