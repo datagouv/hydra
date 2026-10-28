@@ -169,9 +169,9 @@ async def analyse_resource(
     timer.stop()
 
     # the resource has changed, or must be analysed anyway (forced, first check, new URL)
-    should_notify: bool = change_status == Change.HAS_CHANGED or must_analyse
+    has_changed: bool = change_status == Change.HAS_CHANGED or must_analyse
 
-    if should_notify:
+    if has_changed:
         # Send analysis result to udata
         queue.enqueue(
             send,
@@ -214,7 +214,7 @@ async def analyse_resource(
             await Resource.update(resource_id, data={"status": None})
         return
 
-    if should_notify and data_format is not None and not dl_analysis.get("analysis:error"):
+    if has_changed and data_format is not None and not dl_analysis.get("analysis:error"):
         log.info(
             f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
         )
