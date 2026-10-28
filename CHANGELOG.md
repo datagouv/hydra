@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.14.1 (2026-10-27)
+
+- fix: stream unzip ([#497](https://github.com/datagouv/hydra/pull/497))
+
+
 ## 2.14.0 (2026-10-21)
 
 - chore: escape quote identifiers in SQL queries and expose only safe errors in analysis:parsing:error ([#485](https://github.com/datagouv/hydra/pull/485))

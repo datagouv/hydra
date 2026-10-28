@@ -18,6 +18,7 @@ class Gz(DataFormat):
     standard_mime_type = "application/gzip"
     valid_mime_types = {standard_mime_type, "application/x-gzip"}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["gz"])
+    max_decompressed_filesize_allowed = int(config.MAX_DECOMPRESSED_FILESIZE_ALLOWED)
     check_url = ".gz"
     further_analysis = True
 
@@ -37,13 +38,13 @@ class Gz(DataFormat):
             "url", ""
         )
 
-    def unwrap(self) -> None:
+    def unwrap(self, max_size_allowed: int | None) -> None:
         """Gunzip in place; call before checksum or analysis on the payload."""
         mime_type = magic.from_file(str(self.path), mime=True)
         if mime_type not in self.valid_mime_types:
             return
         try:
-            extracted = extract_gzip(str(self.path))
+            extracted = extract_gzip(str(self.path), max_size_allowed=max_size_allowed)
         except IOException:
             self.path.unlink(missing_ok=True)
             raise
