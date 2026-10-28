@@ -132,6 +132,19 @@ async def test_previous_analysis_on_another_url(
     ogc_analyse.assert_called_once()
 
 
+async def test_new_url_after_failed_first_analysis(
+    setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
+):
+    """A recent analysis of the old URL must not count once the first one on the new URL failed"""
+    await previous_check(
+        ogc_analysis_age=timedelta(days=2), url="https://example.com/old/wfs?SERVICE=WFS"
+    )
+    failed = await previous_check(created_at=datetime.now(timezone.utc) - timedelta(days=1))
+    await Check.update(failed["id"], {"parsing_error": "ogc_service_connection:error"})
+    await _analyse_new_check(fake_check, rmock)
+    ogc_analyse.assert_called_once()
+
+
 async def test_too_large_on_download(setup_catalog, rmock, fake_check, produce_mock, ogc_analyse):
     check = await _analyse_new_check(fake_check, rmock, headers={"content-length": TOO_LARGE})
     ogc_analyse.assert_not_called()
