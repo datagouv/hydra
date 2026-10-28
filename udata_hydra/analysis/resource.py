@@ -169,6 +169,23 @@ async def analyse_resource(
     timer.stop()
 
     has_changed: bool = change_status == Change.HAS_CHANGED or must_analyse
+
+    if has_changed:
+        # Send analysis result to udata
+        queue.enqueue(
+            send,
+            dataset_id=dataset_id,
+            resource_id=resource_id,
+            document=UdataPayload(analysis_results),
+            _priority="high",
+        )
+    else:
+        log.info(
+            f"[resource_id={resource_id}] analyse_resource: skipped analysis udata notify "
+            f"(change_status={change_status.name}, last_parsing_table="
+            f"{last_check.get('parsing_table') if last_check else None})"
+        )
+
     ogc_format: type[Ogc] | None = (
         data_format if data_format is not None and issubclass(data_format, Ogc) else None
     )
@@ -176,7 +193,7 @@ async def analyse_resource(
     # OGC services are analysed on their own schedule: the GetCapabilities document can stay
     # the same for years or change on every check, whatever happens to the service
     if ogc_format is not None:
-        # a failed download (e.g. too large) rules out the analysis, which fetches the document again
+        # a failed download (e.g. too large) rules out the analysis, which would fetch the document again
         if not dl_analysis.get("analysis:error") and await is_ogc_analysis_due(
             check, must_analyse=must_analyse
         ):
@@ -194,48 +211,29 @@ async def analyse_resource(
             )
         else:
             await Resource.update(resource_id, data={"status": None})
+        return
 
-    if has_changed:
-        # OGC formats have already been handled above
-        if data_format is not None and not ogc_format and not dl_analysis.get("analysis:error"):
-            log.info(
-                f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
-            )
-            await Resource.update(
-                resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
-            )
-            if tmp_file and analysis_file_name:
-                file = data_format(
-                    file_name=analysis_file_name,
-                    resource_id=resource_id,
-                    dataset_id=dataset_id,
-                )
-                queue.enqueue(
-                    file.analyse,
-                    check=dict(check),
-                    _priority="high" if worker_priority == "high" else "default",
-                    _exception=bool(exception),
-                )
-        elif not ogc_format:
-            await Resource.update(resource_id, data={"status": None})
-
-        # Send analysis result to udata
-        queue.enqueue(
-            send,
-            dataset_id=dataset_id,
-            resource_id=resource_id,
-            document=UdataPayload(analysis_results),
-            _priority="high",
-        )
-
-    else:
+    if has_changed and data_format is not None and not dl_analysis.get("analysis:error"):
         log.info(
-            f"[resource_id={resource_id}] analyse_resource: skipped re-parse and analysis udata notify "
-            f"(change_status={change_status.name}, last_parsing_table="
-            f"{last_check.get('parsing_table') if last_check else None})"
+            f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
         )
-        if not ogc_format:
-            await Resource.update(resource_id, data={"status": None})
+        await Resource.update(
+            resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
+        )
+        if tmp_file and analysis_file_name:
+            file = data_format(
+                file_name=analysis_file_name,
+                resource_id=resource_id,
+                dataset_id=dataset_id,
+            )
+            queue.enqueue(
+                file.analyse,
+                check=dict(check),
+                _priority="high" if worker_priority == "high" else "default",
+                _exception=bool(exception),
+            )
+    else:
+        await Resource.update(resource_id, data={"status": None})
 
 
 async def is_ogc_analysis_due(check: dict, must_analyse: bool) -> bool:
