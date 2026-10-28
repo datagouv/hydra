@@ -111,6 +111,7 @@ PARQUET_TO_DB = false
 OGC_ANALYSIS_ENABLED = false
 OGC_FORMATS = ["wfs", "wms"]
 OGC_GETCAPABILITIES_TIMEOUT = 30  # in seconds
-# re-run the OGC analysis when the last one is older than this, whether the GetCapabilities changed or not
-# slightly below the longest CHECK_DELAYS (30 days) so that monthly checked resources are refreshed every month
+# OGC services are deemed stable: re-run their analysis about once a month, whatever the crawl rate
+# (new resources and URL changes are analysed right away); kept slightly below the longest CHECK_DELAYS
+# (720 hours) so that resources checked monthly are re-analysed at every check
 OGC_ANALYSIS_MAX_AGE_DAYS = 28
