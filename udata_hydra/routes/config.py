@@ -4,8 +4,8 @@ from udata_hydra import config
 
 
 async def get_exposed_config(request: web.Request) -> web.Response:
-    """Endpoint to get all the threshold up to which a file of a specific format will be analyzed
-    Respond with a 200 status code with a dict format: max_size
+    """Endpoint to expose parts of the config that is of interest to producers.
+    Respond with a 200 status code with a dict containing the exposed config attributes
     """
 
     return web.json_response(
