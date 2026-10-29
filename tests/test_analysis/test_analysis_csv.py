@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -711,14 +711,35 @@ async def test_export_parquet_stores_error_on_recrawled_check(
     notify_udata.assert_awaited_once()
 
 
-async def test_export_parquet_skips_notify_when_later_check_parsed(
-    setup_catalog, fake_check, mocker
+@pytest.mark.parametrize(
+    "later_check_data,status,should_notify",
+    [
+        # a later check has parsed the resource: don't overwrite its analysis nor its status
+        (
+            {
+                "parsing_started_at": datetime.now(timezone.utc),
+                "parsing_finished_at": datetime.now(timezone.utc),
+            },
+            "BACKOFF",
+            False,
+        ),
+        # a later check is parsing the resource: don't overwrite its analysis nor its status
+        ({"parsing_started_at": datetime.now(timezone.utc)}, "ANALYSING_CSV", False),
+        # a later check got stuck while parsing (e.g. killed worker): it doesn't block the export
+        (
+            {"parsing_started_at": datetime.now(timezone.utc) - timedelta(days=1)},
+            "ANALYSING_CSV",
+            True,
+        ),
+    ],
+)
+async def test_export_parquet_notify_depending_on_later_check(
+    setup_catalog, fake_check, mocker, later_check_data, status, should_notify
 ):
-    """A later check has parsed the resource: don't overwrite its analysis nor its status."""
     check = await fake_check()
     later_check = await fake_check()
-    await Check.update(later_check["id"], {"parsing_started_at": datetime.now()})
-    await Resource.update(RESOURCE_ID, {"status": "ANALYSING_CSV"})
+    await Check.update(later_check["id"], later_check_data)
+    await Resource.update(RESOURCE_ID, {"status": status})
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
         new=mocker.AsyncMock(),
@@ -736,10 +757,14 @@ async def test_export_parquet_skips_notify_when_later_check_parsed(
         check=check,
     )
 
-    notify_udata.assert_not_awaited()
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
-    assert resource["status"] == "ANALYSING_CSV"
+    if should_notify:
+        notify_udata.assert_awaited_once()
+        assert resource["status"] is None
+    else:
+        notify_udata.assert_not_awaited()
+        assert resource["status"] == status
 
 
 async def test_file_with_nan(
