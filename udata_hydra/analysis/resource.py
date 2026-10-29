@@ -1,9 +1,11 @@
 import json
 import logging
 import os
+from collections.abc import Callable
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 import magic
 from asyncpg import Record
@@ -14,7 +16,6 @@ from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.data_formats import (
     DataFormat,
     Gz,
-    Ogc,
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.db.check import Check
@@ -170,36 +171,42 @@ async def analyse_resource(
 
     timer.stop()
 
-    if change_status == Change.HAS_CHANGED or must_analyse:
-        if data_format is not None and not dl_analysis.get("analysis:error"):
-            log.info(
-                f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
-            )
-            await Resource.update(
-                resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
-            )
-            if issubclass(data_format, Ogc):
-                queue.enqueue(
-                    data_format.analyse,
-                    check=dict(check),
-                    _priority="high" if worker_priority == "high" else "default",
-                    _exception=bool(exception),
-                )
-            elif tmp_file and analysis_file_name:
-                file = data_format(
-                    file_name=analysis_file_name,
-                    resource_id=resource_id,
-                    dataset_id=dataset_id,
-                )
-                queue.enqueue(
-                    file.analyse,
-                    check=dict(check),
-                    _priority="high" if worker_priority == "high" else "default",
-                    _exception=bool(exception),
-                )
-        else:
-            await Resource.update(resource_id, data={"status": None})
+    has_changed: bool = change_status == Change.HAS_CHANGED
 
+    # e.g. too large: rules out further analysis
+    download_failed: bool = bool(dl_analysis.get("analysis:error"))
+
+    analysis_job: Callable[..., Any] | None = None
+    if (
+        data_format is not None
+        and not download_failed
+        and await data_format.is_analysis_due(
+            check, has_changed=has_changed, must_analyse=must_analyse
+        )
+    ):
+        analysis_job = data_format.analysis_job(
+            file_name=analysis_file_name if tmp_file else None,
+            resource_id=resource_id,
+            dataset_id=dataset_id,
+        )
+
+    if data_format is not None and analysis_job is not None:
+        log.info(
+            f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
+        )
+        await Resource.update(
+            resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
+        )
+        queue.enqueue(
+            analysis_job,
+            check=dict(check),
+            _priority="high" if worker_priority == "high" else "default",
+            _exception=bool(exception),
+        )
+    else:
+        await Resource.update(resource_id, data={"status": None})
+
+    if has_changed or must_analyse:
         # Send analysis result to udata
         queue.enqueue(
             send,
@@ -208,14 +215,12 @@ async def analyse_resource(
             document=UdataPayload(analysis_results),
             _priority="high",
         )
-
     else:
         log.info(
-            f"[resource_id={resource_id}] analyse_resource: skipped re-parse and analysis udata notify "
+            f"[resource_id={resource_id}] analyse_resource: skipped analysis udata notify "
             f"(change_status={change_status.name}, last_parsing_table="
             f"{last_check.get('parsing_table') if last_check else None})"
         )
-        await Resource.update(resource_id, data={"status": None})
 
 
 async def update_check_with_modification_and_next_dates(

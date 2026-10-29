@@ -1,7 +1,8 @@
 import logging
 import re
-from datetime import datetime, timezone
-from typing import Literal, TypedDict
+from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
+from typing import Any, Literal, TypedDict
 from urllib.parse import parse_qs, urlparse
 
 from asyncpg import Record
@@ -75,6 +76,32 @@ class Ogc(DataFormat):
     @classmethod
     def detect_from_catalog_format(cls, format: str | None) -> bool:
         return False
+
+    @classmethod
+    async def is_analysis_due(cls, check: dict, has_changed: bool, must_analyse: bool) -> bool:
+        """OGC services are analysed on their own schedule, whether the GetCapabilities document
+        has changed or not, since it can stay the same for years or change on every check:
+        when must_analyse, when the analysis never succeeded on this URL, or when the check of
+        the last successful analysis is older than OGC_ANALYSIS_MAX_AGE_DAYS.
+        """
+        if must_analyse:
+            return True
+
+        last_ogc_analysis: Record | None = await Check.get_previous_ogc_analysed(
+            str(check["resource_id"]), check["url"], check["id"]
+        )
+        if not last_ogc_analysis:
+            return True
+
+        max_age = timedelta(days=config.OGC_ANALYSIS_MAX_AGE_DAYS)
+        return last_ogc_analysis["created_at"] < datetime.now(timezone.utc) - max_age
+
+    @classmethod
+    def analysis_job(
+        cls, file_name: str | None, resource_id: str, dataset_id: str
+    ) -> Callable[..., Any]:
+        """The OGC analysis fetches the service itself, it doesn't need the downloaded file"""
+        return cls.analyse
 
     @classmethod
     async def analyse(cls, check: dict, debug_insert: bool = False) -> OgcMetadata | None:
