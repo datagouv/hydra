@@ -403,6 +403,7 @@ async def test_change_analysis_content_length_header(
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
+    assert data["analysis:last-modified-at"].endswith("Z")
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
     now = datetime.now(timezone.utc)
     # modified date should be pretty close from now, let's say 30 seconds
@@ -424,6 +425,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
+    assert data["analysis:last-modified-at"].endswith("Z")
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
     now = datetime.now(timezone.utc)
     # modified date should be pretty close from now, let's say 30 seconds
