@@ -104,6 +104,7 @@ async def test_db_to_parquet_embeds_latest_tables_index_entry(clean_db, fake_che
     assert embedded == json.loads(latest["csv_detective"])
     assert embedded["profile"].keys() == file.inspection["columns"].keys()
     assert datetime.fromisoformat(metadata[b"created_at"].decode()) == latest["created_at"]
+    assert metadata[b"created_at"].decode().endswith("Z")
     parquet.path.unlink()
 
 

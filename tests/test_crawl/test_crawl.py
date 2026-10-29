@@ -115,6 +115,7 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
     webhook = next(p for p in payloads if "check:id" in p)
     assert webhook.get("check:date")
     datetime.fromisoformat(webhook["check:date"])
+    assert webhook["check:date"].endswith("Z")
     if exception is TimeoutError:
         assert webhook.get("check:available")
         assert webhook.get("check:headers:content-type") == "application/json"
@@ -311,7 +312,7 @@ async def test_analyse_resource_hands_off_crawler_to_csv(
     mocker.patch("udata_hydra.analysis.resource.queue.enqueue")
 
     check = await fake_check(headers={"content-type": "text/csv"})
-    await analyse_resource(check=check, last_check=None)
+    await analyse_resource(check=check)
 
     assert job_states(job_status_snapshots, "crawler") == [
         "ANALYSING_RESOURCE_HEAD",
@@ -335,7 +336,7 @@ async def test_analyse_resource_clears_crawler_when_download_fails(
     mocker.patch("udata_hydra.analysis.resource.queue.enqueue")
 
     check = await fake_check(headers={"content-type": "text/csv"})
-    await analyse_resource(check=check, last_check=None)
+    await analyse_resource(check=check)
 
     assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
@@ -425,7 +426,7 @@ async def test_change_analysis_last_modified_header(setup_catalog, rmock, udata_
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
-    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37+00:00"
+    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37Z"
     assert data["analysis:last-modified-detection"] == "last-modified-header"
 
 
@@ -443,6 +444,7 @@ async def test_change_analysis_content_length_header(
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
+    assert data["analysis:last-modified-at"].endswith("Z")
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
     now = datetime.now(timezone.utc)
     # modified date should be pretty close from now, let's say 30 seconds
@@ -464,6 +466,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
+    assert data["analysis:last-modified-at"].endswith("Z")
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
     now = datetime.now(timezone.utc)
     # modified date should be pretty close from now, let's say 30 seconds
@@ -487,7 +490,7 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, fake_chec
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
-    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000+00:00"
+    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000Z"
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
     res = await db.fetch("SELECT * FROM checks ORDER BY created_at DESC LIMIT 1")
     assert res[0]["detected_last_modified_at"].isoformat() == "2022-12-06T05:00:32.647000+00:00"
@@ -675,14 +678,14 @@ async def test_analyse_new_url_notifies_udata(setup_catalog, rmock, fake_check, 
     analysis_payload = next(p for p in payloads if "analysis:check_id" in p)
     assert analysis_payload["analysis:check_id"] == check["id"]
     assert analysis_payload["analysis:last-modified-detection"] == "harvest-resource-metadata"
-    assert analysis_payload["analysis:last-modified-at"] == harvest_modified_at.isoformat()
+    assert analysis_payload["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000Z"
 
 
 @pytest.mark.parametrize(
     "head_last_modified,expect_put,expected_modified_at,use_detected_at",
     [
         ("Thu, 09 Jan 2020 09:33:37 GMT", False, None, False),
-        ("2020-01-09T09:33:37+04:00", True, "2020-01-09T09:33:37+04:00", True),
+        ("2020-01-09T09:33:37+04:00", True, "2020-01-09T05:33:37Z", True),
     ],
     ids=["same_instant_rfc822", "same_instant_different_offset"],
 )

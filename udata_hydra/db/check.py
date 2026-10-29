@@ -1,8 +1,8 @@
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from asyncpg import Record
 
-from udata_hydra import context
+from udata_hydra import config, context
 from udata_hydra.db import (
     compute_insert_query,
     convert_dict_values_to_json,
@@ -55,6 +55,23 @@ class Check:
                 LIMIT 1
             """
             return await connection.fetchrow(q, resource_id, check_id)
+
+    @classmethod
+    async def has_later_parsing(cls, resource_id: str, check_id: int) -> bool:
+        """Whether a check after check_id has parsed the resource (successfully or not)
+        or is currently parsing it. A parsing started more than STUCK_THRESHOLD_SECONDS ago
+        and not finished is considered stuck (e.g. worker killed) and is ignored."""
+        threshold = datetime.now(timezone.utc) - timedelta(seconds=config.STUCK_THRESHOLD_SECONDS)
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = """
+                SELECT EXISTS (
+                    SELECT 1 FROM checks
+                    WHERE resource_id = $1 AND id > $2
+                    AND (parsing_finished_at IS NOT NULL OR parsing_started_at > $3)
+                )
+            """
+            return await connection.fetchval(q, resource_id, check_id, threshold)
 
     @classmethod
     async def get_by_url(cls, url: str) -> list[Record]:
