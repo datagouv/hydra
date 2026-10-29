@@ -72,7 +72,7 @@ async def test_get_latest_check(setup_catalog, client, query, expected, fake_che
         "pmtiles_size": None,
         "geojson_url": None,
         "geojson_size": None,
-        "detected_last_modified_at": "2025-04-04T00:00:00+00:00",
+        "detected_last_modified_at": "2025-04-04T00:00:00Z",
         "analysis_error": "Too large",
         "checksum": "abc123",
         "filesize": 1024,
@@ -285,6 +285,7 @@ async def test_create_check(
     webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
     assert webhook.get("check:date")
     datetime.fromisoformat(webhook["check:date"])
+    assert webhook["check:date"].endswith("Z")
     if resource_exception or resource_status == 500:
         if resource_status == 429:
             # In the case of a 429 status code, the error is on the crawler side and we can't give an availability status.

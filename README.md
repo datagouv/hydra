@@ -550,7 +550,7 @@ $ curl -s "http://localhost:8000/api/health" | json_pp
    "version" : "2.12.0",
    "python_version" : "3.14.0",
    "environment" : "local",
-   "uptime_since" : "2026-06-09T10:00:00.123456+00:00",
+   "uptime_since" : "2026-06-09T10:00:00.123456Z",
    "csv_analysis" : true,
    "csv_to_db" : true,
    "db_to_parquet" : false,

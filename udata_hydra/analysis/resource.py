@@ -29,6 +29,7 @@ from udata_hydra.utils import (
     queue,
     send,
 )
+from udata_hydra.utils.http import format_utc_datetime
 
 
 class Change(Enum):
@@ -258,12 +259,14 @@ async def detect_resource_change_from_checksum(
     if last_check and last_check.get("checksum"):
         if last_check.get("checksum") != new_checksum:
             return Change.HAS_CHANGED, {
-                "analysis:last-modified-at": datetime.now(timezone.utc).isoformat(),
+                "analysis:last-modified-at": format_utc_datetime(datetime.now(timezone.utc)),
                 "analysis:last-modified-detection": "computed-checksum",
             }
         elif last_check.get("detected_last_modified_at"):
             return Change.HAS_NOT_CHANGED, {
-                "analysis:last-modified-at": last_check["detected_last_modified_at"].isoformat(),
+                "analysis:last-modified-at": format_utc_datetime(
+                    last_check["detected_last_modified_at"]
+                ),
                 "analysis:last-modified-detection": "previous-check-detection",
             }
     # if the previous check did not have the info, we investigate further
@@ -278,7 +281,7 @@ async def detect_resource_change_from_last_modified_header(
     if len(data) == 1 and data[0]["last_modified"]:
         last_modified_date = date_parser(data[0]["last_modified"])
         return Change.HAS_CHANGED, {
-            "analysis:last-modified-at": last_modified_date.isoformat(),
+            "analysis:last-modified-at": format_utc_datetime(last_modified_date),
             "analysis:last-modified-detection": "last-modified-header",
         }
 
@@ -287,7 +290,7 @@ async def detect_resource_change_from_last_modified_header(
 
     last_modified_date = date_parser(data[0]["last_modified"])
     payload = {
-        "analysis:last-modified-at": last_modified_date.isoformat(),
+        "analysis:last-modified-at": format_utc_datetime(last_modified_date),
         "analysis:last-modified-detection": "last-modified-header",
     }
     if data[0]["last_modified"] != data[1]["last_modified"]:
@@ -305,14 +308,16 @@ async def detect_resource_change_from_content_length_header(
         if data[0]["content_length"] != data[1]["content_length"]:
             return Change.HAS_CHANGED, {
                 # if resource has changed, set last-modified to the current check's creation
-                "analysis:last-modified-at": data[0]["created_at"].isoformat(),
+                "analysis:last-modified-at": format_utc_datetime(data[0]["created_at"]),
                 "analysis:last-modified-detection": "content-length-header",
             }
         # same content_length is not 100% certainly no change, but a good tradeoff to prevent many downloads
         elif data[1].get("detected_last_modified_at"):
             return Change.HAS_NOT_CHANGED, {
                 # no change, using the last-modified from the previous check (passed on from check to check)
-                "analysis:last-modified-at": data[1]["detected_last_modified_at"].isoformat(),
+                "analysis:last-modified-at": format_utc_datetime(
+                    data[1]["detected_last_modified_at"]
+                ),
                 "analysis:last-modified-detection": "previous-check-detection",
             }
     # if the previous check did not have the info, we investigate further
@@ -394,7 +399,7 @@ async def detect_resource_change_from_harvest(
 
     if resource and resource.get("harvest_modified_at"):
         payload = {
-            "analysis:last-modified-at": resource["harvest_modified_at"].isoformat(),
+            "analysis:last-modified-at": format_utc_datetime(resource["harvest_modified_at"]),
             "analysis:last-modified-detection": "harvest-resource-metadata",
         }
         if resource["harvest_modified_at"] == last_check["detected_last_modified_at"]:
