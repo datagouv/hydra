@@ -23,36 +23,34 @@ async def _run_export_job(
     step: str,
     remainder_types: list[str],
     export_fn: str,
-    upload_to_s3: bool = True,
     delete_output: bool = False,
     delete_input: bool = True,
 ) -> DataFormat | None:
     output, check_out = None, None
     try:
         output: DataFormat = await getattr(data_object, export_fn)()
-        if upload_to_s3:
-            df_name = output.__class__.__name__
-            log.debug(f"Uploading {df_name} file {output.file_name} to S3")
-            upload_url = context.s3_client().send_file(
-                output, delete_source=delete_output and config.REMOVE_GENERATED_FILES
-            )
-            await Check.update(
-                check["id"],
-                {
-                    f"{df_name.lower()}_url": upload_url,
-                    f"{df_name.lower()}_size": output.filesize,
-                },
-            )
-            if (
-                delete_input
-                and config.REMOVE_GENERATED_FILES
-                and getattr(data_object, "file_name", None)
-            ):
-                data_object.path.unlink()
+        df_name = output.__class__.__name__
+        log.debug(f"Uploading {df_name} file {output.file_name} to S3")
+        upload_url = context.s3_client().send_file(
+            output, delete_source=delete_output and config.REMOVE_GENERATED_FILES
+        )
+        # the updated check may not be the last one anymore, e.g. recrawled since its parsing
+        check_out = await Check.update(
+            check["id"],
+            {
+                f"{df_name.lower()}_url": upload_url,
+                f"{df_name.lower()}_size": output.filesize,
+            },
+        )
+        if (
+            delete_input
+            and config.REMOVE_GENERATED_FILES
+            and getattr(data_object, "file_name", None)
+        ):
+            data_object.path.unlink()
     except Exception as e:
         if data_object.resource_id:
             remove_remainders(data_object.resource_id, remainder_types)
-        check = await Check.get_by_id(check["id"])  # ty: ignore[invalid-assignment]
         try:
             raise ParseException(
                 message=str(e),
@@ -65,10 +63,11 @@ async def _run_export_job(
             check_out = await handle_parse_exception(
                 pe, getattr(data_object, "table_name", None), check
             )
-    else:
-        check_out = await Check.get_by_id(check["id"])
     finally:
-        if data_object.resource_id is not None:
+        # a later check has (re)parsed the resource: its analysis and status take precedence
+        if data_object.resource_id is not None and not await Check.has_later_parsing(
+            data_object.resource_id, check["id"]
+        ):
             resource = await Resource.get(data_object.resource_id)
             if resource is not None and check_out is not None:
                 await helpers.notify_udata(resource, check_out)

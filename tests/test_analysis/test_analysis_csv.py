@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -651,9 +651,15 @@ async def test_export_geojson_pmtiles_notifies_udata_on_success(setup_catalog, f
     assert resource["status"] is None
 
 
-async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_check, mocker):
+@pytest.mark.parametrize("recrawled", [False, True])
+async def test_export_parquet_notifies_udata_on_success(
+    setup_catalog, fake_check, mocker, recrawled
+):
     """When parquet export succeeds, notify udata and clear the resource status."""
     check = await fake_check()
+    if recrawled:
+        # the export job ran after a new crawl: its check is not the last one anymore
+        await fake_check()
     await Resource.update(RESOURCE_ID, {"status": "CONVERTING_TO_PARQUET"})
     notify_udata = mocker.patch(
         "udata_hydra.analysis.exports.helpers.notify_udata",
@@ -668,7 +674,9 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
             )
         ),
     )
-    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=MagicMock())
+    s3_client = MagicMock()
+    s3_client.send_file.return_value = "https://example.org/file.parquet"
+    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=s3_client)
 
     await export_parquet(
         table=Table(table_name="test", resource_id=RESOURCE_ID),
@@ -676,9 +684,91 @@ async def test_export_parquet_notifies_udata_on_success(setup_catalog, fake_chec
     )
 
     notify_udata.assert_awaited_once()
+    assert notify_udata.await_args.args[1]["parquet_url"] == "https://example.org/file.parquet"
     resource = await Resource.get(RESOURCE_ID)
     assert resource is not None
     assert resource["status"] is None
+
+
+async def test_export_parquet_stores_error_on_recrawled_check(
+    setup_catalog, db, fake_check, mocker
+):
+    """The export error is stored on the exported check, even if it is not the last one anymore."""
+    check = await fake_check()
+    await fake_check()
+    notify_udata = mocker.patch(
+        "udata_hydra.analysis.exports.helpers.notify_udata",
+        new=mocker.AsyncMock(),
+    )
+    mocker.patch(
+        "udata_hydra.analysis.exports.Table.to_parquet",
+        new=mocker.AsyncMock(side_effect=ValueError("conversion failed")),
+    )
+
+    await export_parquet(
+        table=Table(table_name="test", resource_id=RESOURCE_ID),
+        check=check,
+    )
+
+    error = await db.fetchval("SELECT parsing_error FROM checks WHERE id = $1", check["id"])
+    assert error.startswith("parquet_export:")
+    notify_udata.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "later_check_data,status,should_notify",
+    [
+        # a later check has parsed the resource: don't overwrite its analysis nor its status
+        (
+            {
+                "parsing_started_at": datetime.now(timezone.utc),
+                "parsing_finished_at": datetime.now(timezone.utc),
+            },
+            "BACKOFF",
+            False,
+        ),
+        # a later check is parsing the resource: don't overwrite its analysis nor its status
+        ({"parsing_started_at": datetime.now(timezone.utc)}, "ANALYSING_CSV", False),
+        # a later check got stuck while parsing (e.g. killed worker): it doesn't block the export
+        (
+            {"parsing_started_at": datetime.now(timezone.utc) - timedelta(days=1)},
+            "ANALYSING_CSV",
+            True,
+        ),
+    ],
+)
+async def test_export_parquet_notify_depending_on_later_check(
+    setup_catalog, fake_check, mocker, later_check_data, status, should_notify
+):
+    check = await fake_check()
+    later_check = await fake_check()
+    await Check.update(later_check["id"], later_check_data)
+    await Resource.update(RESOURCE_ID, {"status": status})
+    notify_udata = mocker.patch(
+        "udata_hydra.analysis.exports.helpers.notify_udata",
+        new=mocker.AsyncMock(),
+    )
+    mocker.patch(
+        "udata_hydra.analysis.exports.Table.to_parquet",
+        new=mocker.AsyncMock(
+            return_value=Parquet(file_name="tests/data/valid.geojson", resource_id=RESOURCE_ID)
+        ),
+    )
+    mocker.patch("udata_hydra.analysis.exports.context.s3_client", return_value=MagicMock())
+
+    await export_parquet(
+        table=Table(table_name="test", resource_id=RESOURCE_ID),
+        check=check,
+    )
+
+    resource = await Resource.get(RESOURCE_ID)
+    assert resource is not None
+    if should_notify:
+        notify_udata.assert_awaited_once()
+        assert resource["status"] is None
+    else:
+        notify_udata.assert_not_awaited()
+        assert resource["status"] == status
 
 
 async def test_file_with_nan(
