@@ -9,7 +9,7 @@ from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_sta
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.utils import UdataPayload, queue, send
-from udata_hydra.utils.http import CORS_HEADER_FIELDS, format_datetime_for_json
+from udata_hydra.utils.http import CORS_HEADER_FIELDS, format_utc_datetime
 
 log = logging.getLogger("udata-hydra")
 
@@ -49,7 +49,7 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> dict:
             "check:available": is_valid_status(check_data.get("status")),
             "check:status": check_data.get("status"),
             "check:timeout": check_data["timeout"],
-            "check:date": format_datetime_for_json(datetime.now(timezone.utc)),
+            "check:date": format_utc_datetime(datetime.now(timezone.utc)),
             "check:error": check_data.get("error"),
             "check:headers:content-type": await get_content_type_from_header(
                 check_data.get("headers", {})

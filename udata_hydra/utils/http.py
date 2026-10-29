@@ -10,7 +10,7 @@ from udata_hydra import config
 from udata_hydra.utils import IOException
 
 
-def format_datetime_for_json(value: datetime) -> str:
+def format_utc_datetime(value: datetime) -> str:
     if value.tzinfo is None:
         return value.isoformat()
     # Convert to UTC rather than just formatting the offset: udata's `to_naive_datetime`

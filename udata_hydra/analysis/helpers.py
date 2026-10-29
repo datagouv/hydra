@@ -15,7 +15,7 @@ from udata_hydra.utils import (
     send,
     storage_path,
 )
-from udata_hydra.utils.http import format_datetime_for_json
+from udata_hydra.utils.http import format_utc_datetime
 
 
 def get_python_type(column: dict) -> str:
@@ -83,10 +83,10 @@ async def notify_udata(resource: Record | None, check: Record | dict | None) -> 
         "dataset_id": resource["dataset_id"],
         "document": {
             "analysis:parsing:error": check.get("parsing_error"),
-            "analysis:parsing:started_at": format_datetime_for_json(check["parsing_started_at"])
+            "analysis:parsing:started_at": format_utc_datetime(check["parsing_started_at"])
             if check.get("parsing_started_at")
             else None,
-            "analysis:parsing:finished_at": format_datetime_for_json(check["parsing_finished_at"])
+            "analysis:parsing:finished_at": format_utc_datetime(check["parsing_finished_at"])
             if check.get("parsing_finished_at")
             else None,
         },

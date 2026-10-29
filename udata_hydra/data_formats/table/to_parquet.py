@@ -8,7 +8,7 @@ from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.data_formats.table import Table
 from udata_hydra.db import db_col_name, quote_ident
 from udata_hydra.utils import storage_path
-from udata_hydra.utils.http import format_datetime_for_json
+from udata_hydra.utils.http import format_utc_datetime
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats import Parquet
@@ -47,7 +47,7 @@ async def db_to_parquet(table: Table) -> "Parquet":
         # the file must be self-sufficient for readers that don't have access to `tables_index`
         metadata={
             "csv_detective": index_entry["csv_detective"],
-            "created_at": format_datetime_for_json(index_entry["created_at"]),
+            "created_at": format_utc_datetime(index_entry["created_at"]),
         },
     )
 
