@@ -166,7 +166,7 @@ async def analyse_resource(
             has_changed=change_status == Change.HAS_CHANGED,
         )
 
-    analysis_results = {"analysis:check_id": check["id"]} | dl_analysis | (change_payload or {})
+    udata_payload = {"analysis:check_id": check["id"]} | dl_analysis | (change_payload or {})
 
     timer.stop()
 
@@ -205,7 +205,7 @@ async def analyse_resource(
             send,
             dataset_id=dataset_id,
             resource_id=resource_id,
-            document=UdataPayload(analysis_results),
+            document=UdataPayload(udata_payload),
             _priority="high",
         )
 
