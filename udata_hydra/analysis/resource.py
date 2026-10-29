@@ -1,9 +1,11 @@
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from collections.abc import Callable
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 import magic
 from asyncpg import Record
@@ -14,7 +16,6 @@ from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.data_formats import (
     DataFormat,
     Gz,
-    Ogc,
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.db.check import Check
@@ -168,10 +169,42 @@ async def analyse_resource(
 
     timer.stop()
 
-    # the resource has changed, or must be analysed anyway (forced, first check, new URL)
-    has_changed: bool = change_status == Change.HAS_CHANGED or must_analyse
+    has_changed: bool = change_status == Change.HAS_CHANGED
 
-    if has_changed:
+    # e.g. too large: rules out further analysis
+    download_failed: bool = bool(dl_analysis.get("analysis:error"))
+
+    analysis_job: Callable[..., Any] | None = None
+    if (
+        data_format is not None
+        and not download_failed
+        and await data_format.is_analysis_due(
+            check, has_changed=has_changed, must_analyse=must_analyse
+        )
+    ):
+        analysis_job = data_format.analysis_job(
+            file_name=analysis_file_name if tmp_file else None,
+            resource_id=resource_id,
+            dataset_id=dataset_id,
+        )
+
+    if data_format is not None and analysis_job is not None:
+        log.info(
+            f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
+        )
+        await Resource.update(
+            resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
+        )
+        queue.enqueue(
+            analysis_job,
+            check=dict(check),
+            _priority="high" if worker_priority == "high" else "default",
+            _exception=bool(exception),
+        )
+    else:
+        await Resource.update(resource_id, data={"status": None})
+
+    if has_changed or must_analyse:
         # Send analysis result to udata
         queue.enqueue(
             send,
@@ -186,73 +219,6 @@ async def analyse_resource(
             f"(change_status={change_status.name}, last_parsing_table="
             f"{last_check.get('parsing_table') if last_check else None})"
         )
-
-    ogc_format: type[Ogc] | None = (
-        data_format if data_format is not None and issubclass(data_format, Ogc) else None
-    )
-
-    # OGC services are analysed on their own schedule: the GetCapabilities document can stay
-    # the same for years or change on every check, whatever happens to the service
-    if ogc_format is not None:
-        # a failed download (e.g. too large) rules out the analysis, which would fetch the document again
-        if not dl_analysis.get("analysis:error") and await is_ogc_analysis_due(
-            check, must_analyse=must_analyse
-        ):
-            log.info(
-                f"[resource_id={resource_id}] analyse_resource: enqueued {ogc_format.__name__} analysis"
-            )
-            await Resource.update(
-                resource_id, data={"status": f"TO_ANALYSE_{ogc_format.__name__.upper()}"}
-            )
-            queue.enqueue(
-                ogc_format.analyse,
-                check=dict(check),
-                _priority="high" if worker_priority == "high" else "default",
-                _exception=bool(exception),
-            )
-        else:
-            await Resource.update(resource_id, data={"status": None})
-        return
-
-    if has_changed and data_format is not None and not dl_analysis.get("analysis:error"):
-        log.info(
-            f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
-        )
-        await Resource.update(
-            resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
-        )
-        if tmp_file and analysis_file_name:
-            file = data_format(
-                file_name=analysis_file_name,
-                resource_id=resource_id,
-                dataset_id=dataset_id,
-            )
-            queue.enqueue(
-                file.analyse,
-                check=dict(check),
-                _priority="high" if worker_priority == "high" else "default",
-                _exception=bool(exception),
-            )
-    else:
-        await Resource.update(resource_id, data={"status": None})
-
-
-async def is_ogc_analysis_due(check: dict, must_analyse: bool) -> bool:
-    """Decide whether an OGC service should be analysed, independently of the change detection:
-    when must_analyse, when it never succeeded on this URL, or when the check of the last successful analysis
-    is older than OGC_ANALYSIS_MAX_AGE_DAYS.
-    """
-    if must_analyse:
-        return True
-
-    last_ogc_analysis: Record | None = await Check.get_previous_ogc_analysed(
-        str(check["resource_id"]), check["url"], check["id"]
-    )
-    if not last_ogc_analysis:
-        return True
-
-    max_age = timedelta(days=config.OGC_ANALYSIS_MAX_AGE_DAYS)
-    return last_ogc_analysis["created_at"] < datetime.now(timezone.utc) - max_age
 
 
 async def update_check_with_modification_and_next_dates(

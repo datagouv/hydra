@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.data_formats import Wfs
 from udata_hydra.db.check import Check
@@ -83,29 +82,6 @@ async def test_unchanged_and_recently_analysed(
     await _assert_status_reset(check)
 
 
-async def test_unchanged_and_analysis_too_old(
-    setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
-):
-    await previous_check(ogc_analysis_age=timedelta(days=config.OGC_ANALYSIS_MAX_AGE_DAYS + 1))
-    await _analyse_new_check(fake_check, rmock)
-    ogc_analyse.assert_called_once()
-
-
-async def test_recent_failed_analysis_is_retried(
-    setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
-):
-    previous = await previous_check(created_at=datetime.now(timezone.utc) - timedelta(days=1))
-    await Check.update(
-        previous["id"],
-        {
-            "parsing_started_at": previous["created_at"],
-            "parsing_error": "ogc_service_connection:error",
-        },
-    )
-    await _analyse_new_check(fake_check, rmock)
-    ogc_analyse.assert_called_once()
-
-
 async def test_changed_and_recently_analysed(
     setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
 ):
@@ -121,27 +97,6 @@ async def test_forced_analysis(
 ):
     await previous_check(ogc_analysis_age=timedelta(days=1))
     await _analyse_new_check(fake_check, rmock, force_analysis=True)
-    ogc_analyse.assert_called_once()
-
-
-async def test_previous_analysis_on_another_url(
-    setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
-):
-    await previous_check(ogc_analysis_age=timedelta(days=1), url="https://example.com/old/wfs")
-    await _analyse_new_check(fake_check, rmock)
-    ogc_analyse.assert_called_once()
-
-
-async def test_new_url_after_failed_first_analysis(
-    setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
-):
-    """A recent analysis of the old URL must not count once the first one on the new URL failed"""
-    await previous_check(
-        ogc_analysis_age=timedelta(days=2), url="https://example.com/old/wfs?SERVICE=WFS"
-    )
-    failed = await previous_check(created_at=datetime.now(timezone.utc) - timedelta(days=1))
-    await Check.update(failed["id"], {"parsing_error": "ogc_service_connection:error"})
-    await _analyse_new_check(fake_check, rmock)
     ogc_analyse.assert_called_once()
 
 

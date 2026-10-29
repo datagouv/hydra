@@ -237,8 +237,7 @@ async def test_forced_analysis(
 
     # check whether udata was pinged
     if force_analysis:
-        # the last call carries the parsing results, after the change analysis one
-        webhook = rmock.requests[("PUT", URL(udata_url))][-1].kwargs["json"]
+        webhook = rmock.requests[("PUT", URL(udata_url))][0].kwargs["json"]
         assert webhook.get("analysis:parsing:started_at")
         assert webhook.get("analysis:parsing:finished_at")
         assert webhook.get("analysis:parsing:parsing_table")
