@@ -1,14 +1,19 @@
+import csv
 import hashlib
 import json
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import typer
 from asyncpg import Record
 
-from udata_hydra import config
+from udata_hydra import config, context
 from udata_hydra.analysis import helpers
+from udata_hydra.analysis.exports import export_parquet
 from udata_hydra.analysis.resource import analyse_resource
+from udata_hydra.analysis.tables_index import get_previous_inspection
 from udata_hydra.cli.catalog import _insert_url_into_catalog
 from udata_hydra.cli.common import _find_check, _make_async_wrapper, cli, connection, log
 from udata_hydra.data_formats import (
@@ -17,12 +22,19 @@ from udata_hydra.data_formats import (
     Gz,
     Ogc,
     Parquet,
+    Table,
 )
 from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
-from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
+from udata_hydra.data_formats.detect import (
+    catalog_format_for,
+    detect_data_format_from_check_or_catalog,
+    detect_format_from_payload,
+)
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.utils import download_file, queue, storage_path
 
 
 async def _analyse_resource_cli(resource_id: str):
@@ -338,4 +350,221 @@ def analyse_ogc_cli(
     """
     return _make_async_wrapper(_analyse_ogc_cli)(
         format=format, check_id=check_id, url=url, resource_id=resource_id
+    )
+
+
+# udata extras written by hydra (see helpers.notify_udata). They reflect what data.gouv.fr
+# actually exposes, unlike `checks`, where a later crawl without re-parsing gives a new
+# last check that has no parsing_table nor parquet_url.
+_EXTRA_PARSING_TABLE = "analysis:parsing:parsing_table"
+_EXTRA_PARQUET_URL = "analysis:parsing:parquet_url"
+_EXTRA_PARSING_ERROR = "analysis:parsing:error"
+_BACKFILL_STATUS = "TO_BACKFILL_PARQUET"
+
+
+def _read_backfill_candidates(catalog_path: str) -> list[tuple[str, str]]:
+    """Return (resource_id, parsing_table) for catalog rows whose udata extras show a parsed
+    table but no parquet export, sorted by resource_id so that --limit is stable across runs."""
+    # the extras column can be very large
+    csv.field_size_limit(2**31 - 1)
+    candidates = []
+    with open(catalog_path, newline="") as fd:
+        for row in csv.DictReader(fd, delimiter=";"):
+            if row.get("dataset.archived") != "False":
+                continue
+            try:
+                resource_id = str(uuid.UUID(row["id"]))
+                extras = json.loads(row.get("extras") or "{}")
+            except (ValueError, KeyError):
+                continue
+            if not isinstance(extras, dict):
+                continue
+            parsing_table = extras.get(_EXTRA_PARSING_TABLE)
+            if (
+                parsing_table
+                and not extras.get(_EXTRA_PARQUET_URL)
+                and not extras.get(_EXTRA_PARSING_ERROR)
+            ):
+                candidates.append((resource_id, parsing_table))
+    return sorted(candidates)
+
+
+async def _is_csv_like_source(check: dict) -> bool:
+    """Whether the table was loaded from a CSV-like file, detected like the analysis does:
+    parquet sources also get a table, and must not be exported to parquet again."""
+    data_format = await detect_data_format_from_check_or_catalog(check)
+    if data_format is Gz:
+        # like Gz.analyse, from the unzipped payload, whose MIME type the check keeps
+        data_format = detect_format_from_payload(
+            check, check.get("mime_type"), await catalog_format_for(check["resource_id"])
+        )
+    return data_format is not None and issubclass(data_format, CsvLike)
+
+
+async def _backfill_parquet(
+    catalog_url: str | None = None,
+    catalog_file: str | None = None,
+    dry_run: bool = False,
+    limit: int | None = None,
+) -> dict | None:
+    """Enqueue parquet exports for resources that udata shows as parsed but without parquet."""
+    if not config.DB_TO_PARQUET and not dry_run:
+        log.warning("DB_TO_PARQUET is off, no parquet export enqueued. --dry-run still works.")
+        return None
+    if catalog_file:
+        candidates = _read_backfill_candidates(catalog_file)
+    else:
+        url = catalog_url or config.CATALOG_URL
+        log.info(f"Downloading resources catalog from {url}...")
+        with NamedTemporaryFile(dir=storage_path("")) as fd:
+            await download_file(url, fd)
+            fd.flush()
+            candidates = _read_backfill_candidates(fd.name)
+    log.info(f"{len(candidates)} resources without parquet export in udata extras")
+
+    pool = await context.pool()
+    csv_pool = await context.pool("csv")
+    skipped: dict[str, int] = {}
+    enqueued = 0
+    # rows to export, according to csv-detective: a rough measure of the batch size
+    total_lines = 0
+
+    def skip(reason: str, resource_id: str) -> None:
+        log.debug(f"Skipping parquet backfill for resource {resource_id}: {reason}")
+        skipped[reason] = skipped.get(reason, 0) + 1
+
+    for resource_id, parsing_table in candidates:
+        resource = await pool.fetchrow(
+            "SELECT dataset_id, status FROM catalog WHERE resource_id = $1 AND deleted = FALSE",
+            resource_id,
+        )
+        if resource is None:
+            skip("not_in_catalog", resource_id)
+            continue
+        # BACKOFF only means the crawler waits for the domain to cool down, like get_excluded_clause
+        if resource["status"] not in (None, "BACKOFF"):
+            skip("busy", resource_id)
+            continue
+
+        # the latest table for this resource must be the one udata knows about
+        latest_table = await csv_pool.fetchval(
+            "SELECT parsing_table FROM tables_index WHERE resource_id = $1 "
+            "ORDER BY created_at DESC LIMIT 1",
+            resource_id,
+        )
+        if latest_table != parsing_table:
+            skip("table_mismatch", resource_id)
+            continue
+
+        # The export writes parquet_url on this check, then sends its whole analysis:parsing
+        # group to udata: it must be the check that produced the table, not the last check.
+        check = await pool.fetchrow(
+            "SELECT * FROM checks WHERE resource_id = $1 AND parsing_table = $2 "
+            "ORDER BY id DESC LIMIT 1",
+            resource_id,
+            parsing_table,
+        )
+        if check is None:
+            skip("no_matching_check", resource_id)
+            continue
+        if not await _is_csv_like_source(dict(check)):
+            skip("not_csv_like", resource_id)
+            continue
+        # exported since the catalog snapshot was generated
+        if check["parquet_url"]:
+            skip("already_exported_locally", resource_id)
+            continue
+
+        try:
+            # JSONB reorders csv_detective keys; the live table has the real column order.
+            inspection = await get_previous_inspection(resource_id)
+        except Exception:
+            log.exception(f"Could not get the inspection of resource {resource_id}")
+            inspection = None
+        if inspection is None:
+            skip("inspection_failed", resource_id)
+            continue
+
+        if not dry_run:
+            # lock the resource so that the crawler leaves it alone until the export is done,
+            # the export job resets the status when it finishes
+            locked = await pool.fetchval(
+                "UPDATE catalog SET status = $1, status_since = $2 "
+                "WHERE resource_id = $3 AND (status IS NULL OR status = 'BACKOFF') "
+                "AND deleted = FALSE "
+                "RETURNING resource_id",
+                _BACKFILL_STATUS,
+                datetime.now(timezone.utc),
+                resource_id,
+            )
+            if locked is None:
+                skip("busy", resource_id)
+                continue
+            exception = await ResourceException.get_by_resource_id(resource_id)
+            try:
+                queue.enqueue(
+                    export_parquet,
+                    table=Table(
+                        table_name=parsing_table,
+                        inspection=inspection,
+                        resource_id=resource_id,
+                        dataset_id=resource["dataset_id"],
+                    ),
+                    check=dict(check),
+                    _priority="low",
+                    # set per job: the queue keeps the default timeout of its first use
+                    job_timeout=config.RQ_DEFAULT_TIMEOUT * (5 if exception else 1),
+                )
+            except Exception:
+                await Resource.update(resource_id, {"status": None})
+                raise
+
+        if type(inspection.get("total_lines")) is int:
+            total_lines += inspection["total_lines"]
+        enqueued += 1
+        if limit is not None and enqueued >= limit:
+            break
+
+    summary = {
+        "candidates": len(candidates),
+        "enqueued": enqueued,
+        "skipped": skipped,
+        "total_lines": total_lines,
+    }
+    log.info(f"Parquet backfill dry_run={dry_run} {summary}")
+    return summary
+
+
+@cli.command(name="backfill-parquet")
+def backfill_parquet_cli(
+    catalog_url: str | None = typer.Option(
+        None, help="URL of the resources catalog to read udata extras from, defaults to config"
+    ),
+    catalog_file: str | None = typer.Option(
+        None, help="Local copy of the resources catalog, used instead of downloading it"
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Count candidates and their total lines without locking resources nor enqueueing jobs",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        min=1,
+        help=(
+            "Stop after this many exports. With --dry-run, limits how many candidates are counted. "
+            "Exported resources are skipped on the next run"
+        ),
+    ),
+):
+    """Enqueue parquet exports for parsed resources that udata shows without a parquet file.
+
+    Candidates come from the udata extras in the resources catalog, then are checked against
+    the local tables. Run on a single host. Jobs go to the shared low-priority queue.
+    Queued resources get the TO_BACKFILL_PARQUET status until their export is done: do not run
+    load-catalog before then, its status clean-up would release them early.
+    """
+    return _make_async_wrapper(_backfill_parquet)(
+        catalog_url=catalog_url, catalog_file=catalog_file, dry_run=dry_run, limit=limit
     )
