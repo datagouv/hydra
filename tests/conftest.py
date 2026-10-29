@@ -20,6 +20,7 @@ from udata_hydra.cli import drop_dbs, load_catalog, migrate
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.logger import stop_sentry
 from udata_hydra.utils import storage_path
 
@@ -58,6 +59,29 @@ def dummy(return_value=None):
         return return_value
 
     return fn
+
+
+def job_states(snapshots: list[dict], job: str) -> list[str]:
+    """States recorded for one job in ResourceJobStatus snapshots."""
+    return [snap[job]["state"] for snap in snapshots if job in snap]
+
+
+@pytest.fixture
+def job_status_snapshots(mocker) -> list[dict]:
+    """Snapshot ResourceJobStatus.for_resource() after each set/update."""
+    snapshots: list[dict] = []
+
+    def wrap(method):
+        async def capturing(resource_id: str, *args, **kwargs):
+            result = await method(resource_id, *args, **kwargs)
+            snapshots.append(await ResourceJobStatus.for_resource(resource_id))
+            return result
+
+        return capturing
+
+    mocker.patch.object(ResourceJobStatus, "set", wrap(ResourceJobStatus.set))
+    mocker.patch.object(ResourceJobStatus, "update", wrap(ResourceJobStatus.update))
+    return snapshots
 
 
 @pytest.fixture
@@ -237,9 +261,12 @@ async def insert_fake_resource():
             type="main",
             format=format,
             title="Fake resource",
-            status=status,
             priority=True,
         )
+        if status:
+            await ResourceJobStatus.set(
+                RESOURCE_ID, ResourceJobStatus.job_for_state(status), status
+            )
 
     return _insert_fake_resource
 
