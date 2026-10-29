@@ -11,6 +11,11 @@ from udata_hydra.utils import IOException
 
 
 def format_utc_datetime(value: datetime) -> str:
+    """Format a datetime as ISO 8601, converted to UTC with a "Z" suffix
+    (e.g. "2026-06-09T10:00:00.123456Z").
+
+    Naive datetimes are returned as-is via isoformat(), without timezone info.
+    """
     if value.tzinfo is None:
         return value.isoformat()
     # Convert to UTC rather than just formatting the offset: udata's `to_naive_datetime`
