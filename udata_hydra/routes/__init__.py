@@ -14,7 +14,6 @@ from udata_hydra.routes.resources import (
     delete_resource,
     get_resource,
     get_resources_stats,
-    get_resources_stats_cors,
     update_resource,
 )
 from udata_hydra.routes.resources_exceptions import (
@@ -61,7 +60,6 @@ routes_params = [
     (web.post, "/api/resources", create_resource, None),
     (web.put, "/api/resources/{resource_id}", update_resource, None),
     (web.delete, "/api/resources/{resource_id}", delete_resource, None),
-    (web.get, "/api/resources/stats/cors", get_resources_stats_cors, None),
     (web.get, "/api/resources/stats", get_resources_stats, None),
     # Routes for statuses
     (web.get, "/api/status/crawler", get_crawler_status, None),
