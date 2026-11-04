@@ -16,6 +16,7 @@ from udata_hydra.crawl.helpers import (
 )
 from udata_hydra.crawl.preprocess_check_data import preprocess_check_data
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import queue
 from udata_hydra.utils.http import CORS_HEADER_FIELDS, CORS_HEADER_PREFIX
@@ -158,12 +159,16 @@ async def check_resource(
             )
 
             # Enqueue the resource for analysis
+            exception: Record | None = await ResourceException.get_by_resource_id(
+                str(resource["resource_id"])
+            )
             queue.enqueue(
                 analyse_resource,
                 check=new_check,
                 force_analysis=force_analysis,
                 worker_priority=worker_priority,
                 _priority=worker_priority,
+                _exception=bool(exception),
             )
 
             return RESOURCE_RESPONSE_STATUSES["OK"]
