@@ -258,6 +258,7 @@ async def test_check_enqueues_analysis_with_exception_flag(
     """analyse_resource downloads and unzips, so resources exceptions need the longer timeout"""
     enqueue = mocker.patch("udata_hydra.crawl.check_resources.queue.enqueue")
     resource = await Resource.get(resource_id)
+    assert resource is not None
     rmock.head(resource["url"], status=200, headers={"content-length": "10"})
 
     async with ClientSession() as session:
