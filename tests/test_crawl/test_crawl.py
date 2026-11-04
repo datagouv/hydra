@@ -14,7 +14,7 @@ from aioresponses import CallbackResult
 from asyncpg import Record
 from yarl import URL
 
-from tests.conftest import RESOURCE_ID, RESOURCE_URL, SIMPLE_CSV_CONTENT
+from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_ID, RESOURCE_URL, SIMPLE_CSV_CONTENT
 from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import start_checks
@@ -243,6 +243,30 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
     await start_checks(iterations=1)
     # Assert url has been called because check is deleted
     assert ("HEAD", URL(rurl)) in rmock.requests
+
+
+@pytest.mark.parametrize(
+    "resource_id,is_exception",
+    [
+        (RESOURCE_ID, False),
+        (RESOURCE_EXCEPTION_ID, True),
+    ],
+)
+async def test_check_enqueues_analysis_with_exception_flag(
+    setup_catalog_with_resource_exception, rmock, mocker, resource_id, is_exception
+):
+    """analyse_resource downloads and unzips, so resources exceptions need the longer timeout"""
+    enqueue = mocker.patch("udata_hydra.crawl.check_resources.queue.enqueue")
+    resource = await Resource.get(resource_id)
+    assert resource is not None
+    rmock.head(resource["url"], status=200, headers={"content-length": "10"})
+
+    async with ClientSession() as session:
+        await check_resource(url=resource["url"], resource=resource, session=session)
+
+    analysis_calls = [c for c in enqueue.call_args_list if c.args[0] is analyse_resource]
+    assert len(analysis_calls) == 1
+    assert analysis_calls[0].kwargs["_exception"] is is_exception
 
 
 async def test_switch_head_to_get_on_timeout(
