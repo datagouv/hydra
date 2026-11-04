@@ -14,6 +14,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import ParseException, handle_parse_exception
 
 log = logging.getLogger("udata-hydra")
@@ -112,9 +113,8 @@ class Ogc(DataFormat):
 
         resource: Record | None = None
         if resource_id:
-            resource = await Resource.update(
-                str(resource_id), {"status": f"ANALYSING_{format.upper()}"}
-            )
+            resource = await Resource.get(str(resource_id))
+            await ResourceJobStatus.set(str(resource_id), "ogc", "ANALYSING_OGC")
 
         metadata: OgcMetadata | None = None
         try:
@@ -245,7 +245,7 @@ class Ogc(DataFormat):
             if resource and check_id:
                 await helpers.notify_udata(resource, check)
             if resource_id:
-                await Resource.update(str(resource_id), {"status": None})
+                await ResourceJobStatus.clear(str(resource_id), "ogc")
 
     @staticmethod
     def is_valid_layer_name(name: str) -> bool:
