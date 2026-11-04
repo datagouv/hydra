@@ -39,13 +39,12 @@ async def replace_resource_indexes(request: web.Request) -> web.Response:
     Respond with a 200 status code with the indexes now declared
     """
     resource_id = _resource_id(request)
+    if not await Resource.get(resource_id):
+        raise web.HTTPNotFound()
     try:
         payload = ReplaceResourceIndexesRequest.model_validate(await request.json())
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
-    try:
-        indexes = await ResourceIndex.replace(resource_id, payload.indexes)
-    except ValueError:
-        raise web.HTTPNotFound()
-    return _response(resource_id, indexes)
+    await ResourceIndex.replace(resource_id, payload.indexes)
+    return _response(resource_id, payload.indexes)

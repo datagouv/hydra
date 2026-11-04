@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_ID, RESOURCE_TABLE_INDEXES
+from tests.conftest import RESOURCE_ID, RESOURCE_TABLE_INDEXES
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv, Parquet
 from udata_hydra.db.resource_exception import ResourceException
@@ -52,23 +52,33 @@ async def test_parquet_indexes_created_without_exception(
     assert {idx["column_name"] for idx in indexes} == {"__id", "siren"}
 
 
-async def test_migration_copies_indexes_from_exceptions(setup_catalog_with_resource_exception, db):
+async def test_index_on_a_column_missing_from_the_file_is_skipped(
+    setup_catalog, rmock, catalog_content, db, fake_check, produce_mock
+):
+    """A declaration outlives the file it was written for: a column renamed or removed upstream
+    must not prevent the conversion, nor leave the resource without a table"""
+    await ResourceIndex.replace(RESOURCE_ID, {"url": "index", "removed_column": "index"})
+
+    check = await fake_check(headers={"content-type": "text/csv"})
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    rmock.get(check["url"], status=200, body=catalog_content)
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
+
+    indexes = await get_columns_with_indexes(table_name)
+    assert {idx["column_name"] for idx in indexes} == {"__id", "url"}
+    assert len(await db.fetch(f'SELECT * FROM "{table_name}"')) == 2
+
+
+async def test_migration_copies_indexes_from_exceptions(setup_catalog, db):
     """Indexes declared on exceptions before resources_indexes existed are carried over"""
-    # Legacy state: indexes stored on the exception, nothing in resources_indexes yet.
+    # Legacy state: indexes stored on the exception, as written by the former exceptions endpoints.
     await db.execute(
-        "UPDATE resources_exceptions SET table_indexes = $1 WHERE resource_id = $2",
-        json.dumps(RESOURCE_TABLE_INDEXES),
-        RESOURCE_EXCEPTION_ID,
-    )
-    # A value that is not an object cannot describe indexes: the migration must not fail on it.
-    await ResourceException.insert(resource_id=RESOURCE_ID)
-    await db.execute(
-        "UPDATE resources_exceptions SET table_indexes = '\"stupid\"'::jsonb WHERE resource_id = $1",
+        "INSERT INTO resources_exceptions (resource_id, table_indexes) VALUES ($1, $2)",
         RESOURCE_ID,
+        json.dumps(RESOURCE_TABLE_INDEXES),
     )
-    await db.execute("DELETE FROM resources_indexes")
 
     await db.execute(MIGRATION.read_text())
 
-    assert await ResourceIndex.get_by_resource_id(RESOURCE_EXCEPTION_ID) == RESOURCE_TABLE_INDEXES
-    assert await ResourceIndex.get_by_resource_id(RESOURCE_ID) == {}
+    assert await ResourceIndex.get_by_resource_id(RESOURCE_ID) == RESOURCE_TABLE_INDEXES

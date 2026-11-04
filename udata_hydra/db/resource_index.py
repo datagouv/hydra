@@ -1,5 +1,4 @@
 from udata_hydra import context
-from udata_hydra.db.resource import Resource
 
 
 class ResourceIndex:
@@ -19,12 +18,8 @@ class ResourceIndex:
         return {r["column_name"]: r["index_type"] for r in rows}
 
     @classmethod
-    async def replace(cls, resource_id: str, indexes: dict[str, str]) -> dict[str, str]:
+    async def replace(cls, resource_id: str, indexes: dict[str, str]) -> None:
         """Replace all the indexes of a resource, an empty mapping removes them"""
-        resource = await Resource.get(resource_id)
-        if not resource:
-            raise ValueError("Resource not found")
-
         pool = await context.pool("csv")
         async with pool.acquire() as connection:
             async with connection.transaction():
@@ -38,4 +33,3 @@ class ResourceIndex:
                     """,
                     [(resource_id, column, index_type) for column, index_type in indexes.items()],
                 )
-        return await cls.get_by_resource_id(resource_id)
