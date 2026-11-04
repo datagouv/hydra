@@ -23,6 +23,7 @@ from udata_hydra.routes.resources_exceptions import (
     get_all_resources_exceptions,
     update_resource_exception,
 )
+from udata_hydra.routes.resources_indexes import get_resource_indexes, replace_resource_indexes
 from udata_hydra.routes.status import get_crawler_status, get_health, get_stats, get_worker_status
 
 
@@ -77,6 +78,9 @@ routes_params = [
         delete_resource_exception,
         None,
     ),
+    # Routes for the indexes of resources tables
+    (web.get, "/api/resources-indexes/{resource_id}", get_resource_indexes, None),
+    (web.put, "/api/resources-indexes/{resource_id}", replace_resource_indexes, None),
     (web.get, "/api/config", get_exposed_config, None),
 ]
 

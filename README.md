@@ -239,11 +239,15 @@ The API serves the following endpoints:
 - `PUT` on `/api/resources/{resource_id}` to update a resource in the DB "catalog" table
 - `DELETE` on `/api/resources/{resource_id}` to delete a resource in the DB "catalog" table
 
-*Related to resources exceptions:*
+*Related to resources exceptions (files too large to be processed normally, allowed anyway):*
 - `GET` on `/api/resources-exceptions` to get the list of all resources exceptions
 - `POST` on `/api/resources-exceptions` to create a new resource exception in the DB
 - `PUT` on `/api/resources-exceptions/{resource_id}` to update a resource exception in the DB
 - `DELETE` on `/api/resources-exceptions/{resource_id}` to delete a resource exception from the DB
+
+*Related to the indexes of resources tables (any resource, exception or not):*
+- `GET` on `/api/resources-indexes/{resource_id}` to get the indexes declared on the table of a resource
+- `PUT` on `/api/resources-indexes/{resource_id}` to replace them; they are created at the next conversion of the resource
 
 *Related to some status and health check:*
 - `GET` on `/api/status/crawler` to get the crawling status
@@ -418,23 +422,15 @@ $ curl -s "http://localhost:8000/api/resources/stats/cors" | json_pp
 
 #### Adding a resource exception
 
+An exception lifts the file size limit of a resource and gives its jobs a longer timeout. It does not declare any index: see [Declaring the indexes of a resource table](#declaring-the-indexes-of-a-resource-table).
+
 ```bash
 $ curl   -X POST http://localhost:8000/api/resources-exceptions \
          -H 'Authorization: Bearer <myAPIkey>' \
          -d '{
             "resource_id": "123e4567-e89b-12d3-a456-426614174000",
-            "table_indexes": {
-                  "siren": "index"
-            },
             "comment": "This is a comment for the resource exception."
          }'
-```
-
-...or, if you don't want to add table indexes and a comment:
-```bash
-$ curl  -X POST localhost:8000/api/resources-exceptions \
-        -H 'Authorization: Bearer <myAPIkey>' \
-        -d '{"resource_id": "f868cca6-8da1-4369-a78d-47463f19a9a3"}'
 ```
 
 #### Updating a resource exception
@@ -442,13 +438,7 @@ $ curl  -X POST localhost:8000/api/resources-exceptions \
 ```bash
 $ curl   -X PUT http://localhost:8000/api/resources-exceptions/f868cca6-8da1-4369-a78d-47463f19a9a3 \
          -H "Authorization: Bearer <myAPIkey>" \
-         -d '{
-            "table_indexes": {
-                  "siren": "index",
-                  "code_postal": "index"
-            },
-            "comment": "Updated comment for the resource exception."
-         }'
+         -d '{"comment": "Updated comment for the resource exception."}'
 ```
 
 #### Deleting a resource exception
@@ -456,6 +446,16 @@ $ curl   -X PUT http://localhost:8000/api/resources-exceptions/f868cca6-8da1-436
 ```bash
 $ curl  -X DELETE http://localhost:8000/api/resources-exceptions/f868cca6-8da1-4369-a78d-47463f19a9a3 \
         -H "Authorization: Bearer <myAPIkey>"
+```
+
+#### Declaring the indexes of a resource table
+
+Indexes are declared per resource, exception or not, and created on its table at each conversion (only the `index` type, a B-tree, is supported). The mapping replaces the previous one; `{}` removes them all.
+
+```bash
+$ curl   -X PUT http://localhost:8000/api/resources-indexes/f868cca6-8da1-4369-a78d-47463f19a9a3 \
+         -H "Authorization: Bearer <myAPIkey>" \
+         -d '{"indexes": {"siren": "index", "code_postal": "index"}}'
 ```
 
 #### Get crawling status
