@@ -85,18 +85,19 @@ def compute_create_table_query(
                 )
                 continue
 
-            else:
-                if index_type == "index":
-                    index_name = f"{table_name}_{slugify(col_name)}_idx"
-                    indexes_labels[index_name] = {"column": col_name, "type": index_type}
-                    try:
-                        table.append_constraint(Index(index_name, col_name))
-                    except KeyError:
-                        raise KeyError(
-                            f'Error creating index "{index_name}" on column "{col_name}". '
-                            f'Does the column "{col_name}" exist in the table?'
-                        )
-                # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
+            # A declaration outlives the file it was written for: a column renamed or removed upstream
+            # skips its index instead of failing the conversion, after the previous table was dropped.
+            elif col_name not in table.c:
+                log.error(
+                    f'Column "{col_name}" is not in the file anymore. Index for column {col_name} was not created.'
+                )
+                continue
+
+            elif index_type == "index":
+                index_name = f"{table_name}_{slugify(col_name)}_idx"
+                indexes_labels[index_name] = {"column": col_name, "type": index_type}
+                table.append_constraint(Index(index_name, col_name))
+            # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
 
     compiled_query = CreateTable(table).compile(dialect=asyncpg.dialect())
     query: str = compiled_query.string

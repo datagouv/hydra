@@ -26,7 +26,7 @@ from udata_hydra.utils import storage_path
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
 RESOURCE_EXCEPTION_ID = "d4e3a9fb-4415-488e-ba57-d05269b27adf"
-RESOURCE_EXCEPTION_TABLE_INDEXES = {"Nom": "index", "N° de certificat": "index"}
+RESOURCE_TABLE_INDEXES = {"Nom": "index", "N° de certificat": "index"}
 RESOURCE_URL = "https://example.com/resource-1"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 NOT_EXISTING_RESOURCE_ID = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
@@ -192,7 +192,6 @@ async def setup_catalog_with_resource_exception(setup_catalog):
     )
     await ResourceException.insert(
         resource_id=RESOURCE_EXCEPTION_ID,
-        table_indexes=RESOURCE_EXCEPTION_TABLE_INDEXES,
         comment="This is a test comment.",
     )
 
