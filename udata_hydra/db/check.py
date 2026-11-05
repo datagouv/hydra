@@ -57,6 +57,21 @@ class Check:
             return await connection.fetchrow(q, resource_id, check_id)
 
     @classmethod
+    async def get_previous_ogc_analysed(
+        cls, resource_id: str, url: str, check_id: int
+    ) -> Record | None:
+        """Get the latest check before check_id on which an OGC analysis of this URL succeeded"""
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = """
+                SELECT * FROM checks
+                WHERE resource_id = $1 AND url = $2 AND id < $3 AND ogc_metadata IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            return await connection.fetchrow(q, resource_id, url, check_id)
+
+    @classmethod
     async def has_later_parsing(cls, resource_id: str, check_id: int) -> bool:
         """Whether a check after check_id has parsed the resource (successfully or not)
         or is currently parsing it. A parsing started more than STUCK_THRESHOLD_SECONDS ago

@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -8,6 +9,7 @@ from owslib.util import ServiceException
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from tests.conftest import RESOURCE_ID
+from udata_hydra import config
 from udata_hydra.data_formats import (
     Csv,
     Ogc,
@@ -15,6 +17,7 @@ from udata_hydra.data_formats import (
     Wms,
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
+from udata_hydra.db.check import Check
 
 pytestmark = pytest.mark.asyncio
 
@@ -517,3 +520,60 @@ class TestLayerNameDetection:
     )
     def test_detect_layer_name(self, url, title, expected):
         assert Ogc.detect_layer_name(url, title) == expected
+
+
+ANALYSED_URL = "https://example.com/geoserver/wfs?SERVICE=WFS"
+
+
+class TestOgcIsAnalysisDue:
+    """Ogc.is_analysis_due: OGC services are analysed on their own schedule"""
+
+    @pytest.fixture
+    def previous_check(self, fake_check):
+        async def _previous_check(days_ago: int, url: str = ANALYSED_URL, **update) -> dict:
+            check = await fake_check(
+                url=url, created_at=datetime.now(timezone.utc) - timedelta(days=days_ago)
+            )
+            if update:
+                await Check.update(check["id"], update)
+            return check
+
+        return _previous_check
+
+    async def test_must_analyse(self, setup_catalog, fake_check, previous_check):
+        await previous_check(1, ogc_metadata={"format": "wfs"})
+        check = await fake_check(url=ANALYSED_URL)
+        assert await Wfs.is_analysis_due(check, has_changed=False, must_analyse=True)
+
+    async def test_never_analysed(self, setup_catalog, fake_check):
+        check = await fake_check(url=ANALYSED_URL)
+        assert await Wfs.is_analysis_due(check, has_changed=False, must_analyse=False)
+
+    @pytest.mark.parametrize("has_changed", [False, True])
+    async def test_recently_analysed(self, setup_catalog, fake_check, previous_check, has_changed):
+        """A GetCapabilities change alone doesn't make the analysis due"""
+        await previous_check(1, ogc_metadata={"format": "wfs"})
+        check = await fake_check(url=ANALYSED_URL)
+        assert not await Wfs.is_analysis_due(check, has_changed=has_changed, must_analyse=False)
+
+    async def test_analysis_too_old(self, setup_catalog, fake_check, previous_check):
+        await previous_check(config.OGC_ANALYSIS_MAX_AGE_DAYS + 1, ogc_metadata={"format": "wfs"})
+        check = await fake_check(url=ANALYSED_URL)
+        assert await Wfs.is_analysis_due(check, has_changed=False, must_analyse=False)
+
+    async def test_only_failed_analyses(self, setup_catalog, fake_check, previous_check):
+        await previous_check(
+            1,
+            parsing_started_at=datetime.now(timezone.utc),
+            parsing_error="ogc_service_connection:error",
+        )
+        check = await fake_check(url=ANALYSED_URL)
+        assert await Wfs.is_analysis_due(check, has_changed=False, must_analyse=False)
+
+    async def test_analysed_on_another_url(self, setup_catalog, fake_check, previous_check):
+        await previous_check(1, url="https://example.com/old/wfs", ogc_metadata={"format": "wfs"})
+        check = await fake_check(url=ANALYSED_URL)
+        assert await Wfs.is_analysis_due(check, has_changed=False, must_analyse=False)
+
+    def test_analysis_job_needs_no_file(self):
+        assert Wfs.analysis_job(file_name=None, resource_id="r", dataset_id="d") == Wfs.analyse
