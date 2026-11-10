@@ -12,7 +12,7 @@ import asyncpg
 import nest_asyncio2 as nest_asyncio
 import pytest
 import pytest_asyncio
-from aiohttp import ClientResponse
+from aiohttp import ClientResponse, StreamReader
 from aiohttp.test_utils import TestClient, TestServer
 from aioresponses import aioresponses
 from aioresponses import core as aioresponses_core
@@ -226,6 +226,14 @@ if "stream_writer" in inspect.signature(ClientResponse.__init__).parameters:
             super().__init__(*args, **kwargs)
 
     aioresponses_core.ClientResponse = _ClientResponse  # ty: ignore[invalid-assignment]
+
+    # aiohttp 3.14 asserts that the protocol has a parser when pausing reading, which happens
+    # when aioresponses feeds a body larger than the StreamReader high water mark to a bare
+    # ResponseHandler. Use a mock protocol instead so that large mocked bodies still work.
+    def _stream_reader_factory(loop=None):
+        return StreamReader(Mock(), limit=2**16, loop=loop)
+
+    aioresponses_core.stream_reader_factory = _stream_reader_factory
 
 
 @pytest.fixture
