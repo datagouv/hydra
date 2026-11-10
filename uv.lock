@@ -2609,7 +2609,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = ">=3.10.3" },
+    { name = "aiohttp", specifier = ">=3.14.4" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "boto3", specifier = ">=1.35.0" },
     { name = "coloredlogs", specifier = ">=15.0.1" },
