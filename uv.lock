@@ -161,16 +161,16 @@ wheels = [
 ]
 
 [[package]]
-name = "aioresponses"
-version = "0.7.9"
+name = "aioresponses-ng"
+version = "0.8.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "packaging" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/28/fb/e3f08af812b3e66fca511ea1babb9dfddeca5965dea2a4d13b6926e0b1c2/aioresponses-0.7.9.tar.gz", hash = "sha256:1dcfa28938fc006f046a98383a7c07ac180be7a492c1ed557f5cd7b0805357d3", size = 34072, upload-time = "2026-06-23T21:23:23.828Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/6f/6e317e805995b704894d9fc90ca63a87a567daf567e58db138659bf0abdc/aioresponses_ng-0.8.2.tar.gz", hash = "sha256:0ee168f7bccfcc7990a995fcabf42bb84dd42faafaa30497c7108b093214633f", size = 19394, upload-time = "2026-07-05T16:17:23.065Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/55/4c77cda7e69c1ac81a32e6895a361e0da9350eb7835a2ddb161a37ef1ce9/aioresponses-0.7.9-py2.py3-none-any.whl", hash = "sha256:94f9617f841c5bd7ee088ed783284f2cf4e6acc85d3933d92fc2fc7bd572a1b0", size = 12832, upload-time = "2026-06-23T21:23:22.426Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/9d/4ad5aebee5771ce0822135b6daaa21b45f44043b15eb1b7afc2faaeabf1c/aioresponses_ng-0.8.2-py3-none-any.whl", hash = "sha256:9de28a0de0ad289c6317b56da2f81c846643e4b9c2fde32023c1509064fbb72d", size = 10760, upload-time = "2026-07-05T16:17:21.807Z" },
 ]
 
 [[package]]
@@ -2609,7 +2609,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "aiohttp-devtools" },
-    { name = "aioresponses" },
+    { name = "aioresponses-ng" },
     { name = "gunicorn" },
     { name = "mypy" },
     { name = "nest-asyncio2" },
@@ -2648,7 +2648,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "aiohttp-devtools", specifier = ">=1.0.post0" },
-    { name = "aioresponses", specifier = ">=0.7.3" },
+    { name = "aioresponses-ng", specifier = ">=0.8.2" },
     { name = "gunicorn", specifier = ">=20.1.0" },
     { name = "mypy", specifier = ">=1.11.0" },
     { name = "nest-asyncio2", specifier = ">=1.7.1" },

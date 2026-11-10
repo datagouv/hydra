@@ -5,16 +5,13 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from unittest.mock import Mock
 
 import asyncpg
 import nest_asyncio2 as nest_asyncio
 import pytest
 import pytest_asyncio
-from aiohttp import ClientResponse, StreamReader
 from aiohttp.test_utils import TestClient, TestServer
 from aioresponses import aioresponses
-from aioresponses import core as aioresponses_core
 
 import udata_hydra.cli  # noqa - this register the cli cmds
 from udata_hydra import config
@@ -214,27 +211,6 @@ def analysis_mock(mocker):
         "udata_hydra.analysis.resource.analyse_resource",
         dummy({"error": None, "checksum": None, "filesize": None, "mime_type": None}),
     )
-
-
-# aiohttp 3.14 made `stream_writer` a required argument of ClientResponse, which aioresponses
-# doesn't pass yet: https://github.com/pnuckowski/aioresponses/pull/288
-class _ClientResponse(ClientResponse):
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault("stream_writer", Mock(output_size=0))
-        super().__init__(*args, **kwargs)
-
-
-aioresponses_core.ClientResponse = _ClientResponse  # ty: ignore[invalid-assignment]
-
-
-# aiohttp 3.14 asserts that the protocol has a parser when pausing reading, which happens
-# when aioresponses feeds a body larger than the StreamReader high water mark to a bare
-# ResponseHandler. Use a mock protocol instead so that large mocked bodies still work.
-def _stream_reader_factory(loop: asyncio.AbstractEventLoop | None = None) -> StreamReader:
-    return StreamReader(Mock(), limit=2**16, loop=loop)
-
-
-aioresponses_core.stream_reader_factory = _stream_reader_factory  # ty: ignore[invalid-assignment]
 
 
 @pytest.fixture
