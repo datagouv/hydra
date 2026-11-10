@@ -225,7 +225,7 @@ if "stream_writer" in inspect.signature(ClientResponse.__init__).parameters:
             kwargs.setdefault("stream_writer", Mock(output_size=0))
             super().__init__(*args, **kwargs)
 
-    aioresponses_core.ClientResponse = _ClientResponse
+    aioresponses_core.ClientResponse = _ClientResponse  # ty: ignore[invalid-assignment]
 
 
 @pytest.fixture
