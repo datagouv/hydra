@@ -230,10 +230,10 @@ if "stream_writer" in inspect.signature(ClientResponse.__init__).parameters:
     # aiohttp 3.14 asserts that the protocol has a parser when pausing reading, which happens
     # when aioresponses feeds a body larger than the StreamReader high water mark to a bare
     # ResponseHandler. Use a mock protocol instead so that large mocked bodies still work.
-    def _stream_reader_factory(loop=None):
+    def _stream_reader_factory(loop: asyncio.AbstractEventLoop | None = None) -> StreamReader:
         return StreamReader(Mock(), limit=2**16, loop=loop)
 
-    aioresponses_core.stream_reader_factory = _stream_reader_factory
+    aioresponses_core.stream_reader_factory = _stream_reader_factory  # ty: ignore[invalid-assignment]
 
 
 @pytest.fixture
