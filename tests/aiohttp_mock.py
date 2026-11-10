@@ -16,7 +16,7 @@ from aiohttp import ClientConnectionError, ClientResponseError, ClientSession, R
 from multidict import CIMultiDict, CIMultiDictProxy
 from yarl import URL
 
-RequestCall = namedtuple("RequestCall", ["kwargs"])
+RequestCall = namedtuple("RequestCall", ["kwargs", "headers"])
 
 
 @dataclass
@@ -133,7 +133,9 @@ class aiohttp_mock:
             return await self._original_request(session, method, str_or_url, **kwargs)
 
         url = URL(str_or_url)
-        self.requests.setdefault((method, url), []).append(RequestCall(kwargs))
+        headers = CIMultiDict(session.headers)
+        headers.update(kwargs.get("headers") or {})
+        self.requests.setdefault((method, url), []).append(RequestCall(kwargs, headers))
 
         matcher = next((m for m in self.matchers if (m.method, m.url) == (method, url)), None)
         if matcher is None:
