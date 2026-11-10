@@ -2648,7 +2648,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "aiohttp-devtools", specifier = ">=1.0.post0" },
-    { name = "aioresponses-ng", specifier = ">=0.8.2" },
+    { name = "aioresponses-ng", specifier = "==0.8.2" },
     { name = "gunicorn", specifier = ">=20.1.0" },
     { name = "mypy", specifier = ">=1.11.0" },
     { name = "nest-asyncio2", specifier = ">=1.7.1" },
