@@ -57,7 +57,11 @@ class MockedResponse:
     def raise_for_status(self) -> None:
         if self.status >= 400:
             raise ClientResponseError(
-                self.request_info, (), status=self.status, message=self.reason
+                self.request_info,
+                (),
+                status=self.status,
+                message=self.reason,
+                headers=self.headers,
             )
 
     async def __aenter__(self) -> "MockedResponse":
