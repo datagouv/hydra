@@ -1,4 +1,4 @@
-"""Minimal replacement for aioresponses, covering only what our tests use.
+"""Replacement for non-maintained aioresponses (as of 2026-11), covering only what hydra tests use.
 
 It patches `ClientSession._request` to return duck-typed responses instead of building real
 `aiohttp.ClientResponse` objects, so that it doesn't depend on aiohttp internals.
