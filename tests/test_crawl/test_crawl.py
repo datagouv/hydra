@@ -10,10 +10,10 @@ import nest_asyncio2 as nest_asyncio
 import pytest
 from aiohttp import ClientSession, RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
-from aioresponses import CallbackResult
 from asyncpg import Record
 from yarl import URL
 
+from tests.aiohttp_mock import CallbackResult
 from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_ID, RESOURCE_URL, SIMPLE_CSV_CONTENT
 from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
@@ -793,7 +793,7 @@ async def test_no_check_changed_header(
 async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, produce_mock):
     # very complicated stuff, thanks https://github.com/pnuckowski/aioresponses/issues/111#issuecomment-896585061
     def callback(url, **kwargs):
-        assert config.USER_AGENT == sys._getframe(3).f_locals["orig_self"].headers["user-agent"]
+        assert config.USER_AGENT == sys._getframe(1).f_locals["session"].headers["user-agent"]
         # add content-length to avoid switching from HEAD to GET when crawling
         return CallbackResult(status=200, payload={}, headers={"content-length": "1"})
 
