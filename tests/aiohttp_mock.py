@@ -4,7 +4,6 @@ It patches `ClientSession._request` to return duck-typed responses instead of bu
 `aiohttp.ClientResponse` objects, so that it doesn't depend on aiohttp internals.
 """
 
-import inspect
 import io
 import json
 from collections import namedtuple
@@ -17,7 +16,7 @@ from aiohttp import ClientConnectionError, ClientResponseError, ClientSession, R
 from multidict import CIMultiDict, CIMultiDictProxy
 from yarl import URL
 
-RequestCall = namedtuple("RequestCall", ["args", "kwargs"])
+RequestCall = namedtuple("RequestCall", ["kwargs"])
 
 
 @dataclass
@@ -26,7 +25,6 @@ class CallbackResult:
     body: str | bytes = ""
     payload: Any = None
     headers: dict | None = None
-    content_type: str = "application/json"
 
 
 class MockedContent:
@@ -45,45 +43,22 @@ class MockedResponse:
     def __init__(self, method: str, url: URL, result: CallbackResult):
         body = json.dumps(result.payload) if result.payload is not None else result.body
         self._body = body.encode() if isinstance(body, str) else body
-        self.method = method
-        self.url = url
         self.status = result.status
-        try:
-            self.reason = HTTPStatus(result.status).phrase
-        except ValueError:
-            self.reason = ""
-        headers = CIMultiDict({"Content-Type": result.content_type})
+        self.reason = HTTPStatus(result.status).phrase
+        headers = CIMultiDict({"Content-Type": "application/json"})
         headers.update(result.headers or {})
         self.headers = CIMultiDictProxy(headers)
         self.content = MockedContent(self._body)
         self.request_info = RequestInfo(url, method, CIMultiDictProxy(CIMultiDict()), url)
-        self.history = ()
 
-    @property
-    def ok(self) -> bool:
-        return self.status < 400
-
-    async def read(self) -> bytes:
-        return self._body
-
-    async def text(self, encoding: str = "utf-8") -> str:
-        return self._body.decode(encoding)
-
-    async def json(self, **kwargs) -> Any:
+    async def json(self) -> Any:
         return json.loads(self._body)
 
     def raise_for_status(self) -> None:
-        if not self.ok:
+        if self.status >= 400:
             raise ClientResponseError(
-                self.request_info,
-                self.history,
-                status=self.status,
-                message=self.reason,
-                headers=self.headers,
+                self.request_info, (), status=self.status, message=self.reason
             )
-
-    def release(self) -> None:
-        pass
 
     async def __aenter__(self) -> "MockedResponse":
         return self
@@ -134,7 +109,7 @@ class aiohttp_mock:
         **kwargs,
     ) -> None:
         self.matchers.append(
-            Matcher(method.upper(), URL(url), exception, repeat, callback, CallbackResult(**kwargs))
+            Matcher(method, URL(url), exception, repeat, callback, CallbackResult(**kwargs))
         )
 
     def get(self, url: str, **kwargs) -> None:
@@ -153,8 +128,8 @@ class aiohttp_mock:
         if any(str(str_or_url).startswith(prefix) for prefix in self.passthrough):
             return await self._original_request(session, method, str_or_url, **kwargs)
 
-        method, url = method.upper(), URL(str(str_or_url))
-        self.requests.setdefault((method, url), []).append(RequestCall((), kwargs))
+        url = URL(str_or_url)
+        self.requests.setdefault((method, url), []).append(RequestCall(kwargs))
 
         matcher = next((m for m in self.matchers if (m.method, m.url) == (method, url)), None)
         if matcher is None:
@@ -164,16 +139,8 @@ class aiohttp_mock:
         if matcher.exception is not None:
             raise matcher.exception
 
-        result = matcher.result
-        if matcher.callback is not None:
-            result = matcher.callback(url, **kwargs)
-            if inspect.isawaitable(result):
-                result = await result
+        result = matcher.callback(url, **kwargs) if matcher.callback else matcher.result
         response = MockedResponse(method, url, result)
-
-        raise_for_status = kwargs.get("raise_for_status")
-        if raise_for_status is None:
-            raise_for_status = session._raise_for_status
-        if raise_for_status:
+        if session._raise_for_status:
             response.raise_for_status()
         return response
