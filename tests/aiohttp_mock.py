@@ -145,6 +145,6 @@ class aiohttp_mock:
 
         result = matcher.callback(url, **kwargs) if matcher.callback else matcher.result
         response = MockedResponse(method, url, result)
-        if session._raise_for_status:
+        if session.raise_for_status:
             response.raise_for_status()
         return response
