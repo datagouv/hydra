@@ -85,15 +85,14 @@ async def parquet_to_db(
         db_col_name(c): helpers.get_python_type(v) for c, v in file.inspection["columns"].items()
     }
 
-    # Built before the drop: a query that cannot be built must not leave the resource without a table
-    create_query = compute_create_table_query(
-        table_name=table_name, columns=columns, indexes=table_indexes
-    )
-
+    q = f'DROP TABLE IF EXISTS "{table_name}"'
     db = await context.pool("csv")
-    await db.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+    await db.execute(q)
+
+    # Create table
+    q = compute_create_table_query(table_name=table_name, columns=columns, indexes=table_indexes)
     try:
-        await db.execute(create_query)
+        await db.execute(q)
     except Exception as e:
         raise ParseException(
             message=str(e),
