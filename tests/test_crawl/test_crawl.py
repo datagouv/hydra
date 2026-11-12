@@ -1,6 +1,5 @@
 import hashlib
 import json
-import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
@@ -10,7 +9,6 @@ import nest_asyncio2 as nest_asyncio
 import pytest
 from aiohttp import ClientSession, RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
-from aioresponses import CallbackResult
 from asyncpg import Record
 from yarl import URL
 
@@ -791,16 +789,13 @@ async def test_no_check_changed_header(
 
 
 async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, produce_mock):
-    # very complicated stuff, thanks https://github.com/pnuckowski/aioresponses/issues/111#issuecomment-896585061
-    def callback(url, **kwargs):
-        assert config.USER_AGENT == sys._getframe(3).f_locals["orig_self"].headers["user-agent"]
-        # add content-length to avoid switching from HEAD to GET when crawling
-        return CallbackResult(status=200, payload={}, headers={"content-length": "1"})
-
-    rurl = RESOURCE_URL
-    rmock.head(rurl, callback=callback)
-    rmock.get(rurl, callback=callback)
+    # add content-length to avoid switching from HEAD to GET when crawling
+    rmock.head(RESOURCE_URL, headers={"content-length": "1"})
+    rmock.get(RESOURCE_URL, headers={"content-length": "1"})
     await start_checks(iterations=1)
+    calls = [c for (_, url), cs in rmock.requests.items() if url == URL(RESOURCE_URL) for c in cs]
+    assert calls
+    assert all(c.headers["user-agent"] == config.USER_AGENT_FULL for c in calls)
 
 
 async def test_check_triggered_by_udata_entrypoint_clean_catalog(

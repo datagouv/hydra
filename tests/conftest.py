@@ -11,9 +11,9 @@ import nest_asyncio2 as nest_asyncio
 import pytest
 import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
-from aioresponses import aioresponses
 
 import udata_hydra.cli  # noqa - this register the cli cmds
+from tests.aiohttp_mock import aiohttp_mock
 from udata_hydra import config
 from udata_hydra.app import app_factory
 from udata_hydra.cli import drop_dbs, load_catalog, migrate
@@ -216,7 +216,7 @@ def analysis_mock(mocker):
 @pytest.fixture
 def rmock():
     # passthrough for local requests (aiohttp TestServer)
-    with aioresponses(passthrough=["http://127.0.0.1"]) as m:
+    with aiohttp_mock(passthrough=["http://127.0.0.1"]) as m:
         yield m
 
 
