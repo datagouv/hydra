@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from udata_hydra import config
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
-from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import Timer
 
 if TYPE_CHECKING:
@@ -32,21 +32,24 @@ class Geojson(DataFormat):
         resource_id: str = str(check["resource_id"])
         url = check["url"]
 
-        # Update resource status to ANALYSING_GEOJSON
-        await Resource.update(resource_id, {"status": "ANALYSING_GEOJSON"})
+        await ResourceJobStatus.set(resource_id, "geojson", "ANALYSING_GEOJSON")
 
         timer = Timer("analyse-geojson", resource_id)
         assert any(_ is not None for _ in (check["id"], url))
 
-        # Convert to PMTiles
-        await export_pmtiles(geojson_file=self, check=check)
-        timer.mark("geojson-to-pmtiles")
-        check = await Check.update(  # type: ignore[assignment]
-            check_id=check["id"],
-            data={
-                "parsing_finished_at": datetime.now(timezone.utc),
-            },
-        )
+        try:
+            await export_pmtiles(geojson_file=self, check=check)
+            timer.mark("geojson-to-pmtiles")
+            check = await Check.update(  # type: ignore[assignment]
+                check_id=check["id"],
+                data={
+                    "parsing_finished_at": datetime.now(timezone.utc),
+                },
+            )
+        finally:
+            timer.stop()
+            await ResourceJobStatus.clear(resource_id, "geojson")
+            self.path.unlink(missing_ok=True)
 
     async def to_pmtiles(self) -> "PMTiles":
         from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
