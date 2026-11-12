@@ -1,7 +1,7 @@
+import hashlib
 import logging
 
 import pyarrow as pa
-from slugify import slugify
 from sqlalchemy import (
     JSON,
     BigInteger,
@@ -85,18 +85,22 @@ def compute_create_table_query(
                 )
                 continue
 
-            else:
-                if index_type == "index":
-                    index_name = f"{table_name}_{slugify(col_name)}_idx"
-                    indexes_labels[index_name] = {"column": col_name, "type": index_type}
-                    try:
-                        table.append_constraint(Index(index_name, col_name))
-                    except KeyError:
-                        raise KeyError(
-                            f'Error creating index "{index_name}" on column "{col_name}". '
-                            f'Does the column "{col_name}" exist in the table?'
-                        )
-                # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
+            # A declaration outlives the file it was written for: a column renamed or removed upstream
+            # skips its index instead of failing the conversion, after the previous table was dropped.
+            elif col_name not in table.c:
+                log.error(
+                    f'Column "{col_name}" is not in the file anymore. Index for column {col_name} was not created.'
+                )
+                continue
+
+            elif index_type == "index":
+                # Hashed rather than derived from the column name: the table name already takes 32 of
+                # the 63 characters Postgres allows for an identifier, a column name can take up to 63.
+                col_hash = hashlib.md5(col_name.encode("utf-8")).hexdigest()[:8]
+                index_name = f"{table_name}_{col_hash}_idx"
+                indexes_labels[index_name] = {"column": col_name, "type": index_type}
+                table.append_constraint(Index(index_name, col_name))
+            # TODO: other index types. Not easy with sqlalchemy, maybe use raw sql?
 
     compiled_query = CreateTable(table).compile(dialect=asyncpg.dialect())
     query: str = compiled_query.string

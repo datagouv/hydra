@@ -1,14 +1,13 @@
-import json
-
 import pytest
 
 from tests.conftest import (
     NOT_EXISTING_RESOURCE_ID,
     RESOURCE_EXCEPTION_ID,
-    RESOURCE_EXCEPTION_TABLE_INDEXES,
     RESOURCE_ID,
+    RESOURCE_TABLE_INDEXES,
 )
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_index import ResourceIndex
 
 pytestmark = pytest.mark.asyncio
 
@@ -26,12 +25,7 @@ async def test_create_resource_exception(
 ):
     # Test API call with no token
     resp = await client.post(
-        path="/api/resources-exceptions",
-        headers=None,
-        json={
-            "resource_id": RESOURCE_ID,
-            "table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES,
-        },
+        path="/api/resources-exceptions", headers=None, json={"resource_id": RESOURCE_ID}
     )
     assert resp.status == 401
 
@@ -39,10 +33,7 @@ async def test_create_resource_exception(
     resp = await client.post(
         path="/api/resources-exceptions",
         headers=api_headers_wrong_token,
-        json={
-            "resource_id": RESOURCE_ID,
-            "table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES,
-        },
+        json={"resource_id": RESOURCE_ID},
     )
     assert resp.status == 403
 
@@ -56,16 +47,11 @@ async def test_create_resource_exception(
     resp = await client.post(
         path="/api/resources-exceptions",
         headers=api_headers,
-        json={
-            "resource_id": RESOURCE_ID,
-            "table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES,
-            "comment": "This is a test comment.",
-        },
+        json={"resource_id": RESOURCE_ID, "comment": "This is a test comment."},
     )
     assert resp.status == 201
     data: dict = await resp.json()
     assert data["resource_id"] == RESOURCE_ID
-    assert json.loads(data["table_indexes"]) == RESOURCE_EXCEPTION_TABLE_INDEXES
     assert data["comment"] == "This is a test comment."
 
     # Test posting the same resource exception
@@ -75,15 +61,29 @@ async def test_create_resource_exception(
     assert resp.status == 400
     assert "Resource exception already exists" in await resp.text()
 
-    # Test API post success with no table indexes
-    await ResourceException.delete(RESOURCE_ID)  # First, delete any existing resource exception
+
+async def test_resource_exception_rejects_table_indexes(
+    setup_catalog_with_resource_exception, client, api_headers
+):
+    """Indexes are declared on /api/resources-indexes: a client still sending them to the
+    exceptions gets an error, instead of seeing them silently ignored"""
     resp = await client.post(
-        path="/api/resources-exceptions", headers=api_headers, json={"resource_id": RESOURCE_ID}
+        path="/api/resources-exceptions",
+        headers=api_headers,
+        json={"resource_id": RESOURCE_ID, "table_indexes": RESOURCE_TABLE_INDEXES},
     )
-    assert resp.status == 201
-    data: dict = await resp.json()
-    assert data["resource_id"] == RESOURCE_ID
-    assert data["table_indexes"] == "{}"
+    assert resp.status == 400
+    assert "table_indexes" in await resp.text()
+    assert await ResourceException.get_by_resource_id(RESOURCE_ID) is None
+
+    resp = await client.put(
+        path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
+        headers=api_headers,
+        json={"table_indexes": RESOURCE_TABLE_INDEXES},
+    )
+    assert resp.status == 400
+    assert "table_indexes" in await resp.text()
+    assert await ResourceIndex.get_by_resource_id(RESOURCE_EXCEPTION_ID) == {}
 
 
 async def test_update_resource_exception(
@@ -93,7 +93,7 @@ async def test_update_resource_exception(
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
         headers=api_headers_wrong_token,
-        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
+        json={"comment": "Updated test comment."},
     )
     assert resp.status == 403
 
@@ -101,24 +101,15 @@ async def test_update_resource_exception(
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
         headers=api_headers,
-        json={"table_indexes": "stupid"},
+        json={"comment": ["stupid"]},
     )
     assert resp.status == 400
-    assert "dictionary" in (await resp.text()).lower()
-
-    resp = await client.put(
-        path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
-        headers=api_headers,
-        json={"table_indexes": {"column1": "stupid"}},
-    )
-    assert resp.status == 400
-    assert "index type must be one of" in await resp.text()
 
     # Test API call with non existing resource id data
     resp = await client.put(
         path=f"/api/resources-exceptions/{NOT_EXISTING_RESOURCE_ID}",
         headers=api_headers,
-        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
+        json={"comment": "Updated test comment."},
     )
     assert resp.status == 404
 
@@ -126,7 +117,7 @@ async def test_update_resource_exception(
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_ID}",
         headers=api_headers,
-        json={"table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES},
+        json={"comment": "Updated test comment."},
     )
     assert resp.status == 404
 
@@ -134,15 +125,11 @@ async def test_update_resource_exception(
     resp = await client.put(
         path=f"/api/resources-exceptions/{RESOURCE_EXCEPTION_ID}",
         headers=api_headers,
-        json={
-            "table_indexes": RESOURCE_EXCEPTION_TABLE_INDEXES,
-            "comment": "Updated test comment.",
-        },
+        json={"comment": "Updated test comment."},
     )
     assert resp.status == 200
     data: dict = await resp.json()
     assert data["resource_id"] == RESOURCE_EXCEPTION_ID
-    assert json.loads(data["table_indexes"]) == RESOURCE_EXCEPTION_TABLE_INDEXES
     assert data["comment"] == "Updated test comment."
 
 

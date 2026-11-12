@@ -46,7 +46,6 @@ async def create_resource_exception(request: web.Request) -> web.Response:
     try:
         resource_exception: Record | None = await ResourceException.insert(
             resource_id=str(payload.resource_id),
-            table_indexes=payload.table_indexes,
             comment=payload.comment,
         )
         if not resource_exception:
@@ -90,7 +89,6 @@ async def update_resource_exception(request: web.Request) -> web.Response:
     try:
         resource_exception: Record | None = await ResourceException.update(
             resource_id=resource_id,
-            table_indexes=payload.table_indexes,
             comment=payload.comment,
         )
     except ValueError as err:
