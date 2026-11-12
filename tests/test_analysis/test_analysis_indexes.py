@@ -70,6 +70,22 @@ async def test_index_on_a_column_missing_from_the_file_is_skipped(
     assert len(await db.fetch(f'SELECT * FROM "{table_name}"')) == 2
 
 
+async def test_index_on_a_long_column_name(setup_catalog, rmock, db, fake_check, produce_mock):
+    """The index name must fit in the 63 characters Postgres allows, whatever the column length"""
+    column = "code_commune_insee_de_residence_du_beneficiaire"
+    await ResourceIndex.replace(RESOURCE_ID, {column: "index"})
+
+    check = await fake_check(headers={"content-type": "text/csv"})
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    rmock.get(check["url"], status=200, body=f"{column};nom\n75056;Paris\n69123;Lyon\n".encode())
+    file = await download_from_check(check, Csv)
+    await file.analyse(check=check)
+
+    indexes = await get_columns_with_indexes(table_name)
+    assert {idx["column_name"] for idx in indexes} == {"__id", column}
+    assert len(await db.fetch(f'SELECT * FROM "{table_name}"')) == 2
+
+
 async def test_migration_copies_indexes_from_exceptions(setup_catalog, db):
     """Indexes declared on exceptions before resources_indexes existed are carried over"""
     # Legacy state: indexes stored on the exception, as written by the former exceptions endpoints.
