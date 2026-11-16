@@ -67,7 +67,7 @@ async def test_first_check_is_analysed(setup_catalog, rmock, fake_check, produce
 async def test_unchanged_and_never_analysed(
     setup_catalog, rmock, fake_check, previous_check, produce_mock, ogc_analyse
 ):
-    """e.g. geo-ide: the GetCapabilities never changes, so the analysis used to never run"""
+    """e.g. geo-ide: the GetCapabilities never changes"""
     await previous_check()
     await _analyse_new_check(fake_check, rmock)
     ogc_analyse.assert_called_once()
