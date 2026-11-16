@@ -23,7 +23,14 @@ from udata_hydra.utils import ParseException, download_resource, handle_parse_ex
 log = logging.getLogger("udata-hydra")
 
 VALID_LAYER_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-.:]{1,100}$")
-SERVICE_MAPPING = {
+
+
+class OgcService(TypedDict):
+    service: Callable[..., Any]
+    versions: list[str]
+
+
+SERVICE_MAPPING: dict[str, OgcService] = {
     "wfs": {
         "service": WebFeatureService,
         "versions": ["2.0.0", "1.1.0", "1.0.0"],
@@ -175,13 +182,11 @@ class Ogc(DataFormat):
             web_service = None
             version = None
             connection_error = None
-            for v in SERVICE_MAPPING[format]["versions"]:  # type: ignore[not-iterable]
+            for v in SERVICE_MAPPING[format]["versions"]:
                 try:
                     # owslib fetches the document with no size limit, unless given the xml
                     xml = await cls.fetch_capabilities(url, v)
-                    web_service = SERVICE_MAPPING[format]["service"](  # type: ignore[call-non-callable]
-                        url, version=v, xml=xml
-                    )
+                    web_service = SERVICE_MAPPING[format]["service"](url, version=v, xml=xml)
                     version = v
                     break
                 except Exception as e:
