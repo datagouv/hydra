@@ -73,10 +73,8 @@ class DataFormat(ABC):
     @classmethod
     def analysis_job(
         cls, file_name: str | None, resource_id: str, dataset_id: str
-    ) -> Callable[..., Any] | None:
+    ) -> Callable[..., Any]:
         """The analysis to enqueue, which works on the downloaded file by default"""
-        if not file_name:
-            return None
         return cls(file_name=file_name, resource_id=resource_id, dataset_id=dataset_id).analyse
 
     @abstractmethod

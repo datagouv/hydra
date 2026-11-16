@@ -1,11 +1,9 @@
 import json
 import logging
 import os
-from collections.abc import Callable
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 import magic
 from asyncpg import Record
@@ -177,7 +175,6 @@ async def analyse_resource(
     # e.g. too large: rules out further analysis
     download_failed: bool = bool(dl_analysis.get("analysis:error"))
 
-    analysis_job: Callable[..., Any] | None = None
     if (
         data_format is not None
         and not download_failed
@@ -186,12 +183,10 @@ async def analyse_resource(
         )
     ):
         analysis_job = data_format.analysis_job(
-            file_name=analysis_file_name if tmp_file else None,
+            file_name=analysis_file_name,
             resource_id=resource_id,
             dataset_id=dataset_id,
         )
-
-    if data_format is not None and analysis_job is not None:
         log.info(
             f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
         )

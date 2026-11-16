@@ -122,7 +122,3 @@ async def test_default_is_analysis_due(has_changed, must_analyse, expected):
         await Xls.is_analysis_due({}, has_changed=has_changed, must_analyse=must_analyse)
         is expected
     )
-
-
-def test_default_analysis_job_needs_a_file():
-    assert Xls.analysis_job(file_name=None, resource_id="r", dataset_id="d") is None
