@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from aioresponses import aioresponses
 from owslib.crs import Crs
 from owslib.util import ServiceException
 from requests.exceptions import ConnectionError as RequestsConnectionError
@@ -17,7 +18,9 @@ from udata_hydra.data_formats import (
     Wms,
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
+from udata_hydra.data_formats.ogc import SERVICE_MAPPING
 from udata_hydra.db.check import Check
+from udata_hydra.utils import FileTooLargeException
 
 pytestmark = pytest.mark.asyncio
 
@@ -84,6 +87,13 @@ class TestOgcDetection:
 @pytest.mark.asyncio
 class TestOgcAnalysis:
     """Tests for OGC analysis"""
+
+    @pytest.fixture(autouse=True)
+    def fetch_capabilities(self, mocker):
+        """The services are mocked in SERVICE_MAPPING, the document they get doesn't matter"""
+        return mocker.patch.object(
+            Ogc, "fetch_capabilities", new=AsyncMock(return_value=b"<Capabilities/>")
+        )
 
     async def test_analyse_ogc_disabled(self, setup_catalog, fake_check):
         with patch("udata_hydra.data_formats.ogc.config") as mock_config:
@@ -474,6 +484,60 @@ class TestOgcAnalysis:
             "output_formats": [],
             "detected_layer": None,
         }
+
+
+class TestOgcFetchCapabilities:
+    """Ogc.fetch_capabilities: the GetCapabilities document is fetched with a size limit"""
+
+    WFS_CAPABILITIES_URL = (
+        "https://example.com/geoserver/wfs?service=WFS&request=GetCapabilities&version=2.0.0"
+    )
+
+    async def test_fetch(self, rmock: aioresponses):
+        rmock.get(self.WFS_CAPABILITIES_URL, status=200, body=b"<WFS_Capabilities/>")
+        content = await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
+        assert content == b"<WFS_Capabilities/>"
+
+    async def test_keeps_url_params(self, rmock: aioresponses):
+        rmock.get(
+            "https://example.com/wms?map=foo&service=WMS&request=GetCapabilities&version=1.3.0",
+            status=200,
+            body=b"<WMS_Capabilities/>",
+        )
+        content = await Wms.fetch_capabilities("https://example.com/wms?map=foo", "1.3.0")
+        assert content == b"<WMS_Capabilities/>"
+
+    async def test_too_large(self, rmock: aioresponses):
+        rmock.get(self.WFS_CAPABILITIES_URL, status=200, body=b"x" * (Wfs.max_filesize_allowed + 1))
+        with pytest.raises(FileTooLargeException):
+            await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
+
+    async def test_empty(self, rmock: aioresponses):
+        """owslib would fetch the document itself on an empty xml"""
+        rmock.get(self.WFS_CAPABILITIES_URL, status=200, body=b"")
+        with pytest.raises(ValueError):
+            await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
+
+    async def test_analyse_too_large(self, setup_catalog, db, fake_check, rmock: aioresponses):
+        """Too large for every version: stored as a connection error on the check"""
+        url = "https://example.com/geoserver/wfs"
+        check = await fake_check(url=url)
+        too_large = b"x" * (Wfs.max_filesize_allowed + 1)
+        for version in SERVICE_MAPPING["wfs"]["versions"]:
+            rmock.get(
+                f"{url}?service=WFS&request=GetCapabilities&version={version}",
+                status=200,
+                body=too_large,
+            )
+        with (
+            patch("udata_hydra.config.OGC_ANALYSIS_ENABLED", True),
+            patch("udata_hydra.config.OGC_FORMATS", ["wfs", "wms"]),
+            patch("udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            assert await Wfs.analyse(check=check) is None
+
+        res = await db.fetchrow("SELECT parsing_error FROM checks WHERE id = $1", check["id"])
+        assert res["parsing_error"] == "ogc_service_connection:error"
 
 
 class TestLayerNameDetection:

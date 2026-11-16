@@ -2,11 +2,14 @@ import logging
 import re
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Literal, TypedDict
 from urllib.parse import parse_qs, urlparse
 
 from asyncpg import Record
 from owslib.crs import Crs
+from owslib.feature.common import WFSCapabilitiesReader
+from owslib.map.common import WMSCapabilitiesReader
 from owslib.wfs import WebFeatureService
 from owslib.wms import WebMapService
 
@@ -15,7 +18,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import ParseException, handle_parse_exception
+from udata_hydra.utils import ParseException, download_resource, handle_parse_exception
 
 log = logging.getLogger("udata-hydra")
 
@@ -30,6 +33,8 @@ SERVICE_MAPPING = {
         "versions": ["1.3.0", "1.1.1"],
     },
 }
+# build the GetCapabilities URL owslib would request, for each version
+CAPABILITIES_READERS = {"wfs": WFSCapabilitiesReader, "wms": WMSCapabilitiesReader}
 OgcFormatLiteral = Literal["wfs", "wms"]
 
 
@@ -104,6 +109,27 @@ class Ogc(DataFormat):
         return cls.analyse
 
     @classmethod
+    async def fetch_capabilities(cls, url: str, version: str) -> bytes:
+        """Fetch the GetCapabilities document within max_filesize_allowed"""
+        capabilities_url: str = CAPABILITIES_READERS[cls.__name__.lower()](
+            version=version
+        ).capabilities_url(url)
+        tmp_file, _ = await download_resource(
+            capabilities_url,
+            max_size_allowed=cls.max_filesize_allowed,
+            timeout=config.OGC_GETCAPABILITIES_TIMEOUT,
+        )
+        path = Path(tmp_file.name)
+        try:
+            content = path.read_bytes()
+        finally:
+            path.unlink(missing_ok=True)
+        if not content:
+            # owslib WFS 1.x/2.0 would fetch the document again on an empty xml
+            raise ValueError("Empty GetCapabilities document")
+        return content
+
+    @classmethod
     async def analyse(cls, check: dict, debug_insert: bool = False) -> OgcMetadata | None:
         """Analyse an OGC endpoint and extract metadata.
 
@@ -156,8 +182,10 @@ class Ogc(DataFormat):
             connection_error = None
             for v in SERVICE_MAPPING[format]["versions"]:  # type: ignore[not-iterable]
                 try:
+                    # owslib fetches the document with no size limit, unless given the xml
+                    xml = await cls.fetch_capabilities(url, v)
                     web_service = SERVICE_MAPPING[format]["service"](  # type: ignore[call-non-callable]
-                        url, version=v, timeout=config.OGC_GETCAPABILITIES_TIMEOUT
+                        url, version=v, xml=xml
                     )
                     version = v
                     break

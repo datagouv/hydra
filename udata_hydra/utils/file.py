@@ -68,9 +68,10 @@ async def download_resource(
     url: str,
     headers: dict | None = None,
     max_size_allowed: int | None = None,
+    timeout: float | None = None,
 ) -> tuple[IO[bytes], str]:
     """
-    Attempts downloading a resource from a given url.
+    Attempts downloading a resource from a given url, within timeout seconds if given.
     Returns a tuple of (downloaded_file_object, detected_extension).
     Raises FileTooLargeException if the resource is too large, IOException if the URL is unreachable.
     """
@@ -90,6 +91,7 @@ async def download_resource(
         async with aiohttp.ClientSession(
             headers={"user-agent": config.USER_AGENT_FULL},
             raise_for_status=True,
+            timeout=aiohttp.ClientTimeout(total=timeout) if timeout else aiohttp.ClientTimeout(),
         ) as session:
             async with session.get(url, allow_redirects=True) as response:
                 async for chunk in response.content.iter_chunked(chunk_size):
