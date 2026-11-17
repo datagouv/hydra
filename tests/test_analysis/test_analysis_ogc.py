@@ -4,11 +4,11 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from aioresponses import aioresponses
 from owslib.crs import Crs
 from owslib.util import ServiceException
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
+from tests.aiohttp_mock import aiohttp_mock
 from tests.conftest import RESOURCE_ID
 from udata_hydra import config
 from udata_hydra.data_formats import (
@@ -493,12 +493,12 @@ class TestOgcFetchCapabilities:
         "https://example.com/geoserver/wfs?service=WFS&request=GetCapabilities&version=2.0.0"
     )
 
-    async def test_fetch(self, rmock: aioresponses):
+    async def test_fetch(self, rmock: aiohttp_mock):
         rmock.get(self.WFS_CAPABILITIES_URL, status=200, body=b"<WFS_Capabilities/>")
         content = await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
         assert content == b"<WFS_Capabilities/>"
 
-    async def test_keeps_url_params(self, rmock: aioresponses):
+    async def test_keeps_url_params(self, rmock: aiohttp_mock):
         rmock.get(
             "https://example.com/wms?map=foo&service=WMS&request=GetCapabilities&version=1.3.0",
             status=200,
@@ -507,18 +507,18 @@ class TestOgcFetchCapabilities:
         content = await Wms.fetch_capabilities("https://example.com/wms?map=foo", "1.3.0")
         assert content == b"<WMS_Capabilities/>"
 
-    async def test_too_large(self, rmock: aioresponses):
+    async def test_too_large(self, rmock: aiohttp_mock):
         rmock.get(self.WFS_CAPABILITIES_URL, status=200, body=b"x" * (Wfs.max_filesize_allowed + 1))
         with pytest.raises(FileTooLargeException):
             await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
 
-    async def test_empty(self, rmock: aioresponses):
+    async def test_empty(self, rmock: aiohttp_mock):
         """owslib would fetch the document itself on an empty xml"""
         rmock.get(self.WFS_CAPABILITIES_URL, status=200, body=b"")
         with pytest.raises(ValueError):
             await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
 
-    async def test_analyse_too_large(self, setup_catalog, db, fake_check, rmock: aioresponses):
+    async def test_analyse_too_large(self, setup_catalog, db, fake_check, rmock: aiohttp_mock):
         """Too large for every version: stored as a connection error on the check"""
         url = "https://example.com/geoserver/wfs"
         check = await fake_check(url=url)
