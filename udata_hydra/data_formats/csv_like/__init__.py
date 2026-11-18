@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -15,6 +14,7 @@ from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_index import ResourceIndex
 from udata_hydra.utils import (
     IOException,
     ParseException,
@@ -68,13 +68,9 @@ class CsvLike(DataFormat):
         # Update resource status to ANALYSING_CSVLIKE
         resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
 
-        # Check if the resource is in the exceptions table
-        # If it is, get the table_indexes to use them later
+        # Exceptions (files too large to be processed normally) get longer export jobs
         exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
-
-        table_indexes: dict | None = None
-        if exception and exception.get("table_indexes"):
-            table_indexes = json.loads(exception["table_indexes"])
+        table_indexes: dict[str, str] = await ResourceIndex.get_by_resource_id(resource_id)
 
         timer = Timer("analyse-csv", resource_id)
         assert any(_ is not None for _ in (check["id"], check["url"]))
