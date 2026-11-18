@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.14.3 (2026-11-18)
+
+- chore(deps): upgrade dependencies ([#508](https://github.com/datagouv/hydra/pull/508))
+- feat: declare table indexes in resources_indexes, independently of resources exceptions ([#502](https://github.com/datagouv/hydra/pull/502))
+- feat(ogc): trigger analysis independently of change detection ([#499](https://github.com/datagouv/hydra/pull/499))
+- fix: remove non-existing type ([#509](https://github.com/datagouv/hydra/pull/509))
+
+
 ## 2.14.2 (2026-11-12)
 
 - chore: upgrade aioresponse ([#505](https://github.com/datagouv/hydra/pull/505))
