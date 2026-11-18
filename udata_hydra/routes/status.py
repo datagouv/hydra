@@ -5,6 +5,7 @@ from aiohttp import web
 
 from udata_hydra import config, context
 from udata_hydra.db.resource import Resource
+from udata_hydra.utils.http import format_utc_datetime
 from udata_hydra.worker import QUEUES
 
 
@@ -185,7 +186,7 @@ async def get_health(request: web.Request) -> web.Response:
             "version": config.APP_VERSION,
             "python_version": platform.python_version(),
             "environment": config.ENVIRONMENT or "unknown",
-            "uptime_since": request.app["started_at"].isoformat(),
+            "uptime_since": format_utc_datetime(request.app["started_at"]),
             "csv_analysis": config.CSV_ANALYSIS,
             "csv_to_db": config.CSV_TO_DB,
             "db_to_parquet": config.DB_TO_PARQUET,

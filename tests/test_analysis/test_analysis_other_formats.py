@@ -111,3 +111,14 @@ async def test_analyse_resource_corrupted_gzip_sets_analysis_error(
     resource = await Resource.get(check["resource_id"])
     assert resource is not None
     assert resource["status"] != "TO_ANALYSE_GZ"
+
+
+@pytest.mark.parametrize(
+    "has_changed,must_analyse,expected",
+    [(True, False, True), (False, True, True), (False, False, False)],
+)
+async def test_default_is_analysis_due(has_changed, must_analyse, expected):
+    assert (
+        await Xls.is_analysis_due({}, has_changed=has_changed, must_analyse=must_analyse)
+        is expected
+    )

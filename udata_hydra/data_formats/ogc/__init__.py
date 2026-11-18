@@ -1,11 +1,15 @@
 import logging
 import re
-from datetime import datetime, timezone
-from typing import Literal, TypedDict
+from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Literal, TypedDict
 from urllib.parse import parse_qs, urlparse
 
 from asyncpg import Record
 from owslib.crs import Crs
+from owslib.feature.common import WFSCapabilitiesReader
+from owslib.map.common import WMSCapabilitiesReader
 from owslib.wfs import WebFeatureService
 from owslib.wms import WebMapService
 
@@ -14,12 +18,19 @@ from udata_hydra.analysis import helpers
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
-from udata_hydra.utils import ParseException, handle_parse_exception
+from udata_hydra.utils import ParseException, download_resource, handle_parse_exception
 
 log = logging.getLogger("udata-hydra")
 
 VALID_LAYER_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-.:]{1,100}$")
-SERVICE_MAPPING = {
+
+
+class OgcService(TypedDict):
+    service: Callable[..., Any]
+    versions: list[str]
+
+
+SERVICE_MAPPING: dict[str, OgcService] = {
     "wfs": {
         "service": WebFeatureService,
         "versions": ["2.0.0", "1.1.0", "1.0.0"],
@@ -29,6 +40,8 @@ SERVICE_MAPPING = {
         "versions": ["1.3.0", "1.1.1"],
     },
 }
+# build the GetCapabilities URL owslib would request, for each version
+CAPABILITIES_READERS = {"wfs": WFSCapabilitiesReader, "wms": WMSCapabilitiesReader}
 OgcFormatLiteral = Literal["wfs", "wms"]
 
 
@@ -75,6 +88,48 @@ class Ogc(DataFormat):
     @classmethod
     def detect_from_catalog_format(cls, format: str | None) -> bool:
         return False
+
+    @classmethod
+    async def is_analysis_due(cls, check: dict, has_changed: bool, must_analyse: bool) -> bool:
+        """OGC services are analysed on their own schedule, whether the GetCapabilities document
+        has changed or not, since it can stay the same for years or change on every check:
+        when must_analyse, when the analysis never succeeded on this URL, or when the check of
+        the last successful analysis is older than OGC_ANALYSIS_MAX_AGE_DAYS.
+        """
+        return must_analyse or not await Check.has_recent_ogc_analysis(
+            str(check["resource_id"]),
+            check["url"],
+            check["id"],
+            max_age=timedelta(days=config.OGC_ANALYSIS_MAX_AGE_DAYS),
+        )
+
+    @classmethod
+    def analysis_job(
+        cls, file_name: str | None, resource_id: str, dataset_id: str
+    ) -> Callable[..., Any]:
+        """The OGC analysis fetches the service itself, it doesn't need the downloaded file"""
+        return cls.analyse
+
+    @classmethod
+    async def fetch_capabilities(cls, url: str, version: str) -> bytes:
+        """Fetch the GetCapabilities document within max_filesize_allowed"""
+        capabilities_url: str = CAPABILITIES_READERS[cls.__name__.lower()](
+            version=version
+        ).capabilities_url(url)
+        tmp_file, _ = await download_resource(
+            capabilities_url,
+            max_size_allowed=cls.max_filesize_allowed,
+            timeout=config.OGC_GETCAPABILITIES_TIMEOUT,
+        )
+        path = Path(tmp_file.name)
+        try:
+            content = path.read_bytes()
+        finally:
+            path.unlink(missing_ok=True)
+        if not content:
+            # owslib WFS 1.x/2.0 would fetch the document again on an empty xml
+            raise ValueError("Empty GetCapabilities document")
+        return content
 
     @classmethod
     async def analyse(cls, check: dict, debug_insert: bool = False) -> OgcMetadata | None:
@@ -127,11 +182,11 @@ class Ogc(DataFormat):
             web_service = None
             version = None
             connection_error = None
-            for v in SERVICE_MAPPING[format]["versions"]:  # type: ignore[not-iterable]
+            for v in SERVICE_MAPPING[format]["versions"]:
                 try:
-                    web_service = SERVICE_MAPPING[format]["service"](  # type: ignore[call-non-callable]
-                        url, version=v, timeout=config.OGC_GETCAPABILITIES_TIMEOUT
-                    )
+                    # owslib fetches the document with no size limit, unless given the xml
+                    xml = await cls.fetch_capabilities(url, v)
+                    web_service = SERVICE_MAPPING[format]["service"](url, version=v, xml=xml)
                     version = v
                     break
                 except Exception as e:

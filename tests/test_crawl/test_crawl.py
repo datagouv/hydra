@@ -1,6 +1,5 @@
 import hashlib
 import json
-import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
@@ -10,11 +9,10 @@ import nest_asyncio2 as nest_asyncio
 import pytest
 from aiohttp import ClientSession, RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
-from aioresponses import CallbackResult
 from asyncpg import Record
 from yarl import URL
 
-from tests.conftest import RESOURCE_ID, RESOURCE_URL, SIMPLE_CSV_CONTENT
+from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_ID, RESOURCE_URL, SIMPLE_CSV_CONTENT
 from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import start_checks
@@ -113,6 +111,7 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
     webhook = next(p for p in payloads if "check:id" in p)
     assert webhook.get("check:date")
     datetime.fromisoformat(webhook["check:date"])
+    assert webhook["check:date"].endswith("Z")
     if exception is TimeoutError:
         assert webhook.get("check:available")
         assert webhook.get("check:headers:content-type") == "application/json"
@@ -242,6 +241,30 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
     await start_checks(iterations=1)
     # Assert url has been called because check is deleted
     assert ("HEAD", URL(rurl)) in rmock.requests
+
+
+@pytest.mark.parametrize(
+    "resource_id,is_exception",
+    [
+        (RESOURCE_ID, False),
+        (RESOURCE_EXCEPTION_ID, True),
+    ],
+)
+async def test_check_enqueues_analysis_with_exception_flag(
+    setup_catalog_with_resource_exception, rmock, mocker, resource_id, is_exception
+):
+    """analyse_resource downloads and unzips, so resources exceptions need the longer timeout"""
+    enqueue = mocker.patch("udata_hydra.crawl.check_resources.queue.enqueue")
+    resource = await Resource.get(resource_id)
+    assert resource is not None
+    rmock.head(resource["url"], status=200, headers={"content-length": "10"})
+
+    async with ClientSession() as session:
+        await check_resource(url=resource["url"], resource=resource, session=session)
+
+    analysis_calls = [c for c in enqueue.call_args_list if c.args[0] is analyse_resource]
+    assert len(analysis_calls) == 1
+    assert analysis_calls[0].kwargs["_exception"] is is_exception
 
 
 async def test_switch_head_to_get_on_timeout(
@@ -384,7 +407,7 @@ async def test_change_analysis_last_modified_header(setup_catalog, rmock, udata_
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
-    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37+00:00"
+    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37Z"
     assert data["analysis:last-modified-detection"] == "last-modified-header"
 
 
@@ -402,6 +425,7 @@ async def test_change_analysis_content_length_header(
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
+    assert data["analysis:last-modified-at"].endswith("Z")
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
     now = datetime.now(timezone.utc)
     # modified date should be pretty close from now, let's say 30 seconds
@@ -423,6 +447,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
+    assert data["analysis:last-modified-at"].endswith("Z")
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
     now = datetime.now(timezone.utc)
     # modified date should be pretty close from now, let's say 30 seconds
@@ -446,7 +471,7 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, fake_chec
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
-    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000+00:00"
+    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000Z"
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
     res = await db.fetch("SELECT * FROM checks ORDER BY created_at DESC LIMIT 1")
     assert res[0]["detected_last_modified_at"].isoformat() == "2022-12-06T05:00:32.647000+00:00"
@@ -634,14 +659,14 @@ async def test_analyse_new_url_notifies_udata(setup_catalog, rmock, fake_check, 
     analysis_payload = next(p for p in payloads if "analysis:check_id" in p)
     assert analysis_payload["analysis:check_id"] == check["id"]
     assert analysis_payload["analysis:last-modified-detection"] == "harvest-resource-metadata"
-    assert analysis_payload["analysis:last-modified-at"] == harvest_modified_at.isoformat()
+    assert analysis_payload["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000Z"
 
 
 @pytest.mark.parametrize(
     "head_last_modified,expect_put,expected_modified_at,use_detected_at",
     [
         ("Thu, 09 Jan 2020 09:33:37 GMT", False, None, False),
-        ("2020-01-09T09:33:37+04:00", True, "2020-01-09T09:33:37+04:00", True),
+        ("2020-01-09T09:33:37+04:00", True, "2020-01-09T05:33:37Z", True),
     ],
     ids=["same_instant_rfc822", "same_instant_different_offset"],
 )
@@ -764,16 +789,13 @@ async def test_no_check_changed_header(
 
 
 async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, produce_mock):
-    # very complicated stuff, thanks https://github.com/pnuckowski/aioresponses/issues/111#issuecomment-896585061
-    def callback(url, **kwargs):
-        assert config.USER_AGENT == sys._getframe(3).f_locals["orig_self"].headers["user-agent"]
-        # add content-length to avoid switching from HEAD to GET when crawling
-        return CallbackResult(status=200, payload={}, headers={"content-length": "1"})
-
-    rurl = RESOURCE_URL
-    rmock.head(rurl, callback=callback)
-    rmock.get(rurl, callback=callback)
+    # add content-length to avoid switching from HEAD to GET when crawling
+    rmock.head(RESOURCE_URL, headers={"content-length": "1"})
+    rmock.get(RESOURCE_URL, headers={"content-length": "1"})
     await start_checks(iterations=1)
+    calls = [c for (_, url), cs in rmock.requests.items() if url == URL(RESOURCE_URL) for c in cs]
+    assert calls
+    assert all(c.headers["user-agent"] == config.USER_AGENT_FULL for c in calls)
 
 
 async def test_check_triggered_by_udata_entrypoint_clean_catalog(
