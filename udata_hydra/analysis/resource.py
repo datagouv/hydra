@@ -187,39 +187,38 @@ async def analyse_resource(
 
     timer.stop()
 
-    if change_status == Change.HAS_CHANGED or must_analyse:
-        if (
-            data_format is not None
-            and not dl_analysis.get("analysis:error")
-            and (issubclass(data_format, Ogc) or tmp_file)
-        ):
-            log.info(
-                f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
-            )
-            job, state = _analysis_job_and_state(data_format)
-            await ResourceJobStatus.update(resource_id, "crawler", job, state)
-            if issubclass(data_format, Ogc):
-                queue.enqueue(
-                    data_format.analyse,
-                    check=dict(check),
-                    _priority="high" if worker_priority == "high" else "default",
-                    _exception=bool(exception),
-                )
-            elif tmp_file and analysis_file_name:
-                file = data_format(
-                    file_name=analysis_file_name,
-                    resource_id=resource_id,
-                    dataset_id=dataset_id,
-                )
-                queue.enqueue(
-                    file.analyse,
-                    check=dict(check),
-                    _priority="high" if worker_priority == "high" else "default",
-                    _exception=bool(exception),
-                )
-        else:
-            await ResourceJobStatus.clear(resource_id, "crawler")
+    has_changed: bool = change_status == Change.HAS_CHANGED
 
+    # e.g. too large: rules out further analysis
+    download_failed: bool = bool(dl_analysis.get("analysis:error"))
+
+    if (
+        data_format is not None
+        and not download_failed
+        and await data_format.is_analysis_due(
+            check, has_changed=has_changed, must_analyse=must_analyse
+        )
+    ):
+        analysis_job = data_format.analysis_job(
+            file_name=analysis_file_name,
+            resource_id=resource_id,
+            dataset_id=dataset_id,
+        )
+        log.info(
+            f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
+        )
+        job, state = _analysis_job_and_state(data_format)
+        await ResourceJobStatus.update(resource_id, "crawler", job, state)
+        queue.enqueue(
+            analysis_job,
+            check=dict(check),
+            _priority="high" if worker_priority == "high" else "default",
+            _exception=bool(exception),
+        )
+    else:
+        await ResourceJobStatus.clear(resource_id, "crawler")
+
+    if has_changed or must_analyse:
         # Send analysis result to udata
         queue.enqueue(
             send,
@@ -228,14 +227,12 @@ async def analyse_resource(
             document=UdataPayload(udata_payload),
             _priority="high",
         )
-
     else:
         log.info(
-            f"[resource_id={resource_id}] analyse_resource: skipped re-parse and analysis udata notify "
+            f"[resource_id={resource_id}] analyse_resource: skipped analysis udata notify "
             f"(change_status={change_status.name}, last_parsing_table="
             f"{last_check.get('parsing_table') if last_check else None})"
         )
-        await ResourceJobStatus.clear(resource_id, "crawler")
 
 
 async def update_check_with_modification_and_next_dates(

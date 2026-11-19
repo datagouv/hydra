@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.14.3 (2026-11-18)
+
+- chore(deps): upgrade dependencies ([#508](https://github.com/datagouv/hydra/pull/508))
+- feat: declare table indexes in resources_indexes, independently of resources exceptions ([#502](https://github.com/datagouv/hydra/pull/502))
+- feat(ogc): trigger analysis independently of change detection ([#499](https://github.com/datagouv/hydra/pull/499))
+- fix: remove non-existing type ([#509](https://github.com/datagouv/hydra/pull/509))
+
+
+## 2.14.2 (2026-11-12)
+
+- chore: upgrade aioresponse ([#505](https://github.com/datagouv/hydra/pull/505))
+- chore: use aiohttp 3.14 and remove aioresponses ([#507](https://github.com/datagouv/hydra/pull/507))
+- clean: remove resource cors stats endpoint ([#501](https://github.com/datagouv/hydra/pull/501))
+- feat: expose max allowed size for each format ([#494](https://github.com/datagouv/hydra/pull/494))
+- feat: normalize UTC date format ([#495](https://github.com/datagouv/hydra/pull/495))
+- fix: apply exception timeout to analyse_resource jobs ([#504](https://github.com/datagouv/hydra/pull/504))
+- fix: notify udata after an export even when the check is no longer the last one ([#496](https://github.com/datagouv/hydra/pull/496))
+- refactor: change var name ([#500](https://github.com/datagouv/hydra/pull/500))
+
+
 ## 2.14.1 (2026-10-27)
 
 - fix: stream unzip ([#497](https://github.com/datagouv/hydra/pull/497))

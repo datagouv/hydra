@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -7,7 +8,9 @@ from owslib.crs import Crs
 from owslib.util import ServiceException
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
+from tests.aiohttp_mock import aiohttp_mock
 from tests.conftest import RESOURCE_ID, job_states
+from udata_hydra import config
 from udata_hydra.data_formats import (
     Csv,
     Ogc,
@@ -15,7 +18,10 @@ from udata_hydra.data_formats import (
     Wms,
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
+from udata_hydra.data_formats.ogc import SERVICE_MAPPING
+from udata_hydra.db.check import Check
 from udata_hydra.db.resource_job_status import ResourceJobStatus
+from udata_hydra.utils import FileTooLargeException
 
 pytestmark = pytest.mark.asyncio
 
@@ -82,6 +88,13 @@ class TestOgcDetection:
 @pytest.mark.asyncio
 class TestOgcAnalysis:
     """Tests for OGC analysis"""
+
+    @pytest.fixture(autouse=True)
+    def fetch_capabilities(self, mocker):
+        """The services are mocked in SERVICE_MAPPING, the document they get doesn't matter"""
+        return mocker.patch.object(
+            Ogc, "fetch_capabilities", new=AsyncMock(return_value=b"<Capabilities/>")
+        )
 
     async def test_analyse_ogc_disabled(self, setup_catalog, fake_check):
         with patch("udata_hydra.data_formats.ogc.config") as mock_config:
@@ -476,6 +489,60 @@ class TestOgcAnalysis:
         }
 
 
+class TestOgcFetchCapabilities:
+    """Ogc.fetch_capabilities: the GetCapabilities document is fetched with a size limit"""
+
+    WFS_CAPABILITIES_URL = (
+        "https://example.com/geoserver/wfs?service=WFS&request=GetCapabilities&version=2.0.0"
+    )
+
+    async def test_fetch(self, rmock: aiohttp_mock):
+        rmock.get(self.WFS_CAPABILITIES_URL, status=200, body=b"<WFS_Capabilities/>")
+        content = await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
+        assert content == b"<WFS_Capabilities/>"
+
+    async def test_keeps_url_params(self, rmock: aiohttp_mock):
+        rmock.get(
+            "https://example.com/wms?map=foo&service=WMS&request=GetCapabilities&version=1.3.0",
+            status=200,
+            body=b"<WMS_Capabilities/>",
+        )
+        content = await Wms.fetch_capabilities("https://example.com/wms?map=foo", "1.3.0")
+        assert content == b"<WMS_Capabilities/>"
+
+    async def test_too_large(self, rmock: aiohttp_mock):
+        rmock.get(self.WFS_CAPABILITIES_URL, status=200, body=b"x" * (Wfs.max_filesize_allowed + 1))
+        with pytest.raises(FileTooLargeException):
+            await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
+
+    async def test_empty(self, rmock: aiohttp_mock):
+        """owslib would fetch the document itself on an empty xml"""
+        rmock.get(self.WFS_CAPABILITIES_URL, status=200, body=b"")
+        with pytest.raises(ValueError):
+            await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
+
+    async def test_analyse_too_large(self, setup_catalog, db, fake_check, rmock: aiohttp_mock):
+        """Too large for every version: stored as a connection error on the check"""
+        url = "https://example.com/geoserver/wfs"
+        check = await fake_check(url=url)
+        too_large = b"x" * (Wfs.max_filesize_allowed + 1)
+        for version in SERVICE_MAPPING["wfs"]["versions"]:
+            rmock.get(
+                f"{url}?service=WFS&request=GetCapabilities&version={version}",
+                status=200,
+                body=too_large,
+            )
+        with (
+            patch("udata_hydra.config.OGC_ANALYSIS_ENABLED", True),
+            patch("udata_hydra.config.OGC_FORMATS", ["wfs", "wms"]),
+            patch("udata_hydra.data_formats.ogc.helpers.notify_udata", new_callable=AsyncMock),
+        ):
+            assert await Wfs.analyse(check=check) is None
+
+        res = await db.fetchrow("SELECT parsing_error FROM checks WHERE id = $1", check["id"])
+        assert res["parsing_error"] == "ogc_service_connection:error"
+
+
 class TestLayerNameDetection:
     """Tests for layer name detection utilities"""
 
@@ -520,3 +587,60 @@ class TestLayerNameDetection:
     )
     def test_detect_layer_name(self, url, title, expected):
         assert Ogc.detect_layer_name(url, title) == expected
+
+
+ANALYSED_URL = "https://example.com/geoserver/wfs?SERVICE=WFS"
+
+
+class TestOgcIsAnalysisDue:
+    """Ogc.is_analysis_due: OGC services are analysed on their own schedule"""
+
+    @pytest.fixture
+    def previous_check(self, fake_check):
+        async def _previous_check(days_ago: int, url: str = ANALYSED_URL, **update) -> dict:
+            check = await fake_check(
+                url=url, created_at=datetime.now(timezone.utc) - timedelta(days=days_ago)
+            )
+            if update:
+                await Check.update(check["id"], update)
+            return check
+
+        return _previous_check
+
+    async def test_must_analyse(self, setup_catalog, fake_check, previous_check):
+        await previous_check(1, ogc_metadata={"format": "wfs"})
+        check = await fake_check(url=ANALYSED_URL)
+        assert await Wfs.is_analysis_due(check, has_changed=False, must_analyse=True)
+
+    async def test_never_analysed(self, setup_catalog, fake_check):
+        check = await fake_check(url=ANALYSED_URL)
+        assert await Wfs.is_analysis_due(check, has_changed=False, must_analyse=False)
+
+    @pytest.mark.parametrize("has_changed", [False, True])
+    async def test_recently_analysed(self, setup_catalog, fake_check, previous_check, has_changed):
+        """A GetCapabilities change alone doesn't make the analysis due"""
+        await previous_check(1, ogc_metadata={"format": "wfs"})
+        check = await fake_check(url=ANALYSED_URL)
+        assert not await Wfs.is_analysis_due(check, has_changed=has_changed, must_analyse=False)
+
+    async def test_analysis_too_old(self, setup_catalog, fake_check, previous_check):
+        await previous_check(config.OGC_ANALYSIS_MAX_AGE_DAYS + 1, ogc_metadata={"format": "wfs"})
+        check = await fake_check(url=ANALYSED_URL)
+        assert await Wfs.is_analysis_due(check, has_changed=False, must_analyse=False)
+
+    async def test_only_failed_analyses(self, setup_catalog, fake_check, previous_check):
+        await previous_check(
+            1,
+            parsing_started_at=datetime.now(timezone.utc),
+            parsing_error="ogc_service_connection:error",
+        )
+        check = await fake_check(url=ANALYSED_URL)
+        assert await Wfs.is_analysis_due(check, has_changed=False, must_analyse=False)
+
+    async def test_analysed_on_another_url(self, setup_catalog, fake_check, previous_check):
+        await previous_check(1, url="https://example.com/old/wfs", ogc_metadata={"format": "wfs"})
+        check = await fake_check(url=ANALYSED_URL)
+        assert await Wfs.is_analysis_due(check, has_changed=False, must_analyse=False)
+
+    def test_analysis_job_needs_no_file(self):
+        assert Wfs.analysis_job(file_name=None, resource_id="r", dataset_id="d") == Wfs.analyse
