@@ -9,7 +9,7 @@ import pytest
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.data_formats import Wfs
 from udata_hydra.db.check import Check
-from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -54,9 +54,7 @@ async def _analyse_new_check(fake_check, rmock, force_analysis=False, **kwargs) 
 
 
 async def _assert_status_reset(check: dict) -> None:
-    resource = await Resource.get(check["resource_id"])
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}
 
 
 async def test_first_check_is_analysed(setup_catalog, rmock, fake_check, produce_mock, ogc_analyse):
