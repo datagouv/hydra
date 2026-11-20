@@ -16,7 +16,11 @@ def enqueue(fn, *args, **kwargs):
     exception = kwargs.pop("_exception", False)
     failure_ttl = config.RQ_DEFAULT_FAILURE_TTL
     # set on each job, not on the queue: queues are cached by name and shared by all jobs
-    job_timeout = config.RQ_DEFAULT_TIMEOUT * 5 if exception else config.RQ_DEFAULT_TIMEOUT
+    job_timeout = (
+        config.RQ_DEFAULT_TIMEOUT * config.EXCEPTION_TIMEOUT_MULTIPLIER
+        if exception
+        else config.RQ_DEFAULT_TIMEOUT
+    )
     return context.queue(priority).enqueue(  # type: ignore[union-attr]
         fn, *args, **kwargs, failure_ttl=failure_ttl, job_timeout=job_timeout
     )
