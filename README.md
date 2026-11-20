@@ -347,6 +347,7 @@ $ curl -s "http://localhost:8000/api/checks/all?url=http://www.drees.sante.gouv.
 #### Get checks occurrences grouped by a column for a specific date
 
 Works with `?group_by={column}` and `?created_at={date}`.
+`column` must be a column of the `checks` table, optionally followed by a JSON key (e.g. `domain` or `headers->>'content-type'`).
 `date` should be a date in format `YYYY-MM-DD` or the default keyword `today`.
 
 ```bash

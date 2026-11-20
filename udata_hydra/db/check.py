@@ -1,6 +1,8 @@
+import re
 from datetime import date, datetime, timedelta, timezone
 
 from asyncpg import Record
+from asyncpg.exceptions import UndefinedColumnError
 
 from udata_hydra import config, context
 from udata_hydra.db import (
@@ -8,6 +10,11 @@ from udata_hydra.db import (
     convert_dict_values_to_json,
     update_table_record,
 )
+
+# What `get_group_by_for_date` accepts as group_by (user input interpolated into SQL):
+# a bare column name, optionally followed by a JSON key, e.g. `domain` or `headers->>'content-type'`.
+# No parentheses, spaces or extra quotes, so no function calls or subqueries.
+GROUP_BY_PATTERN = re.compile(r"^([a-z_]+)(->>'[A-Za-z0-9_-]+')?$")
 
 
 class Check:
@@ -139,17 +146,31 @@ class Check:
     async def get_group_by_for_date(
         cls, column: str, date: date, page_size: int = 20
     ) -> list[Record]:
+        """Count checks created on `date`, grouped by `column`.
+
+        `column` must match GROUP_BY_PATTERN, otherwise ValueError is raised.
+        """
+        match = GROUP_BY_PATTERN.match(column)
+        if not match:
+            raise ValueError(f"Invalid group_by value: {column!r}")
+        # Quoting the column makes keywords like current_user resolve as (missing) columns
+        name, json_key = match.groups()
+        expression = f'"{name}"{json_key or ""}'
+
         pool = await context.pool()
         async with pool.acquire() as connection:
             q = f"""
-            SELECT {column} as value, count(*) as count
+            SELECT {expression} as value, count(*) as count
             FROM checks
             WHERE created_at::date = $1
-            GROUP BY {column}
+            GROUP BY 1
             ORDER BY count desc
             LIMIT $2
             """
-            return await connection.fetch(q, date, page_size)
+            try:
+                return await connection.fetch(q, date, page_size)
+            except UndefinedColumnError:
+                raise ValueError(f"Unknown column: {name!r}")
 
     @classmethod
     async def insert(cls, data: dict, returning: str = "id") -> dict:

@@ -142,6 +142,30 @@ async def test_api_get_checks_aggregate(setup_catalog, client, query, value_temp
         assert data[i]["count"] == occurences[i]
 
 
+@pytest.mark.parametrize(
+    "group_by",
+    [
+        "version()",
+        "(SELECT parquet_url FROM checks LIMIT 1)",
+        "(SELECT string_agg(url, '|') FROM catalog)",
+        "current_user",
+        "does_not_exist",
+        "domain; DROP TABLE checks",
+        "headers->>'content-type' || version()",
+        "headers->>'x'' || version() || '''",
+        "headers->>(SELECT 'a')",
+    ],
+)
+async def test_api_get_checks_aggregate_rejects_invalid_group_by(
+    setup_catalog, client, fake_check, group_by
+):
+    await fake_check(created_at=datetime.now())
+    resp = await client.get(
+        "/api/checks/aggregate", params={"group_by": group_by, "created_at": "today"}
+    )
+    assert resp.status == 400
+
+
 async def test_api_get_checks_aggregate_on_non_text_column(setup_catalog, client, fake_check):
     # group_by accepts any column of the checks table, including non-text ones
     # (status is INT, filesize BIGINT, timeout BOOLEAN): the grouped value is

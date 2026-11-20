@@ -54,7 +54,13 @@ async def get_checks_aggregate(request: web.Request) -> web.Response:
     column: str | None = request.query.get("group_by")
     if not column:
         raise web.HTTPBadRequest(text="Missing mandatory 'group_by' param.")
-    data: list | None = await Check.get_group_by_for_date(column, created_at_date)
+    try:
+        data: list | None = await Check.get_group_by_for_date(column, created_at_date)
+    except ValueError:
+        raise web.HTTPBadRequest(
+            text="Invalid 'group_by' param: expected a column of the checks table, "
+            "optionally with a JSON key, e.g. domain or headers->>'content-type'."
+        )
     if not data:
         raise web.HTTPNotFound()
 
