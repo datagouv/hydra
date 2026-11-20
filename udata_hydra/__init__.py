@@ -42,6 +42,7 @@ class Configurator:
     def check(self) -> None:
         """Sanity check on config"""
         assert self.MAX_POOL_SIZE >= self.BATCH_SIZE, "BATCH_SIZE cannot exceed MAX_POOL_SIZE"
+        assert self.EXCEPTION_TIMEOUT_MULTIPLIER >= 1, "EXCEPTION_TIMEOUT_MULTIPLIER must be >= 1"
 
     def __getattr__(self, __name):
         return self.configuration.get(__name)

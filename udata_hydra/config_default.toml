@@ -38,6 +38,10 @@ NO_BACKOFF_DOMAINS = [
 BACKOFF_NB_REQ = 180
 BACKOFF_PERIOD = 360    # in seconds
 COOL_OFF_PERIOD = 86400 # 1 day to cool off when we've messed up
+
+# Max age of a job status row / parsing before it is considered stuck, in seconds.
+# Keep it strictly above the longest possible job timeout (RQ_DEFAULT_TIMEOUT ×
+# EXCEPTION_TIMEOUT_MULTIPLIER), otherwise a still-running long job could be reaped.
 STUCK_THRESHOLD_SECONDS = 3600
 
 # check batch size, beware of open file limits
@@ -79,7 +83,10 @@ CSV_TO_DB = true
 TEMPORARY_DOWNLOAD_FOLDER = ""
 
 # -- Worker settings -- #
+# Base job timeout in seconds. Exception resources (large files) get longer job timeouts:
+# RQ_DEFAULT_TIMEOUT × EXCEPTION_TIMEOUT_MULTIPLIER.
 RQ_DEFAULT_TIMEOUT = 180
+EXCEPTION_TIMEOUT_MULTIPLIER = 5
 RQ_DEFAULT_FAILURE_TTL = 864000  # How long failed jobs are kept in redis: 10 days.
 
 # -- Webhook integration config -- #
