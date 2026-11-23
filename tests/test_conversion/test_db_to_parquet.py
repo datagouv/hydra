@@ -61,12 +61,7 @@ async def test_db_to_parquet(clean_db, fake_check, mocker):
     inspection = await file.inspect()
 
     table = await file.to_db(check=check)
-    with patch(
-        # wraps because we don't want to change the behaviour, just to know it's been called
-        "udata_hydra.data_formats.table.to_parquet.pa.table",
-        wraps=pa.table,
-    ) as pa_table_func:
-        parquet = await table.to_parquet()
+    parquet = await table.to_parquet()
     assert parquet is not None
     table_from_db = pq.ParquetFile(parquet.path).read()
 
@@ -74,8 +69,7 @@ async def test_db_to_parquet(clean_db, fake_check, mocker):
 
     assert table_from_db.num_rows == table_from_csv.num_rows
     assert table_from_db.to_pydict() == table_from_csv.to_pydict()
-    # can't compare with table_from_db.schema as the reload can make the types differ (date32 VS date64 for instance)
-    assert pa_table_func.call_args.kwargs["schema"] == table_from_csv.schema
+    assert table_from_db.schema == table_from_csv.schema
     parquet.path.unlink()
 
 
