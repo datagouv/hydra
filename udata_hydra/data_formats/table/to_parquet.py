@@ -61,7 +61,11 @@ async def db_to_parquet(table: Table) -> "Parquet":
     try:
         async with pool.acquire() as conn:
             async with conn.transaction():
-                stmt = await conn.prepare(f"SELECT {cols_sql} FROM {quote_ident(table.table_name)}")
+                # __id is the rank of the row in the source file, which readers of the parquet
+                # (api-tabular on DuckDB) get back from the position of the row in this file
+                stmt = await conn.prepare(
+                    f'SELECT {cols_sql} FROM {quote_ident(table.table_name)} ORDER BY "__id"'
+                )
                 cursor = await stmt.cursor()
                 while batch := await cursor.fetch(BATCH_SIZE):
                     pq_table = pa.table(
