@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.14.4 (2026-11-23)
+
+- feat: add EXCEPTION_TIMEOUT_MULTIPLIER to the config instead of hardcoded 5 ([#511](https://github.com/datagouv/hydra/pull/511))
+- fix: export the parquet rows in __id order, which readers number them by ([#513](https://github.com/datagouv/hydra/pull/513))
+- refactor: dedicated SQL table for resource job statuses ([#474](https://github.com/datagouv/hydra/pull/474))
+
+
 ## 2.14.3 (2026-11-18)
 
 - chore(deps): upgrade dependencies ([#508](https://github.com/datagouv/hydra/pull/508))
