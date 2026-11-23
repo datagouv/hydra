@@ -78,6 +78,29 @@ async def test_db_to_parquet(clean_db, fake_check, mocker):
     parquet.path.unlink()
 
 
+async def test_db_to_parquet_keeps_the_rows_in_the_order_of_the_file(
+    clean_db, fake_check, db, mocker, tmp_path
+):
+    """Readers of the parquet (api-tabular on DuckDB) number the rows by their position in the
+    file, which must give back the __id of the table: the rank of the row in the source file."""
+    csv = tmp_path / "rows.csv"
+    csv.write_text("val\n" + "".join(f"row{i}\n" for i in range(1, 6)))
+    mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
+    check = await fake_check()
+    file = CsvLike(file_name=str(csv))
+    await file.inspect()
+    table = await file.to_db(check=check)
+    # an updated row is written anew at the end of the table, where a scan without ORDER BY
+    # reads it last
+    await db.execute(f'UPDATE {quote_ident(table.table_name)} SET val = val WHERE "__id" = 1')
+
+    parquet = await table.to_parquet()
+    assert parquet is not None
+
+    assert pq.read_table(parquet.path).column("val").to_pylist() == [f"row{i}" for i in range(1, 6)]
+    parquet.path.unlink()
+
+
 async def test_db_to_parquet_embeds_latest_tables_index_entry(clean_db, fake_check, db, mocker):
     """The parquet carries the csv-detective inspection and ingestion date of the latest
     `tables_index` entry of its table, so that a reader of the file alone (api-tabular on DuckDB)
