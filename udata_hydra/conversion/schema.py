@@ -59,7 +59,9 @@ PYTHON_TYPE_TO_PA = {
     "bool": pa.bool_(),
     "json": pa.string(),
     "date": pa.date32(),
-    "datetime": pa.date64(),
+    # date64 only keeps the day
+    "datetime": pa.timestamp("us"),
+    "datetime_aware": pa.timestamp("us", tz="UTC"),
     "binary": pa.binary(),
 }
 
