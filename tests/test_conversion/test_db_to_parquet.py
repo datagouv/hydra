@@ -95,6 +95,10 @@ async def test_db_to_parquet_keeps_the_time_of_datetimes(clean_db, fake_check, m
     assert parquet is not None
 
     exported = pq.read_table(parquet.path)
+    # the values alone don't pin the type: aware datetimes compare by instant whatever their zone
+    assert exported.schema == pa.schema(
+        [("naive", pa.timestamp("us")), ("aware", pa.timestamp("us", tz="UTC"))]
+    )
     assert exported.column("naive").to_pylist() == [
         datetime(2024, 3, 5, 14, 30),
         datetime(2024, 3, 6, 8, 0),
