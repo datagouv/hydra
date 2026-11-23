@@ -43,6 +43,9 @@ class Configurator:
         """Sanity check on config"""
         assert self.MAX_POOL_SIZE >= self.BATCH_SIZE, "BATCH_SIZE cannot exceed MAX_POOL_SIZE"
         assert self.EXCEPTION_TIMEOUT_MULTIPLIER >= 1, "EXCEPTION_TIMEOUT_MULTIPLIER must be >= 1"
+        assert (
+            self.STUCK_THRESHOLD_SECONDS > self.RQ_DEFAULT_TIMEOUT * self.EXCEPTION_TIMEOUT_MULTIPLIER
+        ), "STUCK_THRESHOLD_SECONDS must exceed RQ_DEFAULT_TIMEOUT × EXCEPTION_TIMEOUT_MULTIPLIER"
 
     def __getattr__(self, __name):
         return self.configuration.get(__name)
