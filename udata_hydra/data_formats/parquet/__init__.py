@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+import pyarrow.parquet as pq
 from asyncpg import Record
 
 from udata_hydra import config
@@ -32,6 +33,10 @@ class Parquet(DataFormat):
     further_analysis = True
 
     async def inspect(self) -> dict:
+        # csv-detective picks its engine from the content (the downloaded file has no extension)
+        # and would read a CSV or a gzip served as a parquet resource: fail here instead, before
+        # the table of the previous version is dropped
+        pq.ParquetFile(self.path)
         # no validation against the previous inspection, unlike a CSV: csv-detective doesn't check
         # the column order of a parquet file and would return the previous one, while the rows
         # are copied to the table in the order of the file

@@ -269,6 +269,26 @@ async def test_parquet_with_reordered_columns_analysed_again(
     assert [tuple(row) for row in rows] == [("xd4", "yc3")]
 
 
+async def test_parquet_resource_serving_something_else_keeps_its_table(
+    setup_catalog, db, rmock, fake_check, produce_mock, mocker
+):
+    """csv-detective would read a CSV served as a parquet resource: the analysis must fail before
+    the table of the previous version is dropped."""
+    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    check, table = await _analyse_producer_parquet(rmock, fake_check)
+    rmock.get(check["url"], status=200, body=b"a,b\n1,2\n3,4\n")
+    file = await helpers.download_from_check(check, Parquet)
+    with (
+        patch("udata_hydra.config.PARQUET_TO_DB", True),
+        pytest.raises(ParseException) as exc,
+    ):
+        await file.analyse(check=check)
+    assert exc.value.step == "parquet_analysis"
+
+    rows = await db.fetch(f'SELECT name FROM "{table.table_name}"')
+    assert len(rows) == len(_producer_dataframe())
+
+
 async def test_parquet_with_a_reserved_column_name_analysed_again(
     setup_catalog, db, rmock, fake_check, produce_mock, mocker
 ):
