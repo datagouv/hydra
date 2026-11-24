@@ -180,11 +180,16 @@ async def test_analyse_parquet_without_db_to_parquet(
 
 
 async def test_parquet_of_a_producer_exported_from_its_table(
-    setup_catalog, rmock, fake_check, produce_mock, mocker
+    setup_catalog, db, rmock, fake_check, produce_mock, mocker
 ):
-    """The values of the producer file survive the table, in the file api-tabular reads."""
+    """The values of the producer file survive the table, and csv-detective's analysis of it,
+    formats and profile included, is stored and embedded in the file api-tabular reads."""
     mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
-    _, table = await _analyse_producer_parquet(rmock, fake_check)
+    check, table = await _analyse_producer_parquet(rmock, fake_check)
+    res = await db.fetchrow(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
+    )
+    stored = json.loads(res["csv_detective"])
     with patch("udata_hydra.config.DB_TO_PARQUET", True):
         parquet = await table.to_parquet()
     assert parquet is not None
@@ -192,9 +197,17 @@ async def test_parquet_of_a_producer_exported_from_its_table(
     exported = pq.read_table(parquet.path)
     parquet.path.unlink()
     # the inspection of the producer file, which api-tabular serves as the profile
-    inspection = json.loads(exported.schema.metadata[b"csv_detective"])
-    assert inspection["columns"]["stamp"]["format"] == "datetime_aware"
-    assert inspection["total_lines"] == 4
+    embedded = json.loads(exported.schema.metadata[b"csv_detective"])
+    assert embedded["columns"]["stamp"]["format"] == "datetime_aware"
+    assert embedded["columns"]["code_postal"]["format"] == "code_postal"
+    assert embedded["total_lines"] == 4
+    for inspection in (stored, embedded):
+        assert inspection["formats"]["code_postal"] == ["code_postal"]
+        assert inspection["profile"]["code_postal"]["nb_distinct"] == 4
+        assert all(
+            inspection["profile"]["decompte"][stat] is not None
+            for stat in ["min", "max", "mean", "std"]
+        )
     assert exported.to_pydict() == {
         "name": ["Marie", "Paul", "Léa", "Pierre"],
         "score": [1.2, 3.4, 5.6, 7.8],
@@ -224,33 +237,6 @@ async def test_parquet_of_a_producer_exported_from_its_table(
         "bina": [b"\x01\x01\x00", b"\x00\x00\x8c", b"\x01\x9e\xd1", b"\xb7\xd4\x00"],
         "code_postal": ["75001", "13002", "69003", "33000"],
     }
-
-
-async def test_parquet_of_a_producer_gets_the_analysis_of_a_csv(
-    setup_catalog, db, rmock, fake_check, produce_mock, mocker
-):
-    """csv-detective analyses the parquet file of a producer, formats and profile included, and
-    api-tabular gets this analysis from the exported file."""
-    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
-    check, table = await _analyse_producer_parquet(rmock, fake_check)
-    res = await db.fetchrow(
-        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
-    )
-    stored = json.loads(res["csv_detective"])
-    with patch("udata_hydra.config.DB_TO_PARQUET", True):
-        parquet = await table.to_parquet()
-    assert parquet is not None
-    exported = json.loads(pq.read_schema(parquet.path).metadata[b"csv_detective"])
-    parquet.path.unlink()
-
-    for inspection in (stored, exported):
-        assert inspection["columns"]["code_postal"]["format"] == "code_postal"
-        assert inspection["formats"]["code_postal"] == ["code_postal"]
-        assert inspection["profile"]["code_postal"]["nb_distinct"] == 4
-        assert all(
-            inspection["profile"]["decompte"][stat] is not None
-            for stat in ["min", "max", "mean", "std"]
-        )
 
 
 async def test_parquet_analysed_again_validates_the_previous_inspection(
