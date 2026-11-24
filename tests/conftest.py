@@ -11,22 +11,23 @@ import nest_asyncio2 as nest_asyncio
 import pytest
 import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
-from aioresponses import aioresponses
 
 import udata_hydra.cli  # noqa - this register the cli cmds
+from tests.aiohttp_mock import aiohttp_mock
 from udata_hydra import config
 from udata_hydra.app import app_factory
 from udata_hydra.cli import drop_dbs, load_catalog, migrate
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.logger import stop_sentry
 from udata_hydra.utils import storage_path
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/postgres")
 RESOURCE_ID = "c4e3a9fb-4415-488e-ba57-d05269b27adf"
 RESOURCE_EXCEPTION_ID = "d4e3a9fb-4415-488e-ba57-d05269b27adf"
-RESOURCE_EXCEPTION_TABLE_INDEXES = {"Nom": "index", "N° de certificat": "index"}
+RESOURCE_TABLE_INDEXES = {"Nom": "index", "N° de certificat": "index"}
 RESOURCE_URL = "https://example.com/resource-1"
 DATASET_ID = "601ddcfc85a59c3a45c2435a"
 NOT_EXISTING_RESOURCE_ID = "5d0b2b91-b21b-4120-83ef-83f818ba2451"
@@ -58,6 +59,29 @@ def dummy(return_value=None):
         return return_value
 
     return fn
+
+
+def job_states(snapshots: list[dict], job: str) -> list[str]:
+    """States recorded for one job in ResourceJobStatus snapshots."""
+    return [snap[job]["state"] for snap in snapshots if job in snap]
+
+
+@pytest.fixture
+def job_status_snapshots(mocker) -> list[dict]:
+    """Snapshot ResourceJobStatus.for_resource() after each set/update."""
+    snapshots: list[dict] = []
+
+    def wrap(method):
+        async def capturing(resource_id: str, *args, **kwargs):
+            result = await method(resource_id, *args, **kwargs)
+            snapshots.append(await ResourceJobStatus.for_resource(resource_id))
+            return result
+
+        return capturing
+
+    mocker.patch.object(ResourceJobStatus, "set", wrap(ResourceJobStatus.set))
+    mocker.patch.object(ResourceJobStatus, "update", wrap(ResourceJobStatus.update))
+    return snapshots
 
 
 @pytest.fixture
@@ -192,7 +216,6 @@ async def setup_catalog_with_resource_exception(setup_catalog):
     )
     await ResourceException.insert(
         resource_id=RESOURCE_EXCEPTION_ID,
-        table_indexes=RESOURCE_EXCEPTION_TABLE_INDEXES,
         comment="This is a test comment.",
     )
 
@@ -216,7 +239,7 @@ def analysis_mock(mocker):
 @pytest.fixture
 def rmock():
     # passthrough for local requests (aiohttp TestServer)
-    with aioresponses(passthrough=["http://127.0.0.1"]) as m:
+    with aiohttp_mock(passthrough=["http://127.0.0.1"]) as m:
         yield m
 
 
@@ -237,9 +260,12 @@ async def insert_fake_resource():
             type="main",
             format=format,
             title="Fake resource",
-            status=status,
             priority=True,
         )
+        if status:
+            await ResourceJobStatus.set(
+                RESOURCE_ID, ResourceJobStatus.job_for_state(status), status
+            )
 
     return _insert_fake_resource
 

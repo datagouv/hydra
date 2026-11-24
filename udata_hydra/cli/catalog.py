@@ -62,9 +62,9 @@ async def _load_catalog(
                         """
                         INSERT INTO catalog (
                             dataset_id, resource_id, url, type, format,
-                            harvest_modified_at, title, deleted, priority, status
+                            harvest_modified_at, title, deleted, priority
                         )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, FALSE, NULL)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, FALSE)
                         ON CONFLICT (resource_id) DO UPDATE SET
                             dataset_id = $1,
                             url = $3,
@@ -89,7 +89,7 @@ async def _load_catalog(
                     )
             log.info("Resources catalog successfully upserted into DB.")
             cleaned_count: int = await Resource.clean_up_statuses()
-            log.info(f" {cleaned_count} stuck statuses successfully reset to null.")
+            log.info(f" {cleaned_count} stuck statuses successfully reset to idle.")
         except Exception as e:
             raise e
         finally:
@@ -135,9 +135,9 @@ async def _insert_resource_into_catalog(resource_id: str):
             """
             INSERT INTO catalog (
                 dataset_id, resource_id, url, title, harvest_modified_at,
-                deleted, priority, status
+                deleted, priority
             )
-            VALUES ($1, $2, $3, $4, $5, FALSE, FALSE, NULL)
+            VALUES ($1, $2, $3, $4, $5, FALSE, FALSE)
             ON CONFLICT (resource_id) DO UPDATE SET
                 dataset_id = $1,
                 url = $3,
@@ -192,9 +192,9 @@ async def _insert_url_into_catalog(url: str, resource_id: str):
             """
             INSERT INTO catalog (
                 dataset_id, resource_id, url, type, format,
-                harvest_modified_at, deleted, priority, status
+                harvest_modified_at, deleted, priority
             )
-            VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NULL)
+            VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE)
             ON CONFLICT (resource_id) DO UPDATE SET
                 dataset_id = $1,
                 url = $3,

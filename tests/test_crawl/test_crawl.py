@@ -1,6 +1,5 @@
 import hashlib
 import json
-import sys
 import tempfile
 from asyncio.exceptions import TimeoutError
 from datetime import datetime, timedelta, timezone
@@ -10,17 +9,24 @@ import nest_asyncio2 as nest_asyncio
 import pytest
 from aiohttp import ClientSession, RequestInfo
 from aiohttp.client_exceptions import ClientError, ClientResponseError
-from aioresponses import CallbackResult
 from asyncpg import Record
 from yarl import URL
 
-from tests.conftest import RESOURCE_ID, RESOURCE_URL, SIMPLE_CSV_CONTENT
+from tests.conftest import (
+    RESOURCE_EXCEPTION_ID,
+    RESOURCE_ID,
+    RESOURCE_URL,
+    SIMPLE_CSV_CONTENT,
+    job_states,
+)
 from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import start_checks
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
+from udata_hydra.utils import IOException
 
 pytestmark = pytest.mark.asyncio
 # allows nested async to test async with async :mindblown:
@@ -113,6 +119,7 @@ async def test_crawl(setup_catalog, rmock, db, resource, analysis_mock, udata_ur
     webhook = next(p for p in payloads if "check:id" in p)
     assert webhook.get("check:date")
     datetime.fromisoformat(webhook["check:date"])
+    assert webhook["check:date"].endswith("Z")
     if exception is TimeoutError:
         assert webhook.get("check:available")
         assert webhook.get("check:headers:content-type") == "application/json"
@@ -244,6 +251,30 @@ async def test_deleted_check(setup_catalog, rmock, fake_check, produce_mock):
     assert ("HEAD", URL(rurl)) in rmock.requests
 
 
+@pytest.mark.parametrize(
+    "resource_id,is_exception",
+    [
+        (RESOURCE_ID, False),
+        (RESOURCE_EXCEPTION_ID, True),
+    ],
+)
+async def test_check_enqueues_analysis_with_exception_flag(
+    setup_catalog_with_resource_exception, rmock, mocker, resource_id, is_exception
+):
+    """analyse_resource downloads and unzips, so resources exceptions need the longer timeout"""
+    enqueue = mocker.patch("udata_hydra.crawl.check_resources.queue.enqueue")
+    resource = await Resource.get(resource_id)
+    assert resource is not None
+    rmock.head(resource["url"], status=200, headers={"content-length": "10"})
+
+    async with ClientSession() as session:
+        await check_resource(url=resource["url"], resource=resource, session=session)
+
+    analysis_calls = [c for c in enqueue.call_args_list if c.args[0] is analyse_resource]
+    assert len(analysis_calls) == 1
+    assert analysis_calls[0].kwargs["_exception"] is is_exception
+
+
 async def test_switch_head_to_get_on_timeout(
     setup_catalog,
     rmock,
@@ -297,6 +328,45 @@ async def test_analyse_resource(setup_catalog, mocker, fake_check):
     assert result["checksum"] == hashlib.sha1(SIMPLE_CSV_CONTENT.encode("utf-8")).hexdigest()
     assert result["filesize"] == len(SIMPLE_CSV_CONTENT)
     assert result["mime_type"] == "text/plain"
+
+
+async def test_analyse_resource_hands_off_crawler_to_csv(
+    setup_catalog, mocker, fake_check, job_status_snapshots
+):
+    """After resource analysis, crawler is cleared and csv is waiting as TO_ANALYSE_CSV."""
+    mocker.patch("udata_hydra.analysis.resource.download_resource", mock_download_resource)
+    mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
+    # Do not run the queued Csv.analyse / udata notify, so the handoff status stays.
+    mocker.patch("udata_hydra.analysis.resource.queue.enqueue")
+
+    check = await fake_check(headers={"content-type": "text/csv"})
+    await analyse_resource(check=check)
+
+    assert job_states(job_status_snapshots, "crawler") == [
+        "ANALYSING_RESOURCE_HEAD",
+        "DOWNLOADING_RESOURCE",
+        "ANALYSING_DOWNLOADED_RESOURCE",
+    ]
+    status = await ResourceJobStatus.for_resource(RESOURCE_ID)
+    assert "crawler" not in status
+    assert status["csv"]["state"] == "TO_ANALYSE_CSV"
+    assert job_states(job_status_snapshots, "csv") == ["TO_ANALYSE_CSV"]
+
+
+async def test_analyse_resource_clears_crawler_when_download_fails(
+    setup_catalog, mocker, fake_check
+):
+    async def fail_download(*args, **kwargs):
+        raise IOException(message="File too large to download")
+
+    mocker.patch("udata_hydra.analysis.resource.download_resource", fail_download)
+    mocker.patch("udata_hydra.config.WEBHOOK_ENABLED", False)
+    mocker.patch("udata_hydra.analysis.resource.queue.enqueue")
+
+    check = await fake_check(headers={"content-type": "text/csv"})
+    await analyse_resource(check=check)
+
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
 @pytest.mark.parametrize(
@@ -384,7 +454,7 @@ async def test_change_analysis_last_modified_header(setup_catalog, rmock, udata_
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
-    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37+00:00"
+    assert data["analysis:last-modified-at"] == "2020-01-09T09:33:37Z"
     assert data["analysis:last-modified-detection"] == "last-modified-header"
 
 
@@ -402,6 +472,7 @@ async def test_change_analysis_content_length_header(
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
+    assert data["analysis:last-modified-at"].endswith("Z")
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
     now = datetime.now(timezone.utc)
     # modified date should be pretty close from now, let's say 30 seconds
@@ -423,6 +494,7 @@ async def test_change_analysis_checksum(setup_catalog, mocker, fake_check, db, r
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
+    assert data["analysis:last-modified-at"].endswith("Z")
     modified_date = datetime.fromisoformat(data["analysis:last-modified-at"])
     now = datetime.now(timezone.utc)
     # modified date should be pretty close from now, let's say 30 seconds
@@ -446,7 +518,7 @@ async def test_change_analysis_harvested(setup_catalog, mocker, rmock, fake_chec
     requests = rmock.requests[("PUT", URL(udata_url))]
     # last request is the one for analysis
     data = requests[-1].kwargs["json"]
-    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000+00:00"
+    assert data["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000Z"
     assert data["analysis:last-modified-detection"] == "harvest-resource-metadata"
     res = await db.fetch("SELECT * FROM checks ORDER BY created_at DESC LIMIT 1")
     assert res[0]["detected_last_modified_at"].isoformat() == "2022-12-06T05:00:32.647000+00:00"
@@ -634,14 +706,14 @@ async def test_analyse_new_url_notifies_udata(setup_catalog, rmock, fake_check, 
     analysis_payload = next(p for p in payloads if "analysis:check_id" in p)
     assert analysis_payload["analysis:check_id"] == check["id"]
     assert analysis_payload["analysis:last-modified-detection"] == "harvest-resource-metadata"
-    assert analysis_payload["analysis:last-modified-at"] == harvest_modified_at.isoformat()
+    assert analysis_payload["analysis:last-modified-at"] == "2022-12-06T05:00:32.647000Z"
 
 
 @pytest.mark.parametrize(
     "head_last_modified,expect_put,expected_modified_at,use_detected_at",
     [
         ("Thu, 09 Jan 2020 09:33:37 GMT", False, None, False),
-        ("2020-01-09T09:33:37+04:00", True, "2020-01-09T09:33:37+04:00", True),
+        ("2020-01-09T09:33:37+04:00", True, "2020-01-09T05:33:37Z", True),
     ],
     ids=["same_instant_rfc822", "same_instant_different_offset"],
 )
@@ -764,16 +836,13 @@ async def test_no_check_changed_header(
 
 
 async def test_crawl_and_analysis_user_agent(setup_catalog, rmock, produce_mock):
-    # very complicated stuff, thanks https://github.com/pnuckowski/aioresponses/issues/111#issuecomment-896585061
-    def callback(url, **kwargs):
-        assert config.USER_AGENT == sys._getframe(3).f_locals["orig_self"].headers["user-agent"]
-        # add content-length to avoid switching from HEAD to GET when crawling
-        return CallbackResult(status=200, payload={}, headers={"content-length": "1"})
-
-    rurl = RESOURCE_URL
-    rmock.head(rurl, callback=callback)
-    rmock.get(rurl, callback=callback)
+    # add content-length to avoid switching from HEAD to GET when crawling
+    rmock.head(RESOURCE_URL, headers={"content-length": "1"})
+    rmock.get(RESOURCE_URL, headers={"content-length": "1"})
     await start_checks(iterations=1)
+    calls = [c for (_, url), cs in rmock.requests.items() if url == URL(RESOURCE_URL) for c in cs]
+    assert calls
+    assert all(c.headers["user-agent"] == config.USER_AGENT_FULL for c in calls)
 
 
 async def test_check_triggered_by_udata_entrypoint_clean_catalog(
@@ -869,37 +938,38 @@ async def test_recheck_download_only_once(rmock, fake_check, db, produce_mock, s
     assert ("GET", URL(rurl)) not in rmock.requests
 
 
-@pytest.mark.parametrize("resource_status", list(Resource.STATUSES.keys()) + [None])
-async def test_dont_check_resources_with_status(
-    rmock, db, produce_mock, setup_catalog, resource_status
-):
-    await Resource.update(resource_id=RESOURCE_ID, data={"status": resource_status})
+_JOB_STATUS_CASES = [(None, None)] + [
+    (job, state)
+    for job, states in ResourceJobStatus.JOB_STATUSES.items()
+    for state in sorted(states)
+]
+
+
+@pytest.mark.parametrize("job,state", _JOB_STATUS_CASES)
+async def test_dont_check_resources_with_status(rmock, db, produce_mock, setup_catalog, job, state):
+    if job is not None:
+        await ResourceJobStatus.set(RESOURCE_ID, job, state)
     rurl = RESOURCE_URL
     await start_checks(iterations=1)
 
-    if resource_status == "BACKOFF" or resource_status is None:
+    if job is None or (job == "crawler" and state == "BACKOFF"):
         # HEAD should have been called
         assert ("HEAD", URL(rurl)) in rmock.requests
-
-        # Status should have been reset to None
-        resource: dict = await db.fetchrow(
-            "SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID
+        # Use the db fixture: start_checks closes the shared pool.
+        rows = await db.fetch(
+            "SELECT job FROM resource_job_status WHERE resource_id = $1", RESOURCE_ID
         )
-        assert resource["status"] is None
-
+        assert rows == []
     else:
         # Don't check urls that have a status state pending
-
-        # HEAD shouldn't have been called
         assert ("HEAD", URL(rurl)) not in rmock.requests
-        # GET shouldn't have been called
         assert ("GET", URL(rurl)) not in rmock.requests
-
-        # Status should have stayed the same
-        resource: dict = await db.fetchrow(
-            "SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID
+        rows = await db.fetch(
+            "SELECT job, state FROM resource_job_status WHERE resource_id = $1", RESOURCE_ID
         )
-        assert resource["status"] == resource_status
+        assert len(rows) == 1
+        assert rows[0]["job"] == job
+        assert rows[0]["state"] == state
 
 
 @pytest.mark.parametrize(
@@ -964,21 +1034,27 @@ async def test_wrong_url_in_catalog(
         config.STUCK_THRESHOLD_SECONDS * 2,
     ],
 )
-async def test_reset_statuses(fake_check, db, setup_catalog, check_duration):
+async def test_reset_statuses(db, setup_catalog, check_duration):
     """Reset the status of a resource stuck for a while"""
-    await fake_check(
-        resource_id=RESOURCE_ID, created_at=datetime.now() - timedelta(seconds=check_duration)
-    )
+    since = datetime.now(timezone.utc) - timedelta(seconds=check_duration)
     status = "ANALYSING_CSV"
-    await db.execute(f"UPDATE catalog SET status = '{status}' WHERE resource_id = $1", RESOURCE_ID)
-    row = await db.fetchrow("SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID)
-    assert row["status"] == status
+    await db.execute(
+        """
+        INSERT INTO resource_job_status (resource_id, job, state, since)
+        VALUES ($1, 'csv', $2, $3)
+        """,
+        RESOURCE_ID,
+        status,
+        since,
+    )
+    row = await ResourceJobStatus.for_resource(RESOURCE_ID)
+    assert row["csv"]["state"] == status
     await Resource.clean_up_statuses()
-    row = await db.fetchrow("SELECT status FROM catalog WHERE resource_id = $1", RESOURCE_ID)
+    row = await ResourceJobStatus.for_resource(RESOURCE_ID)
     if check_duration > config.STUCK_THRESHOLD_SECONDS:
-        assert row["status"] is None
+        assert row == {}
     else:
-        assert row["status"] == status
+        assert row["csv"]["state"] == status
 
 
 @pytest.mark.parametrize(

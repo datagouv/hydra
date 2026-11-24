@@ -5,10 +5,11 @@ import logging
 import pytest
 from asyncpg import Record
 
-from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_EXCEPTION_TABLE_INDEXES
+from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_TABLE_INDEXES
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv
-from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_index import ResourceIndex
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils.db import get_columns_with_indexes
 
 pytestmark = pytest.mark.asyncio
@@ -21,10 +22,12 @@ async def test_exception_analysis(
     setup_catalog_with_resource_exception, rmock, db, fake_check, produce_mock, mocker
 ):
     """
-    Tests that exception resources (files that are too large to be normally processed) are indeed processed.
+    Tests that exception resources (files that are too large to be normally processed) are indeed processed,
+    with the indexes declared on them.
     """
     # Change config to accept large files
     mocker.patch("udata_hydra.config.MAX_FILESIZE_ALLOWED", 5000)
+    await ResourceIndex.replace(RESOURCE_EXCEPTION_ID, RESOURCE_TABLE_INDEXES)
 
     # Create a previous fake check for the resource
     check = await fake_check(resource_id=RESOURCE_EXCEPTION_ID)
@@ -36,31 +39,23 @@ async def test_exception_analysis(
     rmock.get(url, status=200, body=data)
 
     # Check resource status before analysis
-    resource = await Resource.get(RESOURCE_EXCEPTION_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_EXCEPTION_ID) == {}
 
     # Analyse the CSV
     file = await download_from_check(check, Csv)
     await file.analyse(check=check)
 
     # Check resource status after analysis
-    resource = await Resource.get(RESOURCE_EXCEPTION_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_EXCEPTION_ID) == {}
 
     # Check the table has been created in CSV DB, with the expected number of rows, and get the columns
     row: Record = await db.fetchrow(f'SELECT *, count(*) over () AS count FROM "{table_name}"')
     assert row["count"] == expected_count
 
-    # Check if indexes have been created for the table
-    expected_columns_with_indexes = list(RESOURCE_EXCEPTION_TABLE_INDEXES.keys())
-    expected_columns_with_indexes.append("__id")
-    indexes: list[Record] | None = await get_columns_with_indexes(table_name)
-    assert indexes
-    for idx in indexes:
-        assert idx["table_name"] == table_name
-        assert idx["column_name"] in expected_columns_with_indexes
+    # Check the declared indexes have been created for the table, next to the primary key
+    indexes: list[Record] = await get_columns_with_indexes(table_name)
+    assert {idx["table_name"] for idx in indexes} == {table_name}
+    assert {idx["column_name"] for idx in indexes} == {"__id", *RESOURCE_TABLE_INDEXES}
 
     # Check the profile has been saved in the tables_index
     profile = await db.fetchrow(

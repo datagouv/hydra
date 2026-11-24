@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import aiohttp
@@ -7,6 +8,20 @@ from aiohttp import web
 
 from udata_hydra import config
 from udata_hydra.utils import IOException
+
+
+def format_utc_datetime(value: datetime) -> str:
+    """Format a datetime as ISO 8601, converted to UTC with a "Z" suffix
+    (e.g. "2026-06-09T10:00:00.123456Z").
+
+    Naive datetimes are returned as-is via isoformat(), without timezone info.
+    """
+    if value.tzinfo is None:
+        return value.isoformat()
+    # Convert to UTC rather than just formatting the offset: udata's `to_naive_datetime`
+    # drops the offset without converting, so a `+04:00` date would be stored 4h off.
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
 
 log = logging.getLogger("udata-hydra")
 

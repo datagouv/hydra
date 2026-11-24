@@ -4,10 +4,12 @@ from typing import TYPE_CHECKING
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from udata_hydra.analysis import helpers
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.data_formats.table import Table
 from udata_hydra.db import db_col_name, quote_ident
 from udata_hydra.utils import storage_path
+from udata_hydra.utils.http import format_utc_datetime
 
 if TYPE_CHECKING:
     from udata_hydra.data_formats import Parquet
@@ -40,13 +42,14 @@ async def db_to_parquet(table: Table) -> "Parquet":
     )
     schema = pa.schema(
         [
-            pa.field(c, PYTHON_TYPE_TO_PA[table.inspection["columns"][c]["python_type"]])
+            # the type of the table column: aware datetimes are stored as timestamptz
+            pa.field(c, PYTHON_TYPE_TO_PA[helpers.get_python_type(table.inspection["columns"][c])])
             for c in original_cols
         ],
         # the file must be self-sufficient for readers that don't have access to `tables_index`
         metadata={
             "csv_detective": index_entry["csv_detective"],
-            "created_at": index_entry["created_at"].isoformat(),
+            "created_at": format_utc_datetime(index_entry["created_at"]),
         },
     )
 
@@ -60,7 +63,11 @@ async def db_to_parquet(table: Table) -> "Parquet":
     try:
         async with pool.acquire() as conn:
             async with conn.transaction():
-                stmt = await conn.prepare(f"SELECT {cols_sql} FROM {quote_ident(table.table_name)}")
+                # __id is the rank of the row in the source file, which readers of the parquet
+                # (api-tabular on DuckDB) get back from the position of the row in this file
+                stmt = await conn.prepare(
+                    f'SELECT {cols_sql} FROM {quote_ident(table.table_name)} ORDER BY "__id"'
+                )
                 cursor = await stmt.cursor()
                 while batch := await cursor.fetch(BATCH_SIZE):
                     pq_table = pa.table(

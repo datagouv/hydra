@@ -20,7 +20,7 @@ import pytest
 
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv, Geojson
-from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -129,18 +129,14 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
         data = f.read()
     rmock.get(url, status=200, body=data)
 
-    resource = await Resource.get(check["resource_id"])
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}
 
     start = perf_counter()
     file = await download_from_check(check, Csv)
     await file.analyse(check=check)
     duration = perf_counter() - start
 
-    resource = await Resource.get(check["resource_id"])
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}
 
     count = await db.fetchrow(f'SELECT count(*) AS count FROM "{table_name}"')
     assert count["count"] == expected_count

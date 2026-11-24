@@ -8,8 +8,9 @@ from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_status
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import UdataPayload, queue, send
-from udata_hydra.utils.http import CORS_HEADER_FIELDS
+from udata_hydra.utils.http import CORS_HEADER_FIELDS, format_utc_datetime
 
 log = logging.getLogger("udata-hydra")
 
@@ -49,7 +50,7 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> dict:
             "check:available": is_valid_status(check_data.get("status")),
             "check:status": check_data.get("status"),
             "check:timeout": check_data["timeout"],
-            "check:date": datetime.now(timezone.utc).isoformat(),
+            "check:date": format_utc_datetime(datetime.now(timezone.utc)),
             "check:error": check_data.get("error"),
             "check:headers:content-type": await get_content_type_from_header(
                 check_data.get("headers", {})
@@ -77,9 +78,10 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> dict:
         )
 
     # Update resource following check:
-    # Reset resource status so that it's not forbidden to be checked again.
+    # Clear crawler status so that it's not forbidden to be checked again.
     # Reset priority so that it's not prioritised anymore.
-    await Resource.update(check_data["resource_id"], data={"status": None, "priority": False})
+    await ResourceJobStatus.clear(check_data["resource_id"], "crawler")
+    await Resource.update(check_data["resource_id"], data={"priority": False})
 
     return new_check
 

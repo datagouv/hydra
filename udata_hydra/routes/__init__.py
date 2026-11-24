@@ -8,12 +8,12 @@ from udata_hydra.routes.checks import (
     get_checks_aggregate,
     get_latest_check,
 )
+from udata_hydra.routes.config import get_exposed_config
 from udata_hydra.routes.resources import (
     create_resource,
     delete_resource,
     get_resource,
     get_resources_stats,
-    get_resources_stats_cors,
     update_resource,
 )
 from udata_hydra.routes.resources_exceptions import (
@@ -22,6 +22,7 @@ from udata_hydra.routes.resources_exceptions import (
     get_all_resources_exceptions,
     update_resource_exception,
 )
+from udata_hydra.routes.resources_indexes import get_resource_indexes, replace_resource_indexes
 from udata_hydra.routes.status import get_crawler_status, get_health, get_stats, get_worker_status
 
 
@@ -60,7 +61,6 @@ routes_params = [
     (web.post, "/api/resources", create_resource, None),
     (web.put, "/api/resources/{resource_id}", update_resource, None),
     (web.delete, "/api/resources/{resource_id}", delete_resource, None),
-    (web.get, "/api/resources/stats/cors", get_resources_stats_cors, None),
     (web.get, "/api/resources/stats", get_resources_stats, None),
     # Routes for statuses
     (web.get, "/api/status/crawler", get_crawler_status, None),
@@ -76,6 +76,10 @@ routes_params = [
         delete_resource_exception,
         None,
     ),
+    # Routes for the indexes of resources tables
+    (web.get, "/api/resources-indexes/{resource_id}", get_resource_indexes, None),
+    (web.put, "/api/resources-indexes/{resource_id}", replace_resource_indexes, None),
+    (web.get, "/api/config", get_exposed_config, None),
 ]
 
 # Generate the routes

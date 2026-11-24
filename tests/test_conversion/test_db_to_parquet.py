@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
@@ -8,6 +8,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from udata_hydra.analysis.helpers import get_python_type
 from udata_hydra.conversion.schema import PYTHON_TYPE_TO_PA
 from udata_hydra.data_formats import CsvLike, Parquet
 from udata_hydra.data_formats.table.to_parquet import DEFAULT_PARQUET_FILENAME
@@ -27,7 +28,7 @@ def _reference_table_from_csv(file_path: Path, inspection: dict) -> pa.Table:
     return pa.Table.from_pylist(
         [{c: v for c, v in zip(columns, values)} for values in rows],
         schema=pa.schema(
-            [pa.field(c, PYTHON_TYPE_TO_PA[columns[c]["python_type"]]) for c in columns]
+            [pa.field(c, PYTHON_TYPE_TO_PA[get_python_type(columns[c])]) for c in columns]
         ),
     )
 
@@ -60,12 +61,7 @@ async def test_db_to_parquet(clean_db, fake_check, mocker):
     inspection = await file.inspect()
 
     table = await file.to_db(check=check)
-    with patch(
-        # wraps because we don't want to change the behaviour, just to know it's been called
-        "udata_hydra.data_formats.table.to_parquet.pa.table",
-        wraps=pa.table,
-    ) as pa_table_func:
-        parquet = await table.to_parquet()
+    parquet = await table.to_parquet()
     assert parquet is not None
     table_from_db = pq.ParquetFile(parquet.path).read()
 
@@ -73,8 +69,67 @@ async def test_db_to_parquet(clean_db, fake_check, mocker):
 
     assert table_from_db.num_rows == table_from_csv.num_rows
     assert table_from_db.to_pydict() == table_from_csv.to_pydict()
-    # can't compare with table_from_db.schema as the reload can make the types differ (date32 VS date64 for instance)
-    assert pa_table_func.call_args.kwargs["schema"] == table_from_csv.schema
+    assert table_from_db.schema == table_from_csv.schema
+    parquet.path.unlink()
+
+
+async def test_db_to_parquet_keeps_the_time_of_datetimes(clean_db, fake_check, mocker, tmp_path):
+    """Readers of the parquet (api-tabular on DuckDB) serve the same values as the table, aware
+    datetimes in UTC like timestamptz."""
+    csv = tmp_path / "datetimes.csv"
+    csv.write_text(
+        "naive,aware\n"
+        "2024-03-05 14:30:00,2024-03-05T14:30:00+01:00\n"
+        "2024-03-06 08:00:00,2024-03-06T08:00:00+01:00\n"
+    )
+    mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
+    check = await fake_check()
+    file = CsvLike(file_name=str(csv))
+    inspection = await file.inspect()
+    assert {name: get_python_type(column) for name, column in inspection["columns"].items()} == {
+        "naive": "datetime",
+        "aware": "datetime_aware",
+    }
+    table = await file.to_db(check=check)
+    parquet = await table.to_parquet()
+    assert parquet is not None
+
+    exported = pq.read_table(parquet.path)
+    # the values alone don't pin the type: aware datetimes compare by instant whatever their zone
+    assert exported.schema == pa.schema(
+        [("naive", pa.timestamp("us")), ("aware", pa.timestamp("us", tz="UTC"))]
+    )
+    assert exported.column("naive").to_pylist() == [
+        datetime(2024, 3, 5, 14, 30),
+        datetime(2024, 3, 6, 8, 0),
+    ]
+    assert exported.column("aware").to_pylist() == [
+        datetime(2024, 3, 5, 13, 30, tzinfo=timezone.utc),
+        datetime(2024, 3, 6, 7, 0, tzinfo=timezone.utc),
+    ]
+    parquet.path.unlink()
+
+
+async def test_db_to_parquet_keeps_the_rows_in_the_order_of_the_file(
+    clean_db, fake_check, db, mocker, tmp_path
+):
+    """Readers of the parquet (api-tabular on DuckDB) number the rows by their position in the
+    file, which must give back the __id of the table: the rank of the row in the source file."""
+    csv = tmp_path / "rows.csv"
+    csv.write_text("val\n" + "".join(f"row{i}\n" for i in range(1, 6)))
+    mocker.patch("udata_hydra.config.DB_TO_PARQUET", True)
+    check = await fake_check()
+    file = CsvLike(file_name=str(csv))
+    await file.inspect()
+    table = await file.to_db(check=check)
+    # an updated row is written anew at the end of the table, where a scan without ORDER BY
+    # reads it last
+    await db.execute(f'UPDATE {quote_ident(table.table_name)} SET val = val WHERE "__id" = 1')
+
+    parquet = await table.to_parquet()
+    assert parquet is not None
+
+    assert pq.read_table(parquet.path).column("val").to_pylist() == [f"row{i}" for i in range(1, 6)]
     parquet.path.unlink()
 
 
@@ -104,6 +159,7 @@ async def test_db_to_parquet_embeds_latest_tables_index_entry(clean_db, fake_che
     assert embedded == json.loads(latest["csv_detective"])
     assert embedded["profile"].keys() == file.inspection["columns"].keys()
     assert datetime.fromisoformat(metadata[b"created_at"].decode()) == latest["created_at"]
+    assert metadata[b"created_at"].decode().endswith("Z")
     parquet.path.unlink()
 
 

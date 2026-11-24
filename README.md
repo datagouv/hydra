@@ -233,17 +233,20 @@ The API serves the following endpoints:
 
 *Related to resources:*
 - `GET` on `/api/resources/{resource_id}` to get a resource in the DB "catalog" table from its `resource_id`
-- `GET` on `/api/resources/stats` to get aggregate statistics about resources (counts and breakdown by catalog `status`)
-- `GET` on `/api/resources/stats/cors` to get CORS coverage statistics for external resources (URLs not on data.gouv.fr)
+- `GET` on `/api/resources/stats` to get aggregate statistics about resources (counts and breakdown by per-job `status`)
 - `POST` on `/api/resources` to receive a resource creation event from a source. It will create a new resource in the DB "catalog" table and mark it as priority for next crawling
 - `PUT` on `/api/resources/{resource_id}` to update a resource in the DB "catalog" table
 - `DELETE` on `/api/resources/{resource_id}` to delete a resource in the DB "catalog" table
 
-*Related to resources exceptions:*
+*Related to resources exceptions (files too large to be processed normally, allowed anyway):*
 - `GET` on `/api/resources-exceptions` to get the list of all resources exceptions
 - `POST` on `/api/resources-exceptions` to create a new resource exception in the DB
 - `PUT` on `/api/resources-exceptions/{resource_id}` to update a resource exception in the DB
 - `DELETE` on `/api/resources-exceptions/{resource_id}` to delete a resource exception from the DB
+
+*Related to the indexes of resources tables (any resource, exception or not):*
+- `GET` on `/api/resources-indexes/{resource_id}` to get the indexes declared on the table of a resource
+- `PUT` on `/api/resources-indexes/{resource_id}` to replace them; they are created at the next conversion of the resource
 
 *Related to some status and health check:*
 - `GET` on `/api/status/crawler` to get the crawling status
@@ -386,55 +389,40 @@ $ curl -s "http://localhost:8000/api/checks/aggregate?group_by=domain&created_at
 
 #### Get resources stats
 
+`idle` + `busy` = `total_count` (resource counts). `jobs` counts status rows and may sum to more than `busy` when one resource has several jobs.
+
 ```bash
 $ curl -s "http://localhost:8000/api/resources/stats" | json_pp
 {
    "total_count" : 100,
    "deleted_count" : 3,
    "statuses_count" : {
-      "null" : 85,
-      "BACKOFF" : 2,
-      "CRAWLING_URL" : 1,
-      ...
+      "idle" : 85,
+      "busy" : 15,
+      "jobs" : {
+         "crawler" : { "BACKOFF" : 2, "CRAWLING_URL" : 1 },
+         "csv" : { "ANALYSING_CSV" : 12 },
+         "parquet" : { "CONVERTING_TO_PARQUET" : 1 },
+         "geojson" : {},
+         "pmtiles" : {},
+         "ogc" : {},
+         "gz" : {}
+      }
    }
 }
 ```
 
-#### Get resources CORS stats (external URLs)
-
-```bash
-$ curl -s "http://localhost:8000/api/resources/stats/cors" | json_pp
-{
-   "external_resources_with_cors_data" : 42,
-   "external_resources_without_cors_data" : 55,
-   "external_resources_cors_coverage_percentage" : 43.3,
-   "external_resources_allow_origin_distribution" : [
-      { "access_status" : "Accessible (Wildcard *)", "unique_resources_count" : 15, "percentage" : 35.71 },
-      { "access_status" : "Accessible (Specific Whitelist)", "unique_resources_count" : 20, "percentage" : 47.62 },
-      ...
-   ]
-}
-```
-
 #### Adding a resource exception
+
+An exception lifts the file size limit of a resource and gives its jobs a longer timeout. It does not declare any index: see [Declaring the indexes of a resource table](#declaring-the-indexes-of-a-resource-table).
 
 ```bash
 $ curl   -X POST http://localhost:8000/api/resources-exceptions \
          -H 'Authorization: Bearer <myAPIkey>' \
          -d '{
             "resource_id": "123e4567-e89b-12d3-a456-426614174000",
-            "table_indexes": {
-                  "siren": "index"
-            },
             "comment": "This is a comment for the resource exception."
          }'
-```
-
-...or, if you don't want to add table indexes and a comment:
-```bash
-$ curl  -X POST localhost:8000/api/resources-exceptions \
-        -H 'Authorization: Bearer <myAPIkey>' \
-        -d '{"resource_id": "f868cca6-8da1-4369-a78d-47463f19a9a3"}'
 ```
 
 #### Updating a resource exception
@@ -442,13 +430,7 @@ $ curl  -X POST localhost:8000/api/resources-exceptions \
 ```bash
 $ curl   -X PUT http://localhost:8000/api/resources-exceptions/f868cca6-8da1-4369-a78d-47463f19a9a3 \
          -H "Authorization: Bearer <myAPIkey>" \
-         -d '{
-            "table_indexes": {
-                  "siren": "index",
-                  "code_postal": "index"
-            },
-            "comment": "Updated comment for the resource exception."
-         }'
+         -d '{"comment": "Updated comment for the resource exception."}'
 ```
 
 #### Deleting a resource exception
@@ -456,6 +438,16 @@ $ curl   -X PUT http://localhost:8000/api/resources-exceptions/f868cca6-8da1-436
 ```bash
 $ curl  -X DELETE http://localhost:8000/api/resources-exceptions/f868cca6-8da1-4369-a78d-47463f19a9a3 \
         -H "Authorization: Bearer <myAPIkey>"
+```
+
+#### Declaring the indexes of a resource table
+
+Indexes are declared per resource, exception or not, and created on its table at each conversion (only the `index` type, a B-tree, is supported). The mapping replaces the previous one; `{}` removes them all.
+
+```bash
+$ curl   -X PUT http://localhost:8000/api/resources-indexes/f868cca6-8da1-4369-a78d-47463f19a9a3 \
+         -H "Authorization: Bearer <myAPIkey>" \
+         -d '{"indexes": {"siren": "index", "code_postal": "index"}}'
 ```
 
 #### Get crawling status
@@ -550,7 +542,7 @@ $ curl -s "http://localhost:8000/api/health" | json_pp
    "version" : "2.12.0",
    "python_version" : "3.14.0",
    "environment" : "local",
-   "uptime_since" : "2026-06-09T10:00:00.123456+00:00",
+   "uptime_since" : "2026-06-09T10:00:00.123456Z",
    "csv_analysis" : true,
    "csv_to_db" : true,
    "db_to_parquet" : false,
