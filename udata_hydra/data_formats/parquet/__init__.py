@@ -1,20 +1,22 @@
 import logging
-import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pyarrow.parquet as pq
+from asyncpg import Record
 
 from udata_hydra import config
-from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
+from udata_hydra.analysis import helpers
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.table import Table
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.db.resource_index import ResourceIndex
 from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import (
     ParseException,
     Timer,
+    queue,
 )
 
 if TYPE_CHECKING:
@@ -30,33 +32,15 @@ class Parquet(DataFormat):
     check_url = "parquet"
     further_analysis = True
 
-    def inspect(self) -> dict:
-        file = pq.ParquetFile(self.path)
-        columns = {}
-        self.inspection = {"header": []}
-        for col in file.schema_arrow:
-            self.inspection["header"].append(col.name)
-            col_type = str(col.type)
-            if col_type.startswith("dictionary"):
-                # dictionaries are for columns with repeated values
-                # we need to dig deeper to get the type
-                col_type = str(col.type.value_type)
-            try:
-                columns[col.name] = next(
-                    pytype
-                    for pyartype, pytype in PYARROW_TYPE_TO_PYTHON.items()
-                    if re.search(pyartype, col_type)
-                )
-            except StopIteration:
-                raise ValueError(f"Unknown pyarrow type: {col.type}")
-        self.inspection["columns"] = {
-            col_name: {
-                "format": pytype,
-                "python_type": pytype,
-            }
-            for col_name, pytype in columns.items()
-        }
-        self.inspection["total_lines"] = file.metadata.num_rows
+    async def inspect(self) -> dict:
+        # csv-detective picks its engine from the content (the downloaded file has no extension)
+        # and would read a CSV or a gzip served as a parquet resource: fail here instead, before
+        # the table of the previous version is dropped
+        pq.ParquetFile(self.path)
+        # no validation against the previous inspection, unlike a CSV: csv-detective doesn't check
+        # the column order of a parquet file and would return the previous one, while the rows
+        # are copied to the table in the order of the file
+        self.inspection = helpers.run_csv_detective(self, previous_inspection=None)
         return self.inspection
 
     async def analyse(self, check: dict, debug_insert: bool = False) -> "Table|None":
@@ -79,9 +63,9 @@ class Parquet(DataFormat):
                 check["id"], {"parsing_started_at": datetime.now(timezone.utc)}
             )  # type: ignore[assignment]
 
-            # open the file and read the metadata
+            # analyse the whole file with csv-detective
             try:
-                self.inspect()
+                await self.inspect()
             except Exception as e:
                 raise ParseException(
                     message=str(e),
@@ -102,11 +86,27 @@ class Parquet(DataFormat):
                     "parsing_finished_at": datetime.now(timezone.utc),
                 },
             )
-            return table
         finally:
             timer.stop()
             await ResourceJobStatus.clear(resource_id, "parquet")
             self.path.unlink(missing_ok=True)
+
+        # the file of the producer is exported again from the table, like a CSV: the readers of
+        # the exported files (api-tabular) get the embedded inspection and the rows in __id order
+        if config.DB_TO_PARQUET:
+            from udata_hydra.analysis.exports import export_parquet
+
+            # after the clear above, which shares the "parquet" job key
+            await ResourceJobStatus.set(resource_id, "parquet", "CONVERTING_TO_PARQUET")
+            exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
+            queue.enqueue(
+                export_parquet,
+                table=table,
+                check=dict(check),
+                _priority="low",
+                _exception=bool(exception),
+            )
+        return table
 
     async def to_db(
         self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False
