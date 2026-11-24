@@ -437,7 +437,7 @@ async def test_validation(
 
 
 async def test_csv_with_a_reserved_column_name_analysed_again(
-    setup_catalog, rmock, db, fake_check, produce_mock
+    setup_catalog, rmock, db, fake_check, produce_mock, job_status_snapshots
 ):
     """A column named like a Postgres system column is renamed in the table but not in the
     stored inspection: the previous inspection must still be found for it."""
@@ -451,10 +451,22 @@ async def test_csv_with_a_reserved_column_name_analysed_again(
     table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
     rows = await db.fetch(f'SELECT xmin__hydra_renamed, name FROM "{table_name}"')
     assert [tuple(row) for row in rows] == [(1, "x"), (2, "y")]
+    # the second analysis validates the file against the previous inspection
+    assert job_states(job_status_snapshots, "csv") == [
+        "ANALYSING_CSV",
+        "INSERTING_IN_DB",
+        "ANALYSING_CSV",
+        "VALIDATING_CSV",
+        "INSERTING_IN_DB",
+    ]
     res = await db.fetch(
-        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1 ORDER BY created_at DESC",
+        check["resource_id"],
     )
     assert len(res) == 2
+    latest_inspection = json.loads(res[0]["csv_detective"])
+    assert latest_inspection["header"] == ["xmin", "name"]
+    assert set(latest_inspection["columns"]) == {"xmin", "name"}
 
 
 @pytest.mark.parametrize(
