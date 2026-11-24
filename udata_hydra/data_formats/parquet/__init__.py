@@ -6,7 +6,6 @@ from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
-from udata_hydra.analysis.tables_index import get_previous_inspection
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.table import Table
 from udata_hydra.db.check import Check
@@ -33,8 +32,10 @@ class Parquet(DataFormat):
     further_analysis = True
 
     async def inspect(self) -> dict:
-        previous_inspection = await get_previous_inspection(resource_id=self.resource_id)
-        self.inspection = helpers.run_csv_detective(self, previous_inspection)
+        # no validation against the previous inspection, unlike a CSV: csv-detective doesn't check
+        # the column order of a parquet file and would return the previous one, while the rows
+        # are copied to the table in the order of the file
+        self.inspection = helpers.run_csv_detective(self, previous_inspection=None)
         return self.inspection
 
     async def analyse(self, check: dict, debug_insert: bool = False) -> "Table|None":
