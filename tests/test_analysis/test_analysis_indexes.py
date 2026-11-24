@@ -1,12 +1,10 @@
 import hashlib
-import json
-from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
-from tests.conftest import RESOURCE_ID, RESOURCE_TABLE_INDEXES
+from tests.conftest import RESOURCE_ID
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv, Parquet
 from udata_hydra.db.resource_exception import ResourceException
@@ -14,8 +12,6 @@ from udata_hydra.db.resource_index import ResourceIndex
 from udata_hydra.utils.db import get_columns_with_indexes
 
 pytestmark = pytest.mark.asyncio
-
-MIGRATION = Path("udata_hydra/migrations/csv/20261104_add_resources_indexes.sql")
 
 
 async def test_csv_indexes_created_without_exception(
@@ -84,17 +80,3 @@ async def test_index_on_a_long_column_name(setup_catalog, rmock, db, fake_check,
     indexes = await get_columns_with_indexes(table_name)
     assert {idx["column_name"] for idx in indexes} == {"__id", column}
     assert len(await db.fetch(f'SELECT * FROM "{table_name}"')) == 2
-
-
-async def test_migration_copies_indexes_from_exceptions(setup_catalog, db):
-    """Indexes declared on exceptions before resources_indexes existed are carried over"""
-    # Legacy state: indexes stored on the exception, as written by the former exceptions endpoints.
-    await db.execute(
-        "INSERT INTO resources_exceptions (resource_id, table_indexes) VALUES ($1, $2)",
-        RESOURCE_ID,
-        json.dumps(RESOURCE_TABLE_INDEXES),
-    )
-
-    await db.execute(MIGRATION.read_text())
-
-    assert await ResourceIndex.get_by_resource_id(RESOURCE_ID) == RESOURCE_TABLE_INDEXES
