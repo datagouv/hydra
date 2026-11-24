@@ -436,6 +436,27 @@ async def test_validation(
     assert latest_analysis["profile"] is not None
 
 
+async def test_csv_with_a_reserved_column_name_analysed_again(
+    setup_catalog, rmock, db, fake_check, produce_mock
+):
+    """A column named like a Postgres system column is renamed in the table but not in the
+    stored inspection: the previous inspection must still be found for it."""
+    check = await fake_check(headers={"content-type": "application/csv"})
+    body = b"xmin,name\n1,x\n2,y\n"
+    for _ in range(2):
+        rmock.get(check["url"], status=200, body=body)
+        file = await download_from_check(check, Csv)
+        await file.analyse(check=check)
+
+    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    rows = await db.fetch(f'SELECT xmin__hydra_renamed, name FROM "{table_name}"')
+    assert [tuple(row) for row in rows] == [(1, "x"), (2, "y")]
+    res = await db.fetch(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
+    )
+    assert len(res) == 2
+
+
 @pytest.mark.parametrize(
     "params",
     (
