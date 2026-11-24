@@ -4,17 +4,20 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pyarrow.parquet as pq
+from asyncpg import Record
 
 from udata_hydra import config
 from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.table import Table
 from udata_hydra.db.check import Check
+from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.db.resource_index import ResourceIndex
 from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import (
     ParseException,
     Timer,
+    queue,
 )
 
 if TYPE_CHECKING:
@@ -102,11 +105,27 @@ class Parquet(DataFormat):
                     "parsing_finished_at": datetime.now(timezone.utc),
                 },
             )
-            return table
         finally:
             timer.stop()
             await ResourceJobStatus.clear(resource_id, "parquet")
             self.path.unlink(missing_ok=True)
+
+        # the file of the producer is exported again from the table, like a CSV: the readers of
+        # the exported files (api-tabular) get the embedded inspection and the rows in __id order
+        if config.DB_TO_PARQUET:
+            from udata_hydra.analysis.exports import export_parquet
+
+            # after the clear above, which shares the "parquet" job key
+            await ResourceJobStatus.set(resource_id, "parquet", "CONVERTING_TO_PARQUET")
+            exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
+            queue.enqueue(
+                export_parquet,
+                table=table,
+                check=dict(check),
+                _priority="low",
+                _exception=bool(exception),
+            )
+        return table
 
     async def to_db(
         self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False

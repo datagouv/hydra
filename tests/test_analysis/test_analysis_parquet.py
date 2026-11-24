@@ -1,6 +1,5 @@
-import io
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pandas as pd
@@ -9,32 +8,17 @@ import pytest
 
 from tests.conftest import job_states
 from udata_hydra.analysis import helpers
-from udata_hydra.data_formats import Parquet
+from udata_hydra.analysis.exports import export_parquet
+from udata_hydra.data_formats import Parquet, Table
 from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import ParseException
 
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.parametrize(
-    "check_kwargs",
-    [
-        {"url": "http://example.com/file.parquet"},
-        {"headers": {"content-type": "application/vnd.apache.parquet"}},
-    ],
-)
-async def test_analyse_parquet(
-    setup_catalog,
-    rmock,
-    db,
-    fake_check,
-    produce_mock,
-    check_kwargs,
-    job_status_snapshots,
-):
-    check = await fake_check(**check_kwargs)
-    url = check["url"]
-    df = pd.DataFrame(
+def _producer_dataframe() -> pd.DataFrame:
+    """A parquet file of a producer, with a column of each type hydra reads."""
+    return pd.DataFrame(
         {
             "name": ["Marie", "Paul", "Léa", "Pierre"],
             "score": [1.2, 3.4, 5.6, 7.8],
@@ -72,6 +56,27 @@ async def test_analyse_parquet(
             ],
         }
     )
+
+
+@pytest.mark.parametrize(
+    "check_kwargs",
+    [
+        {"url": "http://example.com/file.parquet"},
+        {"headers": {"content-type": "application/vnd.apache.parquet"}},
+    ],
+)
+async def test_analyse_parquet(
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+    produce_mock,
+    check_kwargs,
+    job_status_snapshots,
+):
+    check = await fake_check(**check_kwargs)
+    url = check["url"]
+    df = _producer_dataframe()
     expected_types = {
         "name": {"python": "string", "pg": "character varying"},
         "score": {"python": "float", "pg": "double precision"},
@@ -117,11 +122,90 @@ async def test_analyse_parquet(
         assert inspection["columns"][col]["python_type"] == types["python"]
 
 
-def _parquet_file(df: pd.DataFrame) -> pq.ParquetFile:
-    buffer = io.BytesIO()
-    df.to_parquet(buffer)
-    buffer.seek(0)
-    return pq.ParquetFile(buffer)
+async def _analyse_producer_parquet(rmock, fake_check) -> tuple[dict, Table]:
+    check = await fake_check(url="http://example.com/file.parquet")
+    rmock.get(check["url"], status=200, body=_producer_dataframe().to_parquet())
+    file = await helpers.download_from_check(check, Parquet)
+    with patch("udata_hydra.config.PARQUET_TO_DB", True):
+        table = await file.analyse(check=check)
+    assert table is not None
+    return check, table
+
+
+async def test_analyse_parquet_enqueues_the_parquet_export(
+    setup_catalog, rmock, fake_check, produce_mock, mocker
+):
+    """The parquet file of a producer is exported again from its table, like a CSV."""
+    mock_enqueue = mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    with patch("udata_hydra.config.DB_TO_PARQUET", True):
+        check, table = await _analyse_producer_parquet(rmock, fake_check)
+
+    mock_enqueue.assert_called_once()
+    assert mock_enqueue.call_args.args[0] is export_parquet
+    kwargs = mock_enqueue.call_args.kwargs
+    assert kwargs["table"].table_name == table.table_name
+    assert kwargs["check"]["id"] == check["id"]
+    assert kwargs["_priority"] == "low"
+    # the analysis clears the same job key when it ends: the export state must outlive it
+    status = await ResourceJobStatus.for_resource(check["resource_id"])
+    assert status["parquet"]["state"] == "CONVERTING_TO_PARQUET"
+
+
+async def test_analyse_parquet_without_db_to_parquet(
+    setup_catalog, rmock, fake_check, produce_mock, mocker
+):
+    mock_enqueue = mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    with patch("udata_hydra.config.DB_TO_PARQUET", False):
+        check, _ = await _analyse_producer_parquet(rmock, fake_check)
+
+    mock_enqueue.assert_not_called()
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}
+
+
+async def test_parquet_of_a_producer_exported_from_its_table(
+    setup_catalog, rmock, fake_check, produce_mock, mocker
+):
+    """The values of the producer file survive the table, in the file api-tabular reads."""
+    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    _, table = await _analyse_producer_parquet(rmock, fake_check)
+    with patch("udata_hydra.config.DB_TO_PARQUET", True):
+        parquet = await table.to_parquet()
+    assert parquet is not None
+
+    exported = pq.read_table(parquet.path)
+    parquet.path.unlink()
+    # the inspection of the producer file, which api-tabular serves as the profile
+    inspection = json.loads(exported.schema.metadata[b"csv_detective"])
+    assert inspection["columns"]["stamp"]["python_type"] == "datetime_aware"
+    assert inspection["total_lines"] == 4
+    assert exported.to_pydict() == {
+        "name": ["Marie", "Paul", "Léa", "Pierre"],
+        "score": [1.2, 3.4, 5.6, 7.8],
+        "decompte": [98, -76, -5, 0],
+        "is_true": [True, False, False, True],
+        "birth": [
+            datetime(1996, 2, 13),
+            datetime(2000, 1, 28),
+            datetime(2005, 11, 10),
+            datetime(2018, 1, 31),
+        ],
+        "stamp": [
+            datetime(2018, 7, 1, 1, 53, 26, 972000, tzinfo=timezone.utc),
+            datetime(2020, 10, 7, 11, 53, 26, 972000, tzinfo=timezone.utc),
+            datetime(1998, 2, 1, 1, 53, 26, 972000, tzinfo=timezone.utc),
+            datetime(2022, 12, 31, 9, 33, 26, 972000, tzinfo=timezone.utc),
+        ],
+        # json columns are text in the table, as in the parquet files exported from a CSV
+        "liste": ["[1, 2]", "[-3, 2]", "[6, -2]", "[-18, -17]"],
+        # pandas reads a struct column with every key of the column, and its ints as floats
+        "dicts": [
+            '{"a": 1.0, "b": null, "c": null, "d": null, "e": null}',
+            '{"a": null, "b": 2.0, "c": null, "d": null, "e": null}',
+            '{"a": null, "b": null, "c": 3.0, "d": null, "e": null}',
+            '{"a": null, "b": null, "c": null, "d": 4.0, "e": 5.0}',
+        ],
+        "bina": [b"\x01\x01\x00", b"\x00\x00\x8c", b"\x01\x9e\xd1", b"\xb7\xd4\x00"],
+    }
 
 
 async def test_parquet_to_db_rejects_too_long_column_name(fake_check):
