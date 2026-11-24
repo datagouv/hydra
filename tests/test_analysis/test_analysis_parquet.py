@@ -8,7 +8,7 @@ import pytest
 from csv_detective import validate_then_detect
 from csv_detective.explore_csv import detect_formats
 
-from tests.conftest import job_states
+from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_ID, job_states
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.exports import export_parquet
 from udata_hydra.data_formats import Parquet, Table
@@ -138,9 +138,9 @@ async def test_analyse_parquet(
 
 
 async def _analyse_producer_parquet(
-    rmock, fake_check, df: pd.DataFrame | None = None
+    rmock, fake_check, df: pd.DataFrame | None = None, resource_id: str = RESOURCE_ID
 ) -> tuple[dict, Table]:
-    check = await fake_check(url="http://example.com/file.parquet")
+    check = await fake_check(url="http://example.com/file.parquet", resource_id=resource_id)
     body = (df if df is not None else _producer_dataframe()).to_parquet()
     rmock.get(check["url"], status=200, body=body)
     file = await helpers.download_from_check(check, Parquet)
@@ -150,13 +150,22 @@ async def _analyse_producer_parquet(
     return check, table
 
 
+@pytest.mark.parametrize(
+    "resource_id,is_exception", [(RESOURCE_ID, False), (RESOURCE_EXCEPTION_ID, True)]
+)
 async def test_analyse_parquet_enqueues_the_parquet_export(
-    setup_catalog, rmock, fake_check, produce_mock, mocker
+    setup_catalog_with_resource_exception,
+    rmock,
+    fake_check,
+    produce_mock,
+    mocker,
+    resource_id,
+    is_exception,
 ):
     """The parquet file of a producer is exported again from its table, like a CSV."""
     mock_enqueue = mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
     with patch("udata_hydra.config.DB_TO_PARQUET", True):
-        check, table = await _analyse_producer_parquet(rmock, fake_check)
+        check, table = await _analyse_producer_parquet(rmock, fake_check, resource_id=resource_id)
 
     mock_enqueue.assert_called_once()
     assert mock_enqueue.call_args.args[0] is export_parquet
@@ -164,6 +173,8 @@ async def test_analyse_parquet_enqueues_the_parquet_export(
     assert kwargs["table"].table_name == table.table_name
     assert kwargs["check"]["id"] == check["id"]
     assert kwargs["_priority"] == "low"
+    # the exports of the resources in exception get the longer timeout
+    assert kwargs["_exception"] is is_exception
     # the analysis clears the same job key when it ends: the export state must outlive it
     status = await ResourceJobStatus.for_resource(check["resource_id"])
     assert status["parquet"]["state"] == "CONVERTING_TO_PARQUET"
