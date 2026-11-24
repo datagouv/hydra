@@ -1,4 +1,3 @@
-import hashlib
 import json
 import uuid
 from pathlib import Path
@@ -21,6 +20,7 @@ from udata_hydra.data_formats import (
 from udata_hydra.data_formats.csv_like.to_geojson import csv_to_geojson
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.data_formats.geojson.to_pmtiles import geojson_to_pmtiles
+from udata_hydra.db import parsing_table_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 
@@ -88,7 +88,7 @@ async def _analyse_csv_cli(
             try:
                 # Clean up CSV database tables
                 csv_pool = await connection(db_name="csv")
-                table_hash = hashlib.md5(url.encode()).hexdigest()
+                table_hash = parsing_table_name(url)
 
                 await csv_pool.execute(f'DROP TABLE IF EXISTS "{table_hash}"')
                 await csv_pool.execute(

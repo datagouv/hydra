@@ -3,7 +3,6 @@ NB: we can't use pytest-aiohttp helpers because
 it will interfere with the rest of our async code
 """
 
-import hashlib
 import json
 from datetime import datetime, timezone
 
@@ -13,6 +12,7 @@ from aiohttp.client_exceptions import ClientError, ClientResponseError
 from yarl import URL
 
 from tests.conftest import DATASET_ID, RESOURCE_ID, RESOURCE_URL
+from udata_hydra.db import parsing_table_name
 from udata_hydra.db.resource import Resource
 
 pytestmark = pytest.mark.asyncio
@@ -65,7 +65,7 @@ async def test_get_latest_check(setup_catalog, client, query, expected, fake_che
         "parsing_error": None,
         "parsing_finished_at": None,
         "parsing_started_at": None,
-        "parsing_table": hashlib.md5(url.encode("utf-8")).hexdigest(),
+        "parsing_table": parsing_table_name(url),
         "parquet_url": "https://example.org/file.parquet",
         "parquet_size": 2048,
         "pmtiles_url": None,

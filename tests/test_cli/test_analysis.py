@@ -1,10 +1,9 @@
-import hashlib
-
 import nest_asyncio2 as nest_asyncio
 import pytest
 
 from udata_hydra import context
 from udata_hydra.cli import analyse_csv_cli
+from udata_hydra.db import parsing_table_name
 from udata_hydra.db.check import Check
 
 pytestmark = pytest.mark.asyncio
@@ -49,7 +48,7 @@ async def test_csv_analysis_with_debug_insert(setup_catalog, rmock, db, fake_che
     csv_pool = await context.pool("csv")
 
     # Find the table that was created (it uses MD5 hash of URL)
-    table_hash = hashlib.md5(url.encode()).hexdigest()
+    table_hash = parsing_table_name(url)
 
     table_entry = await csv_pool.fetchrow(
         "SELECT * FROM tables_index WHERE parsing_table = $1", table_hash
@@ -87,7 +86,7 @@ async def test_csv_analysis_from_external_url(setup_catalog, rmock, db, produce_
 
     # Check that no tables remain for this URL (they should be cleaned up)
 
-    table_hash = hashlib.md5(external_url.encode()).hexdigest()
+    table_hash = parsing_table_name(external_url)
 
     table_entry = await csv_pool.fetchrow(
         "SELECT * FROM tables_index WHERE parsing_table = $1", table_hash

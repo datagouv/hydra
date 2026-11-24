@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 import json
 import logging
 import os
@@ -17,6 +16,7 @@ from tests.aiohttp_mock import aiohttp_mock
 from udata_hydra import config
 from udata_hydra.app import app_factory
 from udata_hydra.cli import drop_dbs, load_catalog, migrate
+from udata_hydra.db import parsing_table_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
@@ -315,9 +315,7 @@ async def fake_check():
             "analysis_error": analysis_error,
             "detected_last_modified_at": detected_last_modified_at,
             "next_check_at": next_check_at,
-            "parsing_table": hashlib.md5(_url.encode("utf-8")).hexdigest()
-            if parsing_table
-            else None,
+            "parsing_table": parsing_table_name(_url) if parsing_table else None,
             "parquet_url": "https://example.org/file.parquet" if parquet_url else None,
             "parquet_size": 2048 if parquet_url else None,
             "pmtiles_url": "https://example.org/file.pmtiles" if pmtiles_url else None,

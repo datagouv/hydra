@@ -41,7 +41,8 @@ async def _purge_csv_tables(
     # TODO: check if we should use parsing_table from table_index?
     # And are they necessarily in sync?
 
-    # We want to delete all tables which names (from md5(url)) don't match any URL in catalog
+    # We want to delete all tables which names (from md5(url), as in `parsing_table_name`)
+    # don't match any URL in catalog
     with quiet_logs(enabled=quiet):
         q_catalog = "SELECT DISTINCT md5(url) AS parsing_table FROM catalog WHERE deleted IS false;"
         conn_main = await connection()

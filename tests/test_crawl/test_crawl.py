@@ -23,6 +23,7 @@ from udata_hydra import config
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl import start_checks
 from udata_hydra.crawl.check_resources import check_resource
+from udata_hydra.db import parsing_table_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_job_status import ResourceJobStatus
@@ -566,10 +567,7 @@ async def test_analyse_first_check_parses_when_next_check_already_exists(
 
     await analyse_resource(check=first_check)
 
-    assert (
-        await get_parsing_table(db, first_check["id"])
-        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
-    )
+    assert await get_parsing_table(db, first_check["id"]) == parsing_table_name(RESOURCE_URL)
 
 
 async def test_analyse_check_compares_with_its_own_predecessor(
@@ -589,10 +587,7 @@ async def test_analyse_check_compares_with_its_own_predecessor(
 
     await analyse_resource(check=check)
 
-    assert (
-        await get_parsing_table(db, check["id"])
-        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
-    )
+    assert await get_parsing_table(db, check["id"]) == parsing_table_name(RESOURCE_URL)
 
 
 @pytest.mark.catalog_harvested
@@ -615,9 +610,7 @@ async def test_analyse_new_url_parses_when_harvest_date_unchanged(
 
     await analyse_resource(check=check)
 
-    assert (
-        await get_parsing_table(db, check["id"]) == hashlib.md5(new_url.encode("utf-8")).hexdigest()
-    )
+    assert await get_parsing_table(db, check["id"]) == parsing_table_name(new_url)
 
 
 async def test_analyse_new_url_parses_when_file_is_identical(
@@ -635,10 +628,7 @@ async def test_analyse_new_url_parses_when_file_is_identical(
 
     await analyse_resource(check=check)
 
-    assert (
-        await get_parsing_table(db, check["id"])
-        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
-    )
+    assert await get_parsing_table(db, check["id"]) == parsing_table_name(RESOURCE_URL)
 
 
 async def test_analyse_new_url_parses_when_first_check_on_it_failed(
@@ -657,10 +647,7 @@ async def test_analyse_new_url_parses_when_first_check_on_it_failed(
 
     await analyse_resource(check=check)
 
-    assert (
-        await get_parsing_table(db, check["id"])
-        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
-    )
+    assert await get_parsing_table(db, check["id"]) == parsing_table_name(RESOURCE_URL)
 
 
 async def test_analyse_detects_content_change_across_failed_check(
@@ -678,10 +665,7 @@ async def test_analyse_detects_content_change_across_failed_check(
 
     await analyse_resource(check=check)
 
-    assert (
-        await get_parsing_table(db, check["id"])
-        == hashlib.md5(RESOURCE_URL.encode("utf-8")).hexdigest()
-    )
+    assert await get_parsing_table(db, check["id"]) == parsing_table_name(RESOURCE_URL)
 
 
 @pytest.mark.catalog_harvested

@@ -1,5 +1,4 @@
 import gzip
-import hashlib
 import json
 
 import pytest
@@ -8,6 +7,7 @@ from asyncpg.exceptions import UndefinedTableError
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.data_formats import Gz, Xls, Xlsx
+from udata_hydra.db import parsing_table_name
 from udata_hydra.db.resource_job_status import ResourceJobStatus
 
 pytestmark = pytest.mark.asyncio
@@ -27,7 +27,7 @@ async def test_formats_analysis(setup_catalog, rmock, db, fake_check, produce_mo
     data_format, filename, expected_count = file_and_count
     check: dict = await fake_check(headers={"content-type": data_format.standard_mime_type})
     url: str = check["url"]
-    table_name: str = hashlib.md5(url.encode("utf-8")).hexdigest()
+    table_name: str = parsing_table_name(url)
     with open(f"tests/data/{filename}", "rb") as f:
         data = f.read()
     rmock.get(url, status=200, body=data)
@@ -58,7 +58,7 @@ async def test_gz_skips_json_payload(setup_catalog, rmock, db, fake_check, produ
     assert res["parsing_error"] is None
     assert res["parsing_table"] is None
 
-    table_name: str = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    table_name: str = parsing_table_name(check["url"])
     with pytest.raises(UndefinedTableError):
         await db.fetch(f'SELECT * FROM "{table_name}"')
 
@@ -78,7 +78,7 @@ async def test_analyse_resource_skips_json_gz(setup_catalog, rmock, db, fake_che
     assert res["parsing_table"] is None
     assert res["mime_type"] == "application/json"  # inner payload, not application/gzip
 
-    table_name: str = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    table_name: str = parsing_table_name(check["url"])
     with pytest.raises(UndefinedTableError):
         await db.fetch(f'SELECT * FROM "{table_name}"')
 

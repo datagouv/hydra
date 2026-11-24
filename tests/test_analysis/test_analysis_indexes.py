@@ -1,4 +1,3 @@
-import hashlib
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -9,6 +8,7 @@ import pytest
 from tests.conftest import RESOURCE_ID, RESOURCE_TABLE_INDEXES
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv, Parquet
+from udata_hydra.db import parsing_table_name
 from udata_hydra.db.resource_exception import ResourceException
 from udata_hydra.db.resource_index import ResourceIndex
 from udata_hydra.utils.db import get_columns_with_indexes
@@ -26,7 +26,7 @@ async def test_csv_indexes_created_without_exception(
     await ResourceIndex.replace(RESOURCE_ID, {"url": "index"})
 
     check = await fake_check(headers={"content-type": "text/csv"})
-    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(check["url"])
     rmock.get(check["url"], status=200, body=catalog_content)
     file = await download_from_check(check, Csv)
     await file.analyse(check=check)
@@ -60,7 +60,7 @@ async def test_index_on_a_column_missing_from_the_file_is_skipped(
     await ResourceIndex.replace(RESOURCE_ID, {"url": "index", "removed_column": "index"})
 
     check = await fake_check(headers={"content-type": "text/csv"})
-    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(check["url"])
     rmock.get(check["url"], status=200, body=catalog_content)
     file = await download_from_check(check, Csv)
     await file.analyse(check=check)
@@ -76,7 +76,7 @@ async def test_index_on_a_long_column_name(setup_catalog, rmock, db, fake_check,
     await ResourceIndex.replace(RESOURCE_ID, {column: "index"})
 
     check = await fake_check(headers={"content-type": "text/csv"})
-    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(check["url"])
     rmock.get(check["url"], status=200, body=f"{column};nom\n75056;Paris\n69123;Lyon\n".encode())
     file = await download_from_check(check, Csv)
     await file.analyse(check=check)

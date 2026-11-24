@@ -1,4 +1,3 @@
-import hashlib
 import json
 import logging
 from typing import TYPE_CHECKING, Iterator
@@ -13,7 +12,7 @@ from udata_hydra.analysis import helpers
 from udata_hydra.analysis.tables_index import insert_tables_index_entry
 from udata_hydra.conversion.schema import compute_create_table_query
 from udata_hydra.data_formats.parquet import Parquet
-from udata_hydra.db import compute_insert_query, db_col_name
+from udata_hydra.db import compute_insert_query, db_col_name, parsing_table_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import ParseException
@@ -60,7 +59,7 @@ async def parquet_to_db(
     """
     from udata_hydra.data_formats import Table
 
-    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(check["url"])
 
     log.debug(f"Converting from parquet to db for {table_name}")
 

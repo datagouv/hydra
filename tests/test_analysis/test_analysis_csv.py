@@ -14,6 +14,7 @@ from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
+from udata_hydra.db import parsing_table_name
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_job_status import ResourceJobStatus
@@ -26,7 +27,7 @@ async def test_analyse_csv_on_catalog(
 ):
     check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(url)
     rmock.get(url, status=200, body=catalog_content)
 
     # Check resource status before analysis
@@ -78,7 +79,7 @@ async def test_error_reporting_parsing(
 ):
     check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(url)
     rmock.get(url, status=200, body="a,b,c\n1,2".encode("utf-8"))
 
     # Analyse the CSV
@@ -221,7 +222,7 @@ async def test_forced_analysis(
         )
 
     # check that csv was indeed pushed to db
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(url)
     tables = await db.fetch(
         "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'public';"
     )
@@ -372,7 +373,7 @@ async def test_validation(
         status=200,
         body=create_body(**current_scan_kwargs),
     )
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(url)
 
     # set up previous analysis and db insertion
     await db.execute(
@@ -448,7 +449,7 @@ async def test_csv_with_a_reserved_column_name_analysed_again(
         file = await download_from_check(check, Csv)
         await file.analyse(check=check)
 
-    table_name = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(check["url"])
     rows = await db.fetch(f'SELECT xmin__hydra_renamed, name FROM "{table_name}"')
     assert [tuple(row) for row in rows] == [(1, "x"), (2, "y")]
     # the second analysis validates the file against the previous inspection
@@ -490,7 +491,7 @@ async def test_too_long_column_name(
     col_name = (col * ((max_len // len(col)) + 1))[: max_len if not has_non_ascii else max_len - 3]
     check = await fake_check(headers={"content-type": "application/csv"})
     url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(url)
     rmock.get(
         url,
         status=200,
@@ -586,7 +587,7 @@ async def test_crash_after_db_insertion(
 
     check = await fake_check(headers={"content-type": "application/csv"})
     url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(url)
     rmock.get(
         url,
         status=200,
@@ -816,7 +817,7 @@ async def test_file_with_nan(
 ):
     check = await fake_check(headers={"content-type": "application/csv"})
     url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(url)
     rmock.get(
         url,
         status=200,
