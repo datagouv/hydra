@@ -1,13 +1,12 @@
 import logging
-import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-import pyarrow.parquet as pq
 from asyncpg import Record
 
 from udata_hydra import config
-from udata_hydra.conversion.schema import PYARROW_TYPE_TO_PYTHON
+from udata_hydra.analysis import helpers
+from udata_hydra.analysis.tables_index import get_previous_inspection
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.table import Table
 from udata_hydra.db.check import Check
@@ -33,33 +32,13 @@ class Parquet(DataFormat):
     check_url = "parquet"
     further_analysis = True
 
-    def inspect(self) -> dict:
-        file = pq.ParquetFile(self.path)
-        columns = {}
-        self.inspection = {"header": []}
-        for col in file.schema_arrow:
-            self.inspection["header"].append(col.name)
-            col_type = str(col.type)
-            if col_type.startswith("dictionary"):
-                # dictionaries are for columns with repeated values
-                # we need to dig deeper to get the type
-                col_type = str(col.type.value_type)
-            try:
-                columns[col.name] = next(
-                    pytype
-                    for pyartype, pytype in PYARROW_TYPE_TO_PYTHON.items()
-                    if re.search(pyartype, col_type)
-                )
-            except StopIteration:
-                raise ValueError(f"Unknown pyarrow type: {col.type}")
-        self.inspection["columns"] = {
-            col_name: {
-                "format": pytype,
-                "python_type": pytype,
-            }
-            for col_name, pytype in columns.items()
-        }
-        self.inspection["total_lines"] = file.metadata.num_rows
+    async def inspect(self) -> dict:
+        previous_inspection: dict | None = (
+            await get_previous_inspection(resource_id=self.resource_id)
+            if self.resource_id
+            else None
+        )
+        self.inspection = helpers.run_csv_detective(self, previous_inspection)
         return self.inspection
 
     async def analyse(self, check: dict, debug_insert: bool = False) -> "Table|None":
@@ -84,7 +63,7 @@ class Parquet(DataFormat):
 
             # open the file and read the metadata
             try:
-                self.inspect()
+                await self.inspect()
             except Exception as e:
                 raise ParseException(
                     message=str(e),

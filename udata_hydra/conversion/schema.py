@@ -35,23 +35,6 @@ PYTHON_TYPE_TO_PG = {
     "binary": LargeBinary,
 }
 
-PYARROW_TYPE_TO_PYTHON = {
-    # using regex because of bits-differing types (e.g. int32 and int64)
-    # the "^" makes sure we don't consider the types of elements within structured objects (lists, dicts)
-    "string$": "string",  # large_string also exists
-    "^double": "float",
-    "^float": "float",
-    "^decimal": "float",
-    "^int": "int",
-    "^bool": "bool",
-    "^date": "date",
-    "^struct": "json",  # dictionary
-    "^list": "json",
-    "^binary": "binary",
-    r"^timestamp\[\ws\]": "datetime",
-    r"^timestamp\[\ws,": "datetime_aware",  # the rest of the field depends on the timezone
-}
-
 PYTHON_TYPE_TO_PA = {
     "string": pa.string(),
     "float": pa.float64(),

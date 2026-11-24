@@ -3,8 +3,6 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from asyncpg import Record
-from csv_detective import routine as csv_detective_routine
-from csv_detective import validate_then_detect
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
@@ -39,23 +37,9 @@ class CsvLike(DataFormat):
             if self.resource_id
             else None
         )
-        if previous_inspection:
-            if self.resource_id:
-                await ResourceJobStatus.set(self.resource_id, "csv", "VALIDATING_CSV")
-            self.inspection = validate_then_detect(  # ty: ignore[invalid-assignment]
-                file_path=self.path.as_posix(),
-                previous_analysis=previous_inspection,
-                output_profile=True,
-                num_rows=-1,
-                save_results=False,
-            )
-        else:
-            self.inspection = csv_detective_routine(  # ty: ignore[invalid-assignment]
-                file_path=self.path.as_posix(),
-                output_profile=True,
-                num_rows=-1,
-                save_results=False,
-            )
+        if previous_inspection and self.resource_id:
+            await ResourceJobStatus.set(self.resource_id, "csv", "VALIDATING_CSV")
+        self.inspection = helpers.run_csv_detective(self, previous_inspection)
         return self.inspection
 
     async def analyse(self, check: dict, debug_insert: bool = False) -> None:

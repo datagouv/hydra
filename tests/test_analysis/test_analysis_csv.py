@@ -399,7 +399,7 @@ async def test_validation(
     # run analysis
     with patch(
         # wraps because we don't want to change the behaviour, just to know it's been called
-        "udata_hydra.data_formats.csv_like.validate_then_detect",
+        "udata_hydra.analysis.helpers.validate_then_detect",
         wraps=validate_then_detect,
     ) as mock_func:
         file = await download_from_check(check, Csv)

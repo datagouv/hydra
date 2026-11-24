@@ -22,7 +22,7 @@ JOB_STATUSES: dict[str, set[str]] = {
     },
     "parquet": {
         "TO_ANALYSE_PARQUET",  # parquet resource content to be analysed
-        "ANALYSING_PARQUET",  # retrieving parquet column metadata
+        "ANALYSING_PARQUET",  # parquet resource content currently being analysed by CSV detective
         "INSERTING_IN_DB",  # currently being inserted in DB
         "CONVERTING_TO_PARQUET",  # currently being converted to Parquet
     },

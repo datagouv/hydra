@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
+from csv_detective import validate_then_detect
 
 from tests.conftest import job_states
 from udata_hydra.analysis import helpers
@@ -54,6 +55,8 @@ def _producer_dataframe() -> pd.DataFrame:
                 b"\x01\x9e\xd1",
                 b"\xb7\xd4\x00",
             ],
+            # strings that csv-detective recognises, as in a CSV
+            "code_postal": ["75001", "13002", "69003", "33000"],
         }
     )
 
@@ -77,16 +80,26 @@ async def test_analyse_parquet(
     check = await fake_check(**check_kwargs)
     url = check["url"]
     df = _producer_dataframe()
+    # the python types and formats of csv-detective, which reads the parquet types for both
     expected_types = {
-        "name": {"python": "string", "pg": "character varying"},
-        "score": {"python": "float", "pg": "double precision"},
-        "decompte": {"python": "int", "pg": "bigint"},
-        "is_true": {"python": "bool", "pg": "boolean"},
-        "birth": {"python": "datetime", "pg": "timestamp without time zone"},
-        "stamp": {"python": "datetime_aware", "pg": "timestamp with time zone"},
-        "liste": {"python": "json", "pg": "json"},
-        "dicts": {"python": "json", "pg": "json"},
-        "bina": {"python": "binary", "pg": "bytea"},
+        "name": {"python": "string", "format": "string", "pg": "character varying"},
+        "score": {"python": "float", "format": "float", "pg": "double precision"},
+        "decompte": {"python": "int", "format": "int", "pg": "bigint"},
+        "is_true": {"python": "bool", "format": "bool", "pg": "boolean"},
+        "birth": {
+            "python": "datetime",
+            "format": "datetime_naive",
+            "pg": "timestamp without time zone",
+        },
+        "stamp": {
+            "python": "datetime",
+            "format": "datetime_aware",
+            "pg": "timestamp with time zone",
+        },
+        "liste": {"python": "json", "format": "json", "pg": "json"},
+        "dicts": {"python": "json", "format": "json", "pg": "json"},
+        "bina": {"python": "binary", "format": "binary", "pg": "bytea"},
+        "code_postal": {"python": "string", "format": "code_postal", "pg": "character varying"},
     }
     rmock.get(url, status=200, body=df.to_parquet())
     file = await helpers.download_from_check(check, Parquet)
@@ -120,6 +133,7 @@ async def test_analyse_parquet(
     for col, types in expected_types.items():
         assert pgtypes[col] == types["pg"]
         assert inspection["columns"][col]["python_type"] == types["python"]
+        assert inspection["columns"][col]["format"] == types["format"]
 
 
 async def _analyse_producer_parquet(rmock, fake_check) -> tuple[dict, Table]:
@@ -176,7 +190,7 @@ async def test_parquet_of_a_producer_exported_from_its_table(
     parquet.path.unlink()
     # the inspection of the producer file, which api-tabular serves as the profile
     inspection = json.loads(exported.schema.metadata[b"csv_detective"])
-    assert inspection["columns"]["stamp"]["python_type"] == "datetime_aware"
+    assert inspection["columns"]["stamp"]["format"] == "datetime_aware"
     assert inspection["total_lines"] == 4
     assert exported.to_pydict() == {
         "name": ["Marie", "Paul", "Léa", "Pierre"],
@@ -205,7 +219,62 @@ async def test_parquet_of_a_producer_exported_from_its_table(
             '{"a": null, "b": null, "c": null, "d": 4.0, "e": 5.0}',
         ],
         "bina": [b"\x01\x01\x00", b"\x00\x00\x8c", b"\x01\x9e\xd1", b"\xb7\xd4\x00"],
+        "code_postal": ["75001", "13002", "69003", "33000"],
     }
+
+
+async def test_parquet_of_a_producer_gets_the_analysis_of_a_csv(
+    setup_catalog, db, rmock, fake_check, produce_mock, mocker
+):
+    """csv-detective analyses the parquet file of a producer, formats and profile included, and
+    api-tabular gets this analysis from the exported file."""
+    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    check, table = await _analyse_producer_parquet(rmock, fake_check)
+    res = await db.fetchrow(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
+    )
+    stored = json.loads(res["csv_detective"])
+    with patch("udata_hydra.config.DB_TO_PARQUET", True):
+        parquet = await table.to_parquet()
+    assert parquet is not None
+    exported = json.loads(pq.read_schema(parquet.path).metadata[b"csv_detective"])
+    parquet.path.unlink()
+
+    for inspection in (stored, exported):
+        assert inspection["columns"]["code_postal"]["format"] == "code_postal"
+        assert inspection["formats"]["code_postal"] == ["code_postal"]
+        assert inspection["profile"]["code_postal"]["nb_distinct"] == 4
+        assert all(
+            inspection["profile"]["decompte"][stat] is not None
+            for stat in ["min", "max", "mean", "std"]
+        )
+
+
+async def test_parquet_analysed_again_validates_the_previous_inspection(
+    setup_catalog, db, rmock, fake_check, produce_mock, mocker
+):
+    """A parquet file analysed again is validated against its previous inspection, like a CSV."""
+    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    check, _ = await _analyse_producer_parquet(rmock, fake_check)
+    rmock.get(check["url"], status=200, body=_producer_dataframe().to_parquet())
+    with patch(
+        # wraps because we don't want to change the behaviour, just to know it's been called
+        "udata_hydra.analysis.helpers.validate_then_detect",
+        wraps=validate_then_detect,
+    ) as mock_func:
+        file = await helpers.download_from_check(check, Parquet)
+        with patch("udata_hydra.config.PARQUET_TO_DB", True):
+            await file.analyse(check=check)
+        mock_func.assert_called_once()
+
+    res = await db.fetch(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1 ORDER BY created_at DESC",
+        check["resource_id"],
+    )
+    assert len(res) == 2
+    latest = json.loads(res[0]["csv_detective"])
+    assert latest["columns"]["code_postal"]["format"] == "code_postal"
+    assert latest["profile"]["code_postal"]["nb_distinct"] == 4
 
 
 async def test_parquet_to_db_rejects_too_long_column_name(fake_check):
