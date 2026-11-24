@@ -6,6 +6,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 from csv_detective import validate_then_detect
+from csv_detective.explore_csv import detect_formats
 
 from tests.conftest import job_states
 from udata_hydra.analysis import helpers
@@ -246,15 +247,20 @@ async def test_parquet_analysed_again_validates_the_previous_inspection(
     mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
     check, _ = await _analyse_producer_parquet(rmock, fake_check)
     rmock.get(check["url"], status=200, body=_producer_dataframe().to_parquet())
-    with patch(
-        # wraps because we don't want to change the behaviour, just to know it's been called
-        "udata_hydra.analysis.helpers.validate_then_detect",
-        wraps=validate_then_detect,
-    ) as mock_func:
+    with (
+        patch(
+            # wraps because we don't want to change the behaviour, just to know it's been called
+            "udata_hydra.analysis.helpers.validate_then_detect",
+            wraps=validate_then_detect,
+        ) as mock_func,
+        # only called when the validation fails and csv-detective detects the file from scratch
+        patch("csv_detective.explore_csv.detect_formats", wraps=detect_formats) as mock_detect,
+    ):
         file = await helpers.download_from_check(check, Parquet)
         with patch("udata_hydra.config.PARQUET_TO_DB", True):
             await file.analyse(check=check)
         mock_func.assert_called_once()
+        mock_detect.assert_not_called()
 
     res = await db.fetch(
         "SELECT csv_detective FROM tables_index WHERE resource_id = $1 ORDER BY created_at DESC",
