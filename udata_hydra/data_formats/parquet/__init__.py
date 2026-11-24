@@ -57,7 +57,7 @@ class Parquet(DataFormat):
                 check["id"], {"parsing_started_at": datetime.now(timezone.utc)}
             )  # type: ignore[assignment]
 
-            # open the file and read the metadata
+            # analyse the whole file with csv-detective
             try:
                 await self.inspect()
             except Exception as e:
