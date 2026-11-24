@@ -309,14 +309,20 @@ class Ogc(DataFormat):
 
     @classmethod
     def detect_layer_name(cls, url: str, resource_title: str | None = None) -> str | None:
-        """Detect layer name from URL params (typeName/typeNames/typename) or resource title."""
-        parsed = urlparse(url)
-        query_params = parse_qs(parsed.query)
-        # Case-insensitive param lookup for typename/typeName/typeNames
-        for key, values in query_params.items():
-            if key.lower() in ("typename", "typenames"):
-                if values and cls.is_valid_layer_name(values[0]):
-                    return values[0]
+        """Detect layer name from URL params or resource title.
+
+        Params are looked up case-insensitively, WFS ones (typeName/typeNames) first,
+        then WMS ones (layer/layers). Only the first layer of a comma-separated list is kept.
+        """
+        query_params = {
+            key.lower(): values for key, values in parse_qs(urlparse(url).query).items()
+        }
+        for param in ("typename", "typenames", "layer", "layers"):
+            values = query_params.get(param)
+            if values:
+                candidate = values[0].split(",")[0].strip()
+                if cls.is_valid_layer_name(candidate):
+                    return candidate
         # Fallback: resource title
         if resource_title and cls.is_valid_layer_name(resource_title):
             return resource_title

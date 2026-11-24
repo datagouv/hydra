@@ -573,6 +573,20 @@ class TestLayerNameDetection:
             # typeNames param
             ("https://example.com/wfs?typeNames=ns:layer", None, "ns:layer"),
             ("https://example.com/wfs?TYPENAMES=ns:layer", None, "ns:layer"),
+            # WMS layer / layers params
+            ("https://example.com/wms?LAYER=my_layer", None, "my_layer"),
+            ("https://example.com/wms?layers=my_layer", None, "my_layer"),
+            ("https://example.com/wms?LAYERS=ns:layer1,ns:layer2", None, "ns:layer1"),
+            (
+                "https://data.geopf.fr/wms-v?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities"
+                "&layer=ADMINEXPRESS-COG.LATEST",
+                "other_layer",
+                "ADMINEXPRESS-COG.LATEST",
+            ),
+            # typeName takes precedence over layers
+            ("https://example.com/ows?layers=wms_layer&typeName=ns:layer", None, "ns:layer"),
+            # Invalid layer param, fallback to title
+            ("https://example.com/wms?layers=invalid layer!", "my_layer", "my_layer"),
             # No param, fallback to title
             ("https://example.com/wfs", "my_layer", "my_layer"),
             # No param, invalid title
