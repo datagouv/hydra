@@ -12,7 +12,9 @@ from udata_hydra.utils import ParseException
 log = logging.getLogger("udata-hydra")
 
 
-async def get_previous_inspection(resource_id: str) -> dict | None:
+async def get_previous_inspection(resource_id: str | None) -> dict | None:
+    if not resource_id:
+        return None
     db = await context.pool("csv")
     q = (
         "SELECT parsing_table, csv_detective FROM tables_index "

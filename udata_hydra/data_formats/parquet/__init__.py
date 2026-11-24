@@ -33,11 +33,7 @@ class Parquet(DataFormat):
     further_analysis = True
 
     async def inspect(self) -> dict:
-        previous_inspection: dict | None = (
-            await get_previous_inspection(resource_id=self.resource_id)
-            if self.resource_id
-            else None
-        )
+        previous_inspection = await get_previous_inspection(resource_id=self.resource_id)
         self.inspection = helpers.run_csv_detective(self, previous_inspection)
         return self.inspection
 
