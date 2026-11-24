@@ -136,9 +136,12 @@ async def test_analyse_parquet(
         assert inspection["columns"][col]["format"] == types["format"]
 
 
-async def _analyse_producer_parquet(rmock, fake_check) -> tuple[dict, Table]:
+async def _analyse_producer_parquet(
+    rmock, fake_check, df: pd.DataFrame | None = None
+) -> tuple[dict, Table]:
     check = await fake_check(url="http://example.com/file.parquet")
-    rmock.get(check["url"], status=200, body=_producer_dataframe().to_parquet())
+    body = (df if df is not None else _producer_dataframe()).to_parquet()
+    rmock.get(check["url"], status=200, body=body)
     file = await helpers.download_from_check(check, Parquet)
     with patch("udata_hydra.config.PARQUET_TO_DB", True):
         table = await file.analyse(check=check)
@@ -275,6 +278,28 @@ async def test_parquet_analysed_again_validates_the_previous_inspection(
     latest = json.loads(res[0]["csv_detective"])
     assert latest["columns"]["code_postal"]["format"] == "code_postal"
     assert latest["profile"]["code_postal"]["nb_distinct"] == 4
+
+
+async def test_parquet_with_a_reserved_column_name_analysed_again(
+    setup_catalog, db, rmock, fake_check, produce_mock, mocker
+):
+    """A column named like a Postgres system column is renamed in the table but not in the
+    stored inspection: the previous inspection must still be found for it."""
+    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    df = pd.DataFrame({"xmin": [1, 2], "name": ["x", "y"]})
+    check, _ = await _analyse_producer_parquet(rmock, fake_check, df)
+    rmock.get(check["url"], status=200, body=df.to_parquet())
+    file = await helpers.download_from_check(check, Parquet)
+    with patch("udata_hydra.config.PARQUET_TO_DB", True):
+        table = await file.analyse(check=check)
+    assert table is not None
+
+    rows = await db.fetch(f'SELECT xmin__hydra_renamed, name FROM "{table.table_name}"')
+    assert [tuple(row) for row in rows] == [(1, "x"), (2, "y")]
+    res = await db.fetch(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
+    )
+    assert len(res) == 2
 
 
 async def test_parquet_to_db_rejects_too_long_column_name(fake_check):
