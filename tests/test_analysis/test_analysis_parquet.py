@@ -272,6 +272,66 @@ async def test_parquet_analysed_again_validates_the_previous_inspection(
     assert latest["profile"]["code_postal"]["nb_distinct"] == 4
 
 
+@pytest.mark.parametrize(
+    "df,legacy_types",
+    [
+        # a format csv-detective doesn't know (datetime), so the validation stops early
+        (
+            _producer_dataframe(),
+            {
+                "name": "string",
+                "score": "float",
+                "decompte": "int",
+                "is_true": "bool",
+                "birth": "datetime",
+                "stamp": "datetime_aware",
+                "liste": "json",
+                "dicts": "json",
+                "bina": "binary",
+                "code_postal": "string",
+            },
+        ),
+        # only known formats, so the validation fails on the missing engine
+        (
+            pd.DataFrame({"decompte": [1, 2], "code_postal": ["75001", "13002"]}),
+            {"decompte": "int", "code_postal": "string"},
+        ),
+    ],
+)
+async def test_parquet_with_a_legacy_inspection_detected_again(
+    setup_catalog, db, rmock, fake_check, produce_mock, mocker, df, legacy_types
+):
+    """The parquet files analysed before csv-detective have an inspection made from their arrow
+    types: the validation fails on it, and csv-detective detects the file again."""
+    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    check, _ = await _analyse_producer_parquet(rmock, fake_check, df)
+    legacy_inspection = {
+        "header": list(legacy_types),
+        "columns": {col: {"format": t, "python_type": t} for col, t in legacy_types.items()},
+        "total_lines": len(df),
+    }
+    await db.execute(
+        "UPDATE tables_index SET csv_detective = $1 WHERE resource_id = $2",
+        json.dumps(legacy_inspection),
+        check["resource_id"],
+    )
+    rmock.get(check["url"], status=200, body=df.to_parquet())
+    with patch("csv_detective.explore_csv.detect_formats", wraps=detect_formats) as mock_detect:
+        file = await helpers.download_from_check(check, Parquet)
+        with patch("udata_hydra.config.PARQUET_TO_DB", True):
+            await file.analyse(check=check)
+        mock_detect.assert_called_once()
+
+    res = await db.fetchrow(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1 ORDER BY created_at DESC",
+        check["resource_id"],
+    )
+    latest = json.loads(res["csv_detective"])
+    assert latest["engine"] == "parquet"
+    assert latest["columns"]["code_postal"]["format"] == "code_postal"
+    assert latest["profile"]["code_postal"]["nb_distinct"] == len(df)
+
+
 async def test_parquet_with_a_reserved_column_name_analysed_again(
     setup_catalog, db, rmock, fake_check, produce_mock, mocker
 ):
