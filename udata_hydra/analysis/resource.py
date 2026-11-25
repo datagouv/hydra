@@ -212,6 +212,7 @@ async def analyse_resource(
         queue.enqueue(
             analysis_job,
             check=dict(check),
+            force_analysis=force_analysis,
             _priority="high" if worker_priority == "high" else "default",
             _exception=bool(exception),
         )

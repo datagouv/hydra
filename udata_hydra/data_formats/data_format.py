@@ -78,4 +78,5 @@ class DataFormat(ABC):
         return cls(file_name=file_name, resource_id=resource_id, dataset_id=dataset_id).analyse
 
     @abstractmethod
-    async def analyse(self, check: dict, debug_insert: bool = False): ...
+    async def analyse(self, check: dict, debug_insert: bool = False, force_analysis: bool = False):
+        """force_analysis: analyse from scratch, without relying on a previous analysis"""

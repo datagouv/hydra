@@ -21,7 +21,9 @@ class Geojson(DataFormat):
     check_url = "geojson"
     further_analysis = True
 
-    async def analyse(self, check: dict, debug_insert: bool = False) -> None:
+    async def analyse(
+        self, check: dict, debug_insert: bool = False, force_analysis: bool = False
+    ) -> None:
         """Launch GeoJSON analysis from a check or an URL (debug), using previously downloaded file if any"""
         if not config.GEOJSON_TO_PMTILES:
             log.debug("GEOJSON_TO_PMTILES turned off, skipping.")
