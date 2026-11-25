@@ -1,37 +1,24 @@
-import io
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
+from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_ID, job_states
 from udata_hydra.analysis import helpers
-from udata_hydra.data_formats import Parquet
+from udata_hydra.analysis.exports import export_parquet
+from udata_hydra.data_formats import Parquet, Table
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import ParseException
 
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.parametrize(
-    "check_kwargs",
-    [
-        {"url": "http://example.com/file.parquet"},
-        {"headers": {"content-type": "application/vnd.apache.parquet"}},
-    ],
-)
-async def test_analyse_parquet(
-    setup_catalog,
-    rmock,
-    db,
-    fake_check,
-    produce_mock,
-    check_kwargs,
-):
-    check = await fake_check(**check_kwargs)
-    url = check["url"]
-    df = pd.DataFrame(
+def _producer_dataframe() -> pd.DataFrame:
+    """A parquet file of a producer, with a column of each type hydra reads."""
+    return pd.DataFrame(
         {
             "name": ["Marie", "Paul", "Léa", "Pierre"],
             "score": [1.2, 3.4, 5.6, 7.8],
@@ -67,24 +54,59 @@ async def test_analyse_parquet(
                 b"\x01\x9e\xd1",
                 b"\xb7\xd4\x00",
             ],
+            # strings that csv-detective recognises, as in a CSV
+            "code_postal": ["75001", "13002", "69003", "33000"],
         }
     )
+
+
+@pytest.mark.parametrize(
+    "check_kwargs",
+    [
+        {"url": "http://example.com/file.parquet"},
+        {"headers": {"content-type": "application/vnd.apache.parquet"}},
+    ],
+)
+async def test_analyse_parquet(
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+    produce_mock,
+    check_kwargs,
+    job_status_snapshots,
+):
+    check = await fake_check(**check_kwargs)
+    url = check["url"]
+    df = _producer_dataframe()
+    # the python types and formats of csv-detective, which reads the parquet types for both
     expected_types = {
-        "name": {"python": "string", "pg": "character varying"},
-        "score": {"python": "float", "pg": "double precision"},
-        "decompte": {"python": "int", "pg": "bigint"},
-        "is_true": {"python": "bool", "pg": "boolean"},
-        "birth": {"python": "datetime", "pg": "timestamp without time zone"},
-        "stamp": {"python": "datetime_aware", "pg": "timestamp with time zone"},
-        "liste": {"python": "json", "pg": "json"},
-        "dicts": {"python": "json", "pg": "json"},
-        "bina": {"python": "binary", "pg": "bytea"},
+        "name": {"python": "string", "format": "string", "pg": "character varying"},
+        "score": {"python": "float", "format": "float", "pg": "double precision"},
+        "decompte": {"python": "int", "format": "int", "pg": "bigint"},
+        "is_true": {"python": "bool", "format": "bool", "pg": "boolean"},
+        "birth": {
+            "python": "datetime",
+            "format": "datetime_naive",
+            "pg": "timestamp without time zone",
+        },
+        "stamp": {
+            "python": "datetime",
+            "format": "datetime_aware",
+            "pg": "timestamp with time zone",
+        },
+        "liste": {"python": "json", "format": "json", "pg": "json"},
+        "dicts": {"python": "json", "format": "json", "pg": "json"},
+        "bina": {"python": "binary", "format": "binary", "pg": "bytea"},
+        "code_postal": {"python": "string", "format": "code_postal", "pg": "character varying"},
     }
     rmock.get(url, status=200, body=df.to_parquet())
     file = await helpers.download_from_check(check, Parquet)
     with patch("udata_hydra.config.PARQUET_TO_DB", True):
         table = await file.analyse(check=check)
     assert table is not None
+    assert job_states(job_status_snapshots, "parquet") == ["ANALYSING_PARQUET", "INSERTING_IN_DB"]
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}
     # checking check result
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_table"] == table.table_name
@@ -110,13 +132,183 @@ async def test_analyse_parquet(
     for col, types in expected_types.items():
         assert pgtypes[col] == types["pg"]
         assert inspection["columns"][col]["python_type"] == types["python"]
+        assert inspection["columns"][col]["format"] == types["format"]
 
 
-def _parquet_file(df: pd.DataFrame) -> pq.ParquetFile:
-    buffer = io.BytesIO()
-    df.to_parquet(buffer)
-    buffer.seek(0)
-    return pq.ParquetFile(buffer)
+async def _analyse_producer_parquet(
+    rmock, fake_check, df: pd.DataFrame | None = None, resource_id: str = RESOURCE_ID
+) -> tuple[dict, Table]:
+    check = await fake_check(url="http://example.com/file.parquet", resource_id=resource_id)
+    body = (df if df is not None else _producer_dataframe()).to_parquet()
+    rmock.get(check["url"], status=200, body=body)
+    file = await helpers.download_from_check(check, Parquet)
+    with patch("udata_hydra.config.PARQUET_TO_DB", True):
+        table = await file.analyse(check=check)
+    assert table is not None
+    return check, table
+
+
+@pytest.mark.parametrize(
+    "resource_id,is_exception", [(RESOURCE_ID, False), (RESOURCE_EXCEPTION_ID, True)]
+)
+async def test_analyse_parquet_enqueues_the_parquet_export(
+    setup_catalog_with_resource_exception,
+    rmock,
+    fake_check,
+    produce_mock,
+    mocker,
+    resource_id,
+    is_exception,
+):
+    """The parquet file of a producer is exported again from its table, like a CSV."""
+    mock_enqueue = mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    with patch("udata_hydra.config.DB_TO_PARQUET", True):
+        check, table = await _analyse_producer_parquet(rmock, fake_check, resource_id=resource_id)
+
+    mock_enqueue.assert_called_once()
+    assert mock_enqueue.call_args.args[0] is export_parquet
+    kwargs = mock_enqueue.call_args.kwargs
+    assert kwargs["table"].table_name == table.table_name
+    assert kwargs["check"]["id"] == check["id"]
+    assert kwargs["_priority"] == "low"
+    # the exports of the resources in exception get the longer timeout
+    assert kwargs["_exception"] is is_exception
+    # the analysis clears the same job key when it ends: the export state must outlive it
+    status = await ResourceJobStatus.for_resource(check["resource_id"])
+    assert status["parquet"]["state"] == "CONVERTING_TO_PARQUET"
+
+
+async def test_analyse_parquet_without_db_to_parquet(
+    setup_catalog, rmock, fake_check, produce_mock, mocker
+):
+    mock_enqueue = mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    with patch("udata_hydra.config.DB_TO_PARQUET", False):
+        check, _ = await _analyse_producer_parquet(rmock, fake_check)
+
+    mock_enqueue.assert_not_called()
+    assert await ResourceJobStatus.for_resource(check["resource_id"]) == {}
+
+
+async def test_parquet_of_a_producer_exported_from_its_table(
+    setup_catalog, db, rmock, fake_check, produce_mock, mocker
+):
+    """The values of the producer file survive the table, and csv-detective's analysis of it,
+    formats and profile included, is stored and embedded in the file api-tabular reads."""
+    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    check, table = await _analyse_producer_parquet(rmock, fake_check)
+    res = await db.fetchrow(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
+    )
+    stored = json.loads(res["csv_detective"])
+    with patch("udata_hydra.config.DB_TO_PARQUET", True):
+        parquet = await table.to_parquet()
+    assert parquet is not None
+
+    exported = pq.read_table(parquet.path)
+    parquet.path.unlink()
+    # the inspection of the producer file, which api-tabular serves as the profile
+    embedded = json.loads(exported.schema.metadata[b"csv_detective"])
+    assert embedded["columns"]["stamp"]["format"] == "datetime_aware"
+    assert embedded["columns"]["code_postal"]["format"] == "code_postal"
+    assert embedded["total_lines"] == 4
+    for inspection in (stored, embedded):
+        assert inspection["formats"]["code_postal"] == ["code_postal"]
+        assert inspection["profile"]["code_postal"]["nb_distinct"] == 4
+        assert all(
+            inspection["profile"]["decompte"][stat] is not None
+            for stat in ["min", "max", "mean", "std"]
+        )
+    assert exported.to_pydict() == {
+        "name": ["Marie", "Paul", "Léa", "Pierre"],
+        "score": [1.2, 3.4, 5.6, 7.8],
+        "decompte": [98, -76, -5, 0],
+        "is_true": [True, False, False, True],
+        "birth": [
+            datetime(1996, 2, 13),
+            datetime(2000, 1, 28),
+            datetime(2005, 11, 10),
+            datetime(2018, 1, 31),
+        ],
+        "stamp": [
+            datetime(2018, 7, 1, 1, 53, 26, 972000, tzinfo=timezone.utc),
+            datetime(2020, 10, 7, 11, 53, 26, 972000, tzinfo=timezone.utc),
+            datetime(1998, 2, 1, 1, 53, 26, 972000, tzinfo=timezone.utc),
+            datetime(2022, 12, 31, 9, 33, 26, 972000, tzinfo=timezone.utc),
+        ],
+        # json columns are text in the table, as in the parquet files exported from a CSV
+        "liste": ["[1, 2]", "[-3, 2]", "[6, -2]", "[-18, -17]"],
+        # pandas reads a struct column with every key of the column, and its ints as floats
+        "dicts": [
+            '{"a": 1.0, "b": null, "c": null, "d": null, "e": null}',
+            '{"a": null, "b": 2.0, "c": null, "d": null, "e": null}',
+            '{"a": null, "b": null, "c": 3.0, "d": null, "e": null}',
+            '{"a": null, "b": null, "c": null, "d": 4.0, "e": 5.0}',
+        ],
+        "bina": [b"\x01\x01\x00", b"\x00\x00\x8c", b"\x01\x9e\xd1", b"\xb7\xd4\x00"],
+        "code_postal": ["75001", "13002", "69003", "33000"],
+    }
+
+
+async def test_parquet_with_reordered_columns_analysed_again(
+    setup_catalog, db, rmock, fake_check, produce_mock, mocker
+):
+    """A producer that reorders the columns of its file between two versions: the table must get
+    each value in its own column."""
+    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    # values without a detected format, so that both versions have the same column types
+    v1 = pd.DataFrame({"nom": ["xa1"], "ville": ["yb2"]})
+    check, _ = await _analyse_producer_parquet(rmock, fake_check, v1)
+    v2 = pd.DataFrame({"ville": ["yc3"], "nom": ["xd4"]})
+    rmock.get(check["url"], status=200, body=v2.to_parquet())
+    file = await helpers.download_from_check(check, Parquet)
+    with patch("udata_hydra.config.PARQUET_TO_DB", True):
+        table = await file.analyse(check=check)
+    assert table is not None
+
+    rows = await db.fetch(f'SELECT nom, ville FROM "{table.table_name}"')
+    assert [tuple(row) for row in rows] == [("xd4", "yc3")]
+
+
+async def test_parquet_resource_serving_something_else_keeps_its_table(
+    setup_catalog, db, rmock, fake_check, produce_mock, mocker
+):
+    """csv-detective would read a CSV served as a parquet resource: the analysis must fail before
+    the table of the previous version is dropped."""
+    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    check, table = await _analyse_producer_parquet(rmock, fake_check)
+    rmock.get(check["url"], status=200, body=b"a,b\n1,2\n3,4\n")
+    file = await helpers.download_from_check(check, Parquet)
+    with (
+        patch("udata_hydra.config.PARQUET_TO_DB", True),
+        pytest.raises(ParseException) as exc,
+    ):
+        await file.analyse(check=check)
+    assert exc.value.step == "parquet_analysis"
+
+    rows = await db.fetch(f'SELECT name FROM "{table.table_name}"')
+    assert len(rows) == len(_producer_dataframe())
+
+
+async def test_parquet_with_a_reserved_column_name_analysed_again(
+    setup_catalog, db, rmock, fake_check, produce_mock, mocker
+):
+    """A column named like a Postgres system column is renamed in the table but not in the
+    stored inspection: the previous inspection must still be found for it."""
+    mocker.patch("udata_hydra.data_formats.parquet.queue.enqueue")
+    df = pd.DataFrame({"xmin": [1, 2], "name": ["x", "y"]})
+    check, _ = await _analyse_producer_parquet(rmock, fake_check, df)
+    rmock.get(check["url"], status=200, body=df.to_parquet())
+    file = await helpers.download_from_check(check, Parquet)
+    with patch("udata_hydra.config.PARQUET_TO_DB", True):
+        table = await file.analyse(check=check)
+    assert table is not None
+
+    rows = await db.fetch(f'SELECT xmin__hydra_renamed, name FROM "{table.table_name}"')
+    assert [tuple(row) for row in rows] == [(1, "x"), (2, "y")]
+    res = await db.fetch(
+        "SELECT csv_detective FROM tables_index WHERE resource_id = $1", check["resource_id"]
+    )
+    assert len(res) == 2
 
 
 async def test_parquet_to_db_rejects_too_long_column_name(fake_check):
@@ -148,7 +340,9 @@ async def test_parquet_to_db_copy_failure_raises_parse_exception(fake_check, moc
         "udata_hydra.data_formats.parquet.to_db.context.pool",
         new=mocker.AsyncMock(return_value=mock_pool),
     )
-    mocker.patch("udata_hydra.data_formats.parquet.to_db.Resource.update", new=mocker.AsyncMock())
+    mocker.patch(
+        "udata_hydra.data_formats.parquet.to_db.ResourceJobStatus.set", new=mocker.AsyncMock()
+    )
     inspection = {
         "columns": {"name": {"python_type": "string", "format": set()}},
         "total_lines": 1,
@@ -174,7 +368,9 @@ async def test_parquet_to_db_create_table_failure_raises_parse_exception(fake_ch
         "udata_hydra.data_formats.parquet.to_db.context.pool",
         new=mocker.AsyncMock(return_value=mock_pool),
     )
-    mocker.patch("udata_hydra.data_formats.parquet.to_db.Resource.update", new=mocker.AsyncMock())
+    mocker.patch(
+        "udata_hydra.data_formats.parquet.to_db.ResourceJobStatus.set", new=mocker.AsyncMock()
+    )
     inspection = {
         "columns": {"name": {"python_type": "string", "format": set()}},
         "total_lines": 1,

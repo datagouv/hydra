@@ -1,11 +1,8 @@
-import json
 import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from asyncpg import Record
-from csv_detective import routine as csv_detective_routine
-from csv_detective import validate_then_detect
 
 from udata_hydra import config
 from udata_hydra.analysis import helpers
@@ -15,6 +12,8 @@ from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_index import ResourceIndex
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import (
     IOException,
     ParseException,
@@ -38,23 +37,9 @@ class CsvLike(DataFormat):
             if self.resource_id
             else None
         )
-        if previous_inspection:
-            if self.resource_id:
-                await Resource.update(self.resource_id, {"status": "VALIDATING_CSV"})
-            self.inspection = validate_then_detect(  # ty: ignore[invalid-assignment]
-                file_path=self.path.as_posix(),
-                previous_analysis=previous_inspection,
-                output_profile=True,
-                num_rows=-1,
-                save_results=False,
-            )
-        else:
-            self.inspection = csv_detective_routine(  # ty: ignore[invalid-assignment]
-                file_path=self.path.as_posix(),
-                output_profile=True,
-                num_rows=-1,
-                save_results=False,
-            )
+        if previous_inspection and self.resource_id:
+            await ResourceJobStatus.set(self.resource_id, "csv", "VALIDATING_CSV")
+        self.inspection = helpers.run_csv_detective(self, previous_inspection)
         return self.inspection
 
     async def analyse(self, check: dict, debug_insert: bool = False) -> None:
@@ -65,16 +50,12 @@ class CsvLike(DataFormat):
 
         resource_id: str = str(check["resource_id"])
 
-        # Update resource status to ANALYSING_CSVLIKE
-        resource: Record | None = await Resource.update(resource_id, {"status": "ANALYSING_CSV"})
+        await ResourceJobStatus.set(resource_id, "csv", "ANALYSING_CSV")
+        resource: Record | None = await Resource.get(resource_id)
 
-        # Check if the resource is in the exceptions table
-        # If it is, get the table_indexes to use them later
+        # Exceptions (files too large to be processed normally) get longer export jobs
         exception: Record | None = await ResourceException.get_by_resource_id(resource_id)
-
-        table_indexes: dict | None = None
-        if exception and exception.get("table_indexes"):
-            table_indexes = json.loads(exception["table_indexes"])
+        table_indexes: dict[str, str] = await ResourceIndex.get_by_resource_id(resource_id)
 
         timer = Timer("analyse-csv", resource_id)
         assert any(_ is not None for _ in (check["id"], check["url"]))
@@ -117,12 +98,10 @@ class CsvLike(DataFormat):
             )
 
             if config.CSV_TO_DB:
-                if (
-                    config.DB_TO_PARQUET
-                    and int(table.inspection.get("total_lines", 0)) >= config.MIN_LINES_FOR_PARQUET  # type: ignore[arg-type]
-                ):
+                if config.DB_TO_PARQUET:
                     from udata_hydra.analysis.exports import export_parquet
 
+                    await ResourceJobStatus.set(resource_id, "parquet", "CONVERTING_TO_PARQUET")
                     queue.enqueue(
                         export_parquet,
                         table=table,
@@ -138,6 +117,7 @@ class CsvLike(DataFormat):
                 ):
                     from udata_hydra.analysis.exports import export_geojson_pmtiles
 
+                    await ResourceJobStatus.set(resource_id, "geojson", "CONVERTING_TO_GEOJSON")
                     queue.enqueue(
                         export_geojson_pmtiles,
                         source=table,
@@ -153,10 +133,8 @@ class CsvLike(DataFormat):
         finally:
             await helpers.notify_udata(resource, check)
             timer.stop()
-            self.path.unlink()
-
-            # Reset resource status to None
-            await Resource.update(resource_id, {"status": None})
+            await ResourceJobStatus.clear(resource_id, "csv")
+            self.path.unlink(missing_ok=True)
 
     async def to_db(
         self, check: dict, table_indexes: dict[str, str] | None = None, debug_insert: bool = False
@@ -188,21 +166,6 @@ class Csv(CsvLike):
         "text/plain",
     }
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["csv"])
-
-
-class Csvgz(CsvLike):
-    standard_mime_type = "application/gzip"
-    valid_mime_types = {
-        standard_mime_type,
-        "application/octet-stream",
-        "application/x-gzip",
-    }
-    max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["csvgz"])
-    check_url = "csv.gz"
-
-    @classmethod
-    def detect_from_catalog_format(cls, format: str | None) -> bool:
-        return format == "csv.gz"
 
 
 class Xls(CsvLike):

@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timezone
 
 from asyncpg import Record
@@ -7,11 +8,14 @@ from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.crawl.helpers import get_content_type_from_header, is_valid_status
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import UdataPayload, queue, send
-from udata_hydra.utils.http import CORS_HEADER_FIELDS
+from udata_hydra.utils.http import CORS_HEADER_FIELDS, format_utc_datetime
+
+log = logging.getLogger("udata-hydra")
 
 
-async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict, dict | None]:
+async def preprocess_check_data(dataset_id: str, check_data: dict) -> dict:
     """Preprocess a check data.
 
     Insert a new check in the DB with the provided check data before analysis, and update the resource status and priority.
@@ -22,7 +26,6 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
 
     Returns:
         The updated check data as it has just been inserted in the DB.
-        The previous check data, or None if it's the first check.
     """
 
     check_data["resource_id"] = str(check_data["resource_id"])
@@ -36,13 +39,18 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
     check_data["next_check_at"] = calculate_next_check_date(has_changed, last_check, None)
     new_check: dict = await Check.insert(data=check_data, returning="*")
 
+    log.info(
+        f"[resource_id={check_data['resource_id']}] preprocess_check_data: "
+        f"check_id={new_check['id']} has_changed={has_changed}"
+    )
+
     if has_changed:
         payload = {
             "check:id": new_check["id"],
             "check:available": is_valid_status(check_data.get("status")),
             "check:status": check_data.get("status"),
             "check:timeout": check_data["timeout"],
-            "check:date": datetime.now(timezone.utc).isoformat(),
+            "check:date": format_utc_datetime(datetime.now(timezone.utc)),
             "check:error": check_data.get("error"),
             "check:headers:content-type": await get_content_type_from_header(
                 check_data.get("headers", {})
@@ -70,11 +78,12 @@ async def preprocess_check_data(dataset_id: str, check_data: dict) -> tuple[dict
         )
 
     # Update resource following check:
-    # Reset resource status so that it's not forbidden to be checked again.
+    # Clear crawler status so that it's not forbidden to be checked again.
     # Reset priority so that it's not prioritised anymore.
-    await Resource.update(check_data["resource_id"], data={"status": None, "priority": False})
+    await ResourceJobStatus.clear(check_data["resource_id"], "crawler")
+    await Resource.update(check_data["resource_id"], data={"priority": False})
 
-    return new_check, last_check
+    return new_check
 
 
 async def has_check_changed(check_data: dict, last_check_data: dict | None) -> bool:

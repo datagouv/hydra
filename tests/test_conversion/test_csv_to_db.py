@@ -23,7 +23,10 @@ pytestmark = pytest.mark.asyncio
         ("2.0|1020,20|test|false", (1, 2, 1020.2, "test", False), "|"),
     ),
 )
-async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db, fake_check):
+async def test_csv_to_db_simple_type_casting(
+    db, line_expected, clean_db, fake_check, insert_fake_resource
+):
+    await insert_fake_resource()
     check = await fake_check()
     line, expected, separator = line_expected
     header = separator.join(["int", "float", "string", "bool"])
@@ -66,7 +69,10 @@ async def test_csv_to_db_simple_type_casting(db, line_expected, clean_db, fake_c
         ),
     ),
 )
-async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db, fake_check):
+async def test_csv_to_db_complex_type_casting(
+    db, line_expected, clean_db, fake_check, insert_fake_resource
+):
+    await insert_fake_resource()
     check = await fake_check()
     line, expected = line_expected
     with NamedTemporaryFile() as fp:
@@ -81,7 +87,39 @@ async def test_csv_to_db_complex_type_casting(db, line_expected, clean_db, fake_
     assert dict(res[0]) == {k: v for k, v in zip(cols, expected)}
 
 
-async def test_basic_sql_injection(db, clean_db, fake_check):
+@pytest.mark.parametrize(
+    "values_expected",
+    (
+        # a value no other value of the column disambiguates is read day-first
+        (["05/03/2022"], [date(2022, 3, 5)]),
+        # a single day-only value settles the format of the whole column...
+        (["03/04/2022", "25/04/2022"], [date(2022, 4, 3), date(2022, 4, 25)]),
+        # ...and the same value is read the other way around in a month-first column
+        (["03/04/2022", "04/25/2022"], [date(2022, 3, 4), date(2022, 4, 25)]),
+        # the same disambiguation happens in a year-first column, where the ambiguous
+        # value would otherwise be read as year-month-day
+        (["2022/03/05", "2022/25/04"], [date(2022, 5, 3), date(2022, 4, 25)]),
+    ),
+)
+async def test_csv_to_db_ambiguous_date_column(
+    db, values_expected, clean_db, fake_check, insert_fake_resource
+):
+    await insert_fake_resource()
+    check = await fake_check()
+    values, expected = values_expected
+    rows = "\n".join(f"{index};{value}" for index, value in enumerate(values, start=1))
+    with NamedTemporaryFile() as fp:
+        fp.write(f"int;date\n{rows}".encode("utf-8"))
+        fp.seek(0)
+        file = Csv(file_name=os.path.basename(fp.name), resource_id=RESOURCE_ID)
+        await file.inspect()
+        table = await file.to_db(check=check)
+    res = await db.fetch(f'SELECT date FROM "{table.table_name}" ORDER BY __id')
+    assert [row["date"] for row in res] == expected
+
+
+async def test_basic_sql_injection(db, clean_db, fake_check, insert_fake_resource):
+    await insert_fake_resource()
     check = await fake_check()
     # tries to execute
     # CREATE TABLE table_name("int" integer, "col_name" text);DROP TABLE toto;--)
@@ -97,7 +135,8 @@ async def test_basic_sql_injection(db, clean_db, fake_check):
     assert res[injection] == "test"
 
 
-async def test_percentage_column(db, clean_db, fake_check):
+async def test_percentage_column(db, clean_db, fake_check, insert_fake_resource):
+    await insert_fake_resource()
     check = await fake_check()
     with NamedTemporaryFile() as fp:
         fp.write("int,% mon pourcent\n1,test".encode("utf-8"))
@@ -109,7 +148,8 @@ async def test_percentage_column(db, clean_db, fake_check):
     assert res["% mon pourcent"] == "test"
 
 
-async def test_reserved_column_name(db, clean_db, fake_check):
+async def test_reserved_column_name(db, clean_db, fake_check, insert_fake_resource):
+    await insert_fake_resource()
     check = await fake_check()
     with NamedTemporaryFile() as fp:
         fp.write("int,xmin\n1,test".encode("utf-8"))

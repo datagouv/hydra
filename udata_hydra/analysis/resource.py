@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 
 import magic
 from asyncpg import Record
@@ -11,13 +12,19 @@ from dateparser import parse as date_parser
 from udata_hydra import config, context
 from udata_hydra.crawl.calculate_next_check import calculate_next_check_date
 from udata_hydra.data_formats import (
+    CsvLike,
     DataFormat,
+    Geojson,
+    Gz,
     Ogc,
+    Parquet,
+    Zip,
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import (
     IOException,
     Timer,
@@ -27,6 +34,7 @@ from udata_hydra.utils import (
     queue,
     send,
 )
+from udata_hydra.utils.http import format_utc_datetime
 
 
 class Change(Enum):
@@ -38,9 +46,24 @@ class Change(Enum):
 log = logging.getLogger("udata-hydra")
 
 
+def _analysis_job_and_state(data_format: type[DataFormat]) -> tuple[str, str]:
+    if issubclass(data_format, Ogc):
+        return "ogc", "TO_ANALYSE_OGC"
+    if issubclass(data_format, Gz):
+        return "gz", "TO_ANALYSE_GZ"
+    if issubclass(data_format, Zip):
+        return "zip", "TO_ANALYSE_ZIP"
+    if issubclass(data_format, CsvLike):
+        return "csv", "TO_ANALYSE_CSV"
+    if issubclass(data_format, Geojson):
+        return "geojson", "TO_ANALYSE_GEOJSON"
+    if issubclass(data_format, Parquet):
+        return "parquet", "TO_ANALYSE_PARQUET"
+    raise ValueError(f"Unknown data format: {data_format!r}")
+
+
 async def analyse_resource(
     check: dict,
-    last_check: dict | None,
     force_analysis: bool = False,
     worker_priority: str = "default",
 ) -> None:
@@ -52,7 +75,8 @@ async def analyse_resource(
     - checksum (optional)
     - launch csv_analysis if looks like a CSV response
 
-    Will call udata if first check or changes found, and update check with optional infos
+    Will call udata if first analysis, new URL, changes found or forced analysis,
+    and update check with optional infos
     """
 
     # Check if the resource is in the exceptions table
@@ -67,13 +91,20 @@ async def analyse_resource(
 
     log.debug(f"Analysis for resource {resource_id} in dataset {dataset_id}")
 
-    # Update resource status to ANALYSING_RESOURCE
-    resource: Record | None = await Resource.update(
-        resource_id, data={"status": "ANALYSING_RESOURCE_HEAD"}
-    )
+    await ResourceJobStatus.set(resource_id, "crawler", "ANALYSING_RESOURCE_HEAD")
+    resource: Record | None = await Resource.get(resource_id)
+
+    # compare with the last analysed check, not catalog.last_check: checks that failed in between
+    # (timeout, HTTP error) were never downloaded and tell nothing about the file
+    last_check: Record | None = await Check.get_previous_analysed(str(resource_id), check["id"])
+
+    # the parsing table is named after the URL: a URL never analysed has no table yet
+    must_analyse: bool = force_analysis or not last_check or last_check["url"] != url
 
     # let's see if we can infer a modification date on early hints based on harvest infos and headers
-    change_status, change_payload = await detect_resource_change_on_early_hints(resource)
+    change_status, change_payload = await detect_resource_change_on_early_hints(
+        resource, check_id=check["id"], last_check_id=last_check["id"] if last_check else None
+    )
 
     # could it be a CSV, parquet, GeoJSON or OGC service (WFS)?
     # If we get hints, we will analyse the file further depending on change status
@@ -87,22 +118,36 @@ async def analyse_resource(
         else config.DEFAULT_MAX_FILESIZE_ALLOWED
     )
 
-    # if the change status is NO_GUESS or HAS_CHANGED, let's download the file to get more infos
     dl_analysis = {}
     tmp_file = None
-    if change_status != Change.HAS_NOT_CHANGED or force_analysis:
+    analysis_file_name = None
+    if change_status != Change.HAS_NOT_CHANGED or must_analyse:
         try:
-            await Resource.update(resource_id, data={"status": "DOWNLOADING_RESOURCE"})
+            await ResourceJobStatus.set(resource_id, "crawler", "DOWNLOADING_RESOURCE")
             tmp_file, _ = await download_resource(url, headers, max_size_allowed)
             timer.mark("download-resource")
+            analysis_path = Path(tmp_file.name)
+            analysis_file_name = analysis_path.name
+            if data_format is Gz:
+                gz_file = Gz(
+                    file_name=analysis_file_name,
+                    resource_id=str(resource_id),
+                    dataset_id=dataset_id,
+                )
+                gz_file.unwrap(
+                    max_size_allowed=None if exception else Gz.max_decompressed_filesize_allowed
+                )
+                analysis_file_name = gz_file.file_name
+                analysis_path = gz_file.path
         except IOException as e:
+            # FileTooLargeException.report_to_sentry is False; other IO errors are reported.
             dl_analysis["analysis:error"] = str(e)
         else:
-            await Resource.update(resource_id, data={"status": "ANALYSING_DOWNLOADED_RESOURCE"})
+            await ResourceJobStatus.set(resource_id, "crawler", "ANALYSING_DOWNLOADED_RESOURCE")
             # Get file size
-            dl_analysis["analysis:content-length"] = os.path.getsize(tmp_file.name)
+            dl_analysis["analysis:content-length"] = analysis_path.stat().st_size
             # Get checksum
-            dl_analysis["analysis:checksum"] = compute_checksum_from_file(tmp_file.name)
+            dl_analysis["analysis:checksum"] = compute_checksum_from_file(str(analysis_path))
             # Check if checksum has been modified if we don't have other hints
             if change_status == Change.NO_GUESS:
                 (
@@ -111,7 +156,8 @@ async def analyse_resource(
                 ) = await detect_resource_change_from_checksum(
                     new_checksum=dl_analysis["analysis:checksum"], last_check=last_check
                 )
-            dl_analysis["analysis:mime-type"] = magic.from_file(tmp_file.name, mime=True)
+            # Inner payload MIME after Gz.unwrap when applicable; catalog keeps the declared type.
+            dl_analysis["analysis:mime-type"] = magic.from_file(str(analysis_path), mime=True)
         finally:
             if tmp_file and (data_format is None or not data_format.further_analysis):
                 os.remove(tmp_file.name)
@@ -140,52 +186,63 @@ async def analyse_resource(
             has_changed=change_status == Change.HAS_CHANGED,
         )
 
-    analysis_results = {"analysis:check_id": check["id"]} | dl_analysis | (change_payload or {})
+    udata_payload = {"analysis:check_id": check["id"]} | dl_analysis | (change_payload or {})
 
     timer.stop()
 
-    if change_status == Change.HAS_CHANGED or not last_check or force_analysis:
-        if data_format is not None:
-            await Resource.update(
-                resource_id, data={"status": f"TO_ANALYSE_{data_format.__name__.upper()}"}
-            )
-            if issubclass(data_format, Ogc):
-                queue.enqueue(
-                    data_format.analyse,
-                    check=dict(check),
-                    _priority="high" if worker_priority == "high" else "default",
-                    _exception=bool(exception),
-                )
-            elif tmp_file:
-                file = data_format(
-                    file_name=os.path.basename(tmp_file.name),
-                    resource_id=resource_id,
-                    dataset_id=dataset_id,
-                )
-                queue.enqueue(
-                    file.analyse,
-                    check=dict(check),
-                    _priority="high" if worker_priority == "high" else "default",
-                    _exception=bool(exception),
-                )
-        else:
-            await Resource.update(resource_id, data={"status": None})
+    has_changed: bool = change_status == Change.HAS_CHANGED
 
+    # e.g. too large: rules out further analysis
+    download_failed: bool = bool(dl_analysis.get("analysis:error"))
+
+    if (
+        data_format is not None
+        and not download_failed
+        and await data_format.is_analysis_due(
+            check, has_changed=has_changed, must_analyse=must_analyse
+        )
+    ):
+        analysis_job = data_format.analysis_job(
+            file_name=analysis_file_name,
+            resource_id=resource_id,
+            dataset_id=dataset_id,
+        )
+        log.info(
+            f"[resource_id={resource_id}] analyse_resource: enqueued {data_format.__name__} analysis"
+        )
+        job, state = _analysis_job_and_state(data_format)
+        await ResourceJobStatus.update(resource_id, "crawler", job, state)
+        queue.enqueue(
+            analysis_job,
+            check=dict(check),
+            _priority="high" if worker_priority == "high" else "default",
+            _exception=bool(exception),
+        )
+    else:
+        await ResourceJobStatus.clear(resource_id, "crawler")
+
+    if has_changed or must_analyse:
         # Send analysis result to udata
         queue.enqueue(
             send,
             dataset_id=dataset_id,
             resource_id=resource_id,
-            document=UdataPayload(analysis_results),
+            document=UdataPayload(udata_payload),
             _priority="high",
         )
-
     else:
-        await Resource.update(resource_id, data={"status": None})
+        log.info(
+            f"[resource_id={resource_id}] analyse_resource: skipped analysis udata notify "
+            f"(change_status={change_status.name}, last_parsing_table="
+            f"{last_check.get('parsing_table') if last_check else None})"
+        )
 
 
 async def update_check_with_modification_and_next_dates(
-    change_analysis: dict, check_id: int, last_check: dict | None, has_changed: bool = False
+    change_analysis: dict,
+    check_id: int,
+    last_check: Record | dict | None,
+    has_changed: bool = False,
 ) -> None:
     """Update check with last_modified date and next_check date only if resource has changed
 
@@ -208,7 +265,7 @@ async def update_check_with_modification_and_next_dates(
 
 
 async def detect_resource_change_from_checksum(
-    new_checksum, last_check: dict | None
+    new_checksum, last_check: Record | dict | None
 ) -> tuple[Change, dict | None]:
     """
     Checks if resource checksum has changed over time
@@ -221,12 +278,14 @@ async def detect_resource_change_from_checksum(
     if last_check and last_check.get("checksum"):
         if last_check.get("checksum") != new_checksum:
             return Change.HAS_CHANGED, {
-                "analysis:last-modified-at": datetime.now(timezone.utc).isoformat(),
+                "analysis:last-modified-at": format_utc_datetime(datetime.now(timezone.utc)),
                 "analysis:last-modified-detection": "computed-checksum",
             }
         elif last_check.get("detected_last_modified_at"):
             return Change.HAS_NOT_CHANGED, {
-                "analysis:last-modified-at": last_check["detected_last_modified_at"].isoformat(),
+                "analysis:last-modified-at": format_utc_datetime(
+                    last_check["detected_last_modified_at"]
+                ),
                 "analysis:last-modified-detection": "previous-check-detection",
             }
     # if the previous check did not have the info, we investigate further
@@ -241,7 +300,7 @@ async def detect_resource_change_from_last_modified_header(
     if len(data) == 1 and data[0]["last_modified"]:
         last_modified_date = date_parser(data[0]["last_modified"])
         return Change.HAS_CHANGED, {
-            "analysis:last-modified-at": last_modified_date.isoformat(),
+            "analysis:last-modified-at": format_utc_datetime(last_modified_date),
             "analysis:last-modified-detection": "last-modified-header",
         }
 
@@ -250,7 +309,7 @@ async def detect_resource_change_from_last_modified_header(
 
     last_modified_date = date_parser(data[0]["last_modified"])
     payload = {
-        "analysis:last-modified-at": last_modified_date.isoformat(),
+        "analysis:last-modified-at": format_utc_datetime(last_modified_date),
         "analysis:last-modified-detection": "last-modified-header",
     }
     if data[0]["last_modified"] != data[1]["last_modified"]:
@@ -268,14 +327,16 @@ async def detect_resource_change_from_content_length_header(
         if data[0]["content_length"] != data[1]["content_length"]:
             return Change.HAS_CHANGED, {
                 # if resource has changed, set last-modified to the current check's creation
-                "analysis:last-modified-at": data[0]["created_at"].isoformat(),
+                "analysis:last-modified-at": format_utc_datetime(data[0]["created_at"]),
                 "analysis:last-modified-detection": "content-length-header",
             }
         # same content_length is not 100% certainly no change, but a good tradeoff to prevent many downloads
         elif data[1].get("detected_last_modified_at"):
             return Change.HAS_NOT_CHANGED, {
                 # no change, using the last-modified from the previous check (passed on from check to check)
-                "analysis:last-modified-at": data[1]["detected_last_modified_at"].isoformat(),
+                "analysis:last-modified-at": format_utc_datetime(
+                    data[1]["detected_last_modified_at"]
+                ),
                 "analysis:last-modified-detection": "previous-check-detection",
             }
     # if the previous check did not have the info, we investigate further
@@ -284,11 +345,13 @@ async def detect_resource_change_from_content_length_header(
 
 async def detect_resource_change_on_early_hints(
     resource: Record | None,
+    check_id: int,
+    last_check_id: int | None,
 ) -> tuple[Change, dict | None]:
     """
     Try to guess if a resource has been modified from harvest and headers in check data:
     - last-modified header value if it can be found and parsed
-    - content-length if it is found and changed over time (vs last checks)
+    - content-length if it is found and changed over time (vs the last analysed check)
 
     Returns a tuple with a Change status and an optional payload:
     {
@@ -299,7 +362,7 @@ async def detect_resource_change_on_early_hints(
     data = None
 
     if resource:
-        # Fetch current and last check headers
+        # Fetch headers for the current check and the last analysed one
         q = """
         SELECT
             created_at,
@@ -307,13 +370,14 @@ async def detect_resource_change_on_early_hints(
             headers->>'content-length' as content_length,
             detected_last_modified_at
         FROM checks
-        WHERE resource_id = $1
+        WHERE id = ANY($1::int[])
         ORDER BY created_at DESC
-        LIMIT 2
         """
         pool = await context.pool()
         async with pool.acquire() as connection:
-            data = await connection.fetch(q, str(resource["resource_id"]))
+            data = await connection.fetch(
+                q, [check_id] + ([last_check_id] if last_check_id else [])
+            )
 
     # not enough checks to make a comparison
     if not data:
@@ -354,7 +418,7 @@ async def detect_resource_change_from_harvest(
 
     if resource and resource.get("harvest_modified_at"):
         payload = {
-            "analysis:last-modified-at": resource["harvest_modified_at"].isoformat(),
+            "analysis:last-modified-at": format_utc_datetime(resource["harvest_modified_at"]),
             "analysis:last-modified-detection": "harvest-resource-metadata",
         }
         if resource["harvest_modified_at"] == last_check["detected_last_modified_at"]:

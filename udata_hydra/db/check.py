@@ -1,8 +1,8 @@
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from asyncpg import Record
 
-from udata_hydra import context
+from udata_hydra import config, context
 from udata_hydra.db import (
     compute_insert_query,
     convert_dict_values_to_json,
@@ -42,6 +42,56 @@ class Check:
             return await connection.fetchrow(q, resource_id)
 
     @classmethod
+    async def get_previous_analysed(cls, resource_id: str, check_id: int) -> Record | None:
+        """Get the latest check before check_id whose file has been downloaded, either by its
+        own analysis or inherited from an unchanged previous one (failed checks have no checksum)
+        """
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = """
+                SELECT * FROM checks
+                WHERE resource_id = $1 AND id < $2 AND checksum IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            return await connection.fetchrow(q, resource_id, check_id)
+
+    @classmethod
+    async def has_recent_ogc_analysis(
+        cls, resource_id: str, url: str, check_id: int, max_age: timedelta
+    ) -> bool:
+        """Whether an OGC analysis of this URL succeeded on a check before check_id,
+        created less than max_age ago"""
+        threshold = datetime.now(timezone.utc) - max_age
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = """
+                SELECT EXISTS (
+                    SELECT 1 FROM checks
+                    WHERE resource_id = $1 AND url = $2 AND id < $3
+                    AND ogc_metadata IS NOT NULL AND created_at >= $4
+                )
+            """
+            return await connection.fetchval(q, resource_id, url, check_id, threshold)
+
+    @classmethod
+    async def has_later_parsing(cls, resource_id: str, check_id: int) -> bool:
+        """Whether a check after check_id has parsed the resource (successfully or not)
+        or is currently parsing it. A parsing started more than STUCK_THRESHOLD_SECONDS ago
+        and not finished is considered stuck (e.g. worker killed) and is ignored."""
+        threshold = datetime.now(timezone.utc) - timedelta(seconds=config.STUCK_THRESHOLD_SECONDS)
+        pool = await context.pool()
+        async with pool.acquire() as connection:
+            q = """
+                SELECT EXISTS (
+                    SELECT 1 FROM checks
+                    WHERE resource_id = $1 AND id > $2
+                    AND (parsing_finished_at IS NOT NULL OR parsing_started_at > $3)
+                )
+            """
+            return await connection.fetchval(q, resource_id, check_id, threshold)
+
+    @classmethod
     async def get_by_url(cls, url: str) -> list[Record]:
         pool = await context.pool()
         async with pool.acquire() as connection:
@@ -61,7 +111,7 @@ class Check:
         async with pool.acquire() as connection:
             q = f"""
             SELECT catalog.id as catalog_id, checks.id as check_id,
-                catalog.status as catalog_status, checks.status as check_status, checks.next_check_at as next_check_at,
+                checks.status as check_status, checks.next_check_at as next_check_at,
                 catalog.deleted as deleted, catalog.url as catalog_url, checks.url as check_url, *
             FROM checks, catalog
             WHERE catalog.{column} = $1
@@ -76,7 +126,7 @@ class Check:
         async with pool.acquire() as connection:
             q = f"""
             SELECT catalog.id as catalog_id, checks.id as check_id,
-                catalog.status as catalog_status, checks.status as check_status, checks.next_check_at as next_check_at,
+                checks.status as check_status, checks.next_check_at as next_check_at,
                 catalog.deleted as deleted, catalog.url as catalog_url, checks.url as check_url, *
             FROM checks, catalog
             WHERE catalog.{column} = $1

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import tippecanoe
 
-from udata_hydra.data_formats import Geojson
+from udata_hydra.data_formats.geojson import Geojson
 from udata_hydra.utils import storage_path
 
 if TYPE_CHECKING:

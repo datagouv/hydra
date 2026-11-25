@@ -9,10 +9,11 @@ from asyncpg.exceptions import UndefinedTableError
 from tests.conftest import RESOURCE_ID, SIMPLE_CSV_CONTENT
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.analysis.resource import analyse_resource
-from udata_hydra.data_formats import Csv, Csvgz, Geojson, Parquet, Xls, Xlsx, Zip
+from udata_hydra.data_formats import Csv, Geojson, Gz, Parquet, Xls, Xlsx, Zip
 from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import storage_path
 
 pytestmark = pytest.mark.asyncio
@@ -65,21 +66,18 @@ async def assert_analysed(db, check: dict, expected_lines: int) -> None:
     assert res["parsing_table"] == table_name
 
     # the resource must not stay stuck in an analysis status
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
-async def assert_analysis_failed(db, check: dict, error_fragment: str) -> None:
+async def assert_analysis_failed(db, check: dict, caplog, error_fragment: str) -> None:
     res = await db.fetchrow("SELECT * FROM checks")
-    assert res["parsing_error"].startswith("zip_extraction:")
-    assert error_fragment in res["parsing_error"]
+    # none of these causes is safe to expose: the detail only reaches the server-side log
+    assert res["parsing_error"] == "zip_extraction:error"
+    assert error_fragment in caplog.text
     assert res["parsing_table"] is None
 
     # the resource must not stay stuck in an analysis status
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     table_name: str = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
     with pytest.raises(UndefinedTableError):
@@ -92,9 +90,7 @@ async def assert_not_analysed(db, check: dict) -> None:
     assert res["parsing_error"] is None
     assert res["parsing_table"] is None
 
-    resource = await Resource.get(RESOURCE_ID)
-    assert resource is not None
-    assert resource["status"] is None
+    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
     table_name: str = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
     with pytest.raises(UndefinedTableError):
@@ -170,14 +166,14 @@ async def test_analyse_zip_does_not_recurse_into_a_nested_zip(
 
 @pytest.mark.parametrize("compression", (zipfile.ZIP_LZMA, zipfile.ZIP_BZIP2))
 async def test_analyse_zip_refuses_unbounded_compression(
-    setup_catalog, rmock, db, fake_check, produce_mock, compression
+    setup_catalog, rmock, db, fake_check, produce_mock, caplog, compression
 ):
     """zipfile only bounds what it decompresses for stored and deflated members: with lzma or
     bzip2 it decompresses a whole chunk in one go, so a member lying about its file_size would
     allocate gigabytes before any cap of ours can apply"""
     check = await fake_check(headers={"content-type": "application/zip"})
     await analyse_zip(check, rmock, make_zip({"data.csv": CSV_CONTENT}, compression=compression))
-    await assert_analysis_failed(db, check, "Unsupported compression method")
+    await assert_analysis_failed(db, check, caplog, "Unsupported compression method")
 
 
 @pytest.mark.parametrize("compression", (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED))
@@ -190,7 +186,7 @@ async def test_analyse_zip_accepts_bounded_compression(
 
 
 async def test_analyse_zip_corrupted_archive(
-    setup_catalog, rmock, db, fake_check, produce_mock, mocker
+    setup_catalog, rmock, db, fake_check, produce_mock, mocker, caplog
 ):
     """A real failure, unlike an archive holding nothing analysable, must reach udata"""
     notify_udata = mocker.patch(
@@ -199,24 +195,26 @@ async def test_analyse_zip_corrupted_archive(
     check = await fake_check(headers={"content-type": "application/zip"})
     truncated: bytes = make_zip({"data.csv": CSV_CONTENT})[:40]
     await analyse_zip(check, rmock, truncated)
-    await assert_analysis_failed(db, check, "not a zip file")
+    await assert_analysis_failed(db, check, caplog, "not a zip file")
     notify_udata.assert_awaited_once()
 
 
-async def test_analyse_zip_corrupted_member(setup_catalog, rmock, db, fake_check, produce_mock):
+async def test_analyse_zip_corrupted_member(
+    setup_catalog, rmock, db, fake_check, produce_mock, caplog
+):
     check = await fake_check(headers={"content-type": "application/zip"})
     await analyse_zip(check, rmock, make_zip_with_corrupted_member())
-    await assert_analysis_failed(db, check, "Bad CRC-32")
+    await assert_analysis_failed(db, check, caplog, "Bad CRC-32")
 
 
 async def test_analyse_zip_member_too_large(
-    setup_catalog, rmock, db, fake_check, produce_mock, mocker
+    setup_catalog, rmock, db, fake_check, produce_mock, mocker, caplog
 ):
     """A member is refused on the limit of the format it would be analysed with"""
     mocker.patch.object(Csv, "max_filesize_allowed", 10)
     check = await fake_check(headers={"content-type": "application/zip"})
     await analyse_zip(check, rmock, make_zip({"data.csv": CSV_CONTENT}))
-    await assert_analysis_failed(db, check, "too large")
+    await assert_analysis_failed(db, check, caplog, "too large")
 
 
 @pytest.mark.parametrize(
@@ -293,7 +291,7 @@ async def test_analyse_resource_extracts_zip(setup_catalog, rmock, db, fake_chec
     check = await fake_check(headers={"content-type": "application/zip"})
     rmock.get(check["url"], status=200, body=make_zip({"data.txt": DVF_LIKE_CONTENT}))
 
-    await analyse_resource(check=check, last_check=None)
+    await analyse_resource(check=check)
 
     await assert_analysed(db, check, expected_lines=20)
 
@@ -306,7 +304,7 @@ async def test_analyse_resource_extracts_zip(setup_catalog, rmock, db, fake_chec
         (None, "application/zip", Zip),
         (None, "application/x-zip-compressed", Zip),
         # regression: "gzip".endswith("zip"), a gzipped csv must not be taken for an archive
-        ("csv.gz", "application/gzip", Csvgz),
+        ("csv.gz", "application/gzip", Gz),
         # regression: an xlsx IS a zip container and is often served as such, the catalog format
         # of another format must not lose to the zip mime type
         ("xlsx", "application/zip", Xlsx),

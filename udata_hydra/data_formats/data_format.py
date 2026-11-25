@@ -1,7 +1,9 @@
 import json
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from udata_hydra.utils import storage_path
 
@@ -62,5 +64,18 @@ class DataFormat(ABC):
         # overridden in specific formats
         return cls.__name__.lower() == format
 
+    @classmethod
+    async def is_analysis_due(cls, check: dict, has_changed: bool, must_analyse: bool) -> bool:
+        """Whether the resource should be analysed: by default when it has changed,
+        or must be analysed anyway (forced, first check, new URL)"""
+        return has_changed or must_analyse
+
+    @classmethod
+    def analysis_job(
+        cls, file_name: str | None, resource_id: str, dataset_id: str
+    ) -> Callable[..., Any]:
+        """The analysis to enqueue, which works on the downloaded file by default"""
+        return cls(file_name=file_name, resource_id=resource_id, dataset_id=dataset_id).analyse
+
     @abstractmethod
-    async def analyse(self, check: dict): ...
+    async def analyse(self, check: dict, debug_insert: bool = False): ...

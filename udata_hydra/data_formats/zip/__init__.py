@@ -13,6 +13,7 @@ from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.geojson import Geojson
 from udata_hydra.data_formats.parquet import Parquet
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import IOException, handle_parse_exception, storage_path
 
 log = logging.getLogger("udata-hydra")
@@ -59,7 +60,7 @@ class Zip(DataFormat):
     """
 
     standard_mime_type = "application/zip"
-    # not "application/octet-stream", which already belongs to Csvgz
+    # not "application/octet-stream", which already belongs to Gz
     valid_mime_types = {standard_mime_type, "application/x-zip-compressed"}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["zip"])
     further_analysis = True
@@ -174,23 +175,28 @@ class Zip(DataFormat):
             dataset_id=self.dataset_id,
         )
 
-    async def analyse(self, check: dict) -> None:
+    async def analyse(self, check: dict, debug_insert: bool = False) -> None:
         """Extract the archive and run the analysis of the format it holds"""
+        from udata_hydra.analysis.resource import _analysis_job_and_state
+
         resource_id: str = str(check["resource_id"])
-        resource: Record | None = await Resource.update(resource_id, {"status": "EXTRACTING_ZIP"})
+        await ResourceJobStatus.set(resource_id, "zip", "EXTRACTING_ZIP")
 
         file: DataFormat | None = None
         try:
             file = self.extract(check)
         except IOException as e:
             check = await handle_parse_exception(e, None, check)  # type: ignore[assignment]
+            resource: Record | None = await Resource.get(resource_id)
             await helpers.notify_udata(resource, check)
         finally:
             self.path.unlink(missing_ok=True)
 
         if file is None:
-            await Resource.update(resource_id, {"status": None})
+            await ResourceJobStatus.clear(resource_id, "zip")
             return
 
         log.debug(f"Extracted {file.file_name} from archive, analysing it as {type(file).__name__}")
-        await file.analyse(check=check)
+        job, state = _analysis_job_and_state(type(file))
+        await ResourceJobStatus.update(resource_id, "zip", job, state)
+        await file.analyse(check=check, debug_insert=debug_insert)

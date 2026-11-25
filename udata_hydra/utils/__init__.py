@@ -1,5 +1,5 @@
 from .auth import token_auth_middleware
-from .errors import IOException, ParseException, handle_parse_exception
+from .errors import FileTooLargeException, IOException, ParseException, handle_parse_exception
 from .file import (
     compute_checksum_from_file,
     download_file,
@@ -14,6 +14,7 @@ from .timer import Timer
 
 __all__ = [
     "token_auth_middleware",
+    "FileTooLargeException",
     "IOException",
     "ParseException",
     "handle_parse_exception",

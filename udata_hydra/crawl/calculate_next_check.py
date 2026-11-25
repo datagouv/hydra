@@ -1,16 +1,18 @@
 from datetime import datetime, timedelta, timezone
 
+from asyncpg import Record
+
 from udata_hydra import config
 
 
 def calculate_next_check_date(
-    has_check_changed: bool, last_check: dict | None, last_modified_at: datetime | None
+    has_check_changed: bool, last_check: Record | dict | None, last_modified_at: datetime | None
 ) -> datetime:
     """Calculate the datetime of the next check, depending on the last check data.
 
     Args:
         has_check_changed: Whether the check has changed since the last check.
-        last_check: The last check data as a dict, or None if there is no last check.
+        last_check: The last check data, or None if there is no last check.
         last_modified_at: The last modification date of the ressource as analysed by the earliest change detection methods, or None if it could not be determined.
 
     Returns:

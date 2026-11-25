@@ -97,7 +97,9 @@ async def test_get_health(client) -> None:
     assert resp.status == 200
     data = await resp.json()
 
-    datetime.fromisoformat(data.pop("uptime_since"))
+    uptime_since = data.pop("uptime_since")
+    datetime.fromisoformat(uptime_since)
+    assert uptime_since.endswith("Z")
     assert data == {
         "version": config.APP_VERSION,
         "python_version": platform.python_version(),

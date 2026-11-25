@@ -12,10 +12,10 @@ from udata_hydra import config, context
 from udata_hydra.analysis import helpers
 from udata_hydra.analysis.tables_index import insert_tables_index_entry
 from udata_hydra.conversion.schema import compute_create_table_query
-from udata_hydra.data_formats import Parquet
+from udata_hydra.data_formats.parquet import Parquet
 from udata_hydra.db import compute_insert_query, db_col_name
 from udata_hydra.db.check import Check
-from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import ParseException
 
 if TYPE_CHECKING:
@@ -77,8 +77,7 @@ async def parquet_to_db(
         )
 
     if file.resource_id:
-        # Update resource status to INSERTING_IN_DB
-        await Resource.update(file.resource_id, {"status": "INSERTING_IN_DB"})
+        await ResourceJobStatus.set(file.resource_id, "parquet", "INSERTING_IN_DB")
 
     # build a `column_name: type` mapping and explicitely rename reserved column names
     columns = {
@@ -123,8 +122,6 @@ async def parquet_to_db(
         pqf = pq.ParquetFile(file.path)
         for r in bar.iter(_iter_parquet_rows(pqf)):
             data = {k: v for k, v in zip(pqf.schema.names, r)}
-            print(data)
-            # NB: possible sql injection here, but should not be used in prod
             q = compute_insert_query(table_name=table_name, data=data, returning="__id")
             await db.execute(q, *data.values())
 

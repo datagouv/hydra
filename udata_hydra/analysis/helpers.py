@@ -1,11 +1,14 @@
 import json
-import os
+from pathlib import Path
 from typing import IO
 
 from asyncpg import Record
+from csv_detective import routine as csv_detective_routine
+from csv_detective import validate_then_detect
 
 from udata_hydra import config
 from udata_hydra.data_formats.data_format import DataFormat
+from udata_hydra.data_formats.gz import Gz
 from udata_hydra.utils import (
     IOException,
     UdataPayload,
@@ -14,6 +17,7 @@ from udata_hydra.utils import (
     send,
     storage_path,
 )
+from udata_hydra.utils.http import format_utc_datetime
 
 
 def get_python_type(column: dict) -> str:
@@ -22,6 +26,25 @@ def get_python_type(column: dict) -> str:
         "datetime_aware"
         if column["format"] in {"datetime_aware", "datetime_rfc822"}
         else column["python_type"]
+    )
+
+
+def run_csv_detective(file: DataFormat, previous_inspection: dict | None) -> dict:
+    """Analyse the whole file with csv-detective, profile included. A previous inspection of the
+    resource is validated against the file first, which is cheaper than detecting it again."""
+    if previous_inspection:
+        return validate_then_detect(  # ty: ignore[invalid-return-type]
+            file_path=file.path.as_posix(),
+            previous_analysis=previous_inspection,
+            output_profile=True,
+            num_rows=-1,
+            save_results=False,
+        )
+    return csv_detective_routine(  # ty: ignore[invalid-return-type]
+        file_path=file.path.as_posix(),
+        output_profile=True,
+        num_rows=-1,
+        save_results=False,
     )
 
 
@@ -62,11 +85,14 @@ async def download_from_check(check: dict, data_format: type[DataFormat]) -> Dat
         filename=None,
         data_format=data_format,
     )
-    return data_format(
-        file_name=os.path.basename(tmp_file.name),
+    file = data_format(
+        file_name=Path(tmp_file.name).name,
         resource_id=check.get("resource_id"),
         dataset_id=check.get("dataset_id"),
     )
+    if isinstance(file, Gz):
+        file.unwrap(max_size_allowed=Gz.max_decompressed_filesize_allowed)
+    return file
 
 
 async def notify_udata(resource: Record | None, check: Record | dict | None) -> None:
@@ -78,10 +104,10 @@ async def notify_udata(resource: Record | None, check: Record | dict | None) -> 
         "dataset_id": resource["dataset_id"],
         "document": {
             "analysis:parsing:error": check.get("parsing_error"),
-            "analysis:parsing:started_at": check["parsing_started_at"].isoformat()
+            "analysis:parsing:started_at": format_utc_datetime(check["parsing_started_at"])
             if check.get("parsing_started_at")
             else None,
-            "analysis:parsing:finished_at": check["parsing_finished_at"].isoformat()
+            "analysis:parsing:finished_at": format_utc_datetime(check["parsing_finished_at"])
             if check.get("parsing_finished_at")
             else None,
         },

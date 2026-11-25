@@ -4,6 +4,7 @@ import logging
 import mimetypes
 import re
 import tempfile
+import zlib
 from pathlib import Path
 from typing import IO
 
@@ -11,7 +12,7 @@ import aiohttp
 import magic
 
 from udata_hydra import config
-from udata_hydra.utils import IOException
+from udata_hydra.utils import FileTooLargeException, IOException
 
 log = logging.getLogger("udata-hydra")
 
@@ -33,18 +34,33 @@ def compute_checksum_from_file(filename: str) -> str:
     return sha1sum.hexdigest()
 
 
-def extract_gzip(file_path: str, url: str | None = None) -> IO[bytes]:
+def extract_gzip(
+    file_path: str, url: str | None = None, max_size_allowed: int | None = None
+) -> IO[bytes]:
+    """
+    Gunzip in chunks to a temporary file.
+    Raises FileTooLargeException if the payload exceeds max_size_allowed, IOException on other errors.
+    """
     temp_file = None
     try:
         with gzip.open(file_path, "rb") as gz_file:
             with tempfile.NamedTemporaryFile(
                 dir=storage_path(""), mode="wb", delete=False
             ) as temp_file:
-                temp_file.write(gz_file.read())
-    except (EOFError, gzip.BadGzipFile) as e:
+                size = 0
+                while chunk := gz_file.read(2**20):
+                    size += len(chunk)
+                    if max_size_allowed is not None and size > max_size_allowed:
+                        raise FileTooLargeException("Decompressed file too large", url=url)
+                    temp_file.write(chunk)
+    except (EOFError, OSError, zlib.error, FileTooLargeException) as e:
         if temp_file is not None:
             Path(temp_file.name).unlink(missing_ok=True)
-        raise IOException("Corrupted or truncated gzip file", url=url) from e
+        if isinstance(e, FileTooLargeException):
+            raise
+        if isinstance(e, (EOFError, gzip.BadGzipFile, zlib.error)):
+            raise IOException("Corrupted or truncated gzip file", url=url) from e
+        raise IOException("Could not extract gzip file", url=url) from e
     return temp_file
 
 
@@ -52,18 +68,19 @@ async def download_resource(
     url: str,
     headers: dict | None = None,
     max_size_allowed: int | None = None,
+    timeout: float | None = None,
 ) -> tuple[IO[bytes], str]:
     """
-    Attempts downloading a resource from a given url.
+    Attempts downloading a resource from a given url, within timeout seconds if given.
     Returns a tuple of (downloaded_file_object, detected_extension).
-    Raises custom IOException if the resource is too large or if the URL is unreachable.
+    Raises FileTooLargeException if the resource is too large, IOException if the URL is unreachable.
     """
     if (
         headers
         and max_size_allowed is not None
         and float(headers.get("content-length", -1)) > max_size_allowed
     ):
-        raise IOException("File too large to download", url=url)
+        raise FileTooLargeException("File too large to download", url=url)
 
     tmp_file = tempfile.NamedTemporaryFile(dir=storage_path(""), delete=False)
 
@@ -74,6 +91,7 @@ async def download_resource(
         async with aiohttp.ClientSession(
             headers={"user-agent": config.USER_AGENT_FULL},
             raise_for_status=True,
+            timeout=aiohttp.ClientTimeout(total=timeout) if timeout else aiohttp.ClientTimeout(),
         ) as session:
             async with session.get(url, allow_redirects=True) as response:
                 async for chunk in response.content.iter_chunked(chunk_size):
@@ -90,30 +108,13 @@ async def download_resource(
         if too_large or download_error:
             Path(tmp_file.name).unlink(missing_ok=True)
             if too_large:
-                raise IOException("File too large to download", url=url)
-            raise IOException("Error downloading CSV", url=url) from download_error
+                raise FileTooLargeException("File too large to download", url=url)
+            raise IOException("Error downloading resource", url=url) from download_error
 
-    detected_extension = ""
-
-    if magic.from_file(tmp_file.name, mime=True) in [
-        "application/x-gzip",
-        "application/gzip",
-    ]:
-        # It's compressed - extract and determine extension from URL
-        gzip_tmp_file_name = tmp_file.name
-        try:
-            tmp_file = extract_gzip(gzip_tmp_file_name, url=url)
-        finally:
-            Path(gzip_tmp_file_name).unlink(missing_ok=True)
-
-        # Extract any extension before .gz using regex
-        match = re.search(r"\.([^.]+)\.gz$", url)
-        if match:
-            detected_extension = f".{match.group(1)}"
-        else:
-            detected_extension = ""
+    match = re.search(r"\.([^.]+)\.gz$", url)
+    if match:
+        detected_extension = f".{match.group(1)}"
     else:
-        # Not compressed - use magic to detect type
         mime_type = magic.from_file(tmp_file.name, mime=True)
         detected_extension = mimetypes.guess_extension(mime_type) or ""
 

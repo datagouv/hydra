@@ -1,5 +1,81 @@
 # Changelog
 
+## 2.14.4 (2026-11-23)
+
+- feat: add EXCEPTION_TIMEOUT_MULTIPLIER to the config instead of hardcoded 5 ([#511](https://github.com/datagouv/hydra/pull/511))
+- fix: export the parquet rows in __id order, which readers number them by ([#513](https://github.com/datagouv/hydra/pull/513))
+- refactor: dedicated SQL table for resource job statuses ([#474](https://github.com/datagouv/hydra/pull/474))
+
+
+## 2.14.3 (2026-11-18)
+
+- chore(deps): upgrade dependencies ([#508](https://github.com/datagouv/hydra/pull/508))
+- feat: declare table indexes in resources_indexes, independently of resources exceptions ([#502](https://github.com/datagouv/hydra/pull/502))
+- feat(ogc): trigger analysis independently of change detection ([#499](https://github.com/datagouv/hydra/pull/499))
+- fix: remove non-existing type ([#509](https://github.com/datagouv/hydra/pull/509))
+
+
+## 2.14.2 (2026-11-12)
+
+- chore: upgrade aioresponse ([#505](https://github.com/datagouv/hydra/pull/505))
+- chore: use aiohttp 3.14 and remove aioresponses ([#507](https://github.com/datagouv/hydra/pull/507))
+- clean: remove resource cors stats endpoint ([#501](https://github.com/datagouv/hydra/pull/501))
+- feat: expose max allowed size for each format ([#494](https://github.com/datagouv/hydra/pull/494))
+- feat: normalize UTC date format ([#495](https://github.com/datagouv/hydra/pull/495))
+- fix: apply exception timeout to analyse_resource jobs ([#504](https://github.com/datagouv/hydra/pull/504))
+- fix: notify udata after an export even when the check is no longer the last one ([#496](https://github.com/datagouv/hydra/pull/496))
+- refactor: change var name ([#500](https://github.com/datagouv/hydra/pull/500))
+
+
+## 2.14.1 (2026-10-27)
+
+- fix: stream unzip ([#497](https://github.com/datagouv/hydra/pull/497))
+
+
+## 2.14.0 (2026-10-21)
+
+- chore: escape quote identifiers in SQL queries and expose only safe errors in analysis:parsing:error ([#485](https://github.com/datagouv/hydra/pull/485))
+- chore(deps): upgrade dependencies to latest versions ([#490](https://github.com/datagouv/hydra/pull/490))
+- ci: publish to PyPI without triggering a deploy ([#486](https://github.com/datagouv/hydra/pull/486))
+- feat: embed csv-detective inspection and ingestion date in exported parquet metadata ([#489](https://github.com/datagouv/hydra/pull/489))
+- feat: remove MIN_LINES_FOR_PARQUET to export parquet for every resource ([#487](https://github.com/datagouv/hydra/pull/487))
+- feat: use csv-detective 0.13.0 ([#491](https://github.com/datagouv/hydra/pull/491))
+- fix: dont send error to sentry when file too big ([#483](https://github.com/datagouv/hydra/pull/483))
+- fix: fix error message ([#480](https://github.com/datagouv/hydra/pull/480))
+- fix: parse resources whose URL has no table yet and compare checks with their own predecessor ([#488](https://github.com/datagouv/hydra/pull/488))
+- fix(api): index validation errors on resource exception update ([#473](https://github.com/datagouv/hydra/pull/473))
+- refactor: replace Marshmallow with Pydantic ([#465](https://github.com/datagouv/hydra/pull/465))
+- test: add crawl helpers unit tests ([#462](https://github.com/datagouv/hydra/pull/462))
+- tests: remove useless test ([#493](https://github.com/datagouv/hydra/pull/493))
+
+
+## 2.13.5 (2026-09-07)
+
+- fix: fix gz octet stream detection ([#479](https://github.com/datagouv/hydra/pull/479))
+
+
+## 2.13.4 (2026-09-04)
+
+- fix: circular import ([#478](https://github.com/datagouv/hydra/pull/478))
+
+
+## 2.13.3 (2026-09-04)
+
+- feat: upgrade csv-detective 0.12.1 ([#477](https://github.com/datagouv/hydra/pull/477))
+
+
+## 2.13.2 (2026-09-04)
+
+- chore: add logs to trace check-notify gap on resource update ([#466](https://github.com/datagouv/hydra/pull/466))
+- chore: better corrupted gzip resilience ([#467](https://github.com/datagouv/hydra/pull/467))
+- chore: update .gitignore
+- docs: add comment about [#466](https://github.com/datagouv/hydra/pull/466)
+- feat: perf benchmarks ([#464](https://github.com/datagouv/hydra/pull/464))
+- fix: add dummy migration of resources_exceptions ([#457](https://github.com/datagouv/hydra/pull/457))
+- fix(crawl): fallback to GET when HEAD times out ([#461](https://github.com/datagouv/hydra/pull/461))
+- fix(gz): remove Csvgz dataformat, create Gz dataformat which routes to right format after decompression ([#476](https://github.com/datagouv/hydra/pull/476))
+
+
 ## 2.13.1 (2026-07-08)
 
 - chore(CI): use recommended UV_PUBLISH_TOKEN ([#451](https://github.com/datagouv/hydra/pull/451))

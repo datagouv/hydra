@@ -28,6 +28,7 @@ async def _geojson_from_columns(
     inspection_check: Callable[[dict], None] | None = None,
     sep: str = ";",
     fake_check,
+    insert_fake_resource,
 ) -> dict:
     """Build CSV from columns, convert to DB + GeoJSON, return (geojson, db_to_geojson result)."""
     output_path = storage_path(f"{RESOURCE_ID}.geojson")
@@ -36,6 +37,7 @@ async def _geojson_from_columns(
     except FileNotFoundError:
         pass
 
+    await insert_fake_resource()
     check = await fake_check()
     with NamedTemporaryFile(delete=False) as fp:
         fp.write(_build_csv_content(columns, sep).encode("utf-8"))
@@ -76,7 +78,7 @@ def _assert_geojson_column_format(inspection: dict) -> None:
     ),
 )
 @pytest.mark.asyncio
-async def test_db_to_geojson(db, geo_columns, clean_db, fake_check, mocker):
+async def test_db_to_geojson(db, geo_columns, clean_db, fake_check, insert_fake_resource, mocker):
     mocker.patch("udata_hydra.config.DB_TO_GEOJSON", True)
     expected_lats = [10.0 * k * (-1) ** k for k in range(1, 6)]
     expected_lons = [20.0 * k * (-1) ** k for k in range(1, 6)]
@@ -89,6 +91,7 @@ async def test_db_to_geojson(db, geo_columns, clean_db, fake_check, mocker):
         columns=other_columns | geo_columns,
         table_name="test_geojson_from_db",
         fake_check=fake_check,
+        insert_fake_resource=insert_fake_resource,
     )
 
     assert geojson["type"] == "FeatureCollection"
@@ -106,7 +109,9 @@ async def test_db_to_geojson(db, geo_columns, clean_db, fake_check, mocker):
 
 
 @pytest.mark.asyncio
-async def test_db_to_geojson_with_reserved_column(db, clean_db, fake_check, mocker):
+async def test_db_to_geojson_with_reserved_column(
+    db, clean_db, fake_check, insert_fake_resource, mocker
+):
     mocker.patch("udata_hydra.config.DB_TO_GEOJSON", True)
     """A CSV with a reserved PG column name (xmin) should still produce valid GeoJSON from DB."""
     geojson = await _geojson_from_columns(
@@ -118,6 +123,7 @@ async def test_db_to_geojson_with_reserved_column(db, clean_db, fake_check, mock
         },
         table_name="test_geojson_reserved_col",
         fake_check=fake_check,
+        insert_fake_resource=insert_fake_resource,
     )
 
     assert len(geojson["features"]) == 5
@@ -127,7 +133,9 @@ async def test_db_to_geojson_with_reserved_column(db, clean_db, fake_check, mock
 
 
 @pytest.mark.asyncio
-async def test_db_to_geojson_with_quote_in_column_name(db, clean_db, fake_check, mocker):
+async def test_db_to_geojson_with_quote_in_column_name(
+    db, clean_db, fake_check, insert_fake_resource, mocker
+):
     mocker.patch("udata_hydra.config.DB_TO_GEOJSON", True)
     """A CSV with a single quote in a column name should not break the SQL query."""
     geojson = await _geojson_from_columns(
@@ -145,6 +153,7 @@ async def test_db_to_geojson_with_quote_in_column_name(db, clean_db, fake_check,
         },
         table_name="test_geojson_quote_col",
         fake_check=fake_check,
+        insert_fake_resource=insert_fake_resource,
     )
 
     assert len(geojson["features"]) == 5
@@ -153,7 +162,7 @@ async def test_db_to_geojson_with_quote_in_column_name(db, clean_db, fake_check,
 
 
 @pytest.mark.asyncio
-async def test_db_to_geojson_lonlat(db, clean_db, fake_check, mocker):
+async def test_db_to_geojson_lonlat(db, clean_db, fake_check, insert_fake_resource, mocker):
     mocker.patch("udata_hydra.config.DB_TO_GEOJSON", True)
     """lonlat format ("[lon, lat]") should produce correct GeoJSON coordinates [lon, lat]."""
     lons = [20.0 * k * (-1) ** k for k in range(1, 6)]
@@ -167,6 +176,7 @@ async def test_db_to_geojson_lonlat(db, clean_db, fake_check, mocker):
         table_name="test_geojson_lonlat",
         inspection_check=_assert_lonlat_format,
         fake_check=fake_check,
+        insert_fake_resource=insert_fake_resource,
     )
 
     assert len(geojson["features"]) == 5
@@ -179,7 +189,7 @@ async def test_db_to_geojson_lonlat(db, clean_db, fake_check, mocker):
 
 
 @pytest.mark.asyncio
-async def test_db_to_geojson_geojson_column(db, clean_db, fake_check, mocker):
+async def test_db_to_geojson_geojson_column(db, clean_db, fake_check, insert_fake_resource, mocker):
     mocker.patch("udata_hydra.config.DB_TO_GEOJSON", True)
     """A column containing GeoJSON strings should produce valid geometry from DB."""
     geometries = [
@@ -195,6 +205,7 @@ async def test_db_to_geojson_geojson_column(db, clean_db, fake_check, mocker):
         table_name="test_geojson_geojson_col",
         inspection_check=_assert_geojson_column_format,
         fake_check=fake_check,
+        insert_fake_resource=insert_fake_resource,
     )
 
     assert len(geojson["features"]) == 5
@@ -205,7 +216,7 @@ async def test_db_to_geojson_geojson_column(db, clean_db, fake_check, mocker):
 
 
 @pytest.mark.asyncio
-async def test_db_to_geojson_many_columns(db, clean_db, fake_check, mocker):
+async def test_db_to_geojson_many_columns(db, clean_db, fake_check, insert_fake_resource, mocker):
     mocker.patch("udata_hydra.config.DB_TO_GEOJSON", True)
     """More than 50 property columns should trigger json_build_object chunking."""
     columns = {f"col_{i:03d}": range(1, 6) for i in range(55)}
@@ -216,6 +227,7 @@ async def test_db_to_geojson_many_columns(db, clean_db, fake_check, mocker):
         columns=columns,
         table_name="test_geojson_many_cols",
         fake_check=fake_check,
+        insert_fake_resource=insert_fake_resource,
     )
 
     assert len(geojson["features"]) == 5

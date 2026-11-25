@@ -16,6 +16,8 @@ from udata_hydra.crawl.helpers import (
 )
 from udata_hydra.crawl.preprocess_check_data import preprocess_check_data
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_exception import ResourceException
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils import queue
 from udata_hydra.utils.http import CORS_HEADER_FIELDS, CORS_HEADER_PREFIX
 
@@ -93,9 +95,8 @@ async def check_resource(
     if should_backoff:
         log.info(f"backoff {domain} ({reason})")
         # skip this URL, it will come back in a next batch
-        await Resource.update(
-            str(resource["resource_id"]), data={"status": "BACKOFF", "priority": False}
-        )
+        await ResourceJobStatus.set(str(resource["resource_id"]), "crawler", "BACKOFF")
+        await Resource.update(str(resource["resource_id"]), data={"priority": False})
         return RESOURCE_RESPONSE_STATUSES["BACKOFF"]
 
     try:
@@ -139,7 +140,7 @@ async def check_resource(
                         pass
 
             # Preprocess the check data. If it has changed, it will be sent to udata
-            new_check, last_check = await preprocess_check_data(
+            new_check = await preprocess_check_data(
                 dataset_id=resource["dataset_id"],
                 check_data={
                     "resource_id": str(resource["resource_id"]),
@@ -153,24 +154,35 @@ async def check_resource(
                 },
             )
 
-            # Update resource status to TO_ANALYSE_RESOURCE
-            await Resource.update(
-                str(resource["resource_id"]), data={"status": "TO_ANALYSE_RESOURCE"}
+            await ResourceJobStatus.set(
+                str(resource["resource_id"]), "crawler", "TO_ANALYSE_RESOURCE"
             )
 
             # Enqueue the resource for analysis
+            exception: Record | None = await ResourceException.get_by_resource_id(
+                str(resource["resource_id"])
+            )
             queue.enqueue(
                 analyse_resource,
                 check=new_check,
-                last_check=last_check,
                 force_analysis=force_analysis,
                 worker_priority=worker_priority,
                 _priority=worker_priority,
+                _exception=bool(exception),
             )
 
             return RESOURCE_RESPONSE_STATUSES["OK"]
 
     except asyncio.exceptions.TimeoutError:
+        if method == "head":
+            return await check_resource(
+                url,
+                resource,
+                session,
+                force_analysis=force_analysis,
+                method="get",
+                worker_priority=worker_priority,
+            )
         # Process the check data. If it has changed, it will be sent to udata
         await preprocess_check_data(
             dataset_id=resource["dataset_id"],
@@ -182,8 +194,7 @@ async def check_resource(
             },
         )
 
-        # Reset resource status so that it's not forbidden to be checked again
-        await Resource.update(str(resource["resource_id"]), data={"status": None})
+        await ResourceJobStatus.clear(str(resource["resource_id"]), "crawler")
 
         return RESOURCE_RESPONSE_STATUSES["TIMEOUT"]
 
@@ -228,8 +239,7 @@ async def check_resource(
 
         log.warning(f"Crawling error for url {url}", exc_info=e)
 
-        # Reset resource status so that it's not forbidden to be checked again
-        await Resource.update(str(resource["resource_id"]), data={"status": None})
+        await ResourceJobStatus.clear(str(resource["resource_id"]), "crawler")
 
         return RESOURCE_RESPONSE_STATUSES["ERROR"]
 

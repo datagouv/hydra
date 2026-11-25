@@ -1,12 +1,16 @@
 import json
+import logging
 import uuid
 
 from aiohttp import web
 from asyncpg import Record
 
 from udata_hydra.db.resource import Resource
+from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.routes.status import get_resources_status_counts
-from udata_hydra.schemas import ResourceDocumentSchema, ResourceSchema
+from udata_hydra.schemas import CreateResourceRequest, ResourceSchema
+
+log = logging.getLogger("udata-hydra")
 
 
 async def get_resource(request: web.Request) -> web.Response:
@@ -24,7 +28,9 @@ async def get_resource(request: web.Request) -> web.Response:
     if not resource:
         raise web.HTTPNotFound()
 
-    return web.json_response(ResourceSchema().dump(dict(resource)))
+    payload = dict(resource)
+    payload["status"] = await ResourceJobStatus.for_resource(resource_id)
+    return web.json_response(ResourceSchema.model_validate(payload).model_dump(mode="json"))
 
 
 async def create_resource(request: web.Request) -> web.Response:
@@ -33,30 +39,26 @@ async def create_resource(request: web.Request) -> web.Response:
     Respond with a 200 status code and a JSON body with a message key set to "created"
     If error, respond with a 400 status code
     """
+
     try:
-        payload = await request.json()
-        valid_payload: dict = ResourceSchema().load(payload)
-    except Exception as err:
-        raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
+        request_data: dict = await request.json()
+        payload: CreateResourceRequest = CreateResourceRequest.model_validate(request_data)
+    except Exception as e:
+        raise web.HTTPBadRequest(text=json.dumps({"error": str(e)}))
 
-    document: dict | None = valid_payload["document"]
-    if not document:
-        raise web.HTTPBadRequest(text="Missing document body")
-
-    dataset_id = valid_payload["dataset_id"]
-    resource_id = valid_payload["resource_id"]
+    document = payload.document
 
     await Resource.insert(
-        dataset_id=dataset_id,
-        resource_id=resource_id,
-        url=document["url"],
-        type=document["type"],
-        format=document["format"],
+        dataset_id=payload.dataset_id,
+        resource_id=str(payload.resource_id),
+        url=document.url,
+        type=document.type,
+        format=document.format or None,
         priority=True,
-        title=document["title"],
+        title=document.title,
     )
 
-    return web.json_response(ResourceDocumentSchema().dump(dict(document)), status=201)
+    return web.json_response(document.model_dump(mode="json", by_alias=True), status=201)
 
 
 async def update_resource(request: web.Request) -> web.Response:
@@ -67,28 +69,41 @@ async def update_resource(request: web.Request) -> web.Response:
     """
 
     try:
-        payload = await request.json()
-        valid_payload: dict = ResourceSchema().load(payload)
+        request_data: dict = await request.json()
+        payload: CreateResourceRequest = CreateResourceRequest.model_validate(request_data)
     except Exception as err:
         raise web.HTTPBadRequest(text=json.dumps({"error": str(err)}))
 
-    document: dict | None = valid_payload["document"]
-    if not document:
-        raise web.HTTPBadRequest(text="Missing document body")
+    document = payload.document
 
-    dataset_id: str = valid_payload["dataset_id"]
-    resource_id: str = valid_payload["resource_id"]
+    # Temporary debug for https://github.com/datagouv/data.gouv.fr/issues/2048
+    # (hydra#466). Remove once the check-notify gap is understood.
+    resource_id: str = str(payload.resource_id)
+    new_url: str = document.url
+
+    existing: Record | None = await Resource.get(resource_id)
+    if existing:
+        old_url: str = existing["url"]
+        url_changed: bool = old_url != new_url
+        log.info(
+            f"[resource_id={resource_id}] update_resource webhook: "
+            f"url_changed={url_changed} old={old_url} new={new_url} priority=True"
+        )
+    else:
+        log.info(
+            f"[resource_id={resource_id}] update_resource webhook: created url={new_url} priority=True"
+        )
 
     await Resource.update_or_insert(
-        dataset_id=dataset_id,
+        dataset_id=payload.dataset_id,
         resource_id=resource_id,
-        url=document["url"],
-        type=document["type"],
-        format=document["format"],
-        title=document["title"],
+        url=document.url,
+        type=document.type,
+        format=document.format or None,
+        title=document.title,
     )
 
-    return web.json_response(ResourceDocumentSchema().dump(document), status=200)
+    return web.json_response(document.model_dump(mode="json", by_alias=True), status=200)
 
 
 async def delete_resource(request: web.Request) -> web.Response:
@@ -120,75 +135,8 @@ async def get_resources_stats(request: web.Request) -> web.Response:
         {
             "total_count": stats_resources["total_resources"],
             "deleted_count": stats_resources["deleted_resources"],
-            "statuses_count": await get_resources_status_counts(request),
-        }
-    )
-
-
-async def get_resources_stats_cors(request: web.Request) -> web.Response:
-    """CORS-related statistics for external resources (URLs not on data.gouv.fr)."""
-    q = """
-        -- External resources only; count how many have ≥1 check with CORS data and coverage %.
-        SELECT
-            COUNT(DISTINCT resource_id) FILTER (WHERE has_cors_check) AS resources_with_cors_data,
-            COUNT(DISTINCT resource_id) FILTER (WHERE NOT has_cors_check) AS resources_without_cors_data,
-            ROUND(
-                COUNT(DISTINCT resource_id) FILTER (WHERE has_cors_check) * 100.0 / NULLIF(COUNT(DISTINCT resource_id), 0),
-                2
-            ) AS coverage_percentage
-        FROM (
-            SELECT
-                c.resource_id,
-                BOOL_OR(ch.cors_headers IS NOT NULL) AS has_cors_check
-            FROM catalog c
-            LEFT JOIN checks ch ON c.resource_id = ch.resource_id
-            WHERE c.url NOT LIKE '%data.gouv.fr%'
-            AND c.deleted = False
-            GROUP BY c.resource_id
-        ) resources_summary
-    """
-    row = await request.app["pool"].fetchrow(q)
-    q_dist = """
-        -- Among external resources with ≥1 CORS check, classify by allow-origin and aggregate counts/percentages.
-        SELECT
-            access_status,
-            COUNT(*) AS unique_resources_count,
-            ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS percentage
-        FROM (
-            SELECT
-                c.resource_id,
-                CASE
-                    WHEN BOOL_OR(ch.cors_headers->>'allow-origin' = '*') THEN 'Accessible (Wildcard *)'
-                    WHEN BOOL_OR(ch.cors_headers->>'allow-origin' ILIKE '%data.gouv.fr%') THEN 'Accessible (Specific Whitelist)'
-                    WHEN BOOL_AND(ch.cors_headers->>'allow-origin' IS NULL OR ch.cors_headers->>'allow-origin' = '') THEN 'Blocked (Missing Header)'
-                    ELSE 'Blocked (Other Domain Only)'
-                END AS access_status
-            FROM catalog c
-            INNER JOIN checks ch ON c.resource_id = ch.resource_id
-            WHERE c.url NOT LIKE '%data.gouv.fr%'
-            AND c.deleted = False
-            AND ch.cors_headers IS NOT NULL
-            GROUP BY c.resource_id
-        ) unique_resources_summary
-        GROUP BY access_status
-        ORDER BY access_status
-    """
-    rows_dist = await request.app["pool"].fetch(q_dist)
-    allow_origin_distribution = [
-        {
-            "access_status": r["access_status"],
-            "unique_resources_count": r["unique_resources_count"],
-            "percentage": float(r["percentage"]) if r["percentage"] is not None else None,
-        }
-        for r in rows_dist
-    ]
-    return web.json_response(
-        {
-            "external_resources_with_cors_data": row["resources_with_cors_data"] or 0,
-            "external_resources_without_cors_data": row["resources_without_cors_data"] or 0,
-            "external_resources_cors_coverage_percentage": float(row["coverage_percentage"])
-            if row["coverage_percentage"] is not None
-            else None,
-            "external_resources_allow_origin_distribution": allow_origin_distribution,
+            "statuses_count": await get_resources_status_counts(
+                request, stats_resources["total_resources"]
+            ),
         }
     )

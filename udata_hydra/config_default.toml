@@ -38,6 +38,10 @@ NO_BACKOFF_DOMAINS = [
 BACKOFF_NB_REQ = 180
 BACKOFF_PERIOD = 360    # in seconds
 COOL_OFF_PERIOD = 86400 # 1 day to cool off when we've messed up
+
+# Max age of a job status row / parsing before it is considered stuck, in seconds.
+# Keep it strictly above the longest possible job timeout (RQ_DEFAULT_TIMEOUT ×
+# EXCEPTION_TIMEOUT_MULTIPLIER), otherwise a still-running long job could be reaped.
 STUCK_THRESHOLD_SECONDS = 3600
 
 # check batch size, beware of open file limits
@@ -57,7 +61,7 @@ CORS_PROBE_TIMEOUT_SECONDS = 5
 
 # max download filesize in bytes (100 MB)
 MAX_FILESIZE_ALLOWED.csv = 104857600
-MAX_FILESIZE_ALLOWED.csvgz = 104857600
+MAX_FILESIZE_ALLOWED.gz = 104857600
 MAX_FILESIZE_ALLOWED.xls = 52428800    # /2
 MAX_FILESIZE_ALLOWED.xlsx = 13107200   # /8
 MAX_FILESIZE_ALLOWED.ods = 10485760    # /10
@@ -70,6 +74,9 @@ MAX_FILESIZE_ALLOWED.zip = 104857600
 
 DEFAULT_MAX_FILESIZE_ALLOWED = 52428800
 
+# max size of a gzip payload once decompressed (1 GB), against gzip bombs
+MAX_DECOMPRESSED_FILESIZE_ALLOWED = 1073741824
+
 # -- CSV analysis settings -- #
 SQL_INDEXES_TYPES_SUPPORTED = ["index"]
 
@@ -78,7 +85,10 @@ CSV_TO_DB = true
 TEMPORARY_DOWNLOAD_FOLDER = ""
 
 # -- Worker settings -- #
+# Base job timeout in seconds. Exception resources (large files) get longer job timeouts:
+# RQ_DEFAULT_TIMEOUT × EXCEPTION_TIMEOUT_MULTIPLIER.
 RQ_DEFAULT_TIMEOUT = 180
+EXCEPTION_TIMEOUT_MULTIPLIER = 5
 RQ_DEFAULT_FAILURE_TTL = 864000  # How long failed jobs are kept in redis: 10 days.
 
 # -- Webhook integration config -- #
@@ -99,7 +109,6 @@ S3_URL_PATTERN = "https://{endpoint}/{bucket}/{key}"
 
 # -- Parquet conversion settings -- #
 DB_TO_PARQUET = false
-MIN_LINES_FOR_PARQUET = 200
 
 # -- Geojson conversion settings -- #
 DB_TO_GEOJSON = false
@@ -114,3 +123,7 @@ PARQUET_TO_DB = false
 OGC_ANALYSIS_ENABLED = false
 OGC_FORMATS = ["wfs", "wms"]
 OGC_GETCAPABILITIES_TIMEOUT = 30  # in seconds
+# OGC services are deemed stable: re-run their analysis about once a month, whatever the crawl rate
+# (new resources and URL changes are analysed right away); kept slightly below the longest CHECK_DELAYS
+# (720 hours) so that resources checked monthly are re-analysed at every check
+OGC_ANALYSIS_MAX_AGE_DAYS = 28
