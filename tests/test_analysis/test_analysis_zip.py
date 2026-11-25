@@ -69,11 +69,8 @@ async def assert_analysed(db, check: dict, expected_lines: int) -> None:
     assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
 
 
-async def assert_analysis_failed(db, check: dict, caplog, error_fragment: str) -> None:
+async def assert_no_table(db, check: dict) -> None:
     res = await db.fetchrow("SELECT * FROM checks")
-    # none of these causes is safe to expose: the detail only reaches the server-side log
-    assert res["parsing_error"] == "zip_extraction:error"
-    assert error_fragment in caplog.text
     assert res["parsing_table"] is None
 
     # the resource must not stay stuck in an analysis status
@@ -84,17 +81,19 @@ async def assert_analysis_failed(db, check: dict, caplog, error_fragment: str) -
         await db.fetch(f'SELECT * FROM "{table_name}"')
 
 
+async def assert_analysis_failed(db, check: dict, caplog, error_fragment: str) -> None:
+    res = await db.fetchrow("SELECT * FROM checks")
+    # none of these causes is safe to expose: the detail only reaches the server-side log
+    assert res["parsing_error"] == "zip_extraction:error"
+    assert error_fragment in caplog.text
+    await assert_no_table(db, check)
+
+
 async def assert_not_analysed(db, check: dict) -> None:
     """Holding nothing analysable is not a failure: no error must be recorded"""
     res = await db.fetchrow("SELECT * FROM checks")
     assert res["parsing_error"] is None
-    assert res["parsing_table"] is None
-
-    assert await ResourceJobStatus.for_resource(RESOURCE_ID) == {}
-
-    table_name: str = hashlib.md5(check["url"].encode("utf-8")).hexdigest()
-    with pytest.raises(UndefinedTableError):
-        await db.fetch(f'SELECT * FROM "{table_name}"')
+    await assert_no_table(db, check)
 
 
 async def test_analyse_zip_with_single_csv(setup_catalog, rmock, db, fake_check, produce_mock):
