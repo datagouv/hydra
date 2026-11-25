@@ -33,7 +33,7 @@ DATA_EXTENSIONS: dict[str, type[DataFormat]] = {
 # it is also how a readme is named: only consider those when the archive holds no proper data file.
 FALLBACK_EXTENSIONS: dict[str, type[DataFormat]] = {".txt": Csv}
 
-EXTRACTION_CHUNK_SIZE = 1024 * 1024
+EXTRACTION_CHUNK_SIZE_BYTES = 1024 * 1024
 
 # The only two methods whose output zipfile bounds while decompressing: it passes our read size
 # down to the deflate decompressor, and a stored member is copied as is. For bzip2 and lzma it
@@ -113,9 +113,10 @@ class Zip(DataFormat):
         return candidates[0]
 
     def extract_member(
-        self, archive: zipfile.ZipFile, member: zipfile.ZipInfo, max_size: int, check: dict
+        self, archive: zipfile.ZipFile, member: zipfile.ZipInfo, max_size_bytes: int, check: dict
     ) -> Path:
-        """Write a member of the archive next to it, without ever letting it grow over :max_size:"""
+        """Write a member of the archive next to it, without ever letting it grow over
+        :max_size_bytes:"""
         if member.compress_type not in SAFE_COMPRESSION_METHODS:
             raise self.io_error(
                 f"Unsupported compression method in the zip archive: {member.compress_type}", check
@@ -125,7 +126,7 @@ class Zip(DataFormat):
         # methods zipfile stops decompressing at the announced file_size (and fails the CRC check
         # if the content does not match it), so an archive cannot deliver more bytes than it
         # declares here.
-        if member.file_size > max_size:
+        if member.file_size > max_size_bytes:
             raise self.io_error(
                 f"Extracted file too large: {member.filename[:MAX_MEMBER_NAME_LENGTH]}", check
             )
@@ -136,7 +137,7 @@ class Zip(DataFormat):
             # chose, wherever that name points to inside the shared download folder, while the
             # rest of the pipeline expects the generated one
             with destination, archive.open(member) as source:
-                shutil.copyfileobj(source, destination, EXTRACTION_CHUNK_SIZE)
+                shutil.copyfileobj(source, destination, EXTRACTION_CHUNK_SIZE_BYTES)
         except Exception as e:
             Path(destination.name).unlink(missing_ok=True)
             raise self.io_error(
