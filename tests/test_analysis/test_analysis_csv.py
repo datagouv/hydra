@@ -489,7 +489,6 @@ async def test_forced_analysis_ignores_previous_analysis(
     rmock,
     db,
     fake_check,
-    udata_url,
     produce_mock,
     force_analysis,
     expected_format,
@@ -505,7 +504,6 @@ async def test_forced_analysis_ignores_previous_analysis(
     check = await fake_check(headers={"content-type": "application/csv"})
     await insert_previous_analysis(db, check, previous_scan_kwargs)
     rmock.get(check["url"], status=200, body=create_body(**default_kwargs))
-    rmock.put(udata_url, status=200, repeat=True)
 
     await analyse_resource(check=check, force_analysis=force_analysis)
 
