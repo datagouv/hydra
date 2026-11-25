@@ -19,7 +19,13 @@ from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.db.check import Check
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_job_status import ResourceJobStatus
-from udata_hydra.utils import ParseException, download_resource, handle_parse_exception
+from udata_hydra.utils import (
+    FileTooLargeException,
+    IOException,
+    ParseException,
+    download_resource,
+    handle_parse_exception,
+)
 
 log = logging.getLogger("udata-hydra")
 
@@ -117,11 +123,18 @@ class Ogc(DataFormat):
         capabilities_url: str = CAPABILITIES_READERS[cls.__name__.lower()](
             version=version
         ).capabilities_url(url)
-        tmp_file, _ = await download_resource(
-            capabilities_url,
-            max_size_allowed=cls.max_filesize_allowed,
-            timeout=config.OGC_GETCAPABILITIES_TIMEOUT,
-        )
+        try:
+            tmp_file, _ = await download_resource(
+                capabilities_url,
+                max_size_allowed=cls.max_filesize_allowed,
+                timeout=config.OGC_GETCAPABILITIES_TIMEOUT,
+            )
+        except FileTooLargeException:
+            raise
+        except IOException as e:
+            # Raise the cause (e.g. the HTTP error) instead: an IOException would be reported
+            # to Sentry on top of the ParseException that analyse() raises
+            raise e.__cause__ or e
         path = Path(tmp_file.name)
         try:
             content = path.read_bytes()

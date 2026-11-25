@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from aiohttp import ClientResponseError
 from owslib.crs import Crs
 from owslib.util import ServiceException
 from requests.exceptions import ConnectionError as RequestsConnectionError
@@ -513,6 +514,12 @@ class TestOgcFetchCapabilities:
     async def test_too_large(self, rmock: aiohttp_mock):
         rmock.get(self.WFS_CAPABILITIES_URL, status=200, body=b"x" * (Wfs.max_filesize_allowed + 1))
         with pytest.raises(FileTooLargeException):
+            await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
+
+    async def test_http_error(self, rmock: aiohttp_mock):
+        """The download error itself is raised, not an IOException"""
+        rmock.get(self.WFS_CAPABILITIES_URL, status=500)
+        with pytest.raises(ClientResponseError):
             await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
 
     async def test_empty(self, rmock: aiohttp_mock):
