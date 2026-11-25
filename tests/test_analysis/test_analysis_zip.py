@@ -319,23 +319,27 @@ async def test_analyse_resource_extracts_zip(setup_catalog, rmock, db, fake_chec
 
 
 @pytest.mark.parametrize(
-    "resource_format,content_type,expected",
+    "resource_format,content_type,url,expected",
     (
-        ("txt.zip", "application/zip", Zip),
-        ("zip", "application/octet-stream", Zip),
-        (None, "application/zip", Zip),
-        (None, "application/x-zip-compressed", Zip),
+        ("txt.zip", "application/zip", None, Zip),
+        ("zip", "application/octet-stream", None, Zip),
+        (None, "application/zip", None, Zip),
+        (None, "application/x-zip-compressed", None, Zip),
+        # a "*.zip" catalog format wins over the hints another format would take from the check:
+        # its mime type, or its name in the URL
+        ("txt.zip", "text/plain", None, Zip),
+        ("geojson.zip", "application/zip", "https://example.com/communes.geojson.zip", Zip),
         # regression: "gzip".endswith("zip"), a gzipped csv must not be taken for an archive
-        ("csv.gz", "application/gzip", Gz),
+        ("csv.gz", "application/gzip", None, Gz),
         # regression: an xlsx IS a zip container and is often served as such, the catalog format
         # of another format must not lose to the zip mime type
-        ("xlsx", "application/zip", Xlsx),
-        ("xlsx", "application/x-zip-compressed", Xlsx),
+        ("xlsx", "application/zip", None, Xlsx),
+        ("xlsx", "application/x-zip-compressed", None, Xlsx),
     ),
 )
 async def test_detect_zip_from_check_or_catalog(
-    setup_catalog, fake_check, resource_format, content_type, expected
+    setup_catalog, fake_check, resource_format, content_type, url, expected
 ):
     await Resource.update(RESOURCE_ID, {"format": resource_format})
-    check = await fake_check(headers={"content-type": content_type})
+    check = await fake_check(headers={"content-type": content_type}, url=url)
     assert await detect_data_format_from_check_or_catalog(check) is expected
