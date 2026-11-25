@@ -14,7 +14,12 @@ from udata_hydra.data_formats.geojson import Geojson
 from udata_hydra.data_formats.parquet import Parquet
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_job_status import ResourceJobStatus
-from udata_hydra.utils import IOException, handle_parse_exception, storage_path
+from udata_hydra.utils import (
+    FileTooLargeException,
+    IOException,
+    handle_parse_exception,
+    storage_path,
+)
 
 log = logging.getLogger("udata-hydra")
 
@@ -72,8 +77,10 @@ class Zip(DataFormat):
         # Matching on ".zip" and not "zip" keeps "gzip" out.
         return format is not None and (format == "zip" or format.endswith(".zip"))
 
-    def io_error(self, message: str, check: dict) -> IOException:
-        return IOException(
+    def io_error(
+        self, message: str, check: dict, error_class: type[IOException] = IOException
+    ) -> IOException:
+        return error_class(
             message,
             step="zip_extraction",
             resource_id=self.resource_id,
@@ -108,7 +115,7 @@ class Zip(DataFormat):
             return None
         if len(candidates) > 1:
             names = ", ".join(info.filename[:MAX_MEMBER_NAME_LENGTH] for info, _ in candidates[:5])
-            log.debug(f"Several analysable files in the zip archive, skipping: {names}")
+            log.debug(f"{len(candidates)} analysable files in the zip archive, skipping: {names}")
             return None
 
         return candidates[0]
@@ -128,8 +135,12 @@ class Zip(DataFormat):
         # if the content does not match it), so an archive cannot deliver more bytes than it
         # declares here.
         if member.file_size > max_size_bytes:
+            # an expected limit, like the download and gzip ones: not worth a Sentry event
             raise self.io_error(
-                f"Extracted file too large: {member.filename[:MAX_MEMBER_NAME_LENGTH]}", check
+                f"Extracted file too large ({member.file_size} > {max_size_bytes} bytes): "
+                f"{member.filename[:MAX_MEMBER_NAME_LENGTH]}",
+                check,
+                error_class=FileTooLargeException,
             )
 
         destination = NamedTemporaryFile(dir=storage_path(""), delete=False)

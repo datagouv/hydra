@@ -15,7 +15,7 @@ from udata_hydra.data_formats.data_format import DataFormat
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.db.resource import Resource
 from udata_hydra.db.resource_job_status import ResourceJobStatus
-from udata_hydra.utils import storage_path
+from udata_hydra.utils import FileTooLargeException, storage_path
 
 pytestmark = pytest.mark.asyncio
 
@@ -235,7 +235,23 @@ async def test_analyse_zip_member_too_large(
     mocker.patch.object(Csv, "max_filesize_allowed", 10)
     check = await fake_check(headers={"content-type": "application/zip"})
     await analyse_zip(check, rmock, make_zip({"data.csv": CSV_CONTENT}))
-    await assert_analysis_failed(db, check, caplog, "too large")
+    await assert_analysis_failed(db, check, caplog, f"too large ({len(CSV_CONTENT)} > 10 bytes)")
+
+
+async def test_extract_member_too_large_is_an_expected_limit(
+    setup_catalog, rmock, db, fake_check, produce_mock, mocker
+):
+    """Like the download and gzip limits, a member over its format's limit is not reported to
+    Sentry: it would raise an event on every crawl of the resource"""
+    mocker.patch.object(Csv, "max_filesize_allowed", 10)
+    check = await fake_check(headers={"content-type": "application/zip"})
+    rmock.get(check["url"], status=200, body=make_zip({"data.csv": CSV_CONTENT}))
+    archive: DataFormat = await download_from_check(check, Zip)
+    assert isinstance(archive, Zip)
+
+    with pytest.raises(FileTooLargeException):
+        archive.extract(check)
+    archive.path.unlink(missing_ok=True)
 
 
 @pytest.mark.parametrize(
