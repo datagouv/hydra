@@ -92,15 +92,16 @@ class Zip(DataFormat):
             info for info in archive.infolist() if is_data_member(info)
         ]
 
-        candidates: list[tuple[zipfile.ZipInfo, type[DataFormat]]] = []
-        for extensions in (DATA_EXTENSIONS, FALLBACK_EXTENSIONS):
-            candidates = [
+        def matching(
+            extensions: dict[str, type[DataFormat]],
+        ) -> list[tuple[zipfile.ZipInfo, type[DataFormat]]]:
+            return [
                 (info, data_format)
                 for info in members
                 if (data_format := extensions.get(Path(info.filename).suffix.lower()))
             ]
-            if candidates:
-                break
+
+        candidates = matching(DATA_EXTENSIONS) or matching(FALLBACK_EXTENSIONS)
 
         if not candidates:
             log.debug("No analysable file in the zip archive, skipping.")
