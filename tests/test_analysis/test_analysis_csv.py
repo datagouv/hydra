@@ -1,3 +1,4 @@
+import gzip
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
@@ -484,6 +485,8 @@ async def test_csv_with_a_reserved_column_name_analysed_again(
         (True, "int"),
     ),
 )
+# a gzipped CSV is analysed by the format it wraps, which must be forced too
+@pytest.mark.parametrize("gzipped", (False, True))
 async def test_forced_analysis_ignores_previous_analysis(
     setup_catalog,
     rmock,
@@ -492,6 +495,7 @@ async def test_forced_analysis_ignores_previous_analysis(
     produce_mock,
     force_analysis,
     expected_format,
+    gzipped,
 ):
     # a previous analysis too loose for the data: integers typed as strings
     previous_scan_kwargs = default_kwargs | {
@@ -501,9 +505,17 @@ async def test_forced_analysis_ignores_previous_analysis(
         },
         "formats": {"string": ["a"], "siret": ["epci"]},
     }
-    check = await fake_check(headers={"content-type": "application/csv"})
+    body = create_body(**default_kwargs)
+    if gzipped:
+        check = await fake_check(
+            headers={"content-type": "application/gzip"},
+            url="https://example.com/data.csv.gz",
+        )
+        body = gzip.compress(body)
+    else:
+        check = await fake_check(headers={"content-type": "application/csv"})
     await insert_previous_analysis(db, check, previous_scan_kwargs)
-    rmock.get(check["url"], status=200, body=create_body(**default_kwargs))
+    rmock.get(check["url"], status=200, body=body)
 
     await analyse_resource(check=check, force_analysis=force_analysis)
 
