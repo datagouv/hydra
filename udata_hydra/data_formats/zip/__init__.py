@@ -60,7 +60,8 @@ class Zip(DataFormat):
     """
 
     standard_mime_type = "application/zip"
-    # not "application/octet-stream", which already belongs to Gz
+    # not "application/octet-stream": it is served for shapefiles, FlatGeobuf and any other binary
+    # file, which we would download only to fail opening them as an archive
     valid_mime_types = {standard_mime_type, "application/x-zip-compressed"}
     max_filesize_allowed = int(config.MAX_FILESIZE_ALLOWED["zip"])
     further_analysis = True
