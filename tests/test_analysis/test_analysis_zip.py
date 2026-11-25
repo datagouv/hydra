@@ -1,4 +1,5 @@
 import hashlib
+import struct
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -48,6 +49,17 @@ def make_zip_with_corrupted_member() -> bytes:
         # a stored payload sits right after its local header: 30 fixed bytes, name, extra field
         payload_start: int = member.header_offset + 30 + len(member.filename) + len(member.extra)
     archive[payload_start] ^= 0xFF
+    return bytes(archive)
+
+
+def make_zip_lying_about_its_size() -> bytes:
+    """The decompression bomb: a deflated member announcing 100 bytes while it holds 8 MB. Its size
+    is rewritten in both places zipfile may read it, the local header (offset 22) and the central
+    directory record (offset 24)."""
+    announced_size: int = 100
+    archive = bytearray(make_zip({"data.csv": b"a,b\n" + b"1,2\n" * 2_000_000}))
+    struct.pack_into("<I", archive, 22, announced_size)
+    struct.pack_into("<I", archive, archive.rfind(b"PK\x01\x02") + 24, announced_size)
     return bytes(archive)
 
 
@@ -206,6 +218,16 @@ async def test_analyse_zip_corrupted_member(
     await assert_analysis_failed(db, check, caplog, "Bad CRC-32")
 
 
+async def test_analyse_zip_member_lying_about_its_size(
+    setup_catalog, rmock, db, fake_check, produce_mock, caplog
+):
+    """The size check trusts the announced file_size: what makes it safe is that zipfile stops
+    decompressing there and then fails the CRC check, instead of writing what the member holds"""
+    check = await fake_check(headers={"content-type": "application/zip"})
+    await analyse_zip(check, rmock, make_zip_lying_about_its_size())
+    await assert_analysis_failed(db, check, caplog, "Bad CRC-32")
+
+
 async def test_analyse_zip_member_too_large(
     setup_catalog, rmock, db, fake_check, produce_mock, mocker, caplog
 ):
@@ -222,8 +244,9 @@ async def test_analyse_zip_member_too_large(
         (make_zip({"data.csv": CSV_CONTENT}), False),
         (make_zip({"data.csv": CSV_CONTENT}), True),
         (make_zip_with_corrupted_member(), False),
+        (make_zip_lying_about_its_size(), False),
     ),
-    ids=("analysed", "refused-before-extraction", "failed-mid-extraction"),
+    ids=("analysed", "refused-before-extraction", "failed-mid-extraction", "lying-about-size"),
 )
 async def test_analyse_zip_leaves_no_file_behind(
     setup_catalog, rmock, db, fake_check, produce_mock, mocker, body, refuse_on_size
