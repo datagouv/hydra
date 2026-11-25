@@ -1,3 +1,5 @@
+import json
+
 import nest_asyncio2 as nest_asyncio
 import pytest
 
@@ -28,6 +30,49 @@ async def test_csv_analysis_from_catalog(
         await analyse_csv_cli(check_id=str(check["id"]))
     else:
         await analyse_csv_cli(check_id=None, url=url, debug_insert=False)
+
+
+async def test_csv_analysis_ignores_the_previous_analysis(
+    setup_catalog, rmock, db, fake_check, produce_mock
+):
+    """A manual analysis is asked when the previous one looks wrong: it must not be kept"""
+    check = await fake_check(headers={"content-type": "text/csv"})
+    table_name = parsing_table_name(check["url"])
+    # a previous analysis too loose for the data, which the file still fits: integers as strings
+    previous_analysis = {
+        "encoding": "utf-8",
+        "separator": ",",
+        "header_row_idx": 0,
+        "header": ["a"],
+        "columns": {"a": {"score": 1.0, "format": "string", "python_type": "string"}},
+        "categorical": None,
+        "formats": {"string": ["a"]},
+        "columns_fields": None,
+        "columns_labels": None,
+        "profile": None,
+        "total_lines": 2,
+    }
+    await db.execute(
+        "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) "
+        "VALUES($1, $2, $3, $4, $5)",
+        table_name,
+        json.dumps(previous_analysis),
+        check["resource_id"],
+        check["dataset_id"],
+        check["url"],
+    )
+    await db.execute(f'CREATE TABLE "{table_name}"(__id serial PRIMARY KEY, a VARCHAR)')
+    await db.execute(f"INSERT INTO \"{table_name}\" (a) VALUES ('1'), ('5')")
+    rmock.get(check["url"], status=200, body="a\n1\n5\n")
+
+    await analyse_csv_cli(check_id=str(check["id"]))
+
+    res = await db.fetch(
+        "SELECT csv_detective FROM tables_index WHERE resource_id=$1 ORDER BY created_at DESC",
+        check["resource_id"],
+    )
+    assert len(res) == 2
+    assert json.loads(res[0]["csv_detective"])["columns"]["a"]["format"] == "int"
 
 
 async def test_csv_analysis_with_debug_insert(setup_catalog, rmock, db, fake_check, produce_mock):
