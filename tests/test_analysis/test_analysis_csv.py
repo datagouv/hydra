@@ -496,8 +496,10 @@ async def test_forced_analysis_ignores_previous_analysis(
 ):
     # a previous analysis too loose for the data: integers typed as strings
     previous_scan_kwargs = default_kwargs | {
-        "columns": default_kwargs["columns"]
-        | {"a": {"score": 1.0, "format": "string", "python_type": "string"}},
+        "columns": {
+            "a": {"score": 1.0, "format": "string", "python_type": "string"},
+            "epci": {"score": 1.5, "format": "siret", "python_type": "string"},
+        },
         "formats": {"string": ["a"], "siret": ["epci"]},
     }
     check = await fake_check(headers={"content-type": "application/csv"})
