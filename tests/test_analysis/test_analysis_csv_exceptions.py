@@ -1,4 +1,3 @@
-import hashlib
 import json
 import logging
 
@@ -8,6 +7,7 @@ from asyncpg import Record
 from tests.conftest import RESOURCE_EXCEPTION_ID, RESOURCE_TABLE_INDEXES
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv
+from udata_hydra.db import parsing_table_name
 from udata_hydra.db.resource_index import ResourceIndex
 from udata_hydra.db.resource_job_status import ResourceJobStatus
 from udata_hydra.utils.db import get_columns_with_indexes
@@ -33,7 +33,7 @@ async def test_exception_analysis(
     check = await fake_check(resource_id=RESOURCE_EXCEPTION_ID)
     filename, expected_count = ("20190618-annuaire-diagnostiqueurs.csv", 45522)
     url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(url)
     with open(f"tests/data/{filename}", "rb") as f:
         data = f.read()
     rmock.get(url, status=200, body=data)

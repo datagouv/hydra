@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 from asyncpg import Record
@@ -13,6 +14,12 @@ RESERVED_COLS = ("__id", "cmin", "cmax", "collation", "ctid", "tableoid", "xmin"
 def db_col_name(col: str) -> str:
     """Map a CSV column name to its actual PostgreSQL column name."""
     return f"{col}__hydra_renamed" if col.lower() in RESERVED_COLS else col
+
+
+def parsing_table_name(url: str) -> str:
+    """Name of the table a resource is parsed into, from its URL."""
+    # `_purge_csv_tables` computes the same name in SQL, with `md5(url)`
+    return hashlib.md5(url.encode("utf-8")).hexdigest()
 
 
 def quote_ident(name: str) -> str:

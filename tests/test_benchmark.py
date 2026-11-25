@@ -6,7 +6,6 @@ CircleCI ``benchmark-workflow`` (pipeline parameter ``run-benchmarks=true``).
 
 import csv
 import gzip
-import hashlib
 import json
 import os
 import shutil
@@ -20,6 +19,7 @@ import pytest
 
 from udata_hydra.analysis.helpers import download_from_check
 from udata_hydra.data_formats import Csv, Geojson
+from udata_hydra.db import parsing_table_name
 from udata_hydra.db.resource_job_status import ResourceJobStatus
 
 pytestmark = pytest.mark.asyncio
@@ -122,7 +122,7 @@ async def test_analyse_csv_big_file(setup_catalog, rmock, db, fake_check, produc
 
     check = await fake_check(headers={"content-type": "text/csv"})
     url = check["url"]
-    table_name = hashlib.md5(url.encode("utf-8")).hexdigest()
+    table_name = parsing_table_name(url)
 
     csv_path = Path("tests/data") / ANNUAIRE_CSV
     with csv_path.open("rb") as f:
