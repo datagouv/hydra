@@ -51,7 +51,9 @@ class Gz(DataFormat):
         self.path.unlink(missing_ok=True)
         self.file_name = os.path.basename(extracted.name)
 
-    async def analyse(self, check: dict, debug_insert: bool = False) -> None:
+    async def analyse(
+        self, check: dict, debug_insert: bool = False, force_analysis: bool = False
+    ) -> None:
         from udata_hydra.data_formats.detect import (
             catalog_format_for,
             detect_format_from_payload,
@@ -84,4 +86,4 @@ class Gz(DataFormat):
             resource_id=self.resource_id,
             dataset_id=self.dataset_id,
         )
-        await inner.analyse(check, debug_insert=debug_insert)
+        await inner.analyse(check, debug_insert=debug_insert, force_analysis=force_analysis)

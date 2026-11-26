@@ -19,7 +19,7 @@ class Table(DataFormat):
     def detect_from_catalog_format(cls, format: str | None):
         raise NotImplementedError
 
-    async def analyse(self, check: dict, debug_insert: bool = False):
+    async def analyse(self, check: dict, debug_insert: bool = False, force_analysis: bool = False):
         raise NotImplementedError
 
     async def to_parquet(self) -> "Parquet|None":

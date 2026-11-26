@@ -133,7 +133,9 @@ class Ogc(DataFormat):
         return content
 
     @classmethod
-    async def analyse(cls, check: dict, debug_insert: bool = False) -> OgcMetadata | None:
+    async def analyse(
+        cls, check: dict, debug_insert: bool = False, force_analysis: bool = False
+    ) -> OgcMetadata | None:
         """Analyse an OGC endpoint and extract metadata.
 
         Currently supports WFS and WMS. Connects to the service, retrieves GetCapabilities,

@@ -43,7 +43,9 @@ class Parquet(DataFormat):
         self.inspection = helpers.run_csv_detective(self, previous_inspection=None)
         return self.inspection
 
-    async def analyse(self, check: dict, debug_insert: bool = False) -> "Table|None":
+    async def analyse(
+        self, check: dict, debug_insert: bool = False, force_analysis: bool = False
+    ) -> "Table|None":
         """Insert parquet file and metadata in db"""
         if not config.PARQUET_TO_DB:
             log.debug("PARQUET_TO_DB turned off, skipping.")

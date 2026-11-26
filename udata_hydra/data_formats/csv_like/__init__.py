@@ -31,10 +31,12 @@ log = logging.getLogger("udata-hydra")
 class CsvLike(DataFormat):
     further_analysis = True
 
-    async def inspect(self) -> dict:
+    async def inspect(self, force_analysis: bool = False) -> dict:
+        # an analysis is forced when the previous one looks wrong: validating the file against it
+        # would keep it as long as the data still fits, e.g. a column of dates typed as strings
         previous_inspection: dict | None = (
             await get_previous_inspection(resource_id=self.resource_id)
-            if self.resource_id
+            if self.resource_id and not force_analysis
             else None
         )
         if previous_inspection and self.resource_id:
@@ -42,7 +44,9 @@ class CsvLike(DataFormat):
         self.inspection = helpers.run_csv_detective(self, previous_inspection)
         return self.inspection
 
-    async def analyse(self, check: dict, debug_insert: bool = False) -> None:
+    async def analyse(
+        self, check: dict, debug_insert: bool = False, force_analysis: bool = False
+    ) -> None:
         """Launch csv analysis from a check or an URL (debug), using previously downloaded file if any"""
         if not config.CSV_ANALYSIS:
             log.debug("CSV_ANALYSIS turned off, skipping.")
@@ -67,7 +71,7 @@ class CsvLike(DataFormat):
             )  # type: ignore[assignment]
             # Launch csv-detective against given file
             try:
-                await self.inspect()
+                await self.inspect(force_analysis=force_analysis)
             except Exception as e:
                 raise ParseException(
                     message=str(e),

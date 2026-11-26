@@ -80,7 +80,7 @@ async def _analyse_csv_cli(
         except Exception as e:
             log.warning(f"Failed download resource from  {url}: {e}")
             return
-        await file.analyse(check=check, debug_insert=debug_insert)
+        await file.analyse(check=check, debug_insert=debug_insert, force_analysis=True)
         log.info("CSV analysis completed")
     finally:
         if url and tmp_resource_id:

@@ -1,3 +1,4 @@
+import gzip
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
@@ -12,6 +13,7 @@ from yarl import URL
 from tests.conftest import RESOURCE_ID, RESOURCE_URL, job_states
 from udata_hydra.analysis.exports import export_geojson_pmtiles, export_parquet
 from udata_hydra.analysis.helpers import download_from_check
+from udata_hydra.analysis.resource import analyse_resource
 from udata_hydra.crawl.check_resources import check_resource
 from udata_hydra.data_formats import Csv, Geojson, Parquet, PMTiles, Table
 from udata_hydra.db import parsing_table_name
@@ -299,6 +301,33 @@ def create_analysis(scan: dict) -> dict:
     return analysis
 
 
+async def insert_previous_analysis(db, check: dict, scan: dict) -> str:
+    """Store an analysis of the resource and its table, as a previous parsing would have"""
+    analysis = create_analysis(scan)
+    table_name = parsing_table_name(check["url"])
+    await db.execute(
+        "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)",
+        table_name,
+        json.dumps(analysis),
+        check.get("resource_id"),
+        check.get("dataset_id"),
+        check.get("url"),
+    )
+    await db.execute(
+        f'CREATE TABLE "{table_name}"(__id serial PRIMARY KEY, '
+        + ", ".join(
+            f"{col} {python_type_to_sql[analysis['columns'][col]['python_type']]}"
+            for col in analysis["columns"]
+        )
+        + ")"
+    )
+    await db.execute(
+        f'INSERT INTO "{table_name}" ({", ".join(analysis["header"])}) VALUES '
+        + ", ".join(f"({','.join(row)})" for row in scan["rows"])
+    )
+    return table_name
+
+
 @pytest.mark.parametrize(
     "_params",
     (
@@ -357,7 +386,6 @@ async def test_validation(
     job_status_snapshots,
 ):
     previous_scan_kwargs, current_scan_kwargs, is_valid = _params
-    previous_analysis = create_analysis(previous_scan_kwargs)
     current_analysis = create_analysis(current_scan_kwargs)
 
     # set up check and url
@@ -373,29 +401,7 @@ async def test_validation(
         status=200,
         body=create_body(**current_scan_kwargs),
     )
-    table_name = parsing_table_name(url)
-
-    # set up previous analysis and db insertion
-    await db.execute(
-        "INSERT INTO tables_index(parsing_table, csv_detective, resource_id, dataset_id, url) VALUES($1, $2, $3, $4, $5)",
-        table_name,
-        json.dumps(previous_analysis),
-        check.get("resource_id"),
-        check.get("dataset_id"),
-        check.get("url"),
-    )
-    await db.execute(
-        f'CREATE TABLE "{table_name}"(__id serial PRIMARY KEY, '
-        + ", ".join(
-            f"{col} {python_type_to_sql[previous_analysis['columns'][col]['python_type']]}"
-            for col in previous_analysis["columns"]
-        )
-        + ")"
-    )
-    await db.execute(
-        f'INSERT INTO "{table_name}" ({", ".join(previous_analysis["header"])}) VALUES '
-        + ", ".join(f"({','.join(row)})" for row in previous_scan_kwargs["rows"])
-    )
+    table_name = await insert_previous_analysis(db, check, previous_scan_kwargs)
 
     # run analysis
     with patch(
@@ -468,6 +474,57 @@ async def test_csv_with_a_reserved_column_name_analysed_again(
     latest_inspection = json.loads(res[0]["csv_detective"])
     assert latest_inspection["header"] == ["xmin", "name"]
     assert set(latest_inspection["columns"]) == {"xmin", "name"}
+
+
+@pytest.mark.parametrize(
+    "force_analysis,expected_format",
+    (
+        # the file still fits the previous analysis, which is kept
+        (False, "string"),
+        # a forced analysis detects the file again, and types the column properly
+        (True, "int"),
+    ),
+)
+# a gzipped CSV is analysed by the format it wraps, which must be forced too
+@pytest.mark.parametrize("gzipped", (False, True))
+async def test_forced_analysis_ignores_previous_analysis(
+    setup_catalog,
+    rmock,
+    db,
+    fake_check,
+    produce_mock,
+    force_analysis,
+    expected_format,
+    gzipped,
+):
+    # a previous analysis too loose for the data: integers typed as strings
+    previous_scan_kwargs = default_kwargs | {
+        "columns": {
+            "a": {"score": 1.0, "format": "string", "python_type": "string"},
+            "epci": {"score": 1.5, "format": "siret", "python_type": "string"},
+        },
+        "formats": {"string": ["a"], "siret": ["epci"]},
+    }
+    body = create_body(**default_kwargs)
+    if gzipped:
+        check = await fake_check(
+            headers={"content-type": "application/gzip"},
+            url="https://example.com/data.csv.gz",
+        )
+        body = gzip.compress(body)
+    else:
+        check = await fake_check(headers={"content-type": "application/csv"})
+    await insert_previous_analysis(db, check, previous_scan_kwargs)
+    rmock.get(check["url"], status=200, body=body)
+
+    await analyse_resource(check=check, force_analysis=force_analysis)
+
+    res = await db.fetch(
+        "SELECT csv_detective FROM tables_index WHERE resource_id=$1 ORDER BY created_at DESC",
+        check["resource_id"],
+    )
+    assert len(res) == 2
+    assert json.loads(res[0]["csv_detective"])["columns"]["a"]["format"] == expected_format
 
 
 @pytest.mark.parametrize(
