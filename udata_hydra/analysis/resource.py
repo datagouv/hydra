@@ -18,6 +18,7 @@ from udata_hydra.data_formats import (
     Gz,
     Ogc,
     Parquet,
+    Zip,
 )
 from udata_hydra.data_formats.detect import detect_data_format_from_check_or_catalog
 from udata_hydra.db.check import Check
@@ -50,6 +51,8 @@ def _analysis_job_and_state(data_format: type[DataFormat]) -> tuple[str, str]:
         return "ogc", "TO_ANALYSE_OGC"
     if issubclass(data_format, Gz):
         return "gz", "TO_ANALYSE_GZ"
+    if issubclass(data_format, Zip):
+        return "zip", "TO_ANALYSE_ZIP"
     if issubclass(data_format, CsvLike):
         return "csv", "TO_ANALYSE_CSV"
     if issubclass(data_format, Geojson):

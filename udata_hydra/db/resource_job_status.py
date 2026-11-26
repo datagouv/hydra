@@ -41,6 +41,10 @@ JOB_STATUSES: dict[str, set[str]] = {
     "gz": {
         "TO_ANALYSE_GZ",  # gzip resource to be unwrapped before analysing the payload
     },
+    "zip": {
+        "TO_ANALYSE_ZIP",  # zip archive to be extracted before analysing what it holds
+        "EXTRACTING_ZIP",  # currently extracting the analysable file of a zip archive
+    },
 }
 
 # Resource is crawlable when it has no status row, or only crawler=BACKOFF.

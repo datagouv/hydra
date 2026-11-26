@@ -14,6 +14,7 @@ Since it's called _hydra_, it also has mythical powers embedded:
 - if the remote resource is tabular (csv or excel-like), convert it to a PostgreSQL table, ready for APIfication, and to parquet to offer another distribution of the data
 - if the remote resource is a geojson, convert it to PMTiles to offer another distribution of the data
 - if the remote resource is parquet, ingest it into a PostgreSQL table for API exposition (similarly to csv/excel resources)
+- if the remote resource is a zip archive holding a single analysable file, extract it and analyse it as its own format
 - if the remote resource is an OGC service (WFS or WMS), fetch capabilities and extract layer metadata
 - probe CORS headers on external resources during crawling
 - send crawl and analysis info to a udata instance
@@ -98,6 +99,7 @@ Workers process three RQ queues in order: **`high`**, **`default`**, **`low`**.
 | `Geojson(...).analyse` | `default`, or `high` via API/CLI | When a GeoJSON file needs parsing |
 | `Parquet(...).analyse` | `default`, or `high` via API/CLI | When a Parquet file needs metadata extraction |
 | `Wfs/Wms.analyse` | `default`, or `high` via API/CLI | When an OGC service needs analysis |
+| `Zip(...).analyse` | `default`, or `high` via API/CLI | When a zip archive needs extracting, before analysing what it holds |
 | `send` | `high` | When hydra informs udata of a resource's changes |
 | `export_parquet` | `low` | After CSV ingest, if `DB_TO_PARQUET` is enabled |
 | `export_geojson_pmtiles` | `low` | After CSV ingest, if `DB_TO_GEOJSON` is enabled and geo columns are detected |
