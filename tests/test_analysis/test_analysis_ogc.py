@@ -517,10 +517,11 @@ class TestOgcFetchCapabilities:
             await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
 
     async def test_http_error(self, rmock: aiohttp_mock):
-        """The download error itself is raised, not an IOException"""
+        """The download error itself is raised, not an IOException, nor with it as context"""
         rmock.get(self.WFS_CAPABILITIES_URL, status=500)
-        with pytest.raises(ClientResponseError):
+        with pytest.raises(ClientResponseError) as exc_info:
             await Wfs.fetch_capabilities("https://example.com/geoserver/wfs", "2.0.0")
+        assert exc_info.value.__suppress_context__
 
     async def test_empty(self, rmock: aiohttp_mock):
         """owslib would fetch the document itself on an empty xml"""

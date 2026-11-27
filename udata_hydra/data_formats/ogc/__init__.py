@@ -134,7 +134,7 @@ class Ogc(DataFormat):
         except IOException as e:
             # Raise the cause (e.g. the HTTP error) instead: an IOException would be reported
             # to Sentry on top of the ParseException that analyse() raises
-            raise e.__cause__ or e
+            raise (e.__cause__ or e) from None
         path = Path(tmp_file.name)
         try:
             content = path.read_bytes()
